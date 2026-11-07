@@ -1,4 +1,5 @@
 import { useSim, handleMessage } from '../store'
+import { REPLAY, recordFrame, replayControl } from './replay'
 
 let ws = null
 
@@ -16,7 +17,7 @@ export function connectScreen() {
   const open = () => {
     sock = ws = new WebSocket(wsUrl('/ws/screen'))
     sock.onopen = () => useSim.getState().set({ connected: true })
-    sock.onmessage = (e) => handleMessage(JSON.parse(e.data))
+    sock.onmessage = (e) => { recordFrame(e.data); handleMessage(JSON.parse(e.data)) }
     sock.onclose = () => {
       if (closed) return
       useSim.getState().set({ connected: false })
@@ -28,5 +29,6 @@ export function connectScreen() {
 }
 
 export function control(action, value) {
+  if (REPLAY) return replayControl(action, value)
   if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'control', data: { action, value } }))
 }

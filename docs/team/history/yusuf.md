@@ -3,19 +3,25 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/rescue-route` (M8) committed: rescue routes on all three views + P performance mode. Next: rehearsal fixes with the team on the demo laptop.
-- **Works on main:** M1 phone + QR (#10), M2 network visuals (#16), M3 plan editor (#18), M4 scheduler + follow cam (#20), M5 relay phone (#23), M6 AI detection cards + O/U (#24), M7 figures, glass, robot's-eye view (#26).
+- **Working on:** `p3/replay` committed: browser-side record/replay backup. Next: rehearsal fixes on the demo laptop and phones.
+- **Works on main:** M1–M8 (#10, #16, #18, #20, #23, #24, #26, #27). With Aziz's #28: real crop images in the AI cards, detector chip, rescue routes on Command and phones from delivered data.
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
   - Detector chip in the top bar from `hello.detector` (hidden until the server sends it).
   - Keys O (`do:"overload"`) and U (`do:"resume"`), plus a "Send resume command" button on a robot card in SAFE_STOP. Key list moved to the sidebar.
   - Phone robot cards: "Following P-1 · zone Z1 (last report)" from delivered `cmd_view.robots[].plan_id/zone` (PR #22).
-- **Blocked on / need from others:** Aziz: `command.routes` + phone `cmd_view.routes` + `rescue_route_reported` (Command and phone route drawing is built and waiting), `/crops/<file>` (card images), `hello.detector` (chip). Aziz: are you still doing recorder/replay? If not, I can add a browser-side `?record` / `?replay` fallback in `web/`.
+- **Blocked on / need from others:** nothing. (#28 delivered `/crops`, `hello.detector`, `command.routes`; my duplicate #30 was closed. Rayan's #29 adds V and P to DEMO.md.)
 - **Promises to others:**
   - Rayan's asks (19:50 entry): 1 bigger/brighter robots: yes, 3 AM. 2 robot's-eye view: **Yusuf keeps it** (`web/src/three/RobotEye.jsx`), built last, cut first. 3 phone tap-a-robot with `cmd_view.survivors[].crop`: yes, 3 AM. 4 liquid glass: yes, started on the detection cards, full pass by 3 AM. 5 rescue route on Command: yes, as soon as the contract is posted.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-07 22:40 · p3/replay · Browser record/replay backup, key list fix
+- **Did:** demo backup #3 without a server. Open the big screen with `?record`: a REC chip shows time and size, **S** saves the WebSocket stream as a gzipped JSON file. Open `/?replay` and drop the file in (or `/?replay=<url>`): it plays through the same store with the original timing; Space pauses, Backspace restarts, +/- change playback speed; the QR card and live pill are hidden. Tested: 34 s live recording 27.4 MB raw → 1.8 MB gzipped, round-trips through the loader (2,396 frames, starts with `hello`); a 40 s recording replays with routes, cards and toasts. The loader sniffs gzip magic bytes because the dev server sends `.gz` with `Content-Encoding: gzip`. Also added P and S to the sidebar key list (P was silently missing since M8) and dropped the static robot count so the top bar fits in record/replay.
+- **Contract changes:** none. New URL params `?record`, `?replay[=url]`; new key S.
+- **Heads-up for others:** Aziz: browser replay covers the backup demo, so recorder/replay can come off your list unless you want a server-side one. Crop images in a replay need the server running (they load from `/crops`); without it the cards show the thermal placeholder. Before the demo: record one clean run with `?record`, press S, keep the file next to the backup video.
+- **Next:** rehearsal fixes.
 
 ### 2026-11-07 21:45 · p3/rescue-route · M8 rescue routes on all views, performance mode
 - **Did:** Reality draws each robot's `rescue_route` event as a bright yellow dashed line from the entrance to the survivor with "Route to S1 · 49.6 m" and a pulsing "RL5 beacon" ring on the beacon relay; toast/feed "R1 planned a safe route to S1". Command draws only delivered `command.routes[]` and the phone map only `cmd_view.routes[]` (same style, beacon ring), both empty until the backend sends them. P toggles performance mode (no shadows, dpr 1, half the lidar rays, no headlights; remembered per browser, top-bar chip); default dpr capped at 1.5. Top bar stays one line. Tested on main (PR #25): S3 14.2 m at 0:18, S2 38.2 m, S1 49.6 m with beacon RL5 in the cage; Command shows none.
