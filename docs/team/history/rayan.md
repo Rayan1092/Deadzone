@@ -11,6 +11,26 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 
 ## Log
 
+### 2026-11-07 18:55 · rayan/demo-runbook · Detection events carry the crop and confidence
+- **Did:** `survivor_found` events now carry the thermal crop file the detector scored and its confidence. New `hotspot_rejected` event when the detector turns a hot spot down (once per robot per hot spot). Survivor records (and so the Command view after delivery) carry `crop`. 115 tests pass with the model and with `DETECTOR=sim`.
+- **Contract changes:**
+  - `survivor_found` gains `crop` (file name, e.g. `"pos_0001.png"`) and `conf` (0 to 1, model probability; 0.99 in sim fallback).
+  - New event `hotspot_rejected {robot, id, pos:[x,y], crop:"neg_0001.png", conf}` (conf below 0.6). The robot doesn't know it's a decoy, only "hot but not a person"; `id` is the hot spot id (D1 to D3).
+  - Command `survivors[]` records gain `crop`.
+- **Heads-up for others:** none beyond the asks below.
+- **Blocked:**
+  - **Aziz:**
+    1. Put detector status in `hello` (screen and phone): `"detector": "model"` or `"sim"`, from `deadzone.robot.perception.get_detector().mode`; optional `"detector_reason"` from `.reason` when in sim.
+    2. When `get_detector().mode == "sim"`, `RobotIO.thermal()` must **not** emit decoys (my earlier decoy ask, plus this guard). A missing PyTorch must never put a radiator on screen as a survivor.
+    3. Serve `ml/crops/runtime/` as static files at **`/crops/<file>`** (e.g. `/crops/pos_0001.png`) so the big screen can show what the detector saw.
+  - **Yusuf:**
+    1. Top-bar chip from `hello.detector`: `"model"` → "Detector: AI model", `"sim"` → "Detector: sim fallback" (warning colour).
+    2. Replace the survivor dot with a low-poly person lying down with a warm thermal glow; keep the pulsing ring. Reality and Command both.
+    3. On `survivor_found`, a small card on the **Reality** pane: thermal image from `/crops/<event.crop>`, "person, 100%" from `event.conf`, robot `event.robot`, survivor `event.survivor`, and "no link, holding report" when `event.linked` is false.
+    4. On `hotspot_rejected`, the same card style: image `/crops/<event.crop>`, "not a person, 0%" from `event.conf`, robot `event.robot`. Reality only, never Command.
+    5. Command side can show the crop after delivery from `command.survivors[].crop`.
+- **Next:** `docs/DEMO.md` runbook.
+
 ### 2026-11-07 18:15 · rayan/detector-hookup · Trained detector live in robot perception, decoys in the floor plan
 - **Did:** robots now run every thermal hot spot through the trained detector (`filter_hits(io.thermal())`, PR #14's module); found survivors carry the model's probability as `conf`. Sim sensor fallback when `DETECTOR=sim`, no torch or no model. Added 3 decoys to collapse_01.json. Seed 7, 3 robots, model live (decoys injected into thermal by a test harness the way Aziz's change will): S1 dark at 182.3 s by R1 (conf 1.0) → Command 187.3 s, S2 225.1 s (0.889), S3 18.0 s (0.999); decoys in view D1 69 / D2 332 / D3 10 ticks, none reported. 115 tests pass with the model and with `DETECTOR=sim`.
 - **Contract changes:** **floorplan** gains `"decoys": [{"id","label","pos","thermal"}]`: D1 radiator (15, 28) `neg_0001.png`, D2 engine (37, 12) `neg_0002.png`, D3 coffee machine (22, 28) `neg_0003.png`. Survivor `conf` is now the model probability (was always 0.99).

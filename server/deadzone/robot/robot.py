@@ -12,7 +12,7 @@ from ..geometry import points_in_poly, wrap_angle
 from ..network.dtn import make_bundle
 from . import planning
 from .mapping import OccupancyMap
-from .perception import filter_hits
+from .perception import filter_hits, get_detector
 from .power import Battery, RESERVE_PCT, wheel_current
 from .scheduler import Scheduler
 
@@ -120,6 +120,7 @@ class Robot:
         self.lost_budget = lost_link_budget_s
         self.crumbs = [tuple(pose[:2])]
         self.found = {}           # survivor id -> record
+        self.rejected = set()     # hot spot ids the detector turned down (reported once)
         self.found_while_dark = False
         self.dark_declared = False   # link_lost raised for the current outage
         self.reconnect_t = None      # when the link last came back after an outage
@@ -270,17 +271,28 @@ class Robot:
     # ------------------------------------------------------------------ sensing
     def _perceive(self, io):
         # every hot spot goes through the trained detector (sim sensor fallback if no model)
-        for s in filter_hits(io.thermal()):
+        hits = io.thermal()
+        kept = filter_hits(hits)
+        kept_ids = {h["id"] for h in kept}
+        for h in hits:
+            if h["id"] in kept_ids or h["id"] in self.rejected:
+                continue
+            self.rejected.add(h["id"])    # the robot only knows "hot, but not a person"
+            self.events.append({"kind": "hotspot_rejected", "robot": self.id, "id": h["id"],
+                                "pos": [round(h["pos"][0], 2), round(h["pos"][1], 2)],
+                                "crop": h.get("crop"), "conf": get_detector().score(h.get("crop"))})
+        for s in kept:
             if s["id"] in self.found:
                 continue
             rec = {"id": s["id"], "pos": [round(s["pos"][0], 2), round(s["pos"][1], 2)],
-                   "by": self.id, "t": round(self.t, 1), "conf": s.get("conf", 0.99)}
+                   "by": self.id, "t": round(self.t, 1), "conf": s.get("conf", 0.99), "crop": s.get("crop")}
             self.found[s["id"]] = rec
             if not self.linked:
                 self.found_while_dark = True
             self.outbox.append(make_bundle(self.id, "CMD", "survivor", rec, self.t, 400))
             self.events.append({"kind": "survivor_found", "robot": self.id, "survivor": s["id"],
-                                "pos": rec["pos"], "linked": self.linked})
+                                "pos": rec["pos"], "linked": self.linked,
+                                "crop": rec["crop"], "conf": rec["conf"]})
 
     def _update_link(self, io):
         """Track the link and raise link_lost / link_restored exactly once per outage, in any state.
