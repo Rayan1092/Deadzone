@@ -51,14 +51,16 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | Space | start / pause | live |
 | Backspace | reset to seed 7, paused | live |
 | `+` / `-` | sim speed ×2 / ÷2 | live |
-| R | drop rubble 1.5 m ahead of **R1** | live |
-| Q / Esc | QR join overlay on / off | live |
-| T | faint truth survivors on Reality only | live |
-| F | wheel overcurrent on a robot | backend live (PR #12); key comes with Yusuf's M4. Until then: `Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/fault -ContentType application/json -Body '{"type":"overcurrent","robot":"R3"}'` |
-| G | Command-only situation briefing (labelled local, not Gemini) | backend live (PR #12); key comes with Yusuf's M4. Until then: `Invoke-RestMethod http://localhost:8000/api/report` |
+| 1–3 / 0 | follow robot 1–3 (or click its card) / back to overview. Command follows the robot's last *reported* pose | live |
+| R | drop rubble 1.5 m ahead of the **followed** robot (R1 if none) | live |
+| F | wheel overcurrent on the **followed** robot (R1 if none) | live |
+| G | briefing panel, "Local summary · Command data only" | live |
+| Q / Esc | QR join overlay on / off (Esc also closes the briefing) | live |
+| T | faint truth survivors and decoys on Reality only | live |
 | O | perception overload: deadline misses for 3 s | waiting on Aziz (backend) and Yusuf (key) |
 | resume | clears a robot's SAFE_STOP (director value `{do:"resume", robot}`) | waiting on Aziz, no key yet |
-| 1–3, 0 | follow cams / overhead | not built (stay on the overview camera) |
+
+REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/fault -ContentType application/json -Body '{"type":"overcurrent","robot":"R3"}'`, G `Invoke-RestMethod http://localhost:8000/api/report`.
 
 ## Beat sheet
 
@@ -73,19 +75,20 @@ Space is pressed at **0:40**. Times after it come from a headless seed-7 run wit
 | 0:47 | +0:07 (14.4) | R1 finds **S3** in Office A while linked. It appears on both sides at once | Aziz | "With signal, the report is instant." |
 | 1:08 | +0:28 (56.7) | R1's camera sees the **radiator** (D1). The detector rejects it | Rayan | "That's a radiator. Our model, trained on real FLIR thermal images, says it's not a person, so no false alarm." |
 | 1:09 | +0:29 (57.7) | R3 drops **relay RL1** | Aziz | "Robots drop relays just before the link breaks, like the DARPA SubT teams did." |
-| 1:40 | +0:59.5 (119.1) | R2 enters the **steel cage** and loses link. Command shows a **ghost R2** | Rayan | "Steel kills radio. Command post goes blind, but Robot 2 keeps searching." |
+| 1:38 | +0:58 | Press **2**: follow R2 | Rayan | |
+| 1:40 | +0:59.5 (119.1) | R2 enters the **steel cage** and loses link. Command shows a **ghost R2** (its camera stays at the last reported pose) | Rayan | "Steel kills radio. Command post goes blind, but Robot 2 keeps searching." |
 | 1:44 | +1:04.5 (129.0) | R2 finds **S1** in the dark, confidence 1.0. **Reality side only** | Rayan | Point at the ghost: "Command doesn't know yet. The report waits in the robot's outbox." |
 | 1:52 | +1:11.5 (143.1) | R2 reconnects. Map and **S1 burst onto Command**, 14 s after detection | Rayan | "Store and forward: nothing lost, just late." |
-| 1:55 | +1:15 (150) | Press **R**: rubble falls ahead of R1, which goes **REPLANNING** and drives around | Rayan | "Rubble falls. The robot sees it, stops and replans on its own." |
-| 2:02 | +1:22.5 (165) | Press **F** on R3: **OVERCURRENT** fault, it backs up 0.5 m and replans | Rayan | "A wheel jams. Fault protection stops it, backs off and tries another way." |
-| 2:07 | +1:27.5 (175) | Press **O** on R1: task timeline shows **perception missing deadlines** (red) for 3 s, while **safety still runs at 0 and 50 ms** | Rayan | "Rate monotonic scheduling: when the AI overloads the CPU, perception misses deadlines, but the safety task always runs on time." |
-| 2:20 | | Press **G**: briefing appears | Yusuf | "This briefing only uses what reached the antenna." |
+| 1:55 | +1:15 (150) | Press **1** then **R**: rubble falls ahead of R1, which goes **REPLANNING** and drives around | Rayan | "Rubble falls. The robot sees it, stops and replans on its own." |
+| 2:02 | +1:22.5 (165) | Press **3** then **F**: R3 gets an **OVERCURRENT** fault, backs up 0.5 m and replans | Rayan | "A wheel jams. Fault protection stops it, backs off and tries another way." |
+| 2:07 | +1:27.5 (175) | Press **1** then **O**: the scheduler strip shows **perception missing deadlines** (red) for 3 s, while **safety still runs at 0 and 50 ms** | Rayan | "Rate monotonic scheduling: when the AI overloads the CPU, perception misses deadlines, but the safety task always runs on time." |
+| 2:20 | | Press **0**, then **G**: briefing panel appears | Yusuf | "This briefing only uses what reached the antenna." |
 | 2:33 | +1:53 (226–248) | **S2** found while linked (bonus, if still running) | | |
 | 2:45 | | | Rayan | "The robots are autonomous, and AI detects survivors. Collapsed buildings, mines, wildfires, tunnels." |
 
-If F, O or G aren't wired yet, skip that beat and say the line over the timeline anyway.
+If O isn't wired yet, skip that beat and say the line over the scheduler strip anyway. R and F hit the **followed** robot, so check the follow key first.
 
-Don't press **R** while R1 stands in a doorway: rubble in a doorway seals it in (TRAPPED after 10 s). At 1:55 (sim 150) R1 is near the break-room door and still gets around. That worked in the dry run, but watch it.
+Don't press **R** while the followed robot stands in a doorway: rubble in a doorway seals it in (TRAPPED after 10 s). At 1:55 (sim 150) R1 is near the break-room door and still gets around. That worked in the dry run, but watch it.
 
 ## Plan fallback: send it without the phone
 

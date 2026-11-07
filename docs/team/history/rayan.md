@@ -11,6 +11,12 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 
 ## Log
 
+### 2026-11-07 19:40 · rayan/demo-runbook · DEMO.md updated for M4 keys
+- **Did:** runbook key table and beats follow Yusuf's M4: 1–3 / 0 follow cams, R and F act on the followed robot, F and G are live keys. Beats now say which robot to follow before R / F / O.
+- **Contract changes:** none
+- **Heads-up for others:** none
+- **Next:** scope sync PR, then rescue route.
+
 ### 2026-11-07 19:20 · rayan/demo-runbook · docs/DEMO.md demo runbook
 - **Did:** wrote `docs/DEMO.md`: seed 7, 3 robots, 2x, plan P-1 (R1 west offices, **R2 north-east + steel cage as the dark zone**, R3 break room) preloaded, judges fix it on the phone ("Allow ZNE to go dark") and dispatch before Space. Beat sheet measured headless on merged main with the model live: S3 at +0:07, radiator rejected +0:28, RL1 +0:29, R2 dark +0:59.5, **S1 found dark +1:04.5, on Command +1:11.5 (14.1 s late)**, then R / F / O / G beats, all rehearsed in the dry run. Every director key with status, lines to say per beat, PowerShell plan / fault / report fallbacks, recovery table, judge answers. Also: `_read_commands` now learns peer telemetry if `io.radio.receive()` hands any over (PR #12 drains `robot.inbox` too), so peers can't be lost if the read order changes. 146 tests pass with the model and with `DETECTOR=sim`.
 - **Contract changes:** none
