@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { usePhone } from './store'
 import { MIN_SIDE, addRegion, pointInPoly, rectPoly, snap } from './plan'
+import { sendPhone } from './socket'
 
 // 2D plan of the building: the pre-collapse prior plus delivered Command knowledge.
 // Margins in meters; the CMD antenna sits outside the west wall at x = -2.
@@ -220,6 +221,28 @@ export default function PlanMap() {
         label(relay.id, X(x), Y(y) + r0 + 7, C.amber, 9)
       }
 
+      // this phone's own relay (relay role): its own state, not Command knowledge
+      const mine = usePhone.getState().relay
+      if (mine) {
+        const [x, y] = mine.pos
+        const k = (t * 0.8) % 1
+        if (mine.on) {
+          ctx.strokeStyle = `rgba(45,212,191,${0.8 * (1 - k)})`
+          ctx.lineWidth = 2
+          ctx.beginPath()
+          ctx.arc(X(x), Y(y), r0 * (1.2 + k * 2.2), 0, Math.PI * 2)
+          ctx.stroke()
+        }
+        ctx.fillStyle = mine.on ? C.teal : C.ghost
+        ctx.strokeStyle = '#ffffff'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.arc(X(x), Y(y), r0 * 0.9, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.stroke()
+        label(`You · ${mine.id}${mine.on ? '' : ' off'}`, X(x), Y(y) + r0 + 9, mine.on ? C.teal : C.ghost, 10, 700)
+      }
+
       for (const sv of view?.survivors ?? []) {
         const [x, y] = sv.pos
         const k = (t * 0.9) % 1
@@ -274,7 +297,7 @@ export default function PlanMap() {
     const onDown = (e) => {
       const { mode } = usePhone.getState()
       down = toWorld(e)
-      if (mode === 'view') return
+      if (mode === 'view' || mode === 'place') return
       el.setPointerCapture(e.pointerId)
       drag = { kind: mode, a: clampSnap(down), b: clampSnap(down) }
       dirty = true
@@ -297,6 +320,12 @@ export default function PlanMap() {
       }
       const p = toWorld(e)
       if (!down || Math.hypot(p[0] - down[0], p[1] - down[1]) > 0.5) return // a scroll, not a tap
+      if (st.mode === 'place') {
+        // the server rejects walls, hazards and outside positions with invalid_relay_position
+        sendPhone('relay_place', { pos: [Math.min(W - 0.1, Math.max(0.1, p[0])), Math.min(H - 0.1, Math.max(0.1, p[1]))] })
+        st.set({ mode: 'view' })
+        return
+      }
       const regions = [...(st.draft?.zones ?? []), ...(st.draft?.no_go ?? [])].reverse()
       st.set({ selected: regions.find((r) => pointInPoly(p, r.poly))?.id ?? null })
     }
@@ -309,7 +338,7 @@ export default function PlanMap() {
       const st = usePhone.getState()
       // Survivor pulses and flagged zones animate; otherwise redraw when new data arrives.
       const flaggedZones = st.safety && !st.safety.ok
-      const animating = (st.view?.survivors?.length ?? 0) > 0 || flaggedZones
+      const animating = (st.view?.survivors?.length ?? 0) > 0 || flaggedZones || st.relay?.on
       if (dirty || animating) {
         draw(ms / 1000)
         dirty = false

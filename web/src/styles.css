@@ -92,7 +92,7 @@ button:hover { border-color: var(--teal); }
 .event { display: flex; align-items: baseline; gap: 6px; padding: 6px 8px; border-radius: 6px; background: #1f2429; }
 .event i { width: 6px; height: 6px; border-radius: 50%; background: #3a434c; flex: none; align-self: center; }
 .event.survivor_found i, .event.survivor_reported i, .event.fault i, .event.safety_reject i { background: var(--red); }
-.event.link_lost i, .event.deadline_miss i, .event.rubble_fall i { background: var(--amber); }
+.event.link_lost i, .event.deadline_miss i, .event.rubble_fall i, .event.relay_power i { background: var(--amber); }
 .event.link_restored i, .event.plan_dispatched i, .event.plan_applied i, .event.resumed i { background: var(--green); }
 .event.relay_dropped i { background: var(--teal); }
 .event .count { margin-left: auto; color: var(--muted); font-size: 11px; }
