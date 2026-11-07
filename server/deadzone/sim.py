@@ -14,6 +14,7 @@ from .network.dtn import DTNNetwork, RELAY_QUEUE_BYTES, make_bundle
 from .network.propagation import LinkGraph
 from .robot.lidar import raycast
 from .robot.power import wheel_current
+from .robot.perception import get_detector
 from .robot.robot import BATTERY_TIME_SCALE, PEER_FRESH_S, Robot
 
 DT = 0.1
@@ -84,10 +85,13 @@ class RobotIO:
         return self.sim.add_relay(self.odometry()["pose"][:2], owner=self.rid)
 
     def thermal(self):
-        """Survivors in the forward camera cone with line of sight (sim sensor fallback)."""
+        """Thermal hot spots in the forward camera cone; classification belongs to the robot."""
         b = self.sim.bodies[self.rid]
         out = []
-        for s in self.sim.fp.data.get("survivors", []):
+        spots = list(self.sim.fp.data.get("survivors", []))
+        if get_detector().mode == "model":
+            spots.extend(self.sim.fp.data.get("decoys", []))
+        for s in spots:
             sx, sy = s["pos"]
             d = math.dist((b["x"], b["y"]), (sx, sy))
             if d > THERMAL_RANGE:
@@ -263,10 +267,15 @@ class Sim:
 
     def _queue_peer_telemetry(self, fresh):
         """Fan out reports before transport; disconnected peers wait in custody."""
-        for bundles in fresh.values():
+        for rid, bundles in fresh.items():
             for b in bundles:
                 if b["kind"] != "telemetry":
                     continue
+                # Sample source-owned status once, before transport. Never fill
+                # delayed Command reports from the robot's current live state.
+                status = self.robots[rid].telemetry(None)
+                for key in ("plan_id", "zone"):
+                    b["payload"].setdefault(key, status.get(key))
                 self.network.fanout_telemetry(b, self.robots, ttl=PEER_FRESH_S)
 
     def _move_bundles(self, dt):
