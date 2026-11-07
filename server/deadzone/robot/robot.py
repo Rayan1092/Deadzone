@@ -11,7 +11,8 @@ from ..geometry import wrap_angle
 from ..network.dtn import make_bundle
 from . import planning
 from .mapping import OccupancyMap
-from .power import Battery, RESERVE_PCT
+from .power import Battery, RESERVE_PCT, wheel_current
+from .scheduler import Scheduler
 
 V_MAX = 0.8            # m/s cruise
 LINK_LOST_AFTER = 2.0  # s without a path to CMD
@@ -45,6 +46,19 @@ PATH_CHECK_M = 3.0         # look this far down the path for new obstacles
 PATH_CHECK_SKIP_M = 0.4    # ignore the robot's own footprint (it may sit in a wall's inflation)
 REPLAN_PAUSE_S = 0.6       # stop briefly in REPLANNING so the replan is visible and the map settles
 TRAPPED_AFTER_S = 10.0     # no route for this long raises a TRAPPED fault to the command post
+
+# Wheel overcurrent (plan: above 6 A for 0.5 s -> stop, reverse 0.5 m, mark ahead, replan)
+OVERCURRENT_A = 6.0
+OVERCURRENT_HOLD_S = 0.5
+INJECTED_SPIKE_A = 5.0     # director F key: extra amps on top of the normal wheel current
+REVERSE_M = 0.5
+REVERSE_V = 0.3
+REVERSE_TIMEOUT_S = 4.0
+
+# Final contract (telemetry): `state` is one of STATES, `fault` is None or one of FAULTS.
+STATES = ("DEPLOYING", "EXPLORING", "LOST_LINK_EXPLORING", "RETURNING_TO_SIGNAL",
+          "RETURNING_HOME", "REPLANNING", "FAULT", "DONE")
+FAULTS = ("OVERCURRENT", "STUCK", "LOW_BATTERY", "TRAPPED", "SAFE_STOP")
 
 
 def is_robot_id(nid):
@@ -109,6 +123,15 @@ class Robot:
         self.stuck_ref = (pose[0], pose[1], 0.0)
         self.events = []
 
+        self.scheduler = Scheduler()
+        self.tasks = []
+        self.wheel_a = 0.0
+        self.spike_until = -1.0      # director-injected overcurrent ends at this time
+        self.over_since = None       # wheel current above the limit since
+        self.fault_resume = None     # state to resume after a fault recovery
+        self.reverse_from = None     # pose where the reverse maneuver started
+        self.reverse_t = 0.0
+
     # ------------------------------------------------------------------ main step
     def step(self, dt, io):
         self.t = io.time
@@ -125,9 +148,10 @@ class Robot:
         self._perceive(io)
         self._update_link(io)
         self._maybe_drop_relay(io)
+        self.tasks = self.scheduler.run_frame(int(round(self.t / dt)))
         self._check_faults(odo)
         self._behave()
-        v, w = self._follow()
+        v, w = self._reverse() if self.state == "FAULT" else self._follow()
         io.drive(v, w)
         self.cmd_v = v
         self.v = odo["v"]
@@ -226,12 +250,22 @@ class Robot:
         self.last_telemetry_t = -99.0   # tell peers right away so they keep their spacing
 
     def _check_faults(self, odo):
-        """First pass. The full fault FSM (overcurrent, stuck, low battery) lands at 10 PM."""
+        """Overcurrent and stuck detection. The full fault FSM (3 faults in 60 s -> SAFE_STOP,
+        LOW_BATTERY) lands with the scheduler work."""
         x, y, _ = self.pose
+        spike = INJECTED_SPIKE_A if self.t < self.spike_until else 0.0
+        self.wheel_a = wheel_current(self.cmd_v, bool(odo.get("blocked"))) + spike
+        if self.wheel_a > OVERCURRENT_A and self.state not in ("DEPLOYING", "DONE", "FAULT"):
+            if self.over_since is None:
+                self.over_since = self.t
+            elif self.t - self.over_since >= OVERCURRENT_HOLD_S:
+                self._enter_fault("OVERCURRENT")
+        else:
+            self.over_since = None
         rx, ry, rt = self.stuck_ref
         if self.t - rt > 3.0:
             moved = math.dist((x, y), (rx, ry))
-            if self.cmd_v > 0.2 and moved < 0.05 and self.state not in ("DONE",):
+            if self.cmd_v > 0.2 and moved < 0.05 and self.state not in ("DONE", "FAULT"):
                 self.fault = "STUCK"
                 self.events.append({"kind": "fault", "robot": self.id, "fault": "STUCK"})
                 self._block_ahead()
@@ -242,8 +276,35 @@ class Robot:
         if odo.get("blocked"):
             self._block_ahead()
 
-    def _block_ahead(self):
-        x, y, th = self.pose
+    def inject_overcurrent(self, seconds=1.0):
+        """Director hook (F key): the wheel motors draw an extra INJECTED_SPIKE_A for `seconds`,
+        as if a wheel jammed on debris. Detection and recovery then run as for a real spike."""
+        self.spike_until = self.t + seconds
+
+    def _enter_fault(self, fault):
+        """Stop, back up REVERSE_M, mark what stopped us as occupied, then replan."""
+        self.fault = fault
+        self.events.append({"kind": "fault", "robot": self.id, "fault": fault})
+        self.fault_resume = self.resume_state if self.state == "REPLANNING" else self.state
+        self.reverse_from = list(self.pose)
+        self.reverse_t = self.t
+        self.over_since = None
+        self.path = []
+        self._set_state("FAULT")
+
+    def _reverse(self):
+        return -REVERSE_V, 0.0
+
+    def _fault_recovery(self):
+        backed = math.dist(self.pose[:2], self.reverse_from[:2])
+        if backed < REVERSE_M and self.t - self.reverse_t < REVERSE_TIMEOUT_S:
+            return
+        self._block_ahead(self.reverse_from)
+        self.state = self.fault_resume or "EXPLORING"   # resume target for the replan
+        self._start_replan(self.fault.lower())
+
+    def _block_ahead(self, pose=None):
+        x, y, th = pose if pose is not None else self.pose
         for d in (0.35, 0.6):
             ix = int((x + math.cos(th) * d) // self.cell)
             iy = int((y + math.sin(th) * d) // self.cell)
@@ -263,6 +324,10 @@ class Robot:
         if s == "DEPLOYING":
             if self.t - self.state_since > 1.0 + DEPLOY_STAGGER_S * self.rank:
                 self._set_state("EXPLORING")
+            return
+
+        if s == "FAULT":
+            self._fault_recovery()
             return
 
         if s == "REPLANNING":
@@ -350,8 +415,8 @@ class Robot:
             ok = self._plan_to(self.entry)
         if ok:
             self.replan_fail_since = None
-            if self.fault == "TRAPPED":
-                self.fault = None
+            if self.fault in ("TRAPPED", "OVERCURRENT", "STUCK"):
+                self.fault = None   # recovered
             self._set_state(resume)
             return
         if self.replan_fail_since is None:
@@ -514,7 +579,8 @@ class Robot:
             "path": [[round(px, 2), round(py, 2)] for px, py in self.path[:60]],
             "lidar": self.lidar_pts,
             "fault": self.fault,
-            "tasks": [],
+            "wheel_a": round(self.wheel_a, 2),
+            "tasks": self.tasks,
             "outbox": len(self.outbox),
             "last_link_t": round(self.last_link_t, 1),
         }
