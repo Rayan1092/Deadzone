@@ -50,7 +50,7 @@ function RelayNode({ pos, label, sub, on = true, phone = false, known = true }) 
           <meshBasicMaterial color={COLORS.green} transparent side={THREE.DoubleSide} depthWrite={false} />
         </mesh>
       )}
-      <Html position={[0, top + 0.35, 0]} center distanceFactor={40} style={{ pointerEvents: 'none' }}>
+      <Html position={[0, top + 0.35, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
         <div className={`tag relay${known && !on ? ' off' : ''}`}>
           <b>{label}</b>{sub ? <span>{sub}</span> : null}
         </div>

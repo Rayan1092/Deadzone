@@ -7,17 +7,24 @@ export function wsUrl(path) {
   return `${proto}://${location.host}${path}`
 }
 
+// Returns a cleanup so a remount (hot reload) never leaves a second socket
+// feeding every message into the store twice.
 export function connectScreen() {
+  let closed = false
+  let sock = null
+  let timer
   const open = () => {
-    ws = new WebSocket(wsUrl('/ws/screen'))
-    ws.onopen = () => useSim.getState().set({ connected: true })
-    ws.onmessage = (e) => handleMessage(JSON.parse(e.data))
-    ws.onclose = () => {
+    sock = ws = new WebSocket(wsUrl('/ws/screen'))
+    sock.onopen = () => useSim.getState().set({ connected: true })
+    sock.onmessage = (e) => handleMessage(JSON.parse(e.data))
+    sock.onclose = () => {
+      if (closed) return
       useSim.getState().set({ connected: false })
-      setTimeout(open, 1000) // reconnect forever, the server may restart mid demo
+      timer = setTimeout(open, 1000) // reconnect forever, the server may restart mid demo
     }
   }
   open()
+  return () => { closed = true; clearTimeout(timer); sock?.close() }
 }
 
 export function control(action, value) {

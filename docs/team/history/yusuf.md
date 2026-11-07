@@ -3,17 +3,24 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/phone-plan` (M3) committed, PR not open yet. Next: M4 task timeline, follow camera, director keys (F, G, O) on `p3/timeline-camera`.
-- **Works on main:** M1 phone shell + QR (PR #10). M2 relays/links, toasts, T truth overlay, camera fit (PR #16).
-- **In flight (not merged):** `p3/phone-plan`:
-  - Phone planner: tap Add zone / Add no-go, drag a rectangle on the map (0.5 m snap, min 1 m), tap a zone to edit robot, priority, radio (relay link / dark OK), delete. Dark budget slider. Edits go out as `plan_edit` (debounced); incoming `plan_state` replaces the draft ("edited by phone-b").
-  - Safety card: Run safety check (`plan_submit`) → pass/fail card; failed zones pulse red on the map; `comms_plan` has a one-tap "Allow Zx to go dark" fix. Dispatch = `POST /api/dispatch`; card says "dispatched to R2, starts once the plan reaches it" (never claims the robot acted). Editing a dispatched plan starts P-(n+1); a `plan_dispatched` error from the server forks too.
-  - Phone robot cards show delivered `cmd_view.faults` when present (PR #12 field).
-  - Big screen: draws `plan_state` zones/no-go on both panes above the fog (dashed draft, solid after `plan_dispatched`); toasts plan_dispatched, plan_applied, resumed; sidebar "Following P-7 · zone Z1" from Reality telemetry `plan_id`/`zone`.
-- **Blocked on / need from others:** Aziz: PR #12 merge (screen `plan_state`, `plan_dispatched`, startup tick, F/G, relay phones). Aziz: Command's robot view has no `plan_id`/`zone`, so phones can't show which robots are following a plan.
-- **Promises to others:** truth survivors show only as a faint outline on the Reality pane, off by default, toggled with T. Never on Command. The UI renders actual robot state and never assumes a dispatch or fault made a robot act.
+- **Working on:** `p3/timeline-camera` (M4) committed, PR not open yet. Next: M5 relay phone mode on `p3/phone-relay` (backend is on main since PR #12).
+- **Works on main:** M1 phone shell + QR (PR #10). M2 relays/links, toasts, T truth overlay, camera fit (PR #16). M3 phone plan editor, safety card, plans on the big screen (PR #18).
+- **In flight (not merged):** `p3/timeline-camera`:
+  - Scheduler strip under the panes: one row per robot over the last 100 ms, task colors, busy %, missed slices red with a 1.5 s red pulse and "perception missed" flag.
+  - Follow camera: keys 1-3 (or click a robot card), 0 back to overview. Reality follows the robot; Command follows its last reported pose so the camera never reveals a dark robot. Orbit angle and zoom stay synced.
+  - Director keys act on the followed robot (else R1): R rubble, F overcurrent (`do:"overcurrent"`). G opens the briefing panel from `GET /api/report`, labelled "Local summary · Command data only" unless `source` is gemini.
+  - T overlay also shows the floorplan `decoys` (amber, "D2 engine · decoy"), Reality only.
+  - 3D labels are a constant size and render under overlays (no more giant labels when zoomed). Screen socket closes on remount (no duplicate events after hot reload).
+- **Blocked on / need from others:** Aziz: director `do:"overload"` (O key) and `do:"resume"`; decoys in `RobotIO.thermal()`. Command's robot view has no `plan_id`/`zone` for phones.
+- **Promises to others:** truth survivors and decoys show only as faint outlines on the Reality pane, off by default, toggled with T. Never on Command. The UI renders actual robot state and never assumes a dispatch or fault made a robot act.
 
 ## Log
+
+### 2026-11-07 18:40 · p3/timeline-camera · M4 scheduler strip, follow camera, F/G keys, decoys
+- **Did:** the big screen shows each robot's scheduler frame live (safety preempting, busy %, missed deadlines in red), follows a robot with keys 1-3 / 0, injects overcurrent with F on the followed robot (the robot's own fault toast follows), opens a typed Command briefing with G, and the T overlay marks decoys. Tested on main at 4x: follow R1/R2, F → "R1 fault: Wheel overcurrent" + replan, G → local briefing incl. the reported fault.
+- **Contract changes:** none new. Uses telemetry `tasks`, director `do:"overcurrent"` / `do:"rubble"`, `GET /api/report` + `report` message, floorplan `decoys`.
+- **Heads-up for others:** keyboard map for the demo: 1-3 follow, 0 overview, R rubble, F fault, G briefing, T truth, Q join, Space, Backspace, +/-. The strip's red miss styling is untested live until the O key / overload director value exists. Rayan: the Command camera follows the last reported pose by design.
+- **Next:** M5 relay phone mode.
 
 ### 2026-11-07 18:05 · p3/phone-plan · M3 plan editor, safety card, plans on the big screen
 - **Did:** phones draw zones and no-go areas, assign robots, run the safety check, fix a dead-zone rejection in one tap and dispatch. The big screen shows the shared plan (draft dashed, dispatched solid) and which zone each robot follows. Tested end to end on main (reject → allow dark → pass → dispatch → "R2 is following P-1 (Z1)") and against PR #12 merged with main locally (plan before Space at T+0.1, screen zones, plan_dispatched).
