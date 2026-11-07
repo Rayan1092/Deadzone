@@ -8,7 +8,8 @@ export default defineConfig({
   server: {
     host: true,
     proxy: {
-      '/api': 'http://localhost:8000',
+      // keep the browser's Host so /api/join builds a phone link to this dev server (:5173)
+      '/api': { target: 'http://localhost:8000', changeOrigin: false },
       '/ws': { target: 'ws://localhost:8000', ws: true },
     },
   },

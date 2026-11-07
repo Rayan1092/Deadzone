@@ -69,4 +69,17 @@ button:hover { border-color: var(--teal); }
 .tag.ghost { opacity: .8; border-style: dashed; }
 .tag.alert { border-color: var(--red); color: #fecaca; }
 
-.phone { padding: 24px; font-size: 16px; }
+.join-card { display: flex; gap: 12px; align-items: center; padding: 10px; margin-bottom: 8px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 10px; }
+.join-card:hover { border-color: var(--teal); }
+.join-card svg { border-radius: 6px; flex: none; }
+.join-qr-empty { width: 92px; height: 92px; border-radius: 6px; background: #232a31; flex: none; }
+.join-text { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+
+.join-overlay { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 20px; background: rgba(12,14,17,.94); }
+.join-grid { display: flex; gap: 48px; }
+.join-big { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; font-size: 15px; }
+.join-big svg { border-radius: 12px; margin-bottom: 8px; }
+.join-big b { font-size: 22px; }
+.join-url { font-size: 20px; color: var(--teal); }
