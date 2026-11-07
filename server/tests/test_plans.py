@@ -142,7 +142,8 @@ def test_dead_zone_requires_explicit_permission_or_a_delivered_relay():
     sim = Sim()
     report(sim.post)
     data = plan_data()
-    data["zones"][0]["poly"] = [[35, 24], [39, 24], [39, 28], [35, 28]]
+    # dark from CMD but reachable by a corridor relay (the steel cage at y > 21 is not)
+    data["zones"][0]["poly"] = [[35, 17], [39, 17], [39, 20.5], [35, 20.5]]
     plans = manager(sim)
     plans.save(SearchPlan.model_validate(data))
     assert "comms_plan" in rules(plans.check("P-1"))
