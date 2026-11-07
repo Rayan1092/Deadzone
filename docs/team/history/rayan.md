@@ -3,13 +3,57 @@
 Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions edit this file.
 
 ## Now
-- **Working on:** `rayan/detector-hookup` (PR open): trained detector wired into robot perception + decoys in the floor plan.
-- **Works on main:** frontier exploration, 3-robot target sharing, relay auto-drop, A* return home, lost-link + 10 s reconnect hold, REPLANNING around rubble, rate monotonic scheduler with carry-over and deadline misses, full fault FSM (OVERCURRENT, STUCK, SAFE_STOP, LOW_BATTERY, TRAPPED), SAFE_STOP resume command (PR #13), robots follow dispatched plans (PR #15), trained detector module (PR #14, not yet called by robots). Seed 7, 3 robots: S1 found dark at 182.3 s, on Command at 187.3 s, 4 relays.
-- **In flight (not merged):** `rayan/detector-hookup`: robots call `filter_hits(io.thermal())`; `decoys` D1 to D3 in collapse_01.json.
-- **Blocked on / need from others:** Aziz: decoys in `RobotIO.thermal()` (see Blocked in the newest entry), plus the two director values O (overload) and resume (safe-stop-resume entry). Keep `PEER_FRESH_S` in robot.py (sim.py imports it).
+- **Working on:** `rayan/rescue-route`: beacon relay at a confirmed survivor + safe A* route entrance → survivor sent to CMD (priority 1). Owners/targets: Added scope table in `docs/PLAN.md`.
+- **Works on main:** frontier exploration, 3-robot target sharing, relay auto-drop, A* return home, lost-link + 10 s reconnect hold, REPLANNING around rubble, rate monotonic scheduler with carry-over and deadline misses, full fault FSM (OVERCURRENT, STUCK, SAFE_STOP, LOW_BATTERY, TRAPPED), SAFE_STOP resume command (PR #13), robots follow dispatched plans (PR #15), robots perceive through the trained detector with decoys in the floor plan (PR #14 + #17). Seed 7, 3 robots: S1 found dark at 182.3 s, on Command at 187.3 s, 4 relays.
+- **In flight (not merged):** `rayan/scope-sync` (PLAN.md Added scope). On main since last update: `docs/DEMO.md`, `survivor_found.crop/conf`, `hotspot_rejected` (PR #19), detector hookup + decoys (PR #17).
+- **Blocked on / need from others:** Aziz: `/crops` static, `hello.detector`, decoys in `RobotIO.thermal()` + none in sim fallback, O and resume director values. Yusuf: detector chip, survivor figure, detection cards, bigger robots, robot's-eye view (offer to build), phone robot tap, liquid glass, rescue route drawing. Details in the Blocked sections below; owners/targets in `docs/PLAN.md` Added scope. Keep `PEER_FRESH_S` in robot.py (sim.py imports it).
 - **Promises to others:** states final: DEPLOYING, EXPLORING, LOST_LINK_EXPLORING, RETURNING_TO_SIGNAL, RETURNING_HOME, REPLANNING, FAULT, DONE. Faults final: null, OVERCURRENT, STUCK, LOW_BATTERY, TRAPPED, SAFE_STOP. `tasks` slices as in PR #7, `missed` can now be true. Robot hooks: `inject_overcurrent(seconds=1.0)`, `inject_perception_overload(seconds=3.0, wcet_ms=400)`.
 
 ## Log
+
+### 2026-11-07 19:50 · rayan/scope-sync · Added scope (5:45 PM) in docs/PLAN.md
+- **Did:** committed Rayan's updated `docs/PLAN.md`, which has a new **"Added scope (5:45 PM Saturday)"** table: owners and target times for the AI detection card, detector chip, decoy safety, rescue route + beacon, survivor figures, robot's-eye view, liquid glass, ML slide. Also final states/faults/tasks/relay_dropped wording and names in the roles table.
+- **Contract changes:** none in this commit (rescue route contract comes with `rayan/rescue-route`).
+- **Heads-up for others:** **Aziz and Yusuf: the Added scope table in `docs/PLAN.md` is the source for owners and targets (10 PM / 3 AM).** Aziz's six asks are already in my earlier entries (detector-hookup, safe-stop-resume and detection-events entries): `/crops/<file>` static, `hello.detector`, no decoys in sim fallback, decoys from `RobotIO.thermal()` with survivor rules, O → `inject_perception_overload`, resume director action.
+- **Blocked:** **Yusuf**, new asks on top of the chip / survivor figure / detection cards already posted. Please tell me in your history file which of these you can fit:
+  1. Robots bigger and brighter so they read from across the room (both panes).
+  2. Robot's-eye picture-in-picture: click a robot → small view from its camera (pose + heading from Reality telemetry `pose`), with a **Thermal** toggle (walls cold blue; survivors and decoys glow). Render small and only while open; cut first if time is short. **My session can build this in `web/` if you OK it** (say so in your file and name the component path you want).
+  3. Phone: tap a robot card to see its status and last thermal crop. Phones only see Command, so use the delivered survivor records: `cmd_view.survivors[].crop` (and `by` for the robot), image `/crops/<crop>`.
+  4. Liquid-glass styling (frosted translucent panels, cards, phone UI).
+  5. Draw the rescue route on the **Command** view when it arrives. Contract coming from my next PR (`rayan/rescue-route`); I'll post it here.
+- **Next:** rescue route + beacon relay.
+
+### 2026-11-07 19:40 · rayan/demo-runbook · DEMO.md updated for M4 keys
+- **Did:** runbook key table and beats follow Yusuf's M4: 1–3 / 0 follow cams, R and F act on the followed robot, F and G are live keys. Beats now say which robot to follow before R / F / O.
+- **Contract changes:** none
+- **Heads-up for others:** none
+- **Next:** scope sync PR, then rescue route.
+
+### 2026-11-07 19:20 · rayan/demo-runbook · docs/DEMO.md demo runbook
+- **Did:** wrote `docs/DEMO.md`: seed 7, 3 robots, 2x, plan P-1 (R1 west offices, **R2 north-east + steel cage as the dark zone**, R3 break room) preloaded, judges fix it on the phone ("Allow ZNE to go dark") and dispatch before Space. Beat sheet measured headless on merged main with the model live: S3 at +0:07, radiator rejected +0:28, RL1 +0:29, R2 dark +0:59.5, **S1 found dark +1:04.5, on Command +1:11.5 (14.1 s late)**, then R / F / O / G beats, all rehearsed in the dry run. Every director key with status, lines to say per beat, PowerShell plan / fault / report fallbacks, recovery table, judge answers. Also: `_read_commands` now learns peer telemetry if `io.radio.receive()` hands any over (PR #12 drains `robot.inbox` too), so peers can't be lost if the read order changes. 146 tests pass with the model and with `DETECTOR=sim`.
+- **Contract changes:** none
+- **Heads-up for others:** everyone: read `docs/DEMO.md` before the first rehearsal; the beat times assume P-1 with ZNE dark-OK dispatched before Space. Yusuf: F / G / O keys (M4) are the only missing keys in the runbook. Aziz: O (overload) and resume director values are still open (see the safe-stop-resume entry).
+- **Next:** task 6 director pieces when O / resume / decoys land; rehearsal fixes.
+
+### 2026-11-07 18:55 · rayan/demo-runbook · Detection events carry the crop and confidence
+- **Did:** `survivor_found` events now carry the thermal crop file the detector scored and its confidence. New `hotspot_rejected` event when the detector turns a hot spot down (once per robot per hot spot). Survivor records (and so the Command view after delivery) carry `crop`. 115 tests pass with the model and with `DETECTOR=sim`.
+- **Contract changes:**
+  - `survivor_found` gains `crop` (file name, e.g. `"pos_0001.png"`) and `conf` (0 to 1, model probability; 0.99 in sim fallback).
+  - New event `hotspot_rejected {robot, id, pos:[x,y], crop:"neg_0001.png", conf}` (conf below 0.6). The robot doesn't know it's a decoy, only "hot but not a person"; `id` is the hot spot id (D1 to D3).
+  - Command `survivors[]` records gain `crop`.
+- **Heads-up for others:** none beyond the asks below.
+- **Blocked:**
+  - **Aziz:**
+    1. Put detector status in `hello` (screen and phone): `"detector": "model"` or `"sim"`, from `deadzone.robot.perception.get_detector().mode`; optional `"detector_reason"` from `.reason` when in sim.
+    2. When `get_detector().mode == "sim"`, `RobotIO.thermal()` must **not** emit decoys (my earlier decoy ask, plus this guard). A missing PyTorch must never put a radiator on screen as a survivor.
+    3. Serve `ml/crops/runtime/` as static files at **`/crops/<file>`** (e.g. `/crops/pos_0001.png`) so the big screen can show what the detector saw.
+  - **Yusuf:**
+    1. Top-bar chip from `hello.detector`: `"model"` → "Detector: AI model", `"sim"` → "Detector: sim fallback" (warning colour).
+    2. Replace the survivor dot with a low-poly person lying down with a warm thermal glow; keep the pulsing ring. Reality and Command both.
+    3. On `survivor_found`, a small card on the **Reality** pane: thermal image from `/crops/<event.crop>`, "person, 100%" from `event.conf`, robot `event.robot`, survivor `event.survivor`, and "no link, holding report" when `event.linked` is false.
+    4. On `hotspot_rejected`, the same card style: image `/crops/<event.crop>`, "not a person, 0%" from `event.conf`, robot `event.robot`. Reality only, never Command.
+    5. Command side can show the crop after delivery from `command.survivors[].crop`.
+- **Next:** `docs/DEMO.md` runbook.
 
 ### 2026-11-07 18:15 · rayan/detector-hookup · Trained detector live in robot perception, decoys in the floor plan
 - **Did:** robots now run every thermal hot spot through the trained detector (`filter_hits(io.thermal())`, PR #14's module); found survivors carry the model's probability as `conf`. Sim sensor fallback when `DETECTOR=sim`, no torch or no model. Added 3 decoys to collapse_01.json. Seed 7, 3 robots, model live (decoys injected into thermal by a test harness the way Aziz's change will): S1 dark at 182.3 s by R1 (conf 1.0) → Command 187.3 s, S2 225.1 s (0.889), S3 18.0 s (0.999); decoys in view D1 69 / D2 332 / D3 10 ticks, none reported. 115 tests pass with the model and with `DETECTOR=sim`.
