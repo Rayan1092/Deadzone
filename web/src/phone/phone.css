@@ -46,7 +46,9 @@
 .sw.survivor { background: var(--red); border-radius: 50%; }
 .sw.ghost { border: 1.5px dashed #e5e7eb; background: rgba(148,163,184,.5); border-radius: 50%; }
 
-.note { display: flex; flex-direction: column; gap: 4px; border-left: 3px solid var(--amber); }
+.note { display: flex; flex-direction: column; gap: 4px; background: rgba(245,158,11,.08);
+  border: 1px solid rgba(245,158,11,.28); }
+.note b { color: var(--amber); }
 
 .section-title { margin: 8px 4px 0; font-size: 12px; font-weight: 600; letter-spacing: .12em;
   text-transform: uppercase; color: var(--muted); }
