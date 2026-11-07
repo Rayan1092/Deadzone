@@ -1,6 +1,6 @@
 # Multi-hop network milestone (Person 2)
 
-The simulation now transfers bundles one hop at a time through robots and relays.
+The simulation now transfers bundles one hop at a time through relay nodes.
 Command still changes only when a complete bundle reaches `CMD`.
 
 ## Transfer rules
@@ -12,6 +12,9 @@ Command still changes only when a complete bundle reaches `CMD`.
   bundle cannot make another hop until the next tick.
 - A physical link has one RSSI-dependent byte budget shared by both directions.
   Large bundles take multiple ticks. Other independent links can transfer in parallel.
+- Following the multi-robot team contract, simulation robots are endpoints and do
+  not forward other nodes' bundles. Route checks, screen status and transport all
+  exclude robots as intermediate hops; relays and CMD can forward.
 - The sender retains the complete bundle until the receiver stores it and returns
   a custody acknowledgement. The simulation models receipt and acknowledgement as
   one atomic operation, without separate acknowledgement delay or packet loss.

@@ -189,6 +189,35 @@ def test_route_changes_do_not_loop_into_previous_custodian():
     assert received[0]["hops"] == ["R1", "RL1", "RL2", "RL3", "CMD"]
 
 
+def test_non_forwarding_robot_can_receive_but_cannot_bridge_a_route():
+    net = DTNNetwork()
+    net.register("R1", can_forward=False)
+    net.register("R2", can_forward=False)
+    net.register("RL1")
+    net.register("CMD")
+    net.queues["R1"].append(bundle())
+    bridge = graph(("R1", "R2"), ("R2", "CMD"))
+    assert net.step(bridge, DT, 0.1) == []
+    assert net.queues["R1"] and not net.queues["R2"]
+    # A real relay route still works, even when the robot shortcut is cheaper.
+    routed = graph(("R1", "R2"), ("R2", "CMD"), ("R1", "RL1"), ("RL1", "CMD"))
+    assert net.step(routed, DT, 0.2) == []
+    arrived = net.step(routed, DT, 0.3)
+    assert arrived[0]["hops"] == ["R1", "RL1", "CMD"]
+    net.queues["CMD"].append(bundle(src="CMD", dst="R2", kind="command"))
+    assert net.step(routed, DT, 0.4)[0]["dst"] == "R2"
+
+
+def test_robot_radio_and_screen_agree_that_robot_bridges_are_not_routes():
+    sim = Sim(n_robots=2)
+    sim.links = graph(("R1", "R2"), ("R2", "CMD"))
+    assert not sim.ios["R1"].radio.cmd_reachable()
+    assert sim.ios["R2"].radio.cmd_reachable()
+    shown = {r["id"]: r for r in sim.snapshot()["reality"]["robots"]}
+    assert not shown["R1"]["link"]["up"]
+    assert shown["R2"]["link"]["up"]
+
+
 def test_command_knows_survivor_and_map_only_after_last_hop():
     sim = Sim()
     relay = sim.add_relay((8, 15), owner="R1")

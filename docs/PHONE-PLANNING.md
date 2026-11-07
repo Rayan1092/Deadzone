@@ -165,8 +165,13 @@ If no build exists, the backend returns 503 and the Vite frontend can still be u
 
 ## Verification
 
-`cd server` then `python -m pytest -q`: 70 tests pass. This includes the original
+`cd server` then `python -m pytest -q`: 74 tests pass. This includes the original
 rescue story and DTN tests plus safety, schema, REST, two simultaneous planner
 WebSockets, reconnect/reset, malformed requests, Command-only map updates, join
 URLs, and the built frontend entry route. The phone UI still requires Person 3's
 implementation; a live phone/Wi-Fi rehearsal remains an integration checkpoint.
+
+This branch includes merged multi-robot PR #3. Robot endpoints do not forward other
+nodes' bundles; the transport, radio reachability and screen link status use the
+same rule. Rayan's temporary peer-telemetry shim is preserved for a later transport
+integration milestone.
