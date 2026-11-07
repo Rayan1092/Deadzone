@@ -40,14 +40,17 @@ class DTNNetwork:
         self._seen = {}       # receiver -> bid -> expiry, including forwarded bundles
         self._delivered = {}  # bid -> expiry (destination dedupe)
         self._progress = {}   # (sender, receiver, bid) -> bytes transmitted
+        self.non_forwarding = set()
 
-    def register(self, node, outbox=None, capacity_bytes=None):
+    def register(self, node, outbox=None, capacity_bytes=None, can_forward=True):
         """Attach an existing robot outbox, or create a relay/command queue."""
         if node in self.queues:
             raise ValueError(f"Node already registered: {node}")
         self.queues[node] = [] if outbox is None else outbox
         self.limits[node] = capacity_bytes
         self._seen[node] = {}
+        if not can_forward:
+            self.non_forwarding.add(node)
 
     def _expire(self, now):
         for node, queue in self.queues.items():
@@ -108,7 +111,8 @@ class DTNNetwork:
                 continue  # another transfer may have evicted this queued bundle
             # Do not revisit a previous custodian, whose receipt would otherwise
             # acknowledge a copy it already forwarded. Wait for a loop-free route.
-            route_key = sender, bundle["dst"], tuple(bundle["hops"][:-1])
+            avoid = set(bundle["hops"][:-1]) | (self.non_forwarding - {sender, bundle["dst"]})
+            route_key = sender, bundle["dst"], tuple(sorted(avoid))
             if route_key not in routes:
                 routes[route_key] = links.path(sender, bundle["dst"], avoid=route_key[2])
             path = routes[route_key]
