@@ -3,13 +3,25 @@
 Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions edit this file.
 
 ## Now
-- **Working on:** `rayan/demo-runbook` (PR open): `docs/DEMO.md` + detection events with crop/conf. Then task 6 once Aziz lands O / resume / decoys.
+- **Working on:** `rayan/rescue-route`: beacon relay at a confirmed survivor + safe A* route entrance → survivor sent to CMD (priority 1). Owners/targets: Added scope table in `docs/PLAN.md`.
 - **Works on main:** frontier exploration, 3-robot target sharing, relay auto-drop, A* return home, lost-link + 10 s reconnect hold, REPLANNING around rubble, rate monotonic scheduler with carry-over and deadline misses, full fault FSM (OVERCURRENT, STUCK, SAFE_STOP, LOW_BATTERY, TRAPPED), SAFE_STOP resume command (PR #13), robots follow dispatched plans (PR #15), robots perceive through the trained detector with decoys in the floor plan (PR #14 + #17). Seed 7, 3 robots: S1 found dark at 182.3 s, on Command at 187.3 s, 4 relays.
-- **In flight (not merged):** `rayan/demo-runbook`: `docs/DEMO.md`, `survivor_found.crop/conf`, `hotspot_rejected` event. (Detector hookup + decoys merged as PR #17.)
-- **Blocked on / need from others:** Aziz: decoys in `RobotIO.thermal()` (see Blocked in the newest entry), plus the two director values O (overload) and resume (safe-stop-resume entry). Keep `PEER_FRESH_S` in robot.py (sim.py imports it).
+- **In flight (not merged):** `rayan/scope-sync` (PLAN.md Added scope). On main since last update: `docs/DEMO.md`, `survivor_found.crop/conf`, `hotspot_rejected` (PR #19), detector hookup + decoys (PR #17).
+- **Blocked on / need from others:** Aziz: `/crops` static, `hello.detector`, decoys in `RobotIO.thermal()` + none in sim fallback, O and resume director values. Yusuf: detector chip, survivor figure, detection cards, bigger robots, robot's-eye view (offer to build), phone robot tap, liquid glass, rescue route drawing. Details in the Blocked sections below; owners/targets in `docs/PLAN.md` Added scope. Keep `PEER_FRESH_S` in robot.py (sim.py imports it).
 - **Promises to others:** states final: DEPLOYING, EXPLORING, LOST_LINK_EXPLORING, RETURNING_TO_SIGNAL, RETURNING_HOME, REPLANNING, FAULT, DONE. Faults final: null, OVERCURRENT, STUCK, LOW_BATTERY, TRAPPED, SAFE_STOP. `tasks` slices as in PR #7, `missed` can now be true. Robot hooks: `inject_overcurrent(seconds=1.0)`, `inject_perception_overload(seconds=3.0, wcet_ms=400)`.
 
 ## Log
+
+### 2026-11-07 19:50 · rayan/scope-sync · Added scope (5:45 PM) in docs/PLAN.md
+- **Did:** committed Rayan's updated `docs/PLAN.md`, which has a new **"Added scope (5:45 PM Saturday)"** table: owners and target times for the AI detection card, detector chip, decoy safety, rescue route + beacon, survivor figures, robot's-eye view, liquid glass, ML slide. Also final states/faults/tasks/relay_dropped wording and names in the roles table.
+- **Contract changes:** none in this commit (rescue route contract comes with `rayan/rescue-route`).
+- **Heads-up for others:** **Aziz and Yusuf: the Added scope table in `docs/PLAN.md` is the source for owners and targets (10 PM / 3 AM).** Aziz's six asks are already in my earlier entries (detector-hookup, safe-stop-resume and detection-events entries): `/crops/<file>` static, `hello.detector`, no decoys in sim fallback, decoys from `RobotIO.thermal()` with survivor rules, O → `inject_perception_overload`, resume director action.
+- **Blocked:** **Yusuf**, new asks on top of the chip / survivor figure / detection cards already posted. Please tell me in your history file which of these you can fit:
+  1. Robots bigger and brighter so they read from across the room (both panes).
+  2. Robot's-eye picture-in-picture: click a robot → small view from its camera (pose + heading from Reality telemetry `pose`), with a **Thermal** toggle (walls cold blue; survivors and decoys glow). Render small and only while open; cut first if time is short. **My session can build this in `web/` if you OK it** (say so in your file and name the component path you want).
+  3. Phone: tap a robot card to see its status and last thermal crop. Phones only see Command, so use the delivered survivor records: `cmd_view.survivors[].crop` (and `by` for the robot), image `/crops/<crop>`.
+  4. Liquid-glass styling (frosted translucent panels, cards, phone UI).
+  5. Draw the rescue route on the **Command** view when it arrives. Contract coming from my next PR (`rayan/rescue-route`); I'll post it here.
+- **Next:** rescue route + beacon relay.
 
 ### 2026-11-07 19:40 · rayan/demo-runbook · DEMO.md updated for M4 keys
 - **Did:** runbook key table and beats follow Yusuf's M4: 1–3 / 0 follow cams, R and F act on the followed robot, F and G are live keys. Beats now say which robot to follow before R / F / O.

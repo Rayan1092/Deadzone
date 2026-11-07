@@ -22,7 +22,7 @@ The starter on `main` already runs the core story with one robot. In a headless 
 
 **Done**
 
-- Floor plan `collapse_01` with tuned dead zones: the corridor near the entry is solid, the east wing and south-east room are dark
+- Floor plan `collapse_01` with tuned dead zones: the corridor near the entry is solid, the south-east room is dark, and survivor S1 now sits at (36, 27) inside a steel cage (room E2, metal walls, one door facing away from the corridor) so relays outside can't reach it (PR #5)
 - Sim server: 10 Hz tick, FastAPI, `/ws/screen` streaming `hello`, `tick`, `maps`, `event`, plus `/api/control` and a `/ws/phone` stub
 - One robot: lidar, occupancy map, frontier exploration, A\*, lost-link return to breadcrumbs, sim thermal sensor, battery drain
 - Single-hop store and forward: the robot keeps bundles until it has a link, and the Command view only changes from delivered bundles
@@ -31,6 +31,23 @@ The starter on `main` already runs the core story with one robot. In a headless 
 
 **Not started:** multi-robot coordination (3 robots currently all explore the same room), relays, multi-hop routing, phone app, scheduler and task timeline, full fault FSM, safety checker, Gemini reports, ML detector, Reed-Solomon, CRDT.
 
+## Added scope (5:45 PM Saturday)
+
+The team agreed to make the trained AI visible to judges and to make survivor detection lead somewhere useful. Owners are the people in the Team roles table below. Cut the robot's-eye view first if time runs short.
+
+| Feature | What judges see | Owner | Target |
+| --- | --- | --- | --- |
+| AI detection card | On `survivor_found`, a frosted card on the Reality pane with the thermal crop the detector judged and its verdict ("Person, 100%"). Rejected decoys get a faded card ("Not a person, 0.3%, rejected") | Aziz serves `ml/crops/runtime/` as static files, Yusuf builds the card | 10 PM |
+| Detector status chip | Top bar shows "Detector: AI model" or "Detector: sim fallback" from `hello` | Aziz adds it to `hello`, Yusuf shows it | 10 PM |
+| Decoy safety | In sim fallback, `RobotIO.thermal()` emits no decoys, so a missing PyTorch can never show a radiator as a survivor | Aziz | 10 PM |
+| Rescue route and beacon | When a robot confirms a survivor it drops a beacon relay next to them (if it has one left) and sends a safe A\* route from the entrance to CMD as a priority-1 bundle. Command draws it when it arrives (`rescue_route` event: survivor id, path points, length in meters) | Rayan (robot side), Yusuf (drawing) | 10 PM |
+| Survivor figures | A low-poly person lying down with a warm thermal glow, keeping the pulsing ring. Robots bigger and brighter so they read from across the room | Yusuf | 3 AM |
+| Robot's-eye view | Click a robot: a small picture-in-picture from its camera, with a Thermal toggle where walls go cold blue and survivors and decoys glow. Phone: tap a robot to see its status and last thermal crop. Rendered small and only while open | Yusuf, or Rayan's session with Yusuf's OK | 3 AM, cut first |
+| Liquid glass styling | Frosted translucent panels, cards and phone UI | Yusuf | 3 AM |
+| ML slide | Training examples, pipeline, confusion matrix, 96.2% accuracy, 96.3% precision, 96.0% recall on 1,200 held-out FLIR images, "runs onboard with no signal" | Rayan | freeze |
+
+Also pending from Aziz: director key O (`inject_perception_overload`) and a resume director action for SAFE\_STOP.
+
 ## Team roles and Claude Code
 
 Code, `CLAUDE.md` and this plan refer to roles, not names. Each person tells Claude Code which role they are in their first message.
@@ -38,8 +55,10 @@ Code, `CLAUDE.md` and this plan refer to roles, not names. Each person tells Cla
 | Role | Person | Owns | First task |
 | --- | --- | --- | --- |
 | Rayan (robots and ML) | Rayan | `server/deadzone/robot/`, `ml/`, `data/floorplans/` | 3 robots sharing targets |
-| Person 2 (backend and network) | *add name* | `sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`, `scripts/` | multi-hop store and forward with custody |
-| Person 3 (frontend and phone) | *add name* | `web/` | phone page and QR join |
+| Person 2 (backend and network) | *Aziz* | `sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`, `scripts/` | multi-hop store and forward with custody |
+| Person 3 (frontend and phone) | *Yusuf* | `web/` | phone page and QR join |
+
+**Shared context lives in the repo.** Each person's Claude follows `docs/team/INSTRUCTIONS.md`: read every `docs/team/history/*.md` before working, and stage your own history entry with every commit (a hook enforces it). Asks between teammates go in the history files' Heads-up and Blocked sections instead of chat messages.
 
 **The phone app is a web page, not an Android APK.** Judges scan a QR code and it opens in their phone browser at `/phone`. Nothing to install, and it works on iPhone too.
 
@@ -202,7 +221,11 @@ Row-major `uint8` array of `w * h` cells, row index = y. Values: `0` unknown, `1
 }
 ```
 
-`state` values: `IDLE`, `DEPLOYING`, `EXPLORING`, `LOST_LINK_EXPLORING`, `RETURNING_TO_SIGNAL`, `RETURNING_HOME`, `REPLANNING`, `FAULT`, `DONE`. `tasks` is the scheduler timeline for the last 100 ms frame in virtual ms (0 to 100). `lidar` holds beam endpoints for drawing.
+`state` values (final): `DEPLOYING`, `EXPLORING`, `LOST_LINK_EXPLORING`, `RETURNING_TO_SIGNAL`, `RETURNING_HOME`, `REPLANNING`, `FAULT`, `DONE`. `fault` values: `null`, `OVERCURRENT`, `STUCK`, `LOW_BATTERY`, `TRAPPED`, `SAFE_STOP` (3 faults in 60 s). `wheel_a` is wheel current in amps.
+
+`tasks` is the scheduler timeline for the last 100 ms frame: a list of `{name, start, dur, missed}` with `start` and `dur` in ms from 0 to 100, sorted by start, never overlapping. A preempted task appears as several pieces. Tasks that didn't run in that frame are absent (comms and mapping every 200 ms, perception every 500 ms, battery every 1000 ms). `missed` turns true for deadline misses in the overload moment. `lidar` holds beam endpoints for drawing.
+
+`relay_dropped` event: `{"kind": "relay_dropped", "id": "RL1", "pos": [x, y], "owner": "R1"}`, ids numbered in drop order, `owner` null for relays placed without a robot. Robots receive plan and command bundles through `io.radio.receive()`. The F key calls `sim.robots[rid].inject_overcurrent()`.
 
 ### DTN bundle
 
@@ -315,7 +338,7 @@ Two WebSockets carry everything live: `/ws/screen` for the big screen and `/ws/p
 
 ### Inside the server
 
-Robots push bundles into their own outbox through `io.radio.send`. Each tick the DTN layer moves bundles along up links (bandwidth limited by RSSI), with custody acks per hop. Bundles that reach `CMD` are handed to `command/post.py`, which updates the Command view. Commands and plans flow the other way as bundles with `dst` = robot id. The broadcaster reads `world` and `post` after the tick and never mutates anything.
+Robots append bundles to their own `robot.outbox` (there is no `io.radio.send`). Each tick the DTN layer moves bundles along up links (bandwidth limited by RSSI), with custody per hop. Bundles that reach `CMD` are handed to `command/post.py`, which updates the Command view. Commands, plans and robot-to-robot telemetry (for target sharing) flow the other way as bundles with `dst` = robot id or broadcast, delivered into a `robot.inbox`. The broadcaster reads the sim and `post` after the tick and never mutates anything. The sim currently also emits `link_up` and `link_down` events for every node pair.
 
 ### Gemini tools
 
@@ -334,7 +357,7 @@ P_{rx} = P_{tx} - L_0 - 10\,n\,\log_{10}\!\left(\frac{d}{d_0}\right) - \sum_{i \
 ```
 
 - P\_tx 20 dBm for robots, relays and the command post. L\_0 = 40 dB at d\_0 = 1 m. n = 2.6 (cluttered collapse).
-- Wall loss by material: drywall 4, brick 10, concrete 16, metal 22 dB. Rubble polygons count as concrete.
+- Wall loss by material: drywall 4, brick 10, concrete 16, metal 22 dB. Each rubble polygon edge crossed costs 8 dB (the rubble material in the floor plan).
 - Link hysteresis: up above -82 dBm, down below -88 dBm. Noise floor -95 dBm.
 - Throughput per link per tick falls linearly from 250 kB/s at -60 dBm to 20 kB/s at -88 dBm.
 - Weak links (-80 to -88 dBm) get a simulated byte error rate. Without FEC most bundles fail CRC and retry. With RS(255,223) up to 16 byte errors per block are corrected, so the transfer succeeds. Show the `fec` flag on the link line.
@@ -375,7 +398,7 @@ The demo can spike perception cost (model inference) to show a deadline miss and
 
 - Frontier = known-free cell with an unknown 4-neighbor. One BFS from the robot over inflated free cells finds reachable frontiers. Group them into clusters.
 - Score per cluster = size - 1.5 x distance - 40 if within 4 m of another robot's target + zone priority bonus. Coordination happens through targets shared in telemetry bundles, so robots out of contact may overlap, which is realistic.
-- A\*: 8-connected, octile heuristic, inflation 2 cells (0.5 m), no-go cells blocked, extra cost near hazards. Replan when a path cell turns occupied, after a stuck fault, or on a new command.
+- A\*: 8-connected, octile heuristic, inflation 1 cell (0.25 m, 2 cells would close the 1.2 m doors), no-go cells blocked, extra cost near hazards. Replan when a path cell turns occupied, after a stuck fault, or on a new command.
 - Frontiers that fail twice are blacklisted.
 
 ### Battery and motor (Rayan)
@@ -390,7 +413,7 @@ The demo can spike perception cost (model inference) to show a deadline miss and
 
 ### Lost-link behavior (Rayan)
 
-No path to CMD for 2 s puts the robot in `LOST_LINK_EXPLORING`. It keeps exploring for the plan's `lost_link_budget_s` (default 60 s), or returns at once if it finds a survivor. In `RETURNING_TO_SIGNAL` it A\*s back to the most recent breadcrumb where the link was up. Once the link is back and the outbox drains (or 10 s pass) it resumes exploring.
+No path to CMD for 2 s puts the robot in `LOST_LINK_EXPLORING`. It keeps exploring for the plan's `lost_link_budget_s` (default 45 s), or returns at once if it finds a survivor. In `RETURNING_TO_SIGNAL` it A\*s back to the most recent breadcrumb where the link was up. Once the link is back and the outbox drains (or 10 s pass) it resumes exploring.
 
 ### Safety checker (Person 2)
 
@@ -460,7 +483,7 @@ Each checkpoint is a 10 minute stand-up at one laptop on the big screen. If a pa
 
 **Scenario tests (headless sim, fixed seed)**
 
-- `test_core_story`: with seed 7, survivor S1 is found by 150 s sim time and appears in the Command view by 220 s.
+- `test_core_story`: with seed 7, survivor S1 is found while the robot has no link and appears in the Command view afterwards (about 213 s and 222 s today with 1 robot, faster with 3).
 - `test_no_leak`: the Command view never contains a survivor or map cell before a bundle carrying it was delivered.
 - `test_soak`: 20 minutes of sim time at 10x speed with no exceptions and memory under 500 MB.
 
@@ -499,7 +522,7 @@ The demo runs on a fixed seed with a director so every beat happens on cue, whil
 | 0:15 | Two judges scan the QR. One assigns Robot 2 to the far zone, the safety card rejects it with the exact reason | Person 3 |
 | 0:40 | Space. Robots enter, lidar sweeps, map grows, relays drop as signal weakens | Person 2 |
 | 1:05 | "Your phone is relay 3, turn it off." Chain breaks, bundles hold, then reroute | Person 2 |
-| 1:30 | Robot 2 goes dark, keeps exploring, finds a survivor on the Reality side only. Point at the ghost robot on the Command side | Rayan |
+| 1:30 | Robot 2 goes dark, keeps exploring, finds a survivor on the Reality side only. The AI card shows the thermal image the onboard detector judged ("Person, 100%"), next to a decoy it rejected. Point at the ghost robot on the Command side | Rayan |
 | 1:55 | Press R. Rubble blocks the corridor, the task timeline shows the safety task preempt, robot replans | Rayan |
 | 2:20 | Robot 2 reconnects, map and survivor burst onto the Command view. Press G, Gemini briefing appears | Person 3 |
 | 2:45 | Close: "The robots are autonomous, and AI detects survivors. Collapsed buildings, mines, wildfires, tunnels." | Rayan |
