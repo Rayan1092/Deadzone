@@ -25,7 +25,6 @@ def session(monkeypatch):
     monkeypatch.setenv("DZ_ROBOTS", "1")
     monkeypatch.delenv("DZ_PUBLIC_URL", raising=False)
     monkeypatch.setattr(api, "hub", api.Hub())
-    api.hub.sim.tick()  # supply real delivered initial robot telemetry
     with TestClient(api.app) as client:
         yield client, api.hub
 
@@ -106,7 +105,8 @@ def test_reconnect_gets_current_draft_and_reset_clears_plans_and_dispatch(sessio
         assert hello["plan"]["plan_id"] == "P-1"
         assert client.post("/api/control", json={"action": "reset"}).status_code == 200
         hello, view = initial(ws)
-        assert hello["plan"] is None and view["robots"] == []
+        assert hello["plan"] is None and [r["id"] for r in view["robots"]] == ["R1"]
+        assert hub.sim.tick_n == 1 and not hub.running
         assert not hub.sim.network.queues["CMD"]
         assert not hub.plans.dispatched
 
@@ -125,11 +125,12 @@ def test_invalid_websocket_messages_return_errors_without_closing_session(sessio
         assert ws.receive_json()["t"] == "plan_state"
 
 
-def test_relay_role_is_read_only_until_relay_session_milestone(session):
+def test_relay_role_cannot_edit_planner_state(session):
     client, hub = session
     with client.websocket_connect("/ws/phone?role=relay") as ws:
         hello, _ = initial(ws)
-        assert hello["relay_id"] is None
+        assert hello["relay_id"] in hub.sim.relays
+        assert ws.receive_json()["t"] == "relay_state"
         ws.send_json({"t": "plan_edit", "data": draft()})
         assert ws.receive_json()["data"]["code"] == "read_only_role"
         assert hub.plans.current() is None

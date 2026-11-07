@@ -6,6 +6,7 @@ import asyncio
 import base64
 import ipaddress
 import json
+import math
 import os
 import socket
 import time
@@ -22,21 +23,27 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
+from .command.controls import FaultRequest, RelayPlace, RelayPower, fault_adapter
+from .command.reports import local_report
 from .command.safety import SafetyChecker
 from .sim import DT, ROBOT_DEFS, Sim
 
 MAPS_EVERY = 5
+MAX_PHONE_RELAYS = 32
 WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 
 
 class Hub:
     def __init__(self):
         self.sim = Sim(n_robots=int(os.environ.get("DZ_ROBOTS", "1")), seed=int(os.environ.get("DZ_SEED", "7")))
+        self.sim.tick()  # real sensor/bundle delivery before the paused QR/plan demo beat
         self.running = False
         self.speed = float(os.environ.get("DZ_SPEED", "2"))
         self.screens: set[WebSocket] = set()
         self.phones: set[WebSocket] = set()
         self.phone_sessions = {}
+        self.relay_clients = {}
+        self.relay_power_requests = {}
         self.next_phone_id = 1
         self.seq = 0
         self._init_plans()
@@ -71,7 +78,60 @@ class Hub:
         return {"floorplan": self.sim.prior.planning_data(),
                 "grid": {"w": self.sim.prior.w, "h": self.sim.prior.h, "cell": self.sim.prior.cell},
                 "robots": robots, "plan": self.plans.current(), "client": client, "role": role,
-                "relay_id": None}
+                "relay_id": self.relay_clients.get(client) if role == "relay" else None}
+
+    def attach_relay(self, client):
+        if client not in self.relay_clients:
+            if sum(bool(r["phone"]) for r in self.sim.relays.values()) >= MAX_PHONE_RELAYS:
+                raise PlanError("relay_limit", "Reset the simulation before adding more phone relays", 409)
+            self.relay_clients[client] = self.sim.add_relay(self.sim.prior.entry, owner=client, phone=True)
+        rid = self.relay_clients[client]
+        self.sim.set_relay_power(rid, self.relay_power_requests.setdefault(client, True))
+        return rid
+
+    def relay_state(self, client):
+        rid = self.relay_clients[client]
+        relay = self.sim.relays[rid]
+        return {"id": rid, "on": relay["on"], "pos": list(relay["pos"]),
+                "queue": len(self.sim.network.queues[rid]),
+                "neighbors": [{"id": node, "rssi": round(rssi, 1)}
+                              for node, rssi in sorted(self.sim.links.neighbors(rid))]}
+
+    async def relay_states(self):
+        for ws, (client, role) in list(self.phone_sessions.items()):
+            if role == "relay":
+                try:
+                    await ws.send_text(self.envelope("relay_state", self.relay_state(client)))
+                except (RuntimeError, WebSocketDisconnect):
+                    await self.disconnect_phone(ws, notify=False)
+
+    async def disconnect_phone(self, ws, notify=True):
+        session = self.phone_sessions.pop(ws, None)
+        self.phones.discard(ws)
+        if session is not None:
+            client, role = session
+            if role == "relay" and client in self.relay_clients and (client, role) not in self.phone_sessions.values():
+                self.sim.set_relay_power(self.relay_clients[client], False)
+                if notify:
+                    await self.relay_states()
+
+    async def plan_state(self, state):
+        message = self.envelope("plan_state", state)
+        await self.send_all(self.phones, message)
+        await self.send_all(self.screens, message)
+
+    async def dispatch(self, plan_id):
+        was_dispatched = plan_id in self.plans.dispatched
+        result = self.plans.dispatch(plan_id)
+        if result["ok"]:
+            await self.plan_state(self.plans.get(plan_id).model_dump(mode="json"))
+            if not was_dispatched:
+                await self.send_all(self.screens, self.envelope("event", {
+                    "kind": "plan_dispatched", "plan_id": plan_id}))
+        else:
+            await self.send_all(self.phones, self.envelope("safety", result))
+            await self.send_all(self.screens, self.envelope("event", {"kind": "safety_reject", **result}))
+        return result
 
     def phone_view(self):
         # Do not call snapshot() here: phones need no Reality objects at all.
@@ -89,24 +149,39 @@ class Hub:
         if not isinstance(message, dict) or not isinstance(message.get("data"), dict):
             raise PlanError("invalid_message", "Expected an envelope with object data", 422)
         kind, data = message.get("t"), message["data"]
+        if role == "relay" and kind in ("relay_place", "relay_power"):
+            rid = self.relay_clients[client]
+            if kind == "relay_power":
+                power = RelayPower.model_validate(data)
+                self.relay_power_requests[client] = power.on
+                self.sim.set_relay_power(rid, power.on)
+            else:
+                placement = RelayPlace.model_validate(data)
+                try:
+                    self.sim.move_relay(rid, placement.pos)
+                except ValueError as error:
+                    raise PlanError("invalid_relay_position", str(error), 422) from None
+            await self.relay_states()
+            return
         if role != "planner":
-            raise PlanError("read_only_role", "Relay sessions are read-only in this milestone", 403)
+            raise PlanError("read_only_role", "Relay sessions cannot edit or submit search plans", 403)
         if kind == "plan_edit":
             plan = SearchPlan.model_validate({**data, "author": client})
             state = self.plans.save(plan)
-            await self.send_all(self.phones, self.envelope("plan_state", state))
+            await self.plan_state(state)
         elif kind == "plan_submit":
             ref = PlanRef.model_validate(data)
             await self.check_plan(ref.plan_id)
         else:
             raise PlanError("unsupported_message", f"Unsupported phone message: {kind}", 422)
 
-    async def broadcast_tick(self):
+    async def broadcast_tick(self, force_maps=False):
         snap = self.sim.snapshot()
         await self.send_all(self.screens, self.envelope("tick", snap))
-        if self.sim.tick_n % MAPS_EVERY == 0:
+        if force_maps or self.sim.tick_n % MAPS_EVERY == 0:
             await self.send_all(self.screens, self.envelope("maps", self.sim.maps()))
             await self.send_all(self.phones, self.envelope("cmd_view", self.phone_view()))
+            await self.relay_states()
         for ev in self.sim.drain_events():
             await self.send_all(self.screens, self.envelope("event", ev))
 
@@ -120,23 +195,51 @@ class Hub:
         elif action == "reset":
             self.running = False
             self.sim.reset()
+            self.sim.tick()
             self._init_plans()
+            self.relay_clients.clear()
+            self.relay_power_requests.clear()
+            for client, role in sorted(set(self.phone_sessions.values())):
+                if role == "relay":
+                    self.attach_relay(client)
             await self.send_all(self.screens, self.hello())
             await self.send_all(self.screens, self.envelope("maps", self.sim.maps()))
+            await self.send_all(self.screens, self.envelope("plan_state", None))
             for ws, (client, role) in list(self.phone_sessions.items()):
                 try:
                     await ws.send_text(self.envelope("hello", self.phone_hello(client, role)))
                 except (RuntimeError, WebSocketDisconnect):
-                    self.phones.discard(ws)
-                    self.phone_sessions.pop(ws, None)
-            await self.broadcast_tick()
+                    await self.disconnect_phone(ws, notify=False)
+            await self.broadcast_tick(force_maps=True)
             return
         elif action == "speed":
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+                raise PlanError("invalid_speed", "Speed must be a finite positive number", 422)
             self.speed = max(0.25, min(10.0, float(value)))
-        elif action == "director" and isinstance(value, dict) and value.get("do") == "rubble":
-            self.sim.drop_rubble(value["at"])
-            await self.send_all(self.screens, self.hello())
+        elif action == "director":
+            if not isinstance(value, dict) or "type" in value:
+                raise PlanError("invalid_director", "Director value must use do, not type", 422)
+            await self.inject_fault(fault_adapter.validate_python({
+                "type": value.get("do"), **{k: v for k, v in value.items() if k != "do"}}))
+        else:
+            raise PlanError("unknown_control", "Unknown control action", 422)
         await self.send_all(self.screens, self.envelope("control", {"running": self.running, "speed": self.speed}))
+
+    async def inject_fault(self, fault):
+        if fault.type == "overcurrent":
+            if fault.robot not in self.sim.robots:
+                raise PlanError("robot_not_found", f"Unknown robot: {fault.robot}", 404)
+            until = self.sim.inject_overcurrent(fault.robot, fault.duration_s)
+            result = {"ok": True, "type": "overcurrent", "robot": fault.robot, "until": until}
+        else:
+            x, y = fault.at
+            if not (0 <= x < self.sim.fp.W and 0 <= y < self.sim.fp.H):
+                raise PlanError("invalid_fault_position", "Rubble position must be inside the floor plan", 422)
+            self.sim.drop_rubble(fault.at, fault.size)
+            await self.send_all(self.screens, self.hello())
+            result = {"ok": True, "type": "rubble", "at": list(fault.at)}
+        await self.broadcast_tick()
+        return result
 
     async def loop(self):
         next_t = time.perf_counter()
@@ -187,6 +290,11 @@ async def request_error(request, error):
                         "msg": "Request validation failed", "issues": validation_issues(error)}})
 
 
+@app.exception_handler(ValidationError)
+async def control_validation_error(request, error):
+    return await request_error(request, error)
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "tick": hub.sim.tick_n, "time": hub.sim.time, "running": hub.running}
@@ -200,16 +308,24 @@ def floorplan():
 @app.post("/api/plan")
 async def save_plan(plan: SearchPlan):
     state = hub.plans.save(plan)
-    await hub.send_all(hub.phones, hub.envelope("plan_state", state))
+    await hub.plan_state(state)
     return await hub.check_plan(plan.plan_id)
 
 
 @app.post("/api/dispatch")
 async def dispatch_plan(ref: PlanRef):
-    result = hub.plans.dispatch(ref.plan_id)
-    if not result["ok"]:
-        await hub.send_all(hub.phones, hub.envelope("safety", result))
-        await hub.send_all(hub.screens, hub.envelope("event", {"kind": "safety_reject", **result}))
+    return await hub.dispatch(ref.plan_id)
+
+
+@app.post("/api/fault")
+async def inject_fault(fault: FaultRequest):
+    return await hub.inject_fault(fault)
+
+
+@app.get("/api/report")
+async def report():
+    result = local_report(hub.sim.post, hub.sim.time)
+    await hub.send_all(hub.screens, hub.envelope("report", result))
     return result
 
 
@@ -250,12 +366,23 @@ async def ws_screen(ws: WebSocket):
     await ws.send_text(hub.hello())
     await ws.send_text(hub.envelope("maps", hub.sim.maps()))
     await ws.send_text(hub.envelope("tick", hub.sim.snapshot()))
+    await ws.send_text(hub.envelope("plan_state", hub.plans.current()))
     try:
         while True:
-            msg = json.loads(await ws.receive_text())
-            if msg.get("t") == "control":
-                d = msg.get("data", {})
-                await hub.control(d.get("action"), d.get("value"))
+            try:
+                msg = json.loads(await ws.receive_text())
+                if not isinstance(msg, dict) or not isinstance(msg.get("data"), dict):
+                    raise PlanError("invalid_message", "Expected an envelope with object data", 422)
+                if msg.get("t") == "control":
+                    d = msg["data"]
+                    await hub.control(d.get("action"), d.get("value"))
+            except (PlanError, ValidationError, json.JSONDecodeError) as error:
+                data = {"code": "invalid_message", "msg": "Invalid screen control"}
+                if isinstance(error, PlanError):
+                    data = {"code": error.code, "msg": str(error)}
+                elif isinstance(error, ValidationError):
+                    data["issues"] = validation_issues(error)
+                await ws.send_text(hub.envelope("error", data))
     except (WebSocketDisconnect, RuntimeError, json.JSONDecodeError):
         pass
     finally:
@@ -274,8 +401,12 @@ async def ws_phone(ws: WebSocket,
     hub.phones.add(ws)
     hub.phone_sessions[ws] = client, role
     try:
+        if role == "relay":
+            hub.attach_relay(client)
         await ws.send_text(hub.envelope("hello", hub.phone_hello(client, role)))
         await ws.send_text(hub.envelope("cmd_view", hub.phone_view()))
+        if role == "relay":
+            await ws.send_text(hub.envelope("relay_state", hub.relay_state(client)))
         while True:
             try:
                 message = json.loads(await ws.receive_text())
@@ -289,11 +420,13 @@ async def ws_phone(ws: WebSocket,
                 else:
                     data = {"code": "invalid_json", "msg": "Message must be valid JSON"}
                 await ws.send_text(hub.envelope("error", data))
+    except PlanError as error:
+        await ws.send_text(hub.envelope("error", {"code": error.code, "msg": str(error)}))
+        await ws.close(code=1008)
     except WebSocketDisconnect:
         pass
     finally:
-        hub.phones.discard(ws)
-        hub.phone_sessions.pop(ws, None)
+        await hub.disconnect_phone(ws)
 
 
 @app.get("/phone", include_in_schema=False)

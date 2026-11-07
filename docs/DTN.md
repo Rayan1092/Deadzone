@@ -49,12 +49,13 @@ sim.set_relay_power(relay_id, True)
 ```
 
 Placement rejects obstacles, no-go zones and positions outside the building.
-`phone=True` marks a backend relay as phone-owned; phone sessions and controls
-are a later milestone.
+`phone=True` marks a backend relay as phone-owned. Sessions, placement and power
+controls are documented in [`FRONTEND-HANDOFF.md`](FRONTEND-HANDOFF.md).
 
 Outgoing commands can be placed in `sim.network.queues["CMD"]` with a robot ID as
 `dst`. Delivered commands collect in `sim.inboxes[robot_id]`; `io.radio.receive()`
-consumes that inbox. Robot policy is responsible for executing the commands.
+consumes that inbox and any unread legacy peer telemetry. Robot policy is
+responsible for executing the commands.
 
 ## Peer telemetry
 
@@ -75,9 +76,11 @@ source TTL and Rayan's `PEER_FRESH_S` (currently 15 sim seconds). The original C
 report retains its normal TTL, so a long outage can still produce a delayed report
 to Command without resurrecting an old peer target claim.
 
-On destination delivery, peer telemetry is appended to the existing robot `inbox`
-for Rayan's `_read_inbox()` on the next robot tick. Plans and commands still use
-`Sim.inboxes` / `io.radio.receive()`. No robot policy changes are required.
+On destination delivery, current robot code can still read peer telemetry from its
+existing `inbox`. `io.radio.receive()` now drains both that buffer and the separate
+command buffer, in priority order, once. If Rayan removes the legacy peer inbox,
+all delivery goes directly into `Sim.inboxes` and remains available through IO.
+There are no duplicate copies; clearing a legacy peer buffer cannot drop commands.
 
 Telemetry byte estimates now use at least the UTF-8 JSON payload length plus a
 64-byte envelope allowance, on both the CMD report and peer copies. The old fixed
@@ -116,10 +119,10 @@ priority/queue pressure, rerouting, reverse-direction commands, relay power/rese
 and delayed Command knowledge. A 100-bundle scenario toggles the middle link every
 3 seconds and checks exactly-once delivery. A real floorplan/RSSI scenario also
 connects an east-wing robot through a relay at `(33, 15)`. The combined suite passes
-89 tests, including peer payload snapshots, dedupe, disconnected/relay TTL expiry,
+the integration tests, including peer payload snapshots, dedupe, disconnected/relay TTL expiry,
 outage recovery, partial-transfer retry, survivor priority, shared bandwidth,
 endpoint-only routing and preservation of the separate command inbox.
 
 Safety/plan APIs and planner phone sessions are described in
-[`PHONE-PLANNING.md`](PHONE-PLANNING.md). Phone relay controls, FEC, Gemini,
+[`PHONE-PLANNING.md`](PHONE-PLANNING.md). FEC, Gemini generation,
 recorder/replay and the full soak test remain subsequent Person 2 milestones.

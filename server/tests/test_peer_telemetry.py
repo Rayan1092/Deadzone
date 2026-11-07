@@ -167,7 +167,7 @@ def test_link_break_during_large_peer_transfer_keeps_custody_and_retries():
     assert len(sim.robots["R2"].inbox) == 1
 
 
-def test_plan_command_inbox_is_separate_from_peer_telemetry_inbox():
+def test_io_receive_combines_plan_and_peer_buffers_without_losing_or_repeating_messages():
     sim = Sim(n_robots=2)
     report(sim)
     plan = make_bundle("CMD", "R2", "plan", {"plan_id": "P1"}, 0, 400)
@@ -175,9 +175,24 @@ def test_plan_command_inbox_is_separate_from_peer_telemetry_inbox():
     advance(sim, links(("R1", "R2"), ("CMD", "R2")), 0.1)
     assert len(sim.robots["R2"].inbox) == 1
     assert sim.robots["R2"].inbox[0]["kind"] == "telemetry"
-    assert sim.ios["R2"].radio.receive() == [dict(plan, custodian="R2", hops=["CMD", "R2"])]
+    received = sim.ios["R2"].radio.receive()
+    assert [b["kind"] for b in received] == ["plan", "telemetry"]
+    assert received[0] == dict(plan, custodian="R2", hops=["CMD", "R2"])
+    assert received[1]["src"] == "R1"
+    assert sim.ios["R2"].radio.receive() == []
     sim.robots["R2"]._read_inbox()
     assert not sim.robots["R2"].inbox
+
+
+def test_transport_supports_removal_of_robot_legacy_peer_inbox():
+    sim = Sim(n_robots=2)
+    del sim.robots["R2"].inbox  # Rayan's future IO-only reader need not keep this attribute
+    report(sim)
+    advance(sim, links(("R1", "R2")), 0.1)
+    received = sim.ios["R2"].radio.receive()
+    assert len(received) == 1 and received[0]["kind"] == "telemetry"
+    assert received[0]["payload"]["target"] == [8, 15]
+    assert sim.ios["R2"].radio.receive() == []
 
 
 def test_report_size_accounts_for_payload_and_peer_ttl_does_not_extend_source_ttl():
