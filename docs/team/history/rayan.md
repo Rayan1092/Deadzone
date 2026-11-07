@@ -3,13 +3,19 @@
 Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions edit this file.
 
 ## Now
-- **Working on:** `rayan/plans` next: robots follow dispatched zones / no-go / `lost_link_budget_s` from `io.radio.receive()`.
+- **Working on:** queued: detector hookup once the ML PR from the testing laptop merges, then task 6 decoys.
 - **Works on main:** frontier exploration, 3-robot target sharing, relay auto-drop, A* return home, lost-link + 10 s reconnect hold, REPLANNING around rubble, rate monotonic scheduler with carry-over and deadline misses, full fault FSM (OVERCURRENT, STUCK, SAFE_STOP, LOW_BATTERY, TRAPPED). Seed 7, 3 robots: S1 found dark at 182.3 s, on Command at 187.3 s, 4 relays.
-- **In flight (not merged):** `rayan/safe-stop-resume`: CMD `resume` command bundle clears SAFE_STOP.
+- **In flight (not merged):** `rayan/safe-stop-resume` (PR #13): CMD `resume` command bundle clears SAFE_STOP. `rayan/plans` (stacked on it): robots follow dispatched plans.
 - **Blocked on / need from others:** Aziz: two director values (see Blocked in the newest entry). Aziz's `p2/peer-telemetry-dtn` replaces my temporary shim; robots read peer telemetry from `robot.inbox` today, so tell me where peer bundles land (`robot.inbox` or `io.radio.receive()`) and I'll switch.
 - **Promises to others:** states final: DEPLOYING, EXPLORING, LOST_LINK_EXPLORING, RETURNING_TO_SIGNAL, RETURNING_HOME, REPLANNING, FAULT, DONE. Faults final: null, OVERCURRENT, STUCK, LOW_BATTERY, TRAPPED, SAFE_STOP. `tasks` slices as in PR #7, `missed` can now be true. Robot hooks: `inject_overcurrent(seconds=1.0)`, `inject_perception_overload(seconds=3.0, wcet_ms=400)`.
 
 ## Log
+
+### 2026-11-07 17:40 · rayan/plans · Robots follow dispatched plans
+- **Did:** a `plan` bundle from CMD (Aziz's `/api/dispatch`, read with `io.radio.receive()`) now drives the robot. While reachable frontiers touch its zone (priority 1 first) it picks only among them; before the zone is on its map it is pulled toward it; once 80% of the zone is mapped it helps anywhere. The plan's `no_go` polygons join the robot's no-go mask (never planned through; a newer plan replaces them). `lost_link_budget_s` replaces the 45 s default. No relay drops inside a `lost_link_ok` zone. Seed 7: Office B zone reached at 21 s instead of 97 s. Demo-style plan (R2 east wing `lost_link_ok`): R2 finds S1 dark at 180.9 s, on Command at 186.0 s.
+- **Contract changes:** new event `plan_applied {robot, plan_id, zones:[ids]}` raised when the robot actually starts following a plan. Telemetry gains `plan_id` (or null) and `zone` (active zone id or null).
+- **Heads-up for others:** Yusuf: show "following P-7 / zone Z1" from `plan_id`/`zone`, and only after `plan_applied` (a dispatch is not proof the robot got it). Aziz: nothing needed; dispatch already works end to end. Demo plan tip: give the robot that should go dark a `lost_link_ok` zone over the east wing, otherwise relays may light it up.
+- **Next:** detector hookup (after the ML PR merges), then task 6 decoys.
 
 ### 2026-11-07 17:10 · rayan/safe-stop-resume · SAFE_STOP can be resumed from CMD
 - **Did:** robots now read `io.radio.receive()` every step. A `command` bundle with payload `{"cmd": "resume"}` clears SAFE_STOP and the fault counter, raises a `resumed` event, then the robot replans and carries on. Plan bundles that arrive are stored on the robot (acted on in `rayan/plans`). The resume only reaches a robot that has a route to CMD; a robot that safe-stopped in a dead zone stays stopped until a relay reaches it (realistic, by design).

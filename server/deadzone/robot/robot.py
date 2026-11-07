@@ -7,7 +7,8 @@ import math
 
 import numpy as np
 
-from ..geometry import wrap_angle
+from ..floorplan import UNKNOWN
+from ..geometry import points_in_poly, wrap_angle
 from ..network.dtn import make_bundle
 from . import planning
 from .mapping import OccupancyMap
@@ -61,6 +62,10 @@ SAFE_STOP_WINDOW_S = 60.0  # ... within this window -> SAFE_STOP
 PERCEPTION_OVERLOAD_MS = 400
 PERCEPTION_OVERLOAD_S = 3.0
 
+# Dispatched plans
+ZONE_PULL_PER_M = 0.7      # before the zone is on our map: score falls with distance to the zone
+ZONE_DONE_KNOWN = 0.8      # stop pulling once this share of the zone's cells is mapped
+
 # Final contract (telemetry): `state` is one of STATES, `fault` is None or one of FAULTS.
 STATES = ("DEPLOYING", "EXPLORING", "LOST_LINK_EXPLORING", "RETURNING_TO_SIGNAL",
           "RETURNING_HOME", "REPLANNING", "FAULT", "DONE")
@@ -94,6 +99,8 @@ class Robot:
         self.entry = entry
         self.map = OccupancyMap(w, h, cell)
         self.nogo = nogo if nogo is not None else np.zeros((h, w), dtype=bool)
+        self.base_nogo = self.nogo.copy()   # hazards known at deploy; plan no-go areas add to it
+        self.zones = []                     # this robot's dispatched zones, highest priority first
         self.battery = Battery()
         self.state = "DEPLOYING"
         self.t = 0.0
@@ -185,6 +192,47 @@ class Robot:
             elif b["kind"] == "plan":
                 if self.plan is None or self.plan.get("_t", -1) <= b["created"]:
                     self.plan = dict(p, _t=b["created"])
+                    self._apply_plan(self.plan)
+
+    def _apply_plan(self, plan):
+        """Follow a dispatched search plan: our zones (frontier preference), the plan's no-go
+        areas (never planned through) and its lost-link budget. A newer plan replaces the old."""
+        h, w = self.nogo.shape
+        xs = (np.arange(w) + 0.5) * self.cell
+        ys = (np.arange(h) + 0.5) * self.cell
+        cx, cy = np.meshgrid(xs, ys)
+        nogo = self.base_nogo.copy()
+        for ng in plan.get("no_go", []):
+            nogo |= points_in_poly(cx, cy, ng["poly"])
+        self.nogo = nogo
+        self.zones = []
+        for z in sorted((z for z in plan.get("zones", []) if z.get("robot") == self.id),
+                        key=lambda z: (z.get("priority", 1), z["id"])):
+            mask = points_in_poly(cx, cy, z["poly"])
+            if not mask.any():
+                continue
+            iy, ix = np.nonzero(mask)
+            self.zones.append({"id": z["id"], "priority": z.get("priority", 1),
+                               "comms": z.get("comms", "relay"), "mask": mask,
+                               "near": planning.dilate(mask, 2),   # catches doorway frontiers
+                               "center": (float(xs[ix].mean()), float(ys[iy].mean()))})
+        if "lost_link_budget_s" in plan:
+            self.lost_budget = float(plan["lost_link_budget_s"])
+        self.path = []                       # replan under the new plan right away
+        self.events.append({"kind": "plan_applied", "robot": self.id, "plan_id": plan.get("plan_id"),
+                            "zones": [z["id"] for z in self.zones]})
+
+    def _active_zone(self):
+        """Highest-priority zone that is not mapped yet, or None."""
+        for z in self.zones:
+            known = (self.map.grid[z["mask"]] != UNKNOWN).mean()
+            if known < ZONE_DONE_KNOWN:
+                return z
+        return None
+
+    def _in_lost_link_ok_zone(self):
+        ix, iy = self._cell(*self.pose[:2])
+        return any(z["comms"] == "lost_link_ok" and z["mask"][iy, ix] for z in self.zones)
 
     def _resume_from_safe_stop(self):
         """CMD `resume`: clear SAFE_STOP and the fault counter, then replan and carry on."""
@@ -276,7 +324,7 @@ class Robot:
         if any(math.dist((x, y), p) < RELAY_MIN_SPACING for p in self._known_relays()):
             return
         ix, iy = self._cell(x, y)
-        if self.nogo[iy, ix]:
+        if self.nogo[iy, ix] or self._in_lost_link_ok_zone():   # planner allowed this zone to be dark
             return
         try:
             io.drop_relay()
@@ -528,6 +576,17 @@ class Robot:
             return False
         claimed = self._claimed_targets()
 
+        # dispatched zone: while frontiers touch our zone, pick only among them; before the
+        # zone shows up on our map, pull toward it; once it is mapped, help anywhere
+        zone = self._active_zone()
+        pull = None
+        if zone is not None:
+            inside = [c for c in clusters if any(zone["near"][y, x] for x, y in c["cells"])]
+            if inside:
+                clusters = inside
+            else:
+                pull = zone["center"]
+
         # score: prefer big frontiers that are close, keep going the same way,
         # stay away from frontiers a higher-priority peer already claimed
         def score(c):
@@ -537,6 +596,8 @@ class Robot:
             gx, gy = (c["goal"][0] + 0.5) * self.cell, (c["goal"][1] + 0.5) * self.cell
             if any(math.dist((gx, gy), t) < PEER_TARGET_RADIUS for t in claimed):
                 s -= PEER_TARGET_PENALTY
+            if pull is not None:
+                s -= ZONE_PULL_PER_M * math.dist((gx, gy), pull)
             return s
         clusters.sort(key=score, reverse=True)
         for c in clusters[:4]:
@@ -650,6 +711,8 @@ class Robot:
                         "reserve_needed_pct": round(RESERVE_PCT + self._pct_home(), 1)},
             "link": link,
             "relays_left": self.relays_left,
+            "plan_id": self.plan.get("plan_id") if self.plan else None,
+            "zone": (self._active_zone() or {}).get("id"),
             "target": self.target,
             "path": [[round(px, 2), round(py, 2)] for px, py in self.path[:60]],
             "lidar": self.lidar_pts,
