@@ -31,6 +31,45 @@ The starter on `main` already runs the core story with one robot. In a headless 
 
 **Not started:** multi-robot coordination (3 robots currently all explore the same room), relays, multi-hop routing, phone app, scheduler and task timeline, full fault FSM, safety checker, Gemini reports, ML detector, Reed-Solomon, CRDT.
 
+## Version 2 plan (7 PM Saturday)
+
+Version 1 works end to end (every demo beat verified on the testing laptop), so the remaining 12 hours go to a version that targets every prize: a real-looking 3D board, a clearer story on one screen, the AI visible in the world, a real Gemini briefing and an over-engineered backend. The phone stays a controller only (plan, relay, ask Gemini). Yusuf owns the 3D design and decides how it looks; the items below are what each person delivers so it all fits together.
+
+### Guardrails (non-negotiable)
+
+- **Demo guard test first.** `DEMO.md` becomes a pytest that runs seed 7 and asserts every beat time within a small tolerance. Any PR that moves a beat fails. Version 1 stays recordable at all times.
+- **Every new feature is behind a toggle or key** until it has passed a full dry run on the testing laptop.
+- **Record the Version 1 backup video tonight** (`?record`, then S, plus a screen recording) before big visual changes land.
+- **7:30 AM feature freeze still holds.** After it: fixes, video, Devpost, rehearsal only.
+
+### UX fixes the team agreed on
+
+- **One main 3D view instead of two side-by-side maps.** The big view shows Reality. What Command doesn't know yet is drawn on the same map: a ghost robot at its last reported spot, tied by a dashed line to the real robot; survivors found but not yet reported get a pulsing "Not reported yet" tag; unreported map area is tinted. A small Command inset or a key toggles the pure Command view. When data arrives, the gap closes visibly (the reveal moment).
+- **Task timeline collapsed by default.** It shows only for the followed robot, and auto-expands during the overload beat (O) and on deadline misses.
+- **Less clutter:** labels only on hover or for the followed robot, the event feed trimmed to the important events, and a clear legend.
+- **The AI visible in the world:** survivors and decoys in the 3D scene use the exact thermal crops the detector judges, so the robot's-eye view (thermal mode) shows the same image that the AI card shows. Rendered frames are not fed to the model (that would be a domain gap; the trained model judges real thermal images).
+
+### Owners and priorities
+
+| Priority | Item | Owner | Prize it serves |
+| --- | --- | --- | --- |
+| 1 | Demo guard test | Rayan | It works |
+| 1 | 3D realism pass and the one-view redesign above | Yusuf | Best UI/UX, Best General |
+| 1 | Real Gemini briefing (G) over Command data via tool calls, plus a phone "Ask Gemini" box for questions like "where should team 2 go?" Gemini never drives robots | Aziz (server), Yusuf (phone box, spoken briefing on the board) | MLH Best Use of Gemini, Best AI/ML |
+| 2 | "Without Deadzone" baseline mode and a 20-seed benchmark (survivors found, time to find, coverage, relays) for a slide and a toggle | Rayan | Best General (usefulness proof) |
+| 2 | Grad-CAM "where the AI looked" heatmap per crop, overlaid on the AI card | Rayan (images), Yusuf (overlay) | Best AI/ML |
+| 2 | Survivor and decoy crops exported with metadata as 3D textures for the in-world thermal look | Rayan (export), Yusuf (scene) | Best AI/ML, UI/UX |
+| 2 | Auto-director camera that cuts to the action (robot going dark, S1 discovery, the reveal) | Yusuf | Pitch, UI/UX |
+| 3 | Aftershock event key: part of the building collapses, a relay is destroyed, the network reroutes, robots replan | Aziz (sim, network), Rayan (robot reactions) | X-factor |
+| 3 | Real Reed-Solomon on weak links with counts of corrected bytes shown on link lines | Aziz (codec), Yusuf (display) | Most Over Engineered |
+| 3 | CRDT offline co-planning on phones (two judges edit offline, plans merge) | Aziz, Yusuf | Most Over Engineered |
+| 3 | Judge-picked building: a procedural collapse generator from any seed (Q&A only, never the main demo) | Rayan | Most Over Engineered, X-factor |
+| 3 | Sound cues (discovery ping, fault alarm, reconnect chime) | Yusuf | UI/UX |
+| 4 | Rescue order list on the phone (route length, risk) | Aziz, Yusuf | Usefulness |
+| 4 | Soak test (20 minutes at 10x, no errors, memory flat) | Aziz, Rayan helps if asked | It works |
+
+**Cut order if behind:** priority 4, then 3, then the auto-director camera. Never cut the demo guard, the one-view redesign or Gemini.
+
 ## Added scope (5:45 PM Saturday)
 
 The team agreed to make the trained AI visible to judges and to make survivor detection lead somewhere useful. Owners are the people in the Team roles table below. Cut the robot's-eye view first if time runs short.
