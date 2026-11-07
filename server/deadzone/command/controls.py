@@ -28,3 +28,20 @@ class OvercurrentFault(Model):
 
 FaultRequest = Annotated[RubbleFault | OvercurrentFault, Field(discriminator="type")]
 fault_adapter = TypeAdapter(FaultRequest)
+
+
+class OverloadControl(Model):
+    type: Literal["overload"]
+    robot: Identifier
+
+
+class ResumeControl(Model):
+    type: Literal["resume"]
+    robot: Identifier
+
+
+DirectorRequest = Annotated[
+    RubbleFault | OvercurrentFault | OverloadControl | ResumeControl,
+    Field(discriminator="type"),
+]
+director_adapter = TypeAdapter(DirectorRequest)

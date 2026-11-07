@@ -35,7 +35,8 @@ class CommandPost:
             if prev is None or prev["sent_t"] <= b["created"]:
                 self.robots[p["id"]] = {"id": p["id"], "pose": p["pose"], "state": p["state"],
                                         "battery_pct": p["battery_pct"], "last_seen": round(b["created"], 1),
-                                        "sent_t": b["created"]}
+                                        "sent_t": b["created"],
+                                        "plan_id": p.get("plan_id"), "zone": p.get("zone")}
         elif k == "map_patch":
             fresh = self.map_sent_t[p["iy"], p["ix"]] <= b["created"]
             ix, iy = p["ix"][fresh], p["iy"][fresh]
@@ -59,7 +60,7 @@ class CommandPost:
     def view(self, now):
         robots = []
         for r in self.robots.values():
-            robots.append({k: r[k] for k in ("id", "pose", "state", "battery_pct", "last_seen")}
+            robots.append({k: r[k] for k in ("id", "pose", "state", "battery_pct", "last_seen", "plan_id", "zone")}
                           | {"stale_s": round(now - r["sent_t"], 1)})
         relays = [{"id": r["id"], "pos": list(r["pos"])} for r in self.relays.values()]
         faults = [{k: v for k, v in f.items() if k != "sent_t"} for f in self.faults.values()]

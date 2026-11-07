@@ -23,9 +23,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
-from .command.controls import FaultRequest, RelayPlace, RelayPower, fault_adapter
+from .command.controls import FaultRequest, RelayPlace, RelayPower, director_adapter
 from .command.reports import local_report
 from .command.safety import SafetyChecker
+from .robot.robot import resume_command
 from .sim import DT, ROBOT_DEFS, Sim
 
 MAPS_EVERY = 5
@@ -219,8 +220,17 @@ class Hub:
         elif action == "director":
             if not isinstance(value, dict) or "type" in value:
                 raise PlanError("invalid_director", "Director value must use do, not type", 422)
-            await self.inject_fault(fault_adapter.validate_python({
-                "type": value.get("do"), **{k: v for k, v in value.items() if k != "do"}}))
+            request = director_adapter.validate_python({
+                "type": value.get("do"), **{k: v for k, v in value.items() if k != "do"}})
+            if request.type in ("overload", "resume"):
+                if request.robot not in self.sim.robots:
+                    raise PlanError("robot_not_found", f"Unknown robot: {request.robot}", 404)
+                if request.type == "overload":
+                    self.sim.robots[request.robot].inject_perception_overload()
+                else:
+                    self.sim.network.queues["CMD"].append(resume_command(request.robot, self.sim.time))
+            else:
+                await self.inject_fault(request)
         else:
             raise PlanError("unknown_control", "Unknown control action", 422)
         await self.send_all(self.screens, self.envelope("control", {"running": self.running, "speed": self.speed}))

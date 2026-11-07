@@ -74,6 +74,9 @@ Immediately after connecting, and again on reset:
    normalized draft or `null`. `relay_id` identifies a relay-role client's node;
    it is `null` for planners.
 2. `cmd_view`: the delivered `{robots,survivors,relays,faults}` Command state plus `map`.
+   Each robot also includes last reported `plan_id` and `zone` (string or null),
+   learned only from delivered telemetry. These do not acknowledge a dispatch;
+   see [`DEMO-CONTROLS.md`](DEMO-CONTROLS.md).
    `map` is base64 of the row-major `uint8` Command occupancy grid. Dimensions and
    cell size come from `hello.grid`; values remain 0 unknown, 1 free, 2 occupied.
    Further views are sent every five sim ticks (2 Hz in simulation time).
