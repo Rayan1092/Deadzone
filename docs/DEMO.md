@@ -57,6 +57,8 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | G | briefing panel, "Local summary · Command data only" | live |
 | Q / Esc | QR join overlay on / off (Esc also closes the briefing) | live |
 | T | faint truth survivors and decoys on Reality only | live |
+| V | robot's-eye camera of the followed robot (with a Thermal toggle) | live |
+| P | performance mode (no shadows, fewer lidar rays); press it if the big screen stutters | live |
 | O | perception overload on the **followed** robot: deadline misses for 3 s | live |
 | U | resume the followed robot from SAFE_STOP (also the "Send resume command" button on its card). Travels over the radio, so it needs a route to CMD | live |
 
@@ -86,7 +88,7 @@ Space is pressed at **0:40**. Times after it come from a headless seed-7 run wit
 | 2:43 | +2:03 (245.8) | **S2** found by R2 while linked, with its route (bonus, only if R/F/O landed on time) | | |
 | 2:45 | | | Rayan | "The robots are autonomous, and AI detects survivors. Collapsed buildings, mines, wildfires, tunnels." |
 
-Rescue routes show on Command only once Aziz stores delivered routes in the Command view and Yusuf draws them (contract in `docs/team/history/rayan.md`). Until then, say the route lines over the survivor burst.
+Rescue routes draw on Reality as soon as a robot computes them (yellow dashed line, beacon ring). On Command and phones they appear only once Aziz adds delivered `command.routes`; Yusuf's drawing is ready. Until then, point at the Reality route during the survivor burst.
 
 R, F, O and U hit the **followed** robot, so check the follow key first.
 
