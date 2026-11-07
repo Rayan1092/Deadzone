@@ -47,6 +47,7 @@ LINK_HOLD_S = 10.0         # after reconnecting, wait at most this long for the 
 PATH_CHECK_M = 3.0         # look this far down the path for new obstacles
 PATH_CHECK_SKIP_M = 0.4    # ignore the robot's own footprint (it may sit in a wall's inflation)
 REPLAN_PAUSE_S = 0.6       # stop briefly in REPLANNING so the replan is visible and the map settles
+REPLAN_COOLDOWN_S = 5.0    # repeat obstacles this soon after a replan are replanned silently
 TRAPPED_AFTER_S = 10.0     # no route for this long raises a TRAPPED fault to the command post
 
 # Wheel overcurrent (plan: above 6 A for 0.5 s -> stop, reverse 0.5 m, mark ahead, replan)
@@ -132,6 +133,7 @@ class Robot:
         self.reconnect_t = None      # when the link last came back after an outage
         self.resume_state = None     # state to go back to after REPLANNING
         self.replan_fail_since = None
+        self.last_replan_done_t = -99.0
 
         self.relays_left = RELAYS_PER_ROBOT
         self.my_relays = []       # [x, y] of relays this robot dropped
@@ -300,8 +302,8 @@ class Robot:
             rec = {"id": s["id"], "pos": [round(s["pos"][0], 2), round(s["pos"][1], 2)],
                    "by": self.id, "t": round(self.t, 1), "conf": s.get("conf", 0.99), "crop": s.get("crop")}
             self.found[s["id"]] = rec
-            if not self.linked:
-                self.found_while_dark = True
+            if not self.linked and not self._peer_found(s["id"]):
+                self.found_while_dark = True    # new news: go back to signal and report it
             self.outbox.append(make_bundle(self.id, "CMD", "survivor", rec, self.t, 400))
             self.events.append({"kind": "survivor_found", "robot": self.id, "survivor": s["id"],
                                 "pos": rec["pos"], "linked": self.linked,
@@ -309,12 +311,16 @@ class Robot:
             self._on_survivor_confirmed(io, rec)
 
     # ------------------------------------------------------------------ rescue route
+    def _peer_found(self, sid):
+        """A peer already confirmed this survivor (from the `found` list in its telemetry)."""
+        return any(sid in (info.get("found") or []) for info in self.peers.values())
+
     def _on_survivor_confirmed(self, io, rec):
         """Send responders the safest route from the entrance to the survivor, computed on our
         own map, to CMD as a priority-1 bundle. If the survivor is in a dead zone (no link here)
         also drop a beacon relay next to them, so responders get radio at the survivor. Where
         there is coverage no beacon is needed (and spending relays there reshapes the network)."""
-        if any(rec["id"] in (info.get("found") or []) for info in self.peers.values()):
+        if self._peer_found(rec["id"]):
             return                         # a peer already confirmed this survivor: no 2nd beacon/route
         beacon = None
         if self.relays_left > 0 and not self.linked:
@@ -596,30 +602,45 @@ class Robot:
 
     # ------------------------------------------------------------------ replanning
     def _start_replan(self, reason):
-        """Stop, mark REPLANNING, and replan for whatever we were doing."""
+        """Stop, mark REPLANNING, and replan for whatever we were doing.
+
+        Anti flip-flop: an obstacle seen again within REPLAN_COOLDOWN_S of the last replan (the
+        map is still settling, e.g. a rubble corner coming into view) is handled by an immediate
+        silent replan with no stop and no state change. Only if that fails do we stop and show
+        REPLANNING."""
         if self.state in ("DEPLOYING", "DONE"):
             return
+        if (reason == "obstacle" and self.state != "REPLANNING"
+                and self.t - self.last_replan_done_t < REPLAN_COOLDOWN_S):
+            ok, resume = self._plan_for(self.state)
+            if ok and resume == self.state:
+                return
         if self.state != "REPLANNING":
             self.resume_state = self.state
             self.events.append({"kind": "replan", "robot": self.id, "reason": reason})
         self.path = []
         self._set_state("REPLANNING")
 
+    def _plan_for(self, state):
+        """Plan for what `state` is doing. Returns (ok, state to resume)."""
+        if state in ("EXPLORING", "LOST_LINK_EXPLORING"):
+            if self._plan_frontier():
+                return True, state
+            if self._plan_to(self.entry):
+                return True, "RETURNING_HOME"      # nothing reachable left to explore
+            return False, state
+        if state == "RETURNING_TO_SIGNAL":
+            return self._plan_to_signal(), state
+        return self._plan_to(self.entry), state
+
     def _replanning(self):
         if self.t - self.state_since < REPLAN_PAUSE_S:
             return
         if self.replan_fail_since is not None and self.t - self.last_plan_t < REPLAN_PERIOD:
             return   # throttle retries while no route exists
-        resume = self.resume_state or "EXPLORING"
-        if resume in ("EXPLORING", "LOST_LINK_EXPLORING"):
-            ok = self._plan_frontier()
-            if not ok and self._plan_to(self.entry):
-                ok, resume = True, "RETURNING_HOME"   # nothing reachable left to explore
-        elif resume == "RETURNING_TO_SIGNAL":
-            ok = self._plan_to_signal()
-        else:
-            ok = self._plan_to(self.entry)
+        ok, resume = self._plan_for(self.resume_state or "EXPLORING")
         if ok:
+            self.last_replan_done_t = self.t
             self.replan_fail_since = None
             if self.fault in ("TRAPPED", "OVERCURRENT", "STUCK"):
                 self._clear_fault()   # recovered
