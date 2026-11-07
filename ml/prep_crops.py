@@ -6,7 +6,7 @@ Positives: person boxes (>= --min-h px tall), squared with a margin.
 Negatives: same-size squares that do not overlap any person box. Half are random
 background, half are centered on non-person objects (cars, etc.: hot but not human).
 FLIR train -> crops/train, FLIR val -> crops/val (held-out test split).
-Also writes 3 positive + 3 negative held-out val crops to ml/crops/runtime/ for the sim.
+Writes crops/<split>/manifest.json (source image + box per crop) for pick_runtime.py.
 """
 import argparse
 import json
@@ -16,7 +16,6 @@ from pathlib import Path
 from PIL import Image
 
 ML_DIR = Path(__file__).resolve().parent
-RUNTIME_DIR = ML_DIR / "crops" / "runtime"
 SIZE = 96
 MARGIN = 0.15
 
@@ -99,9 +98,11 @@ def collect(split_dir, n, min_h, rng):
         if all(iou(sq, p) < 0.05 for p in person_boxes.get(iid, [])):
             neg.append((iid, sq))
 
+    n_obj = min(len(neg_obj), n // 2)   # neg[:n_obj] are object-centered
+
     def to_path(jobs):
         return [(split_dir / images[iid]["file_name"], sq) for iid, sq in jobs]
-    return to_path(pos), to_path(neg)
+    return to_path(pos), to_path(neg), n_obj
 
 
 def write_crops(jobs, out_dir):
@@ -130,28 +131,22 @@ def main():
     ap.add_argument("--n-val", type=int, default=600, help="crops per class for val")
     ap.add_argument("--min-h", type=int, default=20)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--runtime-out", default=str(RUNTIME_DIR))
     args = ap.parse_args()
 
     flir, out = Path(args.flir), Path(args.out)
     rng = random.Random(args.seed)
     for split, src, n in (("train", "images_thermal_train", args.n), ("val", "images_thermal_val", args.n_val)):
-        pos, neg = collect(flir / src, n, args.min_h, rng)
+        pos, neg, n_obj = collect(flir / src, n, args.min_h, rng)
         wp = write_crops(pos, out / split / "pos")
         wn = write_crops(neg, out / split / "neg")
         print(f"{split}: {len(wp)} pos, {len(wn)} neg")
+        manifest = {
+            "pos": [{"i": i, "src": str(pth), "box": sq} for i, (pth, sq) in enumerate(pos)],
+            "neg": [{"i": i, "src": str(pth), "box": sq, "object": i < n_obj} for i, (pth, sq) in enumerate(neg)],
+        }
+        (out / split / "manifest.json").write_text(json.dumps(manifest))
 
-    # runtime crops: held-out val crops that the sim floor plan points at
-    rt = Path(args.runtime_out)
-    rt.mkdir(parents=True, exist_ok=True)
-    rrng = random.Random(args.seed + 1)
-    for cls in ("pos", "neg"):
-        files = sorted((out / "val" / cls).glob("*.png"))
-        rrng.shuffle(files)
-        # prefer bigger-object-looking crops: just take the first 3 after shuffle
-        for k, f in enumerate(files[:3], start=1):
-            Image.open(f).save(rt / f"{cls}_{k:04d}.png")
-    print(f"runtime crops -> {rt}")
+    print("next: py ml/train.py, then py ml/pick_runtime.py to write ml/crops/runtime/")
 
 
 if __name__ == "__main__":
