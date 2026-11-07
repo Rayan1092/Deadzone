@@ -57,10 +57,12 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | G | briefing panel, "Local summary · Command data only" | live |
 | Q / Esc | QR join overlay on / off (Esc also closes the briefing) | live |
 | T | faint truth survivors and decoys on Reality only | live |
+| V | robot's-eye camera of the followed robot (with a Thermal toggle) | live |
+| P | performance mode (no shadows, fewer lidar rays); press it if the big screen stutters | live |
 | O | perception overload on the **followed** robot: deadline misses for 3 s | live |
 | U | resume the followed robot from SAFE_STOP (also the "Send resume command" button on its card). Travels over the radio, so it needs a route to CMD | live |
 
-REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/fault -ContentType application/json -Body '{"type":"overcurrent","robot":"R3"}'`, G `Invoke-RestMethod http://localhost:8000/api/report`.
+REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/fault -ContentType application/json -Body '{"type":"overcurrent","robot":"R3"}'`, G `Invoke-RestMethod http://127.0.0.1:8000/api/report`.
 
 ## Beat sheet
 
@@ -74,7 +76,7 @@ Space is pressed at **0:40**. Times after it come from a headless seed-7 run wit
 | 0:40 | 0 | **Space.** Robots enter. Each takes its zone (`plan_applied`) | Aziz | "Every message, even this plan, travels over the simulated radio." |
 | 0:47 | +0:07 (14.4) | R1 finds **S3** in Office A while linked. It appears on both sides at once, with its **rescue route** from the entrance (14.2 m) | Aziz | "With signal, the report is instant, and the robot sends responders the safest route in." |
 | 1:08 | +0:28 (56.7) | R1's camera sees the **radiator** (D1). The detector rejects it | Rayan | "That's a radiator. Our model, trained on real FLIR thermal images, says it's not a person, so no false alarm." |
-| 1:09 | +0:29 (57.7) | R3 drops **relay RL1** | Aziz | "Robots drop relays just before the link breaks, like the DARPA SubT teams did." |
+| 1:09 | +0:28.5 (57.1) | R3 drops **relay RL1** | Aziz | "Robots drop relays just before the link breaks, like the DARPA SubT teams did." |
 | 1:38 | +0:58 | Press **2**: follow R2 | Rayan | |
 | 1:40 | +0:59.5 (119.1) | R2 enters the **steel cage** and loses link. Command shows a **ghost R2** (its camera stays at the last reported pose) | Rayan | "Steel kills radio. Command post goes blind, but Robot 2 keeps searching." |
 | 1:44 | +1:04.5 (129.0) | R2 finds **S1** in the dark, confidence 1.0, and drops **beacon relay RL2** next to them. **Reality side only** | Rayan | Point at the ghost: "Command doesn't know yet. The report and the rescue route wait in the robot's outbox. It leaves a beacon so responders get radio at the survivor." |
@@ -83,12 +85,16 @@ Space is pressed at **0:40**. Times after it come from a headless seed-7 run wit
 | 2:02 | +1:22.5 (165) | Press **3** then **F**: R3 gets an **OVERCURRENT** fault, backs up 0.5 m and replans | Rayan | "A wheel jams. Fault protection stops it, backs off and tries another way." |
 | 2:07 | +1:27.5 (175) | Press **1** then **O**: the scheduler strip shows **perception missing deadlines** (red) for 3 s, while **safety still runs at 0 and 50 ms** | Rayan | "Rate monotonic scheduling: when the AI overloads the CPU, perception misses deadlines, but the safety task always runs on time." |
 | 2:20 | | Press **0**, then **G**: briefing panel appears | Yusuf | "This briefing only uses what reached the antenna." |
-| 2:33 | +1:53 (226–248) | **S2** found while linked (bonus, if still running) | | |
+| 2:43 | +2:03 (245.8) | **S2** found by R2 while linked, with its route (bonus, only if R/F/O landed on time) | | |
 | 2:45 | | | Rayan | "The robots are autonomous, and AI detects survivors. Collapsed buildings, mines, wildfires, tunnels." |
 
-Rescue routes show on Command only once Aziz stores delivered routes in the Command view and Yusuf draws them (contract in `docs/team/history/rayan.md`). Until then, say the route lines over the survivor burst.
+Rescue routes draw on Reality as soon as a robot computes them (yellow dashed line, beacon ring). On Command and phones they appear only once Aziz adds delivered `command.routes`; Yusuf's drawing is ready. Until then, point at the Reality route during the survivor burst.
 
 R, F, O and U hit the **followed** robot, so check the follow key first.
+
+**Press R, F and O on time** (1:55, 2:02, 2:07). They change what the robots do next, and late or extra presses push the S2 bonus past the 2:45 close. If they slip, skip S2 and close on time.
+
+PowerShell fallbacks use `127.0.0.1`, not `localhost`: on Windows `localhost` tries IPv6 first and hangs about 2 s per call.
 
 Don't press **R** while the followed robot stands in a doorway: rubble in a doorway seals it in (TRAPPED after 10 s). At 1:55 (sim 150) R1 is near the break-room door and still gets around. That worked in the dry run, but watch it.
 
@@ -101,12 +107,12 @@ $p1 = '{"plan_id":"P-1","author":"judge-phone","lost_link_budget_s":60,"no_go":[
  {"id":"ZW","robot":"R1","priority":1,"comms":"relay","poly":[[0,17],[20,17],[20,30],[0,30]]},
  {"id":"ZNE","robot":"R2","priority":1,"comms":"relay","poly":[[32,17],[40,17],[40,30],[32,30]]},
  {"id":"ZB","robot":"R3","priority":1,"comms":"relay","poly":[[20,17],[32,17],[32,30],[20,30]]}]}'
-Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/plan -ContentType application/json -Body $p1
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/plan -ContentType application/json -Body $p1
 # rejected with comms_plan for ZNE
 
 $p2 = $p1.Replace('"P-1"', '"P-2"').Replace('"ZNE","robot":"R2","priority":1,"comms":"relay"', '"ZNE","robot":"R2","priority":1,"comms":"lost_link_ok"')
-Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/plan -ContentType application/json -Body $p2
-Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/dispatch -ContentType application/json -Body '{"plan_id":"P-2"}'
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/plan -ContentType application/json -Body $p2
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/dispatch -ContentType application/json -Body '{"plan_id":"P-2"}'
 ```
 
 The safety check needs the command post to have heard each robot once. Startup and reset run one real tick and then pause (T+0.1 s), so checks and dispatch work before Space.

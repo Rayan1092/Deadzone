@@ -82,3 +82,19 @@ def test_sealed_in_robot_raises_trapped_fault():
     assert r.state == "REPLANNING" and r.fault == "TRAPPED"
     assert any(b["kind"] == "fault" and b["prio"] == 1 for b in r.outbox)
     assert sum(e["kind"] == "fault" for e in r.events) == 1
+
+
+def test_repeat_obstacle_right_after_a_replan_is_replanned_silently():
+    """Anti flip-flop: a second obstacle within the cooldown replans in place, no REPLANNING."""
+    grid = np.full((40, 40), FREE, dtype=np.uint8)
+    grid[:, 0] = grid[:, -1] = grid[0, :] = grid[-1, :] = OCC
+    grid[1:10, 30:39] = 0                         # unknown pocket, so a frontier exists
+    r = Robot("R1", "Scout 1", "#fff", (2.0, 2.0, 0.0), (40, 40), 0.25, (2.0, 2.0))
+    r.map.grid = grid
+    r.state, r.t = "EXPLORING", 50.0
+    r.last_replan_done_t = 48.0                   # replanned 2 s ago
+    r._start_replan("obstacle")
+    assert r.state == "EXPLORING" and r.path and not r.events
+    r.last_replan_done_t = 40.0                   # 10 s ago: a normal, visible replan
+    r._start_replan("obstacle")
+    assert r.state == "REPLANNING" and r.events[-1]["kind"] == "replan"
