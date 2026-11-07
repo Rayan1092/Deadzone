@@ -181,3 +181,27 @@
 .signal.s1 i:nth-child(1) { background: var(--amber); }
 .tool-relay { width: 12px; height: 12px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 3px rgba(45,212,191,.3); }
 .robot .following { color: var(--teal); }
+
+/* tap a robot: last delivered thermal crop */
+.robot { cursor: pointer; }
+.robot.open { box-shadow: 0 0 0 1px var(--c) inset; }
+.caps { display: flex; align-items: center; gap: 6px; }
+.tap-hint { margin-left: auto; color: var(--teal); }
+.last-crop { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; background: var(--surface-2); }
+.last-crop img, .crop-ph { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; image-rendering: pixelated; flex: none; }
+.crop-ph { display: grid; place-items: center; font-size: 11px; color: #fde68a;
+  background: radial-gradient(circle at 50% 45%, #f97316 0, #7c2d12 35%, #1e1b4b 75%); }
+.last-crop.empty { display: block; }
+
+/* liquid glass on the phone: soft color behind, frosted cards on top */
+.phone-app { background:
+  radial-gradient(420px 320px at 0% 0%, rgba(45,212,191,.16), transparent 70%),
+  radial-gradient(420px 360px at 100% 45%, rgba(245,158,11,.10), transparent 70%),
+  radial-gradient(380px 320px at 10% 100%, rgba(167,139,250,.10), transparent 70%), var(--bg); }
+.m3-card, .role-card { background: rgba(30, 36, 42, .55); border: 1px solid rgba(255,255,255,.08);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 8px 24px rgba(0,0,0,.25);
+  backdrop-filter: blur(18px) saturate(150%); -webkit-backdrop-filter: blur(18px) saturate(150%); }
+.safety.pass { background: rgba(34,197,94,.12); }
+.safety.fail { background: rgba(239,68,68,.11); }
+.safety.sent { background: rgba(45,212,191,.1); }
+.editor, .region-row, .relay-stats > div, .neighbor, .last-crop { background: rgba(255,255,255,.05); }

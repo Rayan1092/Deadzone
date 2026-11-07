@@ -8,6 +8,12 @@
   --amber: #f59e0b;
   --red: #ef4444;
   --green: #22c55e;
+  /* liquid glass: translucent fill, blur of whatever is behind, light top edge */
+  --glass: rgba(30, 36, 42, .5);
+  --glass-strong: rgba(26, 31, 36, .72);
+  --glass-edge: rgba(255, 255, 255, .1);
+  --glass-hi: inset 0 1px 0 rgba(255, 255, 255, .07);
+  --glass-blur: blur(16px) saturate(150%);
 }
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; height: 100%; background: var(--bg); color: var(--text);
@@ -183,3 +189,35 @@ button:hover { border-color: var(--teal); }
 .detector-chip.model { background: rgba(45,212,191,.14); color: var(--teal); }
 .detector-chip.sim { background: rgba(245,158,11,.16); color: var(--amber); }
 .resume-btn { width: 100%; margin: 2px 0 6px; padding: 6px; font-size: 12px; border-color: rgba(239,68,68,.5); color: #fecaca; }
+
+/* ---------------------------------------------------------------- liquid glass */
+.app { background:
+  radial-gradient(900px 500px at 8% -10%, rgba(45,212,191,.07), transparent 60%),
+  radial-gradient(800px 500px at 100% 110%, rgba(245,158,11,.05), transparent 60%), var(--bg); }
+.topbar, .sidebar, .timeline { background: linear-gradient(180deg, rgba(34,40,46,.78), rgba(24,28,32,.78));
+  box-shadow: var(--glass-hi); }
+.pane-title, .pane-legend, .toast, .report, .robot-card, .join-card {
+  background: var(--glass); border-color: var(--glass-edge); box-shadow: var(--glass-hi);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+.toast { background: var(--glass-strong); box-shadow: 0 8px 24px rgba(0,0,0,.4), var(--glass-hi); }
+.toast.alert { border-color: rgba(239,68,68,.55); }
+.report { background: var(--glass-strong); box-shadow: 0 12px 32px rgba(0,0,0,.45), var(--glass-hi); }
+.robot-card { background: rgba(255,255,255,.03); }
+.event { background: rgba(255,255,255,.04); }
+
+/* robot's-eye picture-in-picture (Reality pane) */
+.robot-eye { position: absolute; z-index: 4; top: 52px; right: 12px; width: 340px; height: 232px; display: flex;
+  flex-direction: column; border-radius: 14px; overflow: hidden; border: 1px solid var(--glass-edge);
+  background: var(--glass-strong); box-shadow: 0 12px 32px rgba(0,0,0,.5), var(--glass-hi);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+.robot-eye.thermal { border-color: rgba(96,165,250,.5); }
+.eye-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 10px; font-size: 12px; }
+.eye-head .swatch { width: 9px; height: 9px; border-radius: 2px; }
+.eye-head b { margin-right: auto; }
+.eye-toggle, .eye-close { padding: 2px 9px; font-size: 11px; border-radius: 999px; }
+.eye-toggle.on { background: rgba(96,165,250,.2); border-color: #60a5fa; color: #bfdbfe; }
+.eye-close { font-size: 15px; line-height: 18px; }
+.robot-eye > div:not(.eye-head) { flex: 1; }
+.eye-note { position: absolute; left: 10px; bottom: 6px; font-size: 10px; color: rgba(230,237,243,.75); pointer-events: none; }
+.cam-btn { margin-left: auto; padding: 2px 8px; font-size: 11px; border-radius: 999px; }
+.cam-btn.on { border-color: var(--teal); color: var(--teal); }

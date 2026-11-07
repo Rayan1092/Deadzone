@@ -63,18 +63,41 @@ function Legend() {
   )
 }
 
+// The newest delivered survivor report from this robot, with the crop its detector judged.
+function LastCrop({ robot, survivors }) {
+  const last = survivors.filter((s) => s.by === robot).sort((a, b) => b.reported_t - a.reported_t)[0]
+  const [failed, setFailed] = useState(false)
+  if (!last) return <div className="last-crop empty muted small">No survivor reports from {robot} yet</div>
+  return (
+    <div className="last-crop">
+      {last.crop && !failed
+        ? <img src={`/crops/${last.crop}`} alt={`Thermal crop of ${last.id}`} onError={() => setFailed(true)} />
+        : <div className="crop-ph" aria-hidden>thermal</div>}
+      <div>
+        <b>{last.id} · person{last.conf != null ? ` ${Math.round(last.conf * 100)}%` : ''}</b>
+        <div className="muted small">Last thermal crop {robot} reported, T+{fmtClock(last.reported_t)}</div>
+      </div>
+    </div>
+  )
+}
+
 function RobotList() {
   const robots = usePhone((s) => s.hello?.robots ?? NONE)
   const reported = usePhone((s) => s.view?.robots ?? NONE)
   const faults = usePhone((s) => s.view?.faults ?? NONE)
+  const survivors = usePhone((s) => s.view?.survivors ?? NONE)
+  const [open, setOpen] = useState(null)
   const byId = Object.fromEntries(reported.map((r) => [r.id, r]))
   const faultById = Object.fromEntries(faults.map((f) => [f.robot, f]))
   return robots.map((meta) => {
     const r = byId[meta.id]
     const fault = faultById[meta.id]
     const caps = meta.capabilities ?? {}
+    const isOpen = open === meta.id
     return (
-      <div key={meta.id} className="m3-card robot" style={{ '--c': meta.color }}>
+      <div key={meta.id} className={`m3-card robot${isOpen ? ' open' : ''}`} style={{ '--c': meta.color }}
+           role="button" tabIndex={0} aria-expanded={isOpen}
+           onClick={() => setOpen(isOpen ? null : meta.id)}>
         <div className="robot-row">
           <i className="swatch" />
           <b>{meta.name}</b>
@@ -100,8 +123,10 @@ function RobotList() {
         ) : (
           <div className="muted small">Waiting for this robot's first report to reach the antenna</div>
         )}
+        {isOpen && <LastCrop robot={meta.id} survivors={survivors} />}
         <div className="caps muted small">
           {caps.stairs ? 'Can climb stairs' : 'No stairs'} · {caps.max_rubble_height ? `Rubble up to ${caps.max_rubble_height} m` : 'No rubble climbing'}
+          <span className="tap-hint">{isOpen ? 'Tap to close' : 'Tap for last crop'}</span>
         </div>
       </div>
     )
