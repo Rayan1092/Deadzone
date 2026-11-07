@@ -57,8 +57,8 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | G | briefing panel, "Local summary · Command data only" | live |
 | Q / Esc | QR join overlay on / off (Esc also closes the briefing) | live |
 | T | faint truth survivors and decoys on Reality only | live |
-| O | perception overload: deadline misses for 3 s | waiting on Aziz (backend) and Yusuf (key) |
-| resume | clears a robot's SAFE_STOP (director value `{do:"resume", robot}`) | waiting on Aziz, no key yet |
+| O | perception overload on the **followed** robot: deadline misses for 3 s | live |
+| U | resume the followed robot from SAFE_STOP (also the "Send resume command" button on its card). Travels over the radio, so it needs a route to CMD | live |
 
 REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/fault -ContentType application/json -Body '{"type":"overcurrent","robot":"R3"}'`, G `Invoke-RestMethod http://localhost:8000/api/report`.
 
@@ -72,13 +72,13 @@ Space is pressed at **0:40**. Times after it come from a headless seed-7 run wit
 | 0:15 | paused | Q: judges scan the QR and see **P-1** on the phone. A judge taps **Run safety check**: the card rejects it, *"Zone ZNE predicts a dead zone; use a relay chain or lost_link_ok"*, and ZNE pulses red | Yusuf | "The safety checker only uses what the command post knows. It predicts the steel cage is a radio dead zone, so it blocks the plan until we say that zone may go dark." |
 | 0:30 | paused | Judge taps **Allow ZNE to go dark**, runs the check again (pass), taps **Dispatch** | Yusuf | "Robot 2 is now allowed to lose signal in the north-east for up to 60 seconds." |
 | 0:40 | 0 | **Space.** Robots enter. Each takes its zone (`plan_applied`) | Aziz | "Every message, even this plan, travels over the simulated radio." |
-| 0:47 | +0:07 (14.4) | R1 finds **S3** in Office A while linked. It appears on both sides at once | Aziz | "With signal, the report is instant." |
+| 0:47 | +0:07 (14.4) | R1 finds **S3** in Office A while linked. It appears on both sides at once, with its **rescue route** from the entrance (14.2 m) | Aziz | "With signal, the report is instant, and the robot sends responders the safest route in." |
 | 1:08 | +0:28 (56.7) | R1's camera sees the **radiator** (D1). The detector rejects it | Rayan | "That's a radiator. Our model, trained on real FLIR thermal images, says it's not a person, so no false alarm." |
 | 1:09 | +0:29 (57.7) | R3 drops **relay RL1** | Aziz | "Robots drop relays just before the link breaks, like the DARPA SubT teams did." |
 | 1:38 | +0:58 | Press **2**: follow R2 | Rayan | |
 | 1:40 | +0:59.5 (119.1) | R2 enters the **steel cage** and loses link. Command shows a **ghost R2** (its camera stays at the last reported pose) | Rayan | "Steel kills radio. Command post goes blind, but Robot 2 keeps searching." |
-| 1:44 | +1:04.5 (129.0) | R2 finds **S1** in the dark, confidence 1.0. **Reality side only** | Rayan | Point at the ghost: "Command doesn't know yet. The report waits in the robot's outbox." |
-| 1:52 | +1:11.5 (143.1) | R2 reconnects. Map and **S1 burst onto Command**, 14 s after detection | Rayan | "Store and forward: nothing lost, just late." |
+| 1:44 | +1:04.5 (129.0) | R2 finds **S1** in the dark, confidence 1.0, and drops **beacon relay RL2** next to them. **Reality side only** | Rayan | Point at the ghost: "Command doesn't know yet. The report and the rescue route wait in the robot's outbox. It leaves a beacon so responders get radio at the survivor." |
+| 1:52 | +1:11.5 (143.1) | R2 reconnects. Map, **S1 and its 49.7 m rescue route burst onto Command**, 14 s after detection | Rayan | "Store and forward: nothing lost, just late. Responders now have the way in." |
 | 1:55 | +1:15 (150) | Press **1** then **R**: rubble falls ahead of R1, which goes **REPLANNING** and drives around | Rayan | "Rubble falls. The robot sees it, stops and replans on its own." |
 | 2:02 | +1:22.5 (165) | Press **3** then **F**: R3 gets an **OVERCURRENT** fault, backs up 0.5 m and replans | Rayan | "A wheel jams. Fault protection stops it, backs off and tries another way." |
 | 2:07 | +1:27.5 (175) | Press **1** then **O**: the scheduler strip shows **perception missing deadlines** (red) for 3 s, while **safety still runs at 0 and 50 ms** | Rayan | "Rate monotonic scheduling: when the AI overloads the CPU, perception misses deadlines, but the safety task always runs on time." |
@@ -86,7 +86,9 @@ Space is pressed at **0:40**. Times after it come from a headless seed-7 run wit
 | 2:33 | +1:53 (226–248) | **S2** found while linked (bonus, if still running) | | |
 | 2:45 | | | Rayan | "The robots are autonomous, and AI detects survivors. Collapsed buildings, mines, wildfires, tunnels." |
 
-If O isn't wired yet, skip that beat and say the line over the scheduler strip anyway. R and F hit the **followed** robot, so check the follow key first.
+Rescue routes show on Command only once Aziz stores delivered routes in the Command view and Yusuf draws them (contract in `docs/team/history/rayan.md`). Until then, say the route lines over the survivor burst.
+
+R, F, O and U hit the **followed** robot, so check the follow key first.
 
 Don't press **R** while the followed robot stands in a doorway: rubble in a doorway seals it in (TRAPPED after 10 s). At 1:55 (sim 150) R1 is near the break-room door and still gets around. That worked in the dry run, but watch it.
 
@@ -113,10 +115,10 @@ The safety check needs the command post to have heard each robot once. Startup a
 
 | Problem | What to do |
 |---|---|
-| Robot in **SAFE_STOP** (F pressed 3 times on it within 60 s) | Send the **resume** director action for that robot. It arrives over the radio, so the robot needs a route to CMD. If there's no route, say "the watchdog stopped it, a human has to clear it" and carry on. |
+| Robot in **SAFE_STOP** (F pressed 3 times on it within 60 s) | Follow it and press **U** (or the "Send resume command" button on its card). It arrives over the radio, so the robot needs a route to CMD. If there's no route, say "the watchdog stopped it, a human has to clear it" and carry on. |
 | Robot **TRAPPED** (rubble sealed a doorway) | It keeps retrying. It can't be cleared live. Carry on, or reset (below). |
 | Story off script (S1 found while linked, wrong plan sent, keys pressed too early) | **Reset:** Backspace (seed 7, paused; the shared plan clears). Preload P-1 again and redo the phone fix, or send and dispatch P-2 with the fallback, then Space. Speed stays where it was; check it reads 2x. |
-| Log says `sim sensor fallback` | Stop. Install CPU torch (pre-flight step 2) and restart the server. Without it there's no AI story, and (until Aziz's guard lands) decoys could show as survivors. |
+| Log says `sim sensor fallback` | Stop. Install CPU torch (pre-flight step 2) and restart the server. Without it there's no AI story (the sensor then emits no decoys, so no false survivors, but no rejection cards either). |
 | Server crashed | Restart it (pre-flight step 3). The browser reconnects by itself. Then reset and dispatch P-2 again. |
 | Phones can't reach the laptop | Move every device to the phone hotspot, or use `cloudflared`. The demo also runs without phones (plan fallback above). |
 | Nothing works | Replay mode, then the backup video (see `docs/PLAN.md`, Backups). |
