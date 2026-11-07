@@ -3,13 +3,13 @@
 Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`. Only Aziz's sessions edit this file.
 
 ## Now
-- **Working on:** `p2/demo-controls-sensors`: overload, DTN resume, real thermal decoy inputs and delivered phone plan/zone status, based on main `75f9609` (including Yusuf's M4).
+- **Working on:** PR #22, `p2/demo-controls-sensors`: ready for requested merge after syncing main `1414ec2` and Rayan's new fallback-safety requirement.
 - **Works on main:** multi-hop DTN/custody, peer telemetry, planning/safety APIs and all PR #12 contracts (paused first tick, screen plans, phone relay lifecycle, overcurrent/rubble, local report, delivered faults/events). PR #12 is merged. Rayan's plan execution/detector hookup and Yusuf's phone planner/timeline are also on main.
-- **In flight (not merged):** `p2/demo-controls-sensors` implements backend items 1-4. Full backend suite: 159 passed with the CPU model loaded, no skips; latest frontend build passes. Local model environment now has Pillow, CPU torch and torchvision.
-- **Blocked on / need from others:** Yusuf: bind O to `do:"overload"`, add resume UI, consume delivered phone `plan_id`/`zone` if desired; M5 relay phone UI remains frontend-owned. Every demo laptop needs verified model dependencies for decoy rejection (the sim fallback passes decoys through). Later Aziz milestones: Gemini tool-calling, actual FEC, recorder/replay and full LAN/soak rehearsal; CRDT optional.
+- **In flight (not merged):** PR #22 implements backend items 1-4 and suppresses decoys in sim/model-unavailable fallback. Full backend suite: 161 passed with the CPU model loaded, no skips; latest M5 frontend build passes. Local model environment has Pillow, CPU torch and torchvision.
+- **Blocked on / need from others:** Yusuf: bind O to `do:"overload"`, add resume UI, consume delivered phone `plan_id`/`zone` if desired; M5 relay phone UI is now on main. Every demo laptop needs verified model dependencies to demonstrate real decoy rejection; fallback emits survivors only. Newly added scope still needs Aziz's `/crops` static route and detector status in hello, followed by Gemini tool-calling, actual FEC, recorder/replay and full LAN/soak rehearsal; CRDT optional.
 - **Promises to others** (PR #12 on main; follow-up additions in flight):
   - Director adds `{do:"overload",robot}` (400 ms perception work for 3 sim seconds) and `{do:"resume",robot}` (priority-1 command queued at CMD, execution only after network delivery). Existing REST fault variants remain rubble/overcurrent.
-  - `RobotIO.thermal()` includes floorplan decoys with survivor-identical range/FOV/LOS and `{id,pos,crop,conf}` only; no decoy label/flag reaches the robot. Classification remains Rayan-owned.
+  - With the model active, `RobotIO.thermal()` includes floorplan decoys with survivor-identical range/FOV/LOS and `{id,pos,crop,conf}` only; no decoy label/flag reaches the robot. In sim/model-unavailable fallback it emits survivors only. Classification remains Rayan-owned.
   - Command/phone robot records add nullable `plan_id`/`zone`. Source status is sampled once into fresh telemetry before DTN fanout; Command changes only on delivery, and queued old reports are never filled with newer live state.
   - Reset/startup runs one real tick, then stays paused. Safety checks work before Space.
   - `plan_state` goes to `/ws/phone` AND `/ws/screen` on edits and accepted dispatch. Screens get the current plan on connect, `null` on reset. A `plan_dispatched` event marks accepted dispatch.
@@ -21,6 +21,12 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
   - Reported faults in `command.faults` / phone `cmd_view.faults` are delivered history, not live fault flags. No Command/phone truth fallback.
 
 ## Log
+
+### 2026-11-07 14:55 PT · p2/demo-controls-sensors · Sync before merge and protect fallback from false survivors
+- **Did:** integrated main `1414ec2` (Rayan's detection events/scope and Yusuf's M5) before the requested PR #22 merge. Added Rayan's newly merged requirement: the thermal sensor emits no decoys when the active detector is in fallback mode. Full combined suite: 161 passed, no skips; frontend production build passes.
+- **Contract changes:** model mode still emits visible survivors and decoys with identical rules/shape. `DETECTOR=sim`, missing model/dependencies or model-load failure now suppress decoys at the sensor, so passthrough cannot report them as survivors. Added tests for explicit sim and missing-checkpoint fallbacks.
+- **Heads-up for others:** this supersedes the prior entry's fallback warning. Real model tests still verify all three survivor/decoy crop decisions. `/crops` and `hello.detector` are separate newly added scope, not implemented by this PR. O/resume and delivered plan/zone contracts are unchanged.
+- **Next:** publish the tested sync and merge PR #22 as requested, then pull merged main.
 
 ### 2026-11-07 14:49 PT · p2/demo-controls-sensors · Backend demo controls, decoys and phone plan status
 - **Did:** implemented overload and network-delivered resume director controls, real thermal decoy inputs, and delivered Command/phone plan status. Installed CPU torch 2.15.0+cpu, torchvision 0.29.2+cpu and Pillow 13.0.0 in this laptop's uv-managed venv. Verified model mode: all 3 survivor crops accepted, all 3 decoys rejected (0.000, 0.000, 0.003 vs threshold 0.6). Full suite: 159 passed with no skips; production web build passed after syncing Yusuf's M4 main `75f9609` (no new backend changes in that merge).

@@ -14,6 +14,7 @@ from .network.dtn import DTNNetwork, RELAY_QUEUE_BYTES, make_bundle
 from .network.propagation import LinkGraph
 from .robot.lidar import raycast
 from .robot.power import wheel_current
+from .robot.perception import get_detector
 from .robot.robot import BATTERY_TIME_SCALE, PEER_FRESH_S, Robot
 
 DT = 0.1
@@ -87,7 +88,9 @@ class RobotIO:
         """Thermal hot spots in the forward camera cone; classification belongs to the robot."""
         b = self.sim.bodies[self.rid]
         out = []
-        spots = [*self.sim.fp.data.get("survivors", []), *self.sim.fp.data.get("decoys", [])]
+        spots = list(self.sim.fp.data.get("survivors", []))
+        if get_detector().mode == "model":
+            spots.extend(self.sim.fp.data.get("decoys", []))
         for s in spots:
             sx, sy = s["pos"]
             d = math.dist((b["x"], b["y"]), (sx, sy))

@@ -3,6 +3,7 @@ import importlib
 import importlib.util
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -101,6 +102,7 @@ def test_director_websocket_recovers_from_invalid_control(session):
     ((3, 17), False), ((3, 14), False),
 ])
 def test_decoys_and_survivors_obey_identical_sensor_visibility(monkeypatch, pos, visible):
+    monkeypatch.setattr("deadzone.sim.get_detector", lambda: SimpleNamespace(mode="model"))
     sim = Sim()
     sim.bodies["R1"].update(x=2, y=15, th=0)
     sim.fp.data["survivors"] = [{"id": "S", "pos": pos, "thermal": "pos_0001.png"}]
@@ -110,6 +112,21 @@ def test_decoys_and_survivors_obey_identical_sensor_visibility(monkeypatch, pos,
     assert {h["id"] for h in hits} == ({"S", "D"} if visible else set())
     for h in hits:
         assert set(h) == {"id", "pos", "crop", "conf"}  # no truth decoy label
+
+
+@pytest.mark.parametrize("fallback", ["sim", "missing_model"])
+def test_fallback_sensor_never_reports_decoys_as_survivors(monkeypatch, tmp_path, fallback):
+    env = {"DETECTOR": "sim"} if fallback == "sim" else {"DETECTOR_MODEL": str(tmp_path / "missing.pt")}
+    detector = perception.make_detector(env=env)
+    assert detector.mode == "sim"
+    monkeypatch.setattr(perception, "_detector", detector)
+    sim = Sim()
+    decoy = sim.fp.data["decoys"][0]
+    sim.bodies["R1"].update(x=decoy["pos"][0], y=decoy["pos"][1], th=0)
+    sim.fp.data["survivors"] = [{"id": "S-test", "pos": decoy["pos"], "thermal": "pos_0001.png"}]
+    assert {h["id"] for h in sim.ios["R1"].thermal()} == {"S-test"}
+    sim.robots["R1"]._perceive(sim.ios["R1"])
+    assert set(sim.robots["R1"].found) == {"S-test"}
 
 
 @pytest.mark.skipif(importlib.util.find_spec("torch") is None or

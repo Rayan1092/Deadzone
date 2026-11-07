@@ -29,7 +29,7 @@ connection usable. These are director controls, not new `/api/fault` variants.
 
 ## Thermal decoys and model environment
 
-`RobotIO.thermal()` now includes floorplan `decoys` along with survivors, using the
+With the trained model active, `RobotIO.thermal()` includes floorplan `decoys` along with survivors, using the
 same range, forward-camera FOV and line-of-sight rules. Every hit has only
 `{id,pos,crop,conf}`. Decoy labels and truth classification are not exposed to the
 robot. Rayan's detector owns classification; the floorplan and robot policy are
@@ -51,9 +51,9 @@ for inference.
 
 Verify `perception.make_detector(env={}).mode == "model"` and run the model tests.
 `DETECTOR=sim`, missing dependencies or a failed checkpoint load select the existing
-passthrough fallback. That fallback trusts thermal hits, including decoys: it is
-not a demonstration of model rejection. Use the verified model environment for
-the decoy demo.
+passthrough fallback. In fallback mode the sensor emits survivors only, suppressing
+decoys so a missing model cannot turn a radiator into a reported survivor. Use the
+verified model environment to demonstrate real decoy classification/rejection.
 
 ## Delivered plan status
 

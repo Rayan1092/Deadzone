@@ -51,10 +51,18 @@ def test_perceive_uses_the_detector():
     r = robot()
     r._perceive(FakeIO())
     if det.mode == "sim":
-        assert set(r.found) == {"S1", "D1"}       # fallback trusts every hot spot
+        assert set(r.found) == {"S1"} | {"D1"}    # fallback trusts every hot spot
     else:
         assert set(r.found) == {"S1"}             # the model rejects the radiator
         assert r.found["S1"]["conf"] >= det.threshold
+        found = next(e for e in r.events if e["kind"] == "survivor_found")
+        assert found["crop"] == "pos_0001.png" and found["conf"] == r.found["S1"]["conf"]
+        rej = [e for e in r.events if e["kind"] == "hotspot_rejected"]
+        assert len(rej) == 1 and rej[0]["id"] == "D1" and rej[0]["crop"] == "neg_0001.png"
+        assert rej[0]["conf"] < det.threshold
+        r.events.clear()
+        r._perceive(FakeIO())                     # seen again: no repeat events
+        assert not any(e["kind"] in ("hotspot_rejected", "survivor_found") for e in r.events)
 
 
 def test_perceive_falls_back_to_sim_sensor(monkeypatch):
