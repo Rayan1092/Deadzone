@@ -304,7 +304,7 @@ def test_power_cycle_retains_relay_queue_and_reset_clears_network():
 
 def test_real_radio_model_routes_a_dark_robot_through_a_relay():
     sim = Sim()
-    sim.bodies["R1"].update(x=37.5, y=26.0)
+    sim.bodies["R1"].update(x=37.5, y=19.0)   # just south of the steel cage (S1 is inside it)
     sim._update_links()
     assert sim.links.path("R1", "CMD") is None
     relay = sim.add_relay((33, 15), owner="R1")
