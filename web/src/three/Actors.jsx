@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { useSim } from '../store'
 import { COLORS, FOG_H, w2t } from './util'
 import { CommandRelays, RealityLinks, RealityRelays } from './Network'
+import { CommandRoutes, RealityRoutes } from './Routes'
 
 // --------------------------------------------------------------- robot body
 function Headlight() {
@@ -22,6 +23,7 @@ function Headlight() {
 const ROBOT_SCALE = 1.8 // drawn larger than the 0.5 m body so robots read on a projector
 
 function RobotBody({ pose, color, ghost = false, label, sub, headlight = true }) {
+  const perf = useSim((s) => s.perf)
   const group = useRef()
   const sensor = useRef()
   const target = useRef(new THREE.Vector3(...w2t(pose[0], pose[1], 0)))
@@ -67,7 +69,7 @@ function RobotBody({ pose, color, ghost = false, label, sub, headlight = true })
         <meshStandardMaterial color="#e5e7eb" transparent={ghost} opacity={op}
                               emissive="#ffffff" emissiveIntensity={ghost ? 0 : 0.6} />
       </mesh>
-      {!ghost && headlight && <Headlight />}
+      {!ghost && headlight && !perf && <Headlight />}
       </group>
       {label && (
         <Html position={[0, 0.8 * ROBOT_SCALE, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
@@ -83,9 +85,10 @@ function RobotBody({ pose, color, ghost = false, label, sub, headlight = true })
 // --------------------------------------------------------------- lidar rays
 function Lidar({ robot }) {
   const geom = useMemo(() => new THREE.BufferGeometry(), [])
+  const perf = useSim((s) => s.perf)
   const [x, y] = robot.pose
   const pts = []
-  for (const [lx, ly] of robot.lidar) {
+  for (const [lx, ly] of perf ? robot.lidar.filter((_, i) => i % 2 === 0) : robot.lidar) {
     pts.push(x, 0.3, -y, lx, 0.3, -ly)
   }
   geom.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
@@ -220,6 +223,7 @@ export function RealityActors() {
       ))}
       <RealityLinks />
       <RealityRelays />
+      <RealityRoutes />
       {survivors_found.map((s) => <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} found by ${s.by}`} />)}
       {showTruth && (fp.survivors ?? []).filter((s) => !found.has(s.id)).map((s) => (
         <TruthMarker key={s.id} pos={s.pos} id={s.id} />
@@ -252,6 +256,7 @@ export function CommandActors() {
         )
       })}
       <CommandRelays />
+      <CommandRoutes />
       {survivors.map((s) => <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} reported`} born={births.current.get(s.id)} />)}
     </group>
   )

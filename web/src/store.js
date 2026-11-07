@@ -3,12 +3,22 @@ import { create } from 'zustand'
 // Events worth a toast on the big screen. replan, deadline_miss and deliveries
 // fire too often and stay in the sidebar feed or the timeline.
 const TOAST_KINDS = new Set(['survivor_found', 'survivor_reported', 'link_lost', 'link_restored',
-  'relay_dropped', 'fault', 'rubble_fall', 'safety_reject', 'plan_dispatched', 'plan_applied', 'resumed'])
+  'relay_dropped', 'fault', 'rubble_fall', 'safety_reject', 'plan_dispatched', 'plan_applied', 'resumed',
+  'rescue_route', 'rescue_route_reported'])
 const COLLAPSE_KINDS = new Set(['replan', 'deadline_miss'])
 // Radio edges flap constantly and every CMD delivery is an event (several per second);
 // keeping them would push the real stories out of the capped feed.
 const SKIP_KINDS = new Set(['link_up', 'link_down', 'bundle_delivered'])
 let eventId = 0
+
+function readPerf() {
+  try { return localStorage.getItem('dz-perf') === '1' } catch { return false }
+}
+
+export function setPerf(on) {
+  try { localStorage.setItem('dz-perf', on ? '1' : '0') } catch { /* storage blocked: session only */ }
+  useSim.getState().set({ perf: on })
+}
 
 // One store for everything streamed from the sim. Components select what they need.
 export const useSim = create((set) => ({
@@ -34,6 +44,8 @@ export const useSim = create((set) => ({
   report: null,        // briefing from /api/report: { text, generated_at, source } | { loading } | { error }
   detector: null,      // { mode: 'model' | 'sim', reason } from hello, null until the server sends it
   detections: [],      // AI detection cards: { eid, side: 'reality' | 'command', verdict, crop, conf, ... }
+  routes: {},          // Reality rescue routes from robot `rescue_route` events, by survivor id
+  perf: readPerf(),    // P key: lighter rendering for a slow demo laptop (remembered per browser)
   set,
 }))
 
@@ -72,7 +84,7 @@ export function handleMessage(msg) {
       s.set({ floorplan: data.floorplan, grid: data.grid, robotsMeta: data.robots,
               running: data.running, speed: data.speed, time,
               detector: data.detector ? { mode: data.detector, reason: data.detector_reason } : null,
-              ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [], detections: [] } : {}) })
+              ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [], detections: [], routes: {} } : {}) })
       break
     }
     case 'tick': {
@@ -103,6 +115,8 @@ export function handleMessage(msg) {
         top.reason === ev.reason && top.task === ev.task
       const events = fold ? [{ ...ev, count: (top.count ?? 1) + 1 }, ...s.events.slice(1)] : [ev, ...s.events]
       if (ev.kind === 'plan_dispatched') s.set({ dispatchedPlans: [...s.dispatchedPlans, ev.plan_id] })
+      // the robot's own route (Reality knowledge); Command draws only delivered command.routes
+      if (ev.kind === 'rescue_route') s.set({ routes: { ...s.routes, [ev.survivor]: ev } })
       const card = detectionCard(ev, repeat, s.tick)
       if (card) s.set({ detections: [...s.detections, card].slice(-6) })
       s.set({ events: events.slice(0, 40),

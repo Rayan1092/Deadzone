@@ -221,6 +221,27 @@ export default function PlanMap() {
         label(relay.id, X(x), Y(y) + r0 + 7, C.amber, 9)
       }
 
+      // rescue routes Command has received (entrance → survivor), with the beacon relay if any
+      for (const route of view?.routes ?? []) {
+        ctx.beginPath()
+        route.path.forEach(([x, y], i) => (i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))))
+        ctx.setLineDash([6, 4])
+        ctx.strokeStyle = '#facc15'
+        ctx.lineWidth = 3
+        ctx.stroke()
+        ctx.setLineDash([])
+        const [ex2, ey2] = route.path[route.path.length - 1]
+        label(`Route to ${route.survivor} · ${route.length_m.toFixed(1)} m`, X(ex2), Y(ey2) + r0 + 18, '#fef08a', 10, 700)
+        const beacon = route.beacon && (view?.relays ?? []).find((r) => r.id === route.beacon)
+        if (beacon) {
+          ctx.strokeStyle = '#facc15'
+          ctx.lineWidth = 2
+          ctx.beginPath()
+          ctx.arc(X(beacon.pos[0]), Y(beacon.pos[1]), r0 * 1.6, 0, Math.PI * 2)
+          ctx.stroke()
+        }
+      }
+
       // this phone's own relay (relay role): its own state, not Command knowledge
       const mine = usePhone.getState().relay
       if (mine) {

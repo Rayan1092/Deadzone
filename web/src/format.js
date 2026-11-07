@@ -47,6 +47,8 @@ export function describeEvent(e) {
       return e.owner ? `Phone ${e.owner} joined as relay ${e.id}` : `Relay ${e.id} placed`
     case 'relay_power': return `${e.phone ? `Phone relay ${e.id}` : `Relay ${e.id}`} switched ${e.on ? 'on' : 'off'}`
     case 'hotspot_rejected': return `${e.robot}'s detector rejected hot spot ${e.id}: not a person`
+    case 'rescue_route': return `${e.robot} planned a safe route to ${e.survivor} · ${Math.round(e.length_m)} m${e.beacon ? `, beacon ${e.beacon}` : ''}`
+    case 'rescue_route_reported': return `Route to ${e.survivor} reached the command post · ${Math.round(e.length_m)} m`
     case 'deadline_miss': return `${e.robot} missed a ${e.task} deadline`
     case 'rubble_fall': return 'Rubble fell'
     case 'plan_dispatched': return `Plan ${e.plan_id} dispatched to the robots`
