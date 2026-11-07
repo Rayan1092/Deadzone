@@ -73,7 +73,10 @@ Immediately after connecting, and again on reset:
    `robots` contains static `{id,name,color,capabilities}`. `plan` is the current
    normalized draft or `null`. `relay_id` identifies a relay-role client's node;
    it is `null` for planners.
-2. `cmd_view`: the delivered `{robots,survivors,relays,faults}` Command state plus `map`.
+2. `cmd_view`: the delivered `{robots,survivors,relays,faults,routes}` Command state plus `map`.
+   `routes` retains the latest delivered route per survivor; relay records add
+   nullable `beacon_for`. Screen and phone `hello` also include active `detector`
+   status; see [`BACKEND-SCOPE-HANDOFF.md`](BACKEND-SCOPE-HANDOFF.md).
    Each robot also includes last reported `plan_id` and `zone` (string or null),
    learned only from delivered telemetry. These do not acknowledge a dispatch;
    see [`DEMO-CONTROLS.md`](DEMO-CONTROLS.md).

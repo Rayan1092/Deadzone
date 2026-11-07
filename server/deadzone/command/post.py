@@ -1,15 +1,22 @@
 """What the command post knows. Updated ONLY by bundles delivered through the network."""
+from copy import deepcopy
+
 import numpy as np
+from pydantic import ValidationError
+
+from .rescue import RescueRoute
 
 
 class CommandPost:
     def __init__(self, fp):
+        self.size = fp.W, fp.H
         self.map = np.zeros((fp.h, fp.w), dtype=np.uint8)
         self.map_sent_t = np.full((fp.h, fp.w), -np.inf)
         self.robots = {}      # id -> last telemetry + last_seen
         self.relays = {}
         self.survivors = {}   # id -> record + reported_t
         self.faults = {}
+        self.routes = {}      # survivor id -> latest delivered route
         self.delivered = 0
         self.events = []
         self._seen = {}
@@ -20,6 +27,15 @@ class CommandPost:
         self._seen = {bid: expiry for bid, expiry in self._seen.items() if now <= expiry}
         if b["bid"] in self._seen:
             return False
+        route = None
+        if b["kind"] == "rescue_route":
+            try:
+                route = RescueRoute.model_validate(b["payload"])
+            except ValidationError:
+                return False
+            if route.by != b["src"] or any(
+                    not (0 <= x <= self.size[0] and 0 <= y <= self.size[1]) for x, y in route.path):
+                return False
         self._seen[b["bid"]] = b["created"] + b["ttl"]
         self.delivered += 1
         p = b["payload"]
@@ -29,7 +45,7 @@ class CommandPost:
             version = b["created"], p.get("revision", 0)
             if prev is None or (prev["sent_t"], prev.get("revision", 0)) <= version:
                 self.relays[p["id"]] = {"id": p["id"], "pos": list(p["pos"]), "sent_t": b["created"],
-                                         "revision": version[1]}
+                                         "revision": version[1], "beacon_for": p.get("beacon_for")}
         elif k == "telemetry":
             prev = self.robots.get(p["id"])
             if prev is None or prev["sent_t"] <= b["created"]:
@@ -47,6 +63,15 @@ class CommandPost:
             prev = self.faults.get(robot)
             if prev is None or prev["sent_t"] <= b["created"]:
                 self.faults[robot] = dict(p, sent_t=b["created"], reported_t=round(now, 1))
+        elif k == "rescue_route":
+            prev = self.routes.get(route.survivor_id)
+            if prev is None or prev["t"] < route.t:
+                record = route.model_dump(mode="json", exclude={"survivor_id"})
+                record.update(survivor=route.survivor_id, reported_t=round(now, 1),
+                              beacon=route.beacon_id, clearance_m=route.clearance_m)
+                self.routes[route.survivor_id] = record
+                self.events.append({"kind": "rescue_route_reported", **deepcopy(record),
+                                    "delay_s": round(now - route.t, 1)})
         elif k == "survivor":
             if p["id"] not in self.survivors:
                 rec = dict(p)
@@ -62,6 +87,9 @@ class CommandPost:
         for r in self.robots.values():
             robots.append({k: r[k] for k in ("id", "pose", "state", "battery_pct", "last_seen", "plan_id", "zone")}
                           | {"stale_s": round(now - r["sent_t"], 1)})
-        relays = [{"id": r["id"], "pos": list(r["pos"])} for r in self.relays.values()]
+        relays = [{"id": r["id"], "pos": list(r["pos"]), "beacon_for": r["beacon_for"]}
+                  for r in self.relays.values()]
         faults = [{k: v for k, v in f.items() if k != "sent_t"} for f in self.faults.values()]
-        return {"robots": robots, "survivors": list(self.survivors.values()), "relays": relays, "faults": faults}
+        routes = [deepcopy(self.routes[sid]) for sid in sorted(self.routes)]
+        return {"robots": robots, "survivors": list(self.survivors.values()), "relays": relays,
+                "faults": faults, "routes": routes}

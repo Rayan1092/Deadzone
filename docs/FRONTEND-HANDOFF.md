@@ -1,5 +1,9 @@
 # Person 2 → Person 3 integration contract
 
+For the Added scope follow-up (crop images, active detector status, delivered
+rescue routes and beacon metadata), see
+[`BACKEND-SCOPE-HANDOFF.md`](BACKEND-SCOPE-HANDOFF.md).
+
 This addresses the demo dependencies raised by the frontend team. All controls
 below use the existing `{t,seq,time,data}` server envelopes. No frontend or robot
 policy files are changed by this backend work.

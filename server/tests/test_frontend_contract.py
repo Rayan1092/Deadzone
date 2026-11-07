@@ -294,7 +294,7 @@ def test_relay_positions_at_same_sim_time_do_not_rewind_command_when_reordered()
     assert old["payload"]["pos"] == [8, 15]
     sim.post.receive(dict(latest, custodian="CMD"), 0)
     sim.post.receive(dict(old, custodian="CMD"), 0)
-    assert sim.post.view(0)["relays"] == [{"id": rid, "pos": [9, 15]}]
+    assert sim.post.view(0)["relays"] == [{"id": rid, "pos": [9, 15], "beacon_for": None}]
 
 
 def test_own_relay_updates_do_not_overfill_a_full_custody_queue():
