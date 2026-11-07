@@ -42,7 +42,8 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 4. The server log must say `survivor detector: trained model, threshold 0.60`. If it says `sim sensor fallback (...)`, fix torch before going on stage. The top-bar chip (coming from Yusuf) will show the same thing.
 5. Open `http://localhost:8000` on the big screen. Phones join with **Q** (QR) on the same Wi-Fi, or on the phone hotspot.
 6. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
-7. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
+7. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped recording, and keep the file next to the backup video.
+8. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
 
 ## Director keys (big screen)
 
@@ -59,6 +60,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | T | faint truth survivors and decoys on Reality only | live |
 | V | robot's-eye camera of the followed robot (with a Thermal toggle) | live |
 | P | performance mode (no shadows, fewer lidar rays); press it if the big screen stutters | live |
+| S | save the recording (only when the page was opened with `?record`) | live |
 | O | perception overload on the **followed** robot: deadline misses for 3 s | live |
 | U | resume the followed robot from SAFE_STOP (also the "Send resume command" button on its card). Travels over the radio, so it needs a route to CMD | live |
 
@@ -127,7 +129,7 @@ The safety check needs the command post to have heard each robot once. Startup a
 | Log says `sim sensor fallback` | Stop. Install CPU torch (pre-flight step 2) and restart the server. Without it there's no AI story (the sensor then emits no decoys, so no false survivors, but no rejection cards either). |
 | Server crashed | Restart it (pre-flight step 3). The browser reconnects by itself. Then reset and dispatch P-2 again. |
 | Phones can't reach the laptop | Move every device to the phone hotspot, or use `cloudflared`. The demo also runs without phones (plan fallback above). |
-| Nothing works | Replay mode, then the backup video (see `docs/PLAN.md`, Backups). |
+| Nothing works | Replay the recording: open `/?replay` and drop the file in (Space pauses, Backspace restarts). It needs no sim, but the detection card images only load if the server is running. Last resort: the backup video. |
 
 ## Judge questions (one answer each)
 
