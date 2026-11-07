@@ -9,7 +9,7 @@ import { followRobot, overview } from '../three/camera'
 const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot'], ['0', 'overview'], ['R', 'rubble ahead of robot'],
   ['F', 'wheel overcurrent'], ['O', 'perception overload'], ['U', 'resume after safe stop'],
-  ['G', 'briefing'], ['T', 'truth overlay'], ['Q', 'phone join QR'], ['+ / −', 'speed'], ['⌫', 'reset'],
+  ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'], ['Q', 'phone join QR'], ['+ / −', 'speed'], ['⌫', 'reset'],
 ]
 
 export function TopBar() {
@@ -60,6 +60,7 @@ export function Sidebar() {
   const time = useSim((s) => s.time)
   const events = useSim((s) => s.events)
   const follow = useSim((s) => s.follow)
+  const eye = useSim((s) => s.eyeRobot)
   const robots = tick?.reality.robots ?? []
   const cmdRobots = Object.fromEntries((tick?.command.robots ?? []).map((r) => [r.id, r]))
   return (
@@ -76,6 +77,10 @@ export function Sidebar() {
             <div className="row">
               <span className="swatch" />
               <b>{r.name}</b>
+              <button className={`cam-btn${eye === r.id ? ' on' : ''}`} title="Robot's camera (V)"
+                      onClick={(e) => { e.stopPropagation(); useSim.getState().set({ eyeRobot: eye === r.id ? null : r.id }) }}>
+                Camera
+              </button>
               <span className={`pill ${r.link.up ? 'ok' : 'bad'}`}>{r.link.up ? `${r.link.rssi} dBm` : 'No link'}</span>
             </div>
             <div className="state">
@@ -131,7 +136,8 @@ export function useKeyboard() {
       const target = robots.find((r) => r.id === s.follow) ?? robots[0]
       const key = e.key.toLowerCase()
       if (key === 'q') s.set({ joinOpen: !s.joinOpen })
-      if (e.key === 'Escape') s.set({ joinOpen: false, report: null })
+      if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null })
+      if (key === 'v' && target) s.set({ eyeRobot: s.eyeRobot === target.id ? null : target.id })
       if (key === 't') s.set({ showTruth: !s.showTruth })
       if (e.code === 'Space') { e.preventDefault(); control('toggle') }
       if (e.code === 'Backspace') control('reset')

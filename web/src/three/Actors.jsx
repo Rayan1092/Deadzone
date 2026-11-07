@@ -111,7 +111,7 @@ function lieAngle(id = '') {
 const HOT = { color: '#ffd166', emissive: '#ffb02e', emissiveIntensity: 1.6, flatShading: true, roughness: 0.7 }
 const WARM = { color: '#ff7a3d', emissive: '#ff4d1a', emissiveIntensity: 1.3, flatShading: true, roughness: 0.7 }
 const COOL = { color: '#c2410c', emissive: '#9a2a0a', emissiveIntensity: 1.0, flatShading: true, roughness: 0.8 }
-function PersonFigure({ id }) {
+export function PersonFigure({ id }) {
   return (
     <group rotation={[0, lieAngle(id), 0]} scale={1.5}>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>

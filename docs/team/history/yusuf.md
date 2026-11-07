@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/visual-pass` (M7, stacked on M6 / PR #24): survivor figures, bigger robots, phone tap-a-robot, liquid glass done; robot's-eye view next; rescue route when Rayan's contract lands.
+- **Working on:** `p3/visual-pass` (M7, stacked on M6 / PR #24): figures, bigger robots, phone last crop, liquid glass and robot's-eye view committed. Rescue route drawing when Rayan's contract lands; then rehearsal fixes and the replay fallback.
 - **Works on main:** M1 phone + QR (PR #10), M2 network visuals + toasts + T (PR #16), M3 plan editor + safety card (PR #18), M4 scheduler strip + follow cam + F/G (PR #20), M5 relay phone mode (PR #23).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,12 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-07 21:20 · p3/visual-pass · M7 part 2: robot's-eye view
+- **Did:** V (or a robot card's Camera button) opens a small picture-in-picture on the Reality pane from that robot's forward camera (Reality telemetry pose, smoothed). Thermal toggle: walls cold blue, survivors glow white-hot and decoys glow amber, so judges see why the detector has to decide. It is a third small WebGL canvas (dpr 1, low-power) that only exists while open.
+- **Contract changes:** none. New key V.
+- **Heads-up for others:** Rayan: robot's-eye view done in `web/src/three/RobotEye.jsx` as agreed; DEMO.md can add V. Closing the camera logs "THREE.WebGLRenderer: Context Lost" in the console; that is the PiP disposing its own context, not a crash.
+- **Next:** rescue route drawing (waiting on the `rescue_route` contract), rehearsal fixes.
 
 ### 2026-11-07 21:00 · p3/visual-pass · M7 part 1: survivor figures, bigger robots, phone last crop, liquid glass
 - **Did:** survivors are low-poly people lying down in thermal colors (head hottest) with a warm floor glow, pulsing ring and arrival shockwave kept. Robots draw 1.8× with stronger emissive and a colored glow pool (ghosts stay dim). Phone: tap a robot card to see the last thermal crop and verdict it reported (delivered `cmd_view.survivors[]` with `by` = that robot). Liquid glass: frosted overlays on the panes, translucent top bar / sidebar / scheduler, phone cards frosted over a soft color wash.

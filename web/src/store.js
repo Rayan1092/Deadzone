@@ -29,6 +29,8 @@ export const useSim = create((set) => ({
   plan: null,          // shared search plan from plan_state (null when none)
   dispatchedPlans: [], // plan IDs with an accepted dispatch (plan_dispatched events)
   follow: null,        // robot id the cameras follow (keys 1-3), null = overview
+  eyeRobot: null,      // robot whose forward camera is open (V key / card button)
+  eyeThermal: false,   // thermal palette in the robot's-eye view
   report: null,        // briefing from /api/report: { text, generated_at, source } | { loading } | { error }
   detector: null,      // { mode: 'model' | 'sim', reason } from hello, null until the server sends it
   detections: [],      // AI detection cards: { eid, side: 'reality' | 'command', verdict, crop, conf, ... }

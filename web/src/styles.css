@@ -204,3 +204,20 @@ button:hover { border-color: var(--teal); }
 .report { background: var(--glass-strong); box-shadow: 0 12px 32px rgba(0,0,0,.45), var(--glass-hi); }
 .robot-card { background: rgba(255,255,255,.03); }
 .event { background: rgba(255,255,255,.04); }
+
+/* robot's-eye picture-in-picture (Reality pane) */
+.robot-eye { position: absolute; z-index: 4; top: 52px; right: 12px; width: 340px; height: 232px; display: flex;
+  flex-direction: column; border-radius: 14px; overflow: hidden; border: 1px solid var(--glass-edge);
+  background: var(--glass-strong); box-shadow: 0 12px 32px rgba(0,0,0,.5), var(--glass-hi);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+.robot-eye.thermal { border-color: rgba(96,165,250,.5); }
+.eye-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 10px; font-size: 12px; }
+.eye-head .swatch { width: 9px; height: 9px; border-radius: 2px; }
+.eye-head b { margin-right: auto; }
+.eye-toggle, .eye-close { padding: 2px 9px; font-size: 11px; border-radius: 999px; }
+.eye-toggle.on { background: rgba(96,165,250,.2); border-color: #60a5fa; color: #bfdbfe; }
+.eye-close { font-size: 15px; line-height: 18px; }
+.robot-eye > div:not(.eye-head) { flex: 1; }
+.eye-note { position: absolute; left: 10px; bottom: 6px; font-size: 10px; color: rgba(230,237,243,.75); pointer-events: none; }
+.cam-btn { margin-left: auto; padding: 2px 8px; font-size: 11px; border-radius: 999px; }
+.cam-btn.on { border-color: var(--teal); color: var(--teal); }
