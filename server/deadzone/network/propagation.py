@@ -66,8 +66,11 @@ class LinkGraph:
                 out.append((b if a == n else a, self.rssi[(a, b)]))
         return out
 
-    def path(self, src, dst):
-        """Cheapest path by Dijkstra, cost = 1 + (-60 - rssi) / 10. Returns list of node ids or None."""
+    def path(self, src, dst, avoid=()):
+        """Cheapest Dijkstra path, excluding prior custodians in ``avoid``.
+
+        Cost = 1 + max(0, (-60 - rssi) / 10). Returns node ids or None.
+        """
         import heapq
         dist = {src: 0.0}
         prev = {}
@@ -82,6 +85,8 @@ class LinkGraph:
             if d > dist.get(n, 1e18):
                 continue
             for m, r in self.neighbors(n):
+                if m in avoid:
+                    continue
                 nd = d + 1 + max(0.0, (-60 - r) / 10)
                 if nd < dist.get(m, 1e18):
                     dist[m] = nd

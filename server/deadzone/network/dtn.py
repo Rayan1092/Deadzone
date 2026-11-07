@@ -1,16 +1,15 @@
-"""Delay-tolerant bundles.
+"""Deterministic, bandwidth-limited store and forward with per-hop custody.
 
-1:30-5:00 milestone: single hop store and forward. A node keeps every bundle in its
-outbox until the link graph has a path to the destination, then hands bundles over
-in priority order, limited by link throughput. The receiver taking the bundle is the
-custody transfer, so a bundle is never in two places and never lost.
-
-Person 2 extends this at 5:00 PM: per-hop forwarding through relays, custody acks,
-dedupe by bid, TTL expiry, relay queues.
+A hop is acknowledged atomically after the receiver stores the complete bundle.
+Until then the sender retains custody. An interrupted hop restarts on reconnect;
+ack packets themselves have no simulated latency or loss yet.
 """
 import itertools
 
+from .propagation import throughput_bps
+
 PRIO = {"survivor": 0, "fault": 1, "command": 1, "plan": 1, "telemetry": 2, "map_patch": 3}
+RELAY_QUEUE_BYTES = 2_000_000
 _seq = itertools.count(1)
 
 
@@ -30,18 +29,117 @@ def make_bundle(src, dst, kind, payload, created, size, ttl=900.0):
     }
 
 
-def drain_outbox(outbox, budget_bytes, now):
-    """Pop bundles in (priority, age) order until the byte budget is spent.
+def _order(bundle):
+    return bundle["prio"], bundle["created"], bundle["bid"]
 
-    Returns the delivered bundles. Expired bundles are dropped.
-    """
-    outbox[:] = [b for b in outbox if now - b["created"] <= b["ttl"]]
-    outbox.sort(key=lambda b: (b["prio"], b["created"]))
-    sent = []
-    while outbox and (budget_bytes >= outbox[0]["size"] or not sent):
-        b = outbox.pop(0)
-        budget_bytes -= b["size"]
-        sent.append(b)
-        if budget_bytes <= 0:
-            break
-    return sent
+
+class DTNNetwork:
+    def __init__(self):
+        self.queues = {}
+        self.limits = {}
+        self._seen = {}       # receiver -> bid -> expiry, including forwarded bundles
+        self._delivered = {}  # bid -> expiry (destination dedupe)
+        self._progress = {}   # (sender, receiver, bid) -> bytes transmitted
+
+    def register(self, node, outbox=None, capacity_bytes=None):
+        """Attach an existing robot outbox, or create a relay/command queue."""
+        if node in self.queues:
+            raise ValueError(f"Node already registered: {node}")
+        self.queues[node] = [] if outbox is None else outbox
+        self.limits[node] = capacity_bytes
+        self._seen[node] = {}
+
+    def _expire(self, now):
+        for node, queue in self.queues.items():
+            bids = set()
+            kept = []
+            for b in queue:
+                if now <= b["created"] + b["ttl"] and b["bid"] not in bids:
+                    kept.append(b)
+                    bids.add(b["bid"])
+            queue[:] = kept
+            self._seen[node] = {bid: expiry for bid, expiry in self._seen[node].items()
+                                if now <= expiry}
+        self._delivered = {bid: expiry for bid, expiry in self._delivered.items() if now <= expiry}
+
+    def _accept(self, node, bundle):
+        """Return a custody ack only after storage, or for an already stored bid."""
+        bid = bundle["bid"]
+        queue = self.queues[node]
+        if bid in self._seen[node] or any(b["bid"] == bid for b in queue):
+            return True
+        limit = self.limits[node]
+        evict = []
+        if limit is not None:
+            needed = sum(b["size"] for b in queue) + bundle["size"] - limit
+            # Prefer life-critical reports, then older bundles. Reject without
+            # touching the receiver if even eviction cannot make enough space.
+            for b in sorted(queue, key=_order, reverse=True):
+                if needed <= 0 or _order(b) <= _order(bundle):
+                    break
+                evict.append(b["bid"])
+                needed -= b["size"]
+            if needed > 0:
+                return False
+        if evict:
+            queue[:] = [b for b in queue if b["bid"] not in evict]
+            for dropped in evict:
+                self._seen[node].pop(dropped, None)
+        received = dict(bundle, custodian=node, hops=[*bundle["hops"], node])
+        queue.append(received)
+        self._seen[node][bid] = bundle["created"] + bundle["ttl"]
+        return True
+
+    def step(self, links, dt, now):
+        """Advance transfers and return bundles that arrived at their destination.
+
+        Only queues present at tick start may transmit: every hop takes at least
+        one tick. Both directions share one byte budget per physical link. A route
+        must exist at tick start; a relay retains custody if that route later dies.
+        """
+        self._expire(now)  # expiry must also run while completely disconnected
+        candidates = [(node, b) for node in sorted(self.queues) for b in self.queues[node]]
+        candidates.sort(key=lambda item: (*_order(item[1]), item[0]))
+        budgets, progress, routes = {}, {}, {}
+        for sender, bundle in candidates:
+            if bundle["dst"] == sender:
+                continue
+            if not any(b is bundle for b in self.queues[sender]):
+                continue  # another transfer may have evicted this queued bundle
+            # Do not revisit a previous custodian, whose receipt would otherwise
+            # acknowledge a copy it already forwarded. Wait for a loop-free route.
+            route_key = sender, bundle["dst"], tuple(bundle["hops"][:-1])
+            if route_key not in routes:
+                routes[route_key] = links.path(sender, bundle["dst"], avoid=route_key[2])
+            path = routes[route_key]
+            if not path or len(path) < 2 or path[1] not in self.queues:
+                continue
+            receiver = path[1]
+            edge = tuple(sorted((sender, receiver)))
+            if edge not in budgets:
+                budgets[edge] = throughput_bps(links.link_rssi(*edge)) * dt
+            if budgets[edge] <= 0:
+                continue
+            key = sender, receiver, bundle["bid"]
+            sent = self._progress.get(key, 0.0)
+            amount = min(bundle["size"] - sent, budgets[edge])
+            sent += amount
+            budgets[edge] -= amount
+            if sent + 1e-9 < bundle["size"]:
+                progress[key] = sent
+                continue
+            if self._accept(receiver, bundle):
+                # The receiver's successful custody ack is the ONLY place a
+                # transmitted bundle is removed from the sender's outbox.
+                self.queues[sender][:] = [b for b in self.queues[sender]
+                                         if b["bid"] != bundle["bid"]]
+                self._seen[sender][bundle["bid"]] = bundle["created"] + bundle["ttl"]
+        self._progress = progress  # drop partial hops interrupted by link/route changes
+        delivered = []
+        for node, queue in self.queues.items():
+            for b in queue:
+                if b["dst"] == node and b["bid"] not in self._delivered:
+                    self._delivered[b["bid"]] = b["created"] + b["ttl"]
+                    delivered.append(b)
+            queue[:] = [b for b in queue if b["dst"] != node]
+        return delivered
