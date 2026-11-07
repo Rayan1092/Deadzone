@@ -67,6 +67,12 @@ STATES = ("DEPLOYING", "EXPLORING", "LOST_LINK_EXPLORING", "RETURNING_TO_SIGNAL"
 FAULTS = ("OVERCURRENT", "STUCK", "LOW_BATTERY", "TRAPPED", "SAFE_STOP")
 
 
+def resume_command(rid, now):
+    """Bundle the command post sends to clear a robot's SAFE_STOP. CMD code enqueues it in the
+    CMD network queue; it reaches the robot only if a route exists (custody like any bundle)."""
+    return make_bundle("CMD", rid, "command", {"cmd": "resume"}, now, 64)
+
+
 def is_robot_id(nid):
     """R1, R2 ... are robots. RL1 (relay), CMD and phones are infrastructure."""
     return len(nid) > 1 and nid[0] == "R" and nid[1:].isdigit()
@@ -140,6 +146,7 @@ class Robot:
         self.fault_times = []        # motion faults in the SAFE_STOP window
         self.low_battery = False
         self.overload_until = None
+        self.plan = None             # latest plan bundle payload from CMD (acted on in step A)
 
     # ------------------------------------------------------------------ main step
     def step(self, dt, io):
@@ -154,6 +161,7 @@ class Robot:
                           for a, r in zip(angles[::2], ranges[::2])]
 
         self._read_inbox()
+        self._read_commands(io)
         self._perceive(io)
         self._update_link(io)
         self._maybe_drop_relay(io)
@@ -168,6 +176,26 @@ class Robot:
         self._emit_bundles()
 
     # ------------------------------------------------------------------ comms in
+    def _read_commands(self, io):
+        """Plan and command bundles from the command post, delivered by the network."""
+        for b in io.radio.receive():
+            p = b.get("payload") or {}
+            if b["kind"] == "command" and p.get("cmd") == "resume":
+                self._resume_from_safe_stop()
+            elif b["kind"] == "plan":
+                if self.plan is None or self.plan.get("_t", -1) <= b["created"]:
+                    self.plan = dict(p, _t=b["created"])
+
+    def _resume_from_safe_stop(self):
+        """CMD `resume`: clear SAFE_STOP and the fault counter, then replan and carry on."""
+        if self.fault != "SAFE_STOP":
+            return
+        self.fault_times = []
+        self._clear_fault()
+        self.events.append({"kind": "resumed", "robot": self.id})
+        self.state = self.fault_resume or "EXPLORING"
+        self._start_replan("resume")
+
     def _read_inbox(self):
         """Learn peer targets from telemetry bundles the network delivered to us."""
         for b in self.inbox:
