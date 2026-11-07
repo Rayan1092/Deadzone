@@ -1,0 +1,18 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# web
+web/node_modules/
+web/dist/
+
+# ml data and weights (too big for git)
+ml/data/
+ml/*.pt
+
+# misc
+.DS_Store
+.env
+*.log
