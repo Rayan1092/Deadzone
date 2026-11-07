@@ -221,3 +221,12 @@ button:hover { border-color: var(--teal); }
 .eye-note { position: absolute; left: 10px; bottom: 6px; font-size: 10px; color: rgba(230,237,243,.75); pointer-events: none; }
 .cam-btn { margin-left: auto; padding: 2px 8px; font-size: 11px; border-radius: 999px; }
 .cam-btn.on { border-color: var(--teal); color: var(--teal); }
+
+.tag.route { border-color: rgba(250,204,21,.7); color: #fef08a; }
+.perf-chip { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: rgba(148,163,184,.16); color: var(--muted); white-space: nowrap; }
+
+/* top bar stays one line as chips are added: the incident name gives way first */
+.topbar { gap: 16px; white-space: nowrap; }
+.incident { min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.stats { gap: 12px; flex: none; }
+.survivor-count, .controls { flex: none; }

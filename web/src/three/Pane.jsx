@@ -74,6 +74,7 @@ function SyncedControls({ id }) {
 export default function Pane({ which, title, subtitle }) {
   const showTruth = useSim((s) => s.showTruth)
   const follow = useSim((s) => s.follow)
+  const perf = useSim((s) => s.perf)
   return (
     <div className={`pane pane-${which}`}>
       <div className="pane-title">
@@ -93,11 +94,11 @@ export default function Pane({ which, title, subtitle }) {
       )}
       <DetectionCards side={which} />
       {which === 'reality' && <RobotEye />}
-      <Canvas shadows dpr={[1, 2]} camera={{ fov: 50, near: 0.1, far: 300 }}>
+      <Canvas shadows={!perf} dpr={perf ? 1 : [1, 1.5]} camera={{ fov: 50, near: 0.1, far: 300 }}>
         <color attach="background" args={[COLORS.bg]} />
         <fog attach="fog" args={[COLORS.bg, 90, 170]} />
         <ambientLight intensity={0.35} />
-        <directionalLight position={[10, 30, 10]} intensity={0.6} castShadow />
+        <directionalLight position={[10, 30, 10]} intensity={0.6} castShadow={!perf} />
         <hemisphereLight args={['#9fb3c8', '#0b0d10', 0.25]} />
         <Building />
         <Fog which={which} />
