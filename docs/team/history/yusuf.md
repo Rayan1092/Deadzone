@@ -3,19 +3,23 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/relays-links` (M2) committed, PR not open yet. Next: M3 plan editor + safety card on `p3/phone-plan`.
-- **Works on main:** M1 (PR #10): `/phone` live Command view, sidebar QR + Q overlay, lazy route chunks.
-- **In flight (not merged):** `p3/relays-links`:
-  - 3D relays (Reality: power lamp, queue, phone flag; Command: announced position only) and real radio link edges (green, amber when weak/`fec`, red dashed robot-to-CMD when a robot has no link). Robot-to-robot edges are not drawn (not routes).
-  - Antenna pulse on each `stats.delivered` increase; shockwave when Command first learns a survivor.
-  - Toasts for survivor_found (first sighting only), survivor_reported, link_lost, link_restored (`dark_s`), relay_dropped, fault, rubble_fall, safety_reject. Feed folds repeated replan / deadline_miss into one line with a count.
-  - Sidebar: fault pill (SAFE_STOP red), `wheel_a` (amber >= 4 A, red >= 6 A), relays left. Top bar: survivors found vs reported (deduped by id).
-  - T key: faint truth survivors on Reality only, above the fog. Overview camera now fits the whole building to the pane.
-  - Fix: the rubble `hello` no longer wipes the event feed (only a reset, time going back, clears it).
-- **Blocked on / need from others:** Aziz's `p2/frontend-backend-contract` merge (`plan_state`, relay phone messages, director control incl. F/O keys, `/api/report`, `bundle_delivered`).
+- **Working on:** `p3/phone-plan` (M3) committed, PR not open yet. Next: M4 task timeline, follow camera, director keys (F, G, O) on `p3/timeline-camera`.
+- **Works on main:** M1 phone shell + QR (PR #10). M2 relays/links, toasts, T truth overlay, camera fit (PR #16).
+- **In flight (not merged):** `p3/phone-plan`:
+  - Phone planner: tap Add zone / Add no-go, drag a rectangle on the map (0.5 m snap, min 1 m), tap a zone to edit robot, priority, radio (relay link / dark OK), delete. Dark budget slider. Edits go out as `plan_edit` (debounced); incoming `plan_state` replaces the draft ("edited by phone-b").
+  - Safety card: Run safety check (`plan_submit`) → pass/fail card; failed zones pulse red on the map; `comms_plan` has a one-tap "Allow Zx to go dark" fix. Dispatch = `POST /api/dispatch`; card says "dispatched to R2, starts once the plan reaches it" (never claims the robot acted). Editing a dispatched plan starts P-(n+1); a `plan_dispatched` error from the server forks too.
+  - Phone robot cards show delivered `cmd_view.faults` when present (PR #12 field).
+  - Big screen: draws `plan_state` zones/no-go on both panes above the fog (dashed draft, solid after `plan_dispatched`); toasts plan_dispatched, plan_applied, resumed; sidebar "Following P-7 · zone Z1" from Reality telemetry `plan_id`/`zone`.
+- **Blocked on / need from others:** Aziz: PR #12 merge (screen `plan_state`, `plan_dispatched`, startup tick, F/G, relay phones). Aziz: Command's robot view has no `plan_id`/`zone`, so phones can't show which robots are following a plan.
 - **Promises to others:** truth survivors show only as a faint outline on the Reality pane, off by default, toggled with T. Never on Command. The UI renders actual robot state and never assumes a dispatch or fault made a robot act.
 
 ## Log
+
+### 2026-11-07 18:05 · p3/phone-plan · M3 plan editor, safety card, plans on the big screen
+- **Did:** phones draw zones and no-go areas, assign robots, run the safety check, fix a dead-zone rejection in one tap and dispatch. The big screen shows the shared plan (draft dashed, dispatched solid) and which zone each robot follows. Tested end to end on main (reject → allow dark → pass → dispatch → "R2 is following P-1 (Z1)") and against PR #12 merged with main locally (plan before Space at T+0.1, screen zones, plan_dispatched).
+- **Contract changes:** none new. Uses `plan_edit`, `plan_submit`, `safety`, `plan_state`, `error`, `POST /api/dispatch`, PR #12's screen `plan_state` / `plan_dispatched` / `cmd_view.faults`, and Rayan's `plan_applied` / `resumed` / telemetry `plan_id` + `zone`.
+- **Heads-up for others:** Aziz: PR #12 merges cleanly with current main (checked locally); its relay_dropped `owner` is a phone client label, the UI now words that as "Phone X joined as relay RLn". Rayan: the demo plan works as you suggested (R2 east wing zone, dark OK).
+- **Next:** M4 timeline + follow camera + director keys.
 
 ### 2026-11-07 17:15 · p3/relays-links · M2 network visuals, toasts, truth toggle
 - **Did:** the big screen now shows relays and the real link mesh, pulses the antenna on deliveries, bursts survivors onto Command, toasts key events, shows wheel current / relays left / fault pills, and a found-vs-reported counter. T toggles truth survivors (Reality only). Camera fits the building. Tested on a live 3-robot sim at 8x.

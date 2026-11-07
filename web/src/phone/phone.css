@@ -92,3 +92,63 @@
 .role-icon.relay { background: rgba(245,158,11,.16); }
 .role-icon.relay::after { content: ''; position: absolute; left: 17px; top: 17px; width: 14px; height: 14px;
   background: var(--amber); transform: rotate(45deg); border-radius: 2px; }
+
+/* map drawing */
+.plan-map.drawing canvas { touch-action: none; cursor: crosshair; }
+
+/* plan editor */
+.plan-card { display: flex; flex-direction: column; gap: 10px; }
+.plan-card .card-head { margin-bottom: 0; }
+.tools { display: flex; gap: 8px; }
+.tool { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px;
+  background: var(--surface-2); border: 1px solid var(--outline); border-radius: 12px; color: var(--text); font: inherit; font-weight: 600; }
+.tool.on { background: rgba(45,212,191,.16); border-color: var(--teal); color: var(--teal); }
+.tool-zone, .tool-nogo { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+.tool-zone { border: 2px solid var(--teal); }
+.tool-nogo { background: repeating-linear-gradient(45deg, rgba(239,68,68,.8) 0 2px, transparent 2px 5px); outline: 1.5px dashed var(--red); }
+.hint { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
+
+.region-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; text-align: left;
+  background: var(--surface-2); border: 1px solid transparent; border-radius: 10px; color: var(--text); font: inherit; font-size: 14px; }
+.region-row.on { border-color: var(--outline); background: var(--surface-3); }
+.region-row .swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--c); flex: none; }
+.region-row.nogo .swatch { background: var(--red); }
+.region-row .text-btn { margin-left: auto; }
+.region-row > span:last-child:not(.text-btn) { margin-left: auto; }
+
+.editor { display: flex; flex-direction: column; gap: 12px; padding: 12px; border-radius: 12px; background: var(--surface-2); }
+.field { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.field .label { font-size: 13px; color: var(--muted); min-width: 64px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px;
+  background: transparent; border: 1px solid var(--outline); color: var(--text); font: inherit; font-size: 13px; }
+.chip-btn .swatch { width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
+.chip-btn.on { background: rgba(255,255,255,.08); border-color: var(--c); }
+.stepper { display: inline-flex; align-items: center; gap: 4px; }
+.stepper button { width: 36px; height: 36px; padding: 0; border-radius: 18px; background: var(--surface-3); border: none;
+  color: var(--text); font-size: 18px; }
+.stepper button:disabled { opacity: .35; }
+.stepper b { min-width: 24px; text-align: center; }
+.segmented { display: inline-flex; border: 1px solid var(--outline); border-radius: 20px; overflow: hidden; }
+.segmented button { padding: 8px 14px; background: transparent; border: none; border-radius: 0; color: var(--muted); font: inherit; font-size: 13px; }
+.segmented button + button { border-left: 1px solid var(--outline); }
+.segmented button.on { background: rgba(45,212,191,.16); color: var(--teal); }
+.budget input { flex: 1; accent-color: var(--teal); }
+.text-btn { background: none; border: none; padding: 6px 4px; color: var(--teal); font: inherit; font-size: 14px; font-weight: 600; align-self: flex-start; }
+.text-btn.danger { color: var(--red); }
+.text-btn:disabled { opacity: .4; }
+
+/* safety card */
+.safety { display: flex; flex-direction: column; gap: 8px; }
+.safety > b { font-size: 16px; }
+.safety.pass { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.35); }
+.safety.pass > b { color: var(--green); }
+.safety.fail { background: rgba(239,68,68,.09); border: 1px solid rgba(239,68,68,.4); }
+.safety.fail > b { color: var(--red); }
+.safety.sent { background: rgba(45,212,191,.08); border: 1px solid rgba(45,212,191,.3); }
+.violation { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-top: 1px solid rgba(239,68,68,.25); }
+.actions { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.filled { padding: 12px 20px; border-radius: 20px; border: none; background: var(--teal); color: var(--on-primary);
+  font: inherit; font-weight: 600; }
+.filled:disabled { opacity: .5; }
+.reported-fault { color: var(--amber); }

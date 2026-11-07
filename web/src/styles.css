@@ -83,6 +83,7 @@ button:hover { border-color: var(--teal); }
 .fill.low { background: var(--red); }
 .fault-pill { margin-left: 8px; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: rgba(245,158,11,.16); color: var(--amber); }
 .fault-pill.stop { background: rgba(239,68,68,.2); color: var(--red); }
+.following { margin: -2px 0 6px; color: var(--teal); }
 .amps.warn { color: var(--amber); }
 .amps.bad { color: var(--red); font-weight: 600; }
 .events { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
@@ -90,7 +91,7 @@ button:hover { border-color: var(--teal); }
 .event i { width: 6px; height: 6px; border-radius: 50%; background: #3a434c; flex: none; align-self: center; }
 .event.survivor_found i, .event.survivor_reported i, .event.fault i, .event.safety_reject i { background: var(--red); }
 .event.link_lost i, .event.deadline_miss i, .event.rubble_fall i { background: var(--amber); }
-.event.link_restored i { background: var(--green); }
+.event.link_restored i, .event.plan_dispatched i, .event.plan_applied i, .event.resumed i { background: var(--green); }
 .event.relay_dropped i { background: var(--teal); }
 .event .count { margin-left: auto; color: var(--muted); font-size: 11px; }
 
@@ -103,6 +104,7 @@ button:hover { border-color: var(--teal); }
 .tag.alert { border-color: var(--red); color: #fecaca; }
 .tag.relay { border-color: rgba(245,158,11,.5); }
 .tag.relay.off { border-color: var(--line); color: var(--muted); }
+.tag.zone { background: rgba(20,23,26,.7); }
 .tag.truth { border-color: rgba(239,68,68,.5); color: #fecaca; }
 
 .join-card { display: flex; gap: 12px; align-items: center; padding: 10px; margin-bottom: 8px; cursor: pointer;

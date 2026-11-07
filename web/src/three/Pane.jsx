@@ -6,6 +6,7 @@ import Building from './Building'
 import Fog from './Fog'
 import { RealityActors, CommandActors } from './Actors'
 import { AntennaPulse } from './Network'
+import PlanZones from './PlanZones'
 import { COLORS } from './util'
 import { useSim } from '../store'
 
@@ -98,6 +99,7 @@ export default function Pane({ which, title, subtitle }) {
         <Building />
         <Fog which={which} />
         <AntennaPulse />
+        <PlanZones />
         {which === 'reality' ? <RealityActors /> : <CommandActors />}
         <SyncedControls id={which} />
       </Canvas>

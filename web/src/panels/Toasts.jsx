@@ -6,7 +6,7 @@ const TOAST_MS = 5000
 const TONE = {
   survivor_found: 'alert', survivor_reported: 'alert', fault: 'alert', safety_reject: 'alert',
   link_lost: 'warn', rubble_fall: 'warn',
-  link_restored: 'ok', relay_dropped: 'info',
+  link_restored: 'ok', relay_dropped: 'info', plan_dispatched: 'ok', plan_applied: 'ok', resumed: 'ok',
 }
 
 // Stack over the split view. Each toast removes itself after TOAST_MS.

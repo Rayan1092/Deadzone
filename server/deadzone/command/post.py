@@ -9,6 +9,7 @@ class CommandPost:
         self.robots = {}      # id -> last telemetry + last_seen
         self.relays = {}
         self.survivors = {}   # id -> record + reported_t
+        self.faults = {}
         self.delivered = 0
         self.events = []
         self._seen = {}
@@ -25,8 +26,10 @@ class CommandPost:
         k = b["kind"]
         if k == "telemetry" and p.get("node_type") == "relay":
             prev = self.relays.get(p["id"])
-            if prev is None or prev["sent_t"] <= b["created"]:
-                self.relays[p["id"]] = {"id": p["id"], "pos": list(p["pos"]), "sent_t": b["created"]}
+            version = b["created"], p.get("revision", 0)
+            if prev is None or (prev["sent_t"], prev.get("revision", 0)) <= version:
+                self.relays[p["id"]] = {"id": p["id"], "pos": list(p["pos"]), "sent_t": b["created"],
+                                         "revision": version[1]}
         elif k == "telemetry":
             prev = self.robots.get(p["id"])
             if prev is None or prev["sent_t"] <= b["created"]:
@@ -38,6 +41,11 @@ class CommandPost:
             ix, iy = p["ix"][fresh], p["iy"][fresh]
             self.map[iy, ix] = p["v"][fresh]
             self.map_sent_t[iy, ix] = b["created"]
+        elif k == "fault":
+            robot = p["robot"]
+            prev = self.faults.get(robot)
+            if prev is None or prev["sent_t"] <= b["created"]:
+                self.faults[robot] = dict(p, sent_t=b["created"], reported_t=round(now, 1))
         elif k == "survivor":
             if p["id"] not in self.survivors:
                 rec = dict(p)
@@ -54,4 +62,5 @@ class CommandPost:
             robots.append({k: r[k] for k in ("id", "pose", "state", "battery_pct", "last_seen")}
                           | {"stale_s": round(now - r["sent_t"], 1)})
         relays = [{"id": r["id"], "pos": list(r["pos"])} for r in self.relays.values()]
-        return {"robots": robots, "survivors": list(self.survivors.values()), "relays": relays}
+        faults = [{k: v for k, v in f.items() if k != "sent_t"} for f in self.faults.values()]
+        return {"robots": robots, "survivors": list(self.survivors.values()), "relays": relays, "faults": faults}

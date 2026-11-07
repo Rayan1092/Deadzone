@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
-import { STATE_LABEL, fmtClock } from '../format'
+import { FAULT_LABEL, STATE_LABEL, fmtClock } from '../format'
 import { usePhone } from './store'
 import { connectPhone, roleFromUrl } from './socket'
+import { forkDispatched } from './plan'
 import PlanMap from './PlanMap'
+import PlanEditor from './PlanEditor'
+import SafetyCard from './SafetyCard'
 import './phone.css'
 
 // Stable fallback: zustand selectors must not return a new [] on every call.
@@ -62,9 +65,12 @@ function Legend() {
 function RobotList() {
   const robots = usePhone((s) => s.hello?.robots ?? NONE)
   const reported = usePhone((s) => s.view?.robots ?? NONE)
+  const faults = usePhone((s) => s.view?.faults ?? NONE)
   const byId = Object.fromEntries(reported.map((r) => [r.id, r]))
+  const faultById = Object.fromEntries(faults.map((f) => [f.robot, f]))
   return robots.map((meta) => {
     const r = byId[meta.id]
+    const fault = faultById[meta.id]
     const caps = meta.capabilities ?? {}
     return (
       <div key={meta.id} className="m3-card robot" style={{ '--c': meta.color }}>
@@ -81,6 +87,11 @@ function RobotList() {
             <div className="robot-state">{STATE_LABEL[r.state] ?? r.state}</div>
             <div className="bar"><div className="fill" style={{ width: `${r.battery_pct}%` }} /></div>
             <div className="muted small">{Math.round(r.battery_pct)}% battery at last report</div>
+            {fault && (
+              <div className="reported-fault small">
+                Reported fault: {FAULT_LABEL[fault.fault] ?? fault.fault} at T+{fmtClock(fault.reported_t)}
+              </div>
+            )}
           </>
         ) : (
           <div className="muted small">Waiting for this robot's first report to reach the antenna</div>
@@ -125,6 +136,9 @@ function Snackbar() {
 
 function Shell({ role }) {
   const hello = usePhone((s) => s.hello)
+  const error = usePhone((s) => s.error)
+  // Another phone dispatched this plan ID first; keep editing under a new ID.
+  useEffect(() => { if (error?.code === 'plan_dispatched') forkDispatched() }, [error])
   const connected = usePhone((s) => s.connected)
   const time = usePhone((s) => s.time)
   return (
@@ -146,6 +160,9 @@ function Shell({ role }) {
         <PlanMap />
         <Legend />
       </section>
+
+      {role === 'planner' && <PlanEditor />}
+      {role === 'planner' && <SafetyCard />}
 
       {role === 'relay' && (
         <section className="m3-card note">
