@@ -11,6 +11,7 @@ export default defineConfig({
       // keep the browser's Host so /api/join builds a phone link to this dev server (:5173)
       '/api': { target: 'http://localhost:8000', changeOrigin: false },
       '/ws': { target: 'ws://localhost:8000', ws: true },
+      '/crops': 'http://localhost:8000', // detector thermal crops (served by the backend)
     },
   },
 })

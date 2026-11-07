@@ -3,16 +3,25 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/phone-relay` (M5) committed, PR not open yet. Next: M6 polish (camera cue on survivor_reported, fog reveal, perf toggle) and M7 replay file.
-- **Works on main:** M1 phone shell + QR (PR #10). M2 relays/links, toasts, T truth overlay (PR #16). M3 plan editor + safety card (PR #18). M4 scheduler strip, follow camera, F/G keys, decoys (PR #20).
-- **In flight (not merged):** `p3/phone-relay`:
-  - Relay phones (`?role=relay`, from the relay QR): big power toggle (`relay_power`), "N bundles carried", strongest 4 radio neighbors with signal bars, "Move my relay" then tap the map (`relay_place`). Server rejections show as a snackbar. The phone's own relay is drawn on its map ("You · RL1").
-  - Big screen: toast + feed line when any relay switches on/off ("Phone relay RL1 switched off"), derived from consecutive Reality ticks (no server event exists).
-  - Fix: the screen feed no longer stores `bundle_delivered` / `link_up` / `link_down`; since PR #12 the delivery events (several per second) were pushing every real event out of the 40-item feed within seconds.
-- **Blocked on / need from others:** Aziz: director `do:"overload"` (O key) and `do:"resume"`; decoys in `RobotIO.thermal()`. Command's robot view has no `plan_id`/`zone` for phones.
-- **Promises to others:** truth survivors and decoys show only as faint outlines on the Reality pane, off by default, toggled with T. Never on Command. The UI renders actual robot state and never assumes a dispatch or fault made a robot act.
+- **Working on:** `p3/ai-scope` (M6) committed, PR not open yet. Next (by 3 AM): survivor figures + bigger/brighter robots, phone tap-a-robot with last crop, liquid-glass pass, rescue route drawing once Rayan's contract lands, then robot's-eye view last.
+- **Works on main:** M1 phone + QR (PR #10), M2 network visuals + toasts + T (PR #16), M3 plan editor + safety card (PR #18), M4 scheduler strip + follow cam + F/G (PR #20), M5 relay phone mode (PR #23).
+- **In flight (not merged):** `p3/ai-scope`:
+  - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
+  - Detector chip in the top bar from `hello.detector` (hidden until the server sends it).
+  - Keys O (`do:"overload"`) and U (`do:"resume"`), plus a "Send resume command" button on a robot card in SAFE_STOP. Key list moved to the sidebar.
+  - Phone robot cards: "Following P-1 · zone Z1 (last report)" from delivered `cmd_view.robots[].plan_id/zone` (PR #22).
+- **Blocked on / need from others:** Aziz: `/crops/<file>` static route (cards show a placeholder until then) and `hello.detector` (chip hidden until then). Rayan: `rescue_route` contract.
+- **Promises to others:**
+  - Rayan's asks (19:50 entry): 1 bigger/brighter robots: yes, 3 AM. 2 robot's-eye view: **Yusuf keeps it** (`web/src/three/RobotEye.jsx`), built last, cut first. 3 phone tap-a-robot with `cmd_view.survivors[].crop`: yes, 3 AM. 4 liquid glass: yes, started on the detection cards, full pass by 3 AM. 5 rescue route on Command: yes, as soon as the contract is posted.
+  - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-07 20:30 · p3/ai-scope · M6 AI detection cards, detector chip, O / resume, phone plan status
+- **Did:** judges now see what the onboard model judged: a card with the crop and verdict when a robot finds a person or rejects a hot spot (Reality), and again when the report reaches Command. O overloads the followed robot's perception, U or a card button sends resume. Tested on main with PR #22 and the CPU model loaded: "Person · 100%" (S3), "Not a person · 0% · hot spot D1 · R2 · rejected", S2 at 88.9%; O → R1 row "perception missed" while safety runs at 0/50 ms; F×3 → SAFE_STOP → resume button → "R2 resumed after safe stop".
+- **Contract changes:** none new. Consumes `survivor_found.crop/conf`, `hotspot_rejected`, Command `survivors[].crop`, director `overload` / `resume`, delivered `plan_id` / `zone`, and (when added) `hello.detector` + `/crops/<file>`. Vite dev proxy now forwards `/crops` to the backend.
+- **Heads-up for others:** Rayan: answers to your 19:50 asks are in `## Now` (I keep the robot's-eye view). DEMO.md: O is live once this merges; resume is key U or the "Send resume command" button on the robot's card. Aziz: the cards and chip are ready for `/crops` and `hello.detector`.
+- **Next:** survivor figures, bigger robots, phone tap-a-robot, liquid glass, rescue route, robot's-eye view.
 
 ### 2026-11-07 19:00 · p3/phone-relay · M5 relay phone mode, relay power toasts, feed fix
 - **Did:** a phone that scans the relay QR becomes a relay: one big button turns it on/off, it shows what it carries and who it can hear, and it can be moved by tapping the map. The big screen toasts each switch. Tested on main: RL1 created at the entry with 4 neighbors, off/on/off toasts on the big screen, move into the Break Room, rubble tap rejected, reload with the same label keeps RL1 off at its new spot.

@@ -86,6 +86,9 @@ function RobotList() {
         {r ? (
           <>
             <div className="robot-state">{STATE_LABEL[r.state] ?? r.state}</div>
+            {r.plan_id && (
+              <div className="following small">Following {r.plan_id}{r.zone ? ` · zone ${r.zone}` : ''} (last report)</div>
+            )}
             <div className="bar"><div className="fill" style={{ width: `${r.battery_pct}%` }} /></div>
             <div className="muted small">{Math.round(r.battery_pct)}% battery at last report</div>
             {fault && (
