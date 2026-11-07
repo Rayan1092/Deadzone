@@ -29,7 +29,10 @@
 
     {"a": [32, 0],  "b": [32, 13], "material": "concrete"},
     {"a": [32, 17], "b": [32, 30], "material": "concrete"},
-    {"a": [34, 21], "b": [40, 21], "material": "metal"},
+    {"a": [34, 21], "b": [38.2, 21], "material": "metal"},
+    {"a": [39.4, 21], "b": [40, 21], "material": "metal"},
+    {"a": [34, 21], "b": [34, 30], "material": "metal"},
+    {"a": [35.4, 24], "b": [40, 24], "material": "metal"},
     {"a": [32, 9],  "b": [36, 9],  "material": "metal"}
   ],
   "doors": [
@@ -39,7 +42,8 @@
     {"at": [27.6, 13], "width": 1.2, "axis": "x", "state": "broken"},
     {"at": [4.6, 17],  "width": 1.2, "axis": "x", "state": "open"},
     {"at": [14.6, 17], "width": 1.2, "axis": "x", "state": "broken"},
-    {"at": [25.6, 17], "width": 1.2, "axis": "x", "state": "open"}
+    {"at": [25.6, 17], "width": 1.2, "axis": "x", "state": "open"},
+    {"at": [38.8, 21], "width": 1.2, "axis": "x", "state": "open"}
   ],
   "rooms": [
     {"id": "N1", "name": "Office A",       "poly": [[0,17],[10,17],[10,30],[0,30]]},
@@ -49,7 +53,8 @@
     {"id": "S2", "name": "Boiler Room",    "poly": [[12,0],[24,0],[24,13],[12,13]]},
     {"id": "S3", "name": "Loading Office", "poly": [[24,0],[32,0],[32,13],[24,13]]},
     {"id": "C1", "name": "Main Corridor",  "poly": [[0,13],[32,13],[32,17],[0,17]]},
-    {"id": "E1", "name": "Warehouse Floor","poly": [[32,0],[40,0],[40,30],[32,30]]}
+    {"id": "E1", "name": "Warehouse Floor","poly": [[32,0],[40,0],[40,30],[32,30]]},
+    {"id": "E2", "name": "Steel Storage Cage", "poly": [[34,21],[40,21],[40,30],[34,30]]}
   ],
   "rubble": [
     {"id": "RB1", "poly": [[21,13.1],[23,13.1],[23,15.0],[21,15.0]], "height": 1.2},
@@ -61,7 +66,7 @@
     {"id": "H1", "type": "gas", "poly": [[12.2,0.2],[23.8,0.2],[23.8,12.8],[12.2,12.8]]}
   ],
   "survivors": [
-    {"id": "S1", "pos": [37.5, 26.0], "thermal": "pos_0001.png"},
+    {"id": "S1", "pos": [36.0, 27.0], "thermal": "pos_0001.png"},
     {"id": "S2", "pos": [29.0, 4.0],  "thermal": "pos_0002.png"},
     {"id": "S3", "pos": [5.0, 26.0],  "thermal": "pos_0003.png"}
   ],

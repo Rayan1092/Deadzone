@@ -26,6 +26,24 @@ PEER_TARGET_PENALTY = 12.0  # larger than the best possible size bonus (40 * 0.2
 PEER_FRESH_S = 15.0        # ignore claims older than this (peer out of contact)
 DEPLOY_STAGGER_S = 1.5     # robot n waits n * this before exploring, so claims go out in order
 
+# Relay drop rule (DARPA SubT style: drop before the link breaks, not after)
+RELAYS_PER_ROBOT = 2
+# dBm to the best upstream (non-robot) neighbor. The plan's -80 almost never fires in
+# collapse_01 because links fall off in jumps at walls, -76 leaves a usable window.
+RELAY_DROP_RSSI = -76.0
+# A new link only comes up above -82 dBm (propagation.LINK_UP_DBM), while an existing one
+# survives down to -88. Below this floor a fresh relay here could never link upstream, so
+# dropping would waste it (happens when one step puts a wall on the line).
+RELAY_DROP_FLOOR = -81.0
+RELAY_MIN_SPACING = 4.0    # m from every relay this robot knows about
+
+HOME_COST_PERIOD = 2.0     # s between A* "distance home" refreshes
+
+
+def is_robot_id(nid):
+    """R1, R2 ... are robots. RL1 (relay), CMD and phones are infrastructure."""
+    return len(nid) > 1 and nid[0] == "R" and nid[1:].isdigit()
+
 
 def robot_rank(rid):
     """R1 -> 0, R2 -> 1 ... Lower rank has priority when two robots want the same frontier."""
@@ -63,6 +81,13 @@ class Robot:
         self.found = {}           # survivor id -> record
         self.found_while_dark = False
 
+        self.relays_left = RELAYS_PER_ROBOT
+        self.my_relays = []       # [x, y] of relays this robot dropped
+        self.upstream_rssi = None
+        self.home_pct = Battery.pct_to_drive(0.0)
+        self.home_m = 0.0
+        self.home_t = -99.0
+
         self.outbox = []
         self.inbox = []           # bundles the network delivered to this robot
         self.peers = {}           # peer id -> {"target", "pose", "t"} from their telemetry
@@ -88,6 +113,7 @@ class Robot:
         self._read_inbox()
         self._perceive(io)
         self._update_link(io)
+        self._maybe_drop_relay(io)
         self._check_faults(odo)
         self._behave()
         v, w = self._follow()
@@ -106,7 +132,8 @@ class Robot:
                 continue
             prev = self.peers.get(p["id"])
             if prev is None or prev["t"] <= b["created"]:
-                self.peers[p["id"]] = {"target": p.get("target"), "pose": p.get("pose"), "t": b["created"]}
+                self.peers[p["id"]] = {"target": p.get("target"), "pose": p.get("pose"),
+                                       "relays": p.get("relays", []), "t": b["created"]}
         self.inbox.clear()
 
     def _claimed_targets(self):
@@ -142,6 +169,39 @@ class Robot:
                 self.crumbs.append((x, y))
                 self.crumbs = self.crumbs[-200:]
         self.linked = reachable
+
+    # ------------------------------------------------------------------ relays
+    def _known_relays(self):
+        out = list(self.my_relays)
+        for info in self.peers.values():
+            out.extend(info.get("relays") or [])
+        return out
+
+    def _maybe_drop_relay(self, io):
+        """Drop a relay when all hold: still linked to CMD, best upstream link below
+        -80 dBm, a relay left to drop, at least 4 m from every known relay, not in no-go.
+        Upstream means infrastructure (CMD, relays, phones): robots never forward for others."""
+        infra = [r for nid, r in io.radio.neighbors() if not is_robot_id(nid)]
+        self.upstream_rssi = max(infra) if infra else None
+        if self.state not in ("EXPLORING", "RETURNING_TO_SIGNAL") or self.relays_left <= 0:
+            return
+        if not self.linked or self.upstream_rssi is None:
+            return
+        if not (RELAY_DROP_FLOOR < self.upstream_rssi < RELAY_DROP_RSSI):
+            return
+        x, y, _ = self.pose
+        if any(math.dist((x, y), p) < RELAY_MIN_SPACING for p in self._known_relays()):
+            return
+        ix, iy = self._cell(x, y)
+        if self.nogo[iy, ix]:
+            return
+        try:
+            io.drop_relay()
+        except ValueError:
+            return   # the deployer refused this spot, try again further along
+        self.relays_left -= 1
+        self.my_relays.append([round(x, 2), round(y, 2)])
+        self.last_telemetry_t = -99.0   # tell peers right away so they keep their spacing
 
     def _check_faults(self, odo):
         """First pass. The full fault FSM (overcurrent, stuck, low battery) lands at 10 PM."""
@@ -293,8 +353,19 @@ class Robot:
         return False
 
     def _pct_home(self):
-        # cheap estimate for now: straight line x 1.6. A* length lands with the battery work at 6 PM.
-        return Battery.pct_to_drive(1.6 * math.dist(self.pose[:2], self.entry))
+        """Battery % needed to drive home along the A* path on our own map (x 1.25 margin
+        inside pct_to_drive). Refreshed every HOME_COST_PERIOD s because A* is not free.
+        Falls back to straight line x 1.6 when our map has no known route yet."""
+        if self.t - self.home_t >= HOME_COST_PERIOD:
+            self.home_t = self.t
+            cells = planning.astar(self._trav(), self._cell(*self.pose[:2]), self._cell(*self.entry))
+            if cells:
+                pts = [((cx + 0.5) * self.cell, (cy + 0.5) * self.cell) for cx, cy in cells]
+                self.home_m = planning.path_length(pts) + math.dist(pts[-1], self.entry)
+            else:
+                self.home_m = 1.6 * math.dist(self.pose[:2], self.entry)
+            self.home_pct = Battery.pct_to_drive(self.home_m)
+        return self.home_pct
 
     # ------------------------------------------------------------------ motion
     def _follow(self):
@@ -323,6 +394,7 @@ class Robot:
             "battery_pct": round(self.battery.pct, 1),
             "found": list(self.found),
             "target": [round(v, 2) for v in self.target] if self.target else None,
+            "relays": [list(p) for p in self.my_relays],
         }, self.t, 120))
         ix, iy, vals = self.map.take_patch()
         if len(vals):
@@ -343,7 +415,7 @@ class Robot:
             "battery": {"pct": round(self.battery.pct, 1), "wh": round(self.battery.wh, 1),
                         "reserve_needed_pct": round(RESERVE_PCT + self._pct_home(), 1)},
             "link": link,
-            "relays_left": 0,
+            "relays_left": self.relays_left,
             "target": self.target,
             "path": [[round(px, 2), round(py, 2)] for px, py in self.path[:60]],
             "lidar": self.lidar_pts,

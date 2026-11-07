@@ -53,8 +53,11 @@ def nearest_traversable(trav, start, radius=4):
     return best
 
 
-def frontier_clusters(grid, trav, start, blacklist=(), min_size=4):
+def frontier_clusters(grid, trav, start, blacklist=(), min_size=2):
     """One BFS from start over traversable cells. Returns clusters sorted by score.
+
+    min_size is 2, not 4: a 1.2 m door or gap seen at an angle only yields 2-3 traversable
+    frontier cells after inflation, and a bigger minimum makes the robot skip whole rooms.
 
     Each cluster: dict(cells=[(x, y)], size, dist (cells), goal=(x, y) closest cell).
     """
