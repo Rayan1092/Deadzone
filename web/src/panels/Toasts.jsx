@@ -24,7 +24,7 @@ export default function Toasts() {
   return (
     <div className="toasts">
       {toasts.map((t) => (
-        <div key={t.eid} className={`toast ${TONE[t.kind] ?? 'info'}`}>
+        <div key={t.eid} className={`toast ${t.kind === 'relay_power' ? (t.on ? 'ok' : 'warn') : TONE[t.kind] ?? 'info'}`}>
           <i />
           <span>{describeEvent(t)}</span>
         </div>

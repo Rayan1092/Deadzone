@@ -6,6 +6,7 @@ import { forkDispatched } from './plan'
 import PlanMap from './PlanMap'
 import PlanEditor from './PlanEditor'
 import SafetyCard from './SafetyCard'
+import RelayPanel from './RelayPanel'
 import './phone.css'
 
 // Stable fallback: zustand selectors must not return a new [] on every call.
@@ -85,6 +86,9 @@ function RobotList() {
         {r ? (
           <>
             <div className="robot-state">{STATE_LABEL[r.state] ?? r.state}</div>
+            {r.plan_id && (
+              <div className="following small">Following {r.plan_id}{r.zone ? ` · zone ${r.zone}` : ''} (last report)</div>
+            )}
             <div className="bar"><div className="fill" style={{ width: `${r.battery_pct}%` }} /></div>
             <div className="muted small">{Math.round(r.battery_pct)}% battery at last report</div>
             {fault && (
@@ -152,6 +156,8 @@ function Shell({ role }) {
         <span className={`chip ${connected ? 'ok' : 'bad'}`}>{connected ? 'Live' : 'Offline'}</span>
       </header>
 
+      {role === 'relay' && <RelayPanel />}
+
       <section className="m3-card map-card">
         <div className="card-head">
           <b>Command view</b>
@@ -164,12 +170,6 @@ function Shell({ role }) {
       {role === 'planner' && <PlanEditor />}
       {role === 'planner' && <SafetyCard />}
 
-      {role === 'relay' && (
-        <section className="m3-card note">
-          <b>Relay mode</b>
-          <span className="muted small">Relay controls arrive later tonight. Until then this phone shows the Command view.</span>
-        </section>
-      )}
 
       <h2 className="section-title">Robots</h2>
       <RobotList />

@@ -92,7 +92,7 @@ button:hover { border-color: var(--teal); }
 .event { display: flex; align-items: baseline; gap: 6px; padding: 6px 8px; border-radius: 6px; background: #1f2429; }
 .event i { width: 6px; height: 6px; border-radius: 50%; background: #3a434c; flex: none; align-self: center; }
 .event.survivor_found i, .event.survivor_reported i, .event.fault i, .event.safety_reject i { background: var(--red); }
-.event.link_lost i, .event.deadline_miss i, .event.rubble_fall i { background: var(--amber); }
+.event.link_lost i, .event.deadline_miss i, .event.rubble_fall i, .event.relay_power i { background: var(--amber); }
 .event.link_restored i, .event.plan_dispatched i, .event.plan_applied i, .event.resumed i { background: var(--green); }
 .event.relay_dropped i { background: var(--teal); }
 .event .count { margin-left: auto; color: var(--muted); font-size: 11px; }
@@ -103,7 +103,9 @@ button:hover { border-color: var(--teal); }
 .tl-legend { display: flex; gap: 10px; margin-left: 12px; color: var(--muted); }
 .tl-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .tl-legend .task { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
-.tl-keys { margin-left: auto; font-size: 11px; }
+.keys { margin-top: 14px; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 12px; color: var(--muted); }
+.keys kbd { font: 600 11px 'JetBrains Mono', ui-monospace, monospace; color: var(--text); background: #232a31;
+  border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; text-align: center; }
 .tl-empty { padding: 4px 0; }
 .tl-row { display: grid; grid-template-columns: 44px 1fr 44px 120px; align-items: center; gap: 10px; }
 .tl-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
@@ -160,3 +162,24 @@ button:hover { border-color: var(--teal); }
 .join-big svg { border-radius: 12px; margin-bottom: 8px; }
 .join-big b { font-size: 22px; }
 .join-url { font-size: 20px; color: var(--teal); }
+
+/* AI detection cards (frosted glass over the pane) */
+.det-cards { position: absolute; z-index: 4; bottom: 12px; right: 12px; display: flex; flex-direction: column; gap: 8px;
+  width: 270px; pointer-events: none; }
+.det-card { display: flex; gap: 10px; padding: 10px; border-radius: 14px; animation: toast-in .3s ease-out;
+  background: rgba(30,36,42,.55); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255,255,255,.12); box-shadow: 0 8px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08); }
+.det-card.person { border-color: rgba(239,68,68,.45); }
+.det-card.rejected { opacity: .72; }
+.det-crop { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; flex: none; background: #000; image-rendering: pixelated; }
+.det-crop.empty { display: grid; place-items: center; font-size: 10px; color: #fde68a;
+  background: radial-gradient(circle at 50% 45%, #f97316 0, #7c2d12 35%, #1e1b4b 75%); }
+.det-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.det-kicker { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.det-body b { font-size: 15px; }
+.det-card.person b { color: #fecaca; }
+.det-warn { color: var(--amber); }
+.detector-chip { font-size: 12px; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.detector-chip.model { background: rgba(45,212,191,.14); color: var(--teal); }
+.detector-chip.sim { background: rgba(245,158,11,.16); color: var(--amber); }
+.resume-btn { width: 100%; margin: 2px 0 6px; padding: 6px; font-size: 12px; border-color: rgba(239,68,68,.5); color: #fecaca; }

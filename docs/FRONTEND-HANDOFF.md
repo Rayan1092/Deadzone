@@ -33,6 +33,10 @@ actually applying its received zones, no-go regions and lost-link budget.
 
 ## 3. Director F and R, plus REST faults
 
+The follow-up backend adds O/overload and network-delivered resume controls,
+real thermal decoy inputs and delivered phone `plan_id`/`zone` status. See
+[`DEMO-CONTROLS.md`](DEMO-CONTROLS.md) for their contracts and model setup.
+
 F sends:
 
 ```json
