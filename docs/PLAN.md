@@ -2,6 +2,87 @@
 
 Nov 7, 2026 · @Rayan Diya
 
+## The idea
+
+Deadzone is rescue robots that keep working where the signal dies. Inside collapsed buildings, mines and tunnels, concrete and steel kill radio, and there is no GPS or cell signal. Most rescue robots stop when they lose their link, and the command post goes blind.
+
+The DARPA Subterranean Challenge (2018 to 2021) showed a better way: the winning robots explored on their own, dropped radio relays as they went, and reported back once they reconnected. Deadzone is a fully simulated version of that idea with three layers (robots, network, command post) and a 3D visualization.
+
+- **The memorable moment:** two synced views side by side. Reality shows where robots are and what they found. Command shows only what reached the antenna: a stale map, ghost robots, no survivors. A robot goes dark, finds a survivor, reconnects, and the map and survivor burst onto the Command view.
+- **Pitch lines:** "Rescue robots today stop when the signal stops. Ours keep searching." and "The robots are autonomous, and AI detects survivors."
+- **Not a GPT wrapper:** autonomy comes from our algorithms (frontier exploration, A\*, relay rules, state machines). Trained AI only detects survivors. Gemini only writes situation reports.
+- **Constraints:** no hardware. Laptops and phones only, nothing that depends on lighting, room noise or physical sensors.
+- **Why not the space theme:** we skip "Into the Hackosmos" on purpose to compete for Best General.
+- **Prize targets:** Best General, Best AI/ML, Most Over Engineered, Best UI/UX, MLH Best Use of Gemini API.
+- **Judging (2025 criteria):** It works, Usefulness, Technicality, Effort, Freshness, Pitch, X-factor. A complex project that doesn't work scores nothing.
+
+## Current status (2:30 PM Saturday)
+
+The starter on `main` already runs the core story with one robot. In a headless run with seed 7, survivor S1 is found in the dark at about 213 s sim time and reaches the command post about 9 s later.
+
+**Done**
+
+- Floor plan `collapse_01` with tuned dead zones: the corridor near the entry is solid, the east wing and south-east room are dark
+- Sim server: 10 Hz tick, FastAPI, `/ws/screen` streaming `hello`, `tick`, `maps`, `event`, plus `/api/control` and a `/ws/phone` stub
+- One robot: lidar, occupancy map, frontier exploration, A\*, lost-link return to breadcrumbs, sim thermal sensor, battery drain
+- Single-hop store and forward: the robot keeps bundles until it has a link, and the Command view only changes from delivered bundles
+- Web big screen: Reality vs Command split with synced cameras, fog of war, lidar rays, planned path, link line, ghost robots, survivor markers, sidebar, keyboard controls
+- 5 server tests, including the core story and a no-leak test
+
+**Not started:** multi-robot coordination (3 robots currently all explore the same room), relays, multi-hop routing, phone app, scheduler and task timeline, full fault FSM, safety checker, Gemini reports, ML detector, Reed-Solomon, CRDT.
+
+## Team roles and Claude Code
+
+Code, `CLAUDE.md` and this plan refer to roles, not names. Each person tells Claude Code which role they are in their first message.
+
+| Role | Person | Owns | First task |
+| --- | --- | --- | --- |
+| Rayan (robots and ML) | Rayan | `server/deadzone/robot/`, `ml/`, `data/floorplans/` | 3 robots sharing targets |
+| Person 2 (backend and network) | *add name* | `sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`, `scripts/` | multi-hop store and forward with custody |
+| Person 3 (frontend and phone) | *add name* | `web/` | phone page and QR join |
+
+**The phone app is a web page, not an Android APK.** Judges scan a QR code and it opens in their phone browser at `/phone`. Nothing to install, and it works on iPhone too.
+
+**Person 2 starter prompt for Claude Code**
+
+```
+I'm Person 2 on Deadzone. I own backend and network: server/deadzone/sim.py, app.py, floorplan.py, network/, command/ and scripts/. Read CLAUDE.md and docs/PLAN.md first, especially The idea, Current status, the APIs section and my column in the Hour-by-hour plan. Then on branch p2/dtn-multihop, turn the single-hop store and forward in sim.py and network/dtn.py into multi-hop forwarding with per-hop custody, dedupe by bid, TTL and relay queues, so relays can carry bundles. Keep the Command view fed only by delivered bundles and keep the sim deterministic. Run the server tests, open a PR and ask me before merging. Keep me updated in short messages.
+```
+
+**Person 3 starter prompt for Claude Code**
+
+```
+I'm Person 3 on Deadzone. I own the frontend in web/: the 3D big screen, the dashboard panels and the phone page. Read CLAUDE.md and docs/PLAN.md first, especially The idea, Current status, the APIs section and my column in the Hour-by-hour plan. Then on branch p3/phone-shell, build the phone page at /phone as a Material 3 style dark mode web app that connects to /ws/phone and shows the floor plan with the Command view, and add a QR join panel on the big screen. The big screen must stay at 60 fps with both views. Run npm run build, open a PR and ask me before merging. Keep me updated in short messages.
+```
+
+## Setup and git workflow
+
+Everyone uses VS Code with the Claude Code extension on one shared GitHub repo, and `main` is protected so it always runs.
+
+**Setup**
+
+- Install Git, Python 3.11+, Node 20+, VS Code and the Claude Code extension (needs a paid Claude plan or a Console account)
+- Clone the repo, then follow the README to install and run the server and web app
+- Keep the project out of OneDrive, or pause OneDrive sync, so `node_modules` doesn't get synced
+- Secrets: the Gemini API key goes in `server/.env` as `GEMINI_API_KEY`. `.env` is gitignored. Never paste keys into code
+
+**Git rules**
+
+- `main` requires a pull request (0 approvals) and blocks force pushes and deletion
+- One short branch per task: `rayan/<feature>`, `p2/<feature>`, `p3/<feature>`
+- Always `git checkout main` and `git pull` before starting a new branch
+- Merge at least every hour so branches never drift
+- Any change to a message shape goes in the PR description and the team chat
+- Run `python -m pytest -q` in `server/` before every PR, and `npm run build` in `web/` if web changed
+
+**Demo laptop and phones**
+
+One laptop runs the server. Run `npm run build` in `web/` once and the server serves the web app itself on port 8000. Phones open `http://<laptop-ip>:8000/phone` on the same Wi-Fi, or everyone joins a phone hotspot if the venue Wi-Fi blocks devices from seeing each other.
+
+**Dataset and model**
+
+`ml/data/` is gitignored, so only Rayan downloads the FLIR dataset. The trained model file gets committed if it's under about 50 MB, otherwise it's shared directly with whoever runs the demo laptop.
+
 ## Overview and locked decisions
 
 One Python sim server owns the truth and streams two views (Reality and Command) to one web app that serves the big screen and the phones. These decisions are locked so all three of you can code against them in parallel from 1:45 PM.
@@ -14,10 +95,10 @@ One Python sim server owns the truth and streams two views (Reality and Command)
 | Sim tick | dt = 0.1 s sim time, speed multiplier default 2x | fast enough for a 3 min demo |
 | Broadcast | state every tick, occupancy maps every 5 ticks (2 Hz sim) | maps are small, no deltas needed |
 | World | single floor, 40 m x 30 m, grid cell 0.25 m (160 x 120 cells) | 1 m doors stay 4 cells wide after inflation |
-| Coordinates | meters, origin bottom-left, x east, y north, heading in radians CCW from +x | three.js maps sim (x, y) to (x, 0, y) with y up |
+| Coordinates | meters, origin bottom-left, x east, y north, heading in radians CCW from +x | three.js maps sim (x, y) to (x, height, -y) so north is up on screen (helper w2t in web/src/three/util.js) |
 | Randomness | one seeded RNG per run | the demo replays identically |
 
-**Honesty rule.** Robot code never reads the World directly. It only sees the world through `sense_lidar()` and only talks to other nodes through network bundles. This keeps the Reality vs Command split real, and it is what you tell judges when they ask whether it is faked.
+**Honesty rule.** Robot code never reads the World directly. It only sees the world through the `io` object (`io.lidar()`, `io.thermal()`, `io.odometry()`) and only talks to other nodes through bundles in its outbox. This keeps the Reality vs Command split real, and it is what you tell judges when they ask whether it is faked.
 
 **Two knowledge views.** Reality = ground truth plus every robot's own map. Command = only what has physically arrived at the command post node through the network. The gap between them is the whole demo.
 
@@ -25,43 +106,45 @@ One Python sim server owns the truth and streams two views (Reality and Command)
 
 ## Repo structure and module ownership
 
-Three top-level folders map to three people, and the only shared files are `protocol.py` and `docs/protocol.md`. Anyone changing a message shape posts it in the team chat first.
+Three areas map to three people, and the table shows what exists on `main` today versus what is still planned. The message shapes in this doc are the contract between server and web. Anyone changing one says so in the PR description and the team chat.
 
-| Path | What it holds | Owner |
-| --- | --- | --- |
-| `docs/protocol.md` | every message and data format (source of truth for the frontend) | Person 2, everyone reviews |
-| `data/floorplans/collapse_01.json` | the demo building | Rayan |
-| `server/deadzone/protocol.py` | pydantic models for every message | Person 2 |
-| `server/deadzone/app.py` | FastAPI app, WebSocket and REST endpoints, broadcaster | Person 2 |
-| `server/deadzone/sim.py` | fixed-tick loop, scenario setup, demo director | Person 2 |
-| `server/deadzone/world.py` | truth grid, robots, relays, survivors, rubble events | Person 2 |
-| `server/deadzone/floorplan.py` | load floor plan JSON, rasterize walls and rubble | Person 2 |
-| `server/deadzone/network/propagation.py` | multi-wall path loss, link graph with hysteresis | Person 2 |
-| `server/deadzone/network/dtn.py` | bundles, custody transfer, store and forward routing | Person 2 |
-| `server/deadzone/network/fec.py` | Reed-Solomon wrapper (`reedsolo` package) | Person 2 |
-| `server/deadzone/command/` | `post.py` command knowledge, `plan.py` plans, `safety.py`, `reports.py` (Gemini) | Person 2 |
-| `server/deadzone/robot/robot.py` | Robot class, owns its map, state and outbox | Rayan |
-| `server/deadzone/robot/scheduler.py` | RTOS-style priority scheduler and task timeline | Rayan |
-| `server/deadzone/robot/lidar.py` `mapping.py` | raycast sensor, occupancy grid | Rayan |
-| `server/deadzone/robot/frontier.py` `astar.py` | frontier search, multi-robot split, A\* replanning | Rayan |
-| `server/deadzone/robot/power.py` `faults.py` `behavior.py` | battery and motor model, fault FSM, top-level FSM incl. lost link and relay drop | Rayan |
-| `server/deadzone/robot/perception.py` | survivor detection (sim sensor + trained model) | Rayan |
-| `ml/` | `prepare_crops.py`, `train.py`, `eval.py`, `thermal_samples/`, `detector.pt` | Rayan |
-| `server/tests/` | pytest unit and scenario tests | each owner for their modules |
-| `web/src/net/` `web/src/store.js` | WebSocket client and zustand store | Person 3 |
-| `web/src/three/` | Building, Robots, Lidar, Fog, Relays, Survivors, Cameras, SplitView | Person 3 |
-| `web/src/panels/` | TopBar, Sidebar, Timeline, ReportPanel | Person 3 |
-| `web/src/phone/` | PlanMap, Zones, SafetyCard, RelayMode | Person 3 |
-| `scripts/` | `record.py` (save the WS stream), replay mode, demo launcher | Person 2 |
+| Path | What it holds | Owner | Status |
+| --- | --- | --- | --- |
+| `CLAUDE.md` | rules Claude Code reads every session | everyone | exists |
+| `docs/PLAN.md` | this plan, exported as Markdown | everyone | exists |
+| `data/floorplans/collapse_01.json` | the demo building | Rayan | exists |
+| `server/deadzone/app.py` | FastAPI app, sim loop, WebSocket and REST endpoints, broadcaster | Person 2 | exists |
+| `server/deadzone/sim.py` | tick loop, world truth, `RobotIO`, link updates, bundle delivery, snapshots, rubble drop | Person 2 | exists |
+| `server/deadzone/floorplan.py` | load floor plan JSON, rasterize walls and rubble, `add_rubble` | Person 2 | exists |
+| `server/deadzone/geometry.py` | point in polygon, segment crossings, angle wrap | shared | exists |
+| `server/deadzone/network/propagation.py` | multi-wall path loss, `LinkGraph` with hysteresis and Dijkstra | Person 2 | exists |
+| `server/deadzone/network/dtn.py` | bundles and priority drain (single hop today) | Person 2 | exists |
+| `server/deadzone/network/fec.py` | Reed-Solomon wrapper (`reedsolo` package) | Person 2 | planned |
+| `server/deadzone/command/post.py` | Command view, updated only by delivered bundles | Person 2 | exists |
+| `server/deadzone/command/` `plan.py` `safety.py` `reports.py` | plans, safety checker, Gemini reports | Person 2 | planned |
+| `server/deadzone/robot/robot.py` | Robot class, behavior FSM, lost link, bundle emit, telemetry | Rayan | exists |
+| `server/deadzone/robot/lidar.py` | raycast sensor | Rayan | exists |
+| `server/deadzone/robot/mapping.py` | occupancy grid and map patches | Rayan | exists |
+| `server/deadzone/robot/planning.py` | traversability, frontier clusters, A\*, wall cost | Rayan | exists |
+| `server/deadzone/robot/power.py` | battery and wheel current | Rayan | exists |
+| `server/deadzone/robot/` `scheduler.py` `faults.py` `perception.py` | RTOS-style scheduler, fault FSM, trained detector hook | Rayan | planned |
+| `ml/` | crop prep, training, eval, `detector.pt` (`ml/data/` is gitignored) | Rayan | planned |
+| `server/tests/test_core.py` | 5 tests including core story and no-leak | each owner adds theirs | exists |
+| `web/src/store.js` `web/src/net/socket.js` | zustand store, WebSocket client with auto reconnect | Person 3 | exists |
+| `web/src/three/` | `Pane`, `Building`, `Fog`, `Actors`, `util` | Person 3 | exists |
+| `web/src/panels/Panels.jsx` | TopBar, Sidebar, keyboard controls | Person 3 | exists |
+| `web/src/phone/` | PlanMap, Zones, SafetyCard, RelayMode | Person 3 | planned |
+| `scripts/` | stream recorder and replay mode | Person 2 | planned |
 
 **The robot boundary.** The sim calls `robot.step(dt, io)` once per tick. `io` is the only door to the outside world:
 
-- `io.lidar()` returns ranges for each beam from the robot's true pose
-- `io.thermal(x, y)` returns a thermal crop id when a survivor is in view, else `None`
-- `io.drive(v, w)` sets wheel command, the sim integrates motion and checks collisions
-- `io.radio.send(bundle)`, `io.radio.inbox()`, `io.radio.neighbors()` with RSSI per neighbor
-- `io.drop_relay()` places a relay node at the robot's position if it still carries one
-- `io.odometry()` returns pose plus wheel current (for fault detection)
+- `io.lidar()` returns beam angles, ranges and hit flags from the robot's true pose
+- `io.thermal()` returns survivors within 5 m in the 120 degree camera cone with line of sight (sim sensor fallback, the trained model plugs in here)
+- `io.odometry()` returns pose, speed and a blocked flag
+- `io.drive(v, w)` sets the wheel command, the sim integrates motion and checks collisions
+- `io.radio.cmd_reachable()` and `io.radio.neighbors()` give link state
+- Outgoing bundles go into `robot.outbox`, and the network takes them when a path exists (custody)
+- Planned: `io.drop_relay()` places a relay at the robot's position if it still carries one
 
 Rayan's code lives entirely behind this interface, so Person 2 can stub it on day one.
 
@@ -138,7 +221,7 @@ Row-major `uint8` array of `w * h` cells, row index = y. Values: `0` unknown, `1
 }
 ```
 
-`kind` and priority (0 = highest): `survivor` 0, `fault` 1, `command` 1, `plan` 1, `telemetry` 2, `map_patch` 3. A `map_patch` payload is `{"robot": "R2", "cells": "<base64 of uint8 list of [ix, iy, value] triples>"}` holding only cells changed since the last patch that got custody.
+`kind` and priority (0 = highest): `survivor` 0, `fault` 1, `command` 1, `plan` 1, `telemetry` 2, `map_patch` 3. Inside the server a `map_patch` payload holds numpy arrays `ix`, `iy` and `v` with the cells changed since the last patch. If a patch ever goes over the wire, encode it as base64 of `[ix, iy, value]` triples.
 
 ### Search plan (phone to command post)
 
@@ -323,7 +406,7 @@ Planning uses the pre-collapse floor plan as the prior (rubble is unknown). For 
 
 ## Hour-by-hour plan
 
-The plan assumes hacking ends Sunday around 1:30 PM (24 hours). Confirm the exact Devpost deadline on the official schedule and shift the last block if it differs. Everyone pushes to `main` at least every hour with small commits, and nobody edits another person's folder without asking.
+The plan assumes hacking ends Sunday around 1:30 PM (24 hours). Confirm the exact Devpost deadline on the official schedule and shift the last block if it differs. Rayan's 1:30 to 5:00 PM robot items are already done in the starter (see Current status), so Rayan starts on the 5:00 PM work now. Everyone merges a PR into `main` at least every hour, and nobody edits another person's folder without asking.
 
 | Time | Rayan (robots + ML) | Person 2 (sim, network, command) | Person 3 (3D, panels, phone) |
 | --- | --- | --- | --- |
