@@ -109,3 +109,20 @@ def test_seed7_dark_survivor_gets_beacon_and_command_learns_route_only_on_delive
     assert route["beacon"] is None and sim.robots["R1"].relays_left == 0
     assert route["path"][0] == list(sim.fp.entry) and route["length_m"] > 30
     assert delivered_t is not None and delivered_t > route_t + 1.0     # held until the link returns
+
+
+class ThermalIO(FakeIO):
+    def thermal(self):
+        return [{"id": "S9", "pos": (8.0, 2.0), "crop": None, "conf": 0.99}]
+
+
+def test_dark_sighting_of_an_already_reported_survivor_does_not_send_robot_back():
+    r = mapped_robot()
+    r.linked = False
+    r.peers["R2"] = {"target": None, "pose": None, "relays": [], "found": ["S9"], "t": 0.0}
+    r._perceive(ThermalIO(linked=False))
+    assert "S9" in r.found and not r.found_while_dark      # old news: keep exploring
+    fresh = mapped_robot()
+    fresh.linked = False
+    fresh._perceive(ThermalIO(linked=False))
+    assert fresh.found_while_dark                           # new news: go back and report
