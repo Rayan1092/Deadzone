@@ -3,13 +3,19 @@
 Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions edit this file.
 
 ## Now
-- **Working on:** `rayan/detector-hookup` (PR open): trained detector wired into robot perception + decoys in the floor plan.
-- **Works on main:** frontier exploration, 3-robot target sharing, relay auto-drop, A* return home, lost-link + 10 s reconnect hold, REPLANNING around rubble, rate monotonic scheduler with carry-over and deadline misses, full fault FSM (OVERCURRENT, STUCK, SAFE_STOP, LOW_BATTERY, TRAPPED), SAFE_STOP resume command (PR #13), robots follow dispatched plans (PR #15), trained detector module (PR #14, not yet called by robots). Seed 7, 3 robots: S1 found dark at 182.3 s, on Command at 187.3 s, 4 relays.
-- **In flight (not merged):** `rayan/detector-hookup`: robots call `filter_hits(io.thermal())`; `decoys` D1 to D3 in collapse_01.json.
+- **Working on:** `rayan/demo-runbook` (PR open): `docs/DEMO.md` + detection events with crop/conf. Then task 6 once Aziz lands O / resume / decoys.
+- **Works on main:** frontier exploration, 3-robot target sharing, relay auto-drop, A* return home, lost-link + 10 s reconnect hold, REPLANNING around rubble, rate monotonic scheduler with carry-over and deadline misses, full fault FSM (OVERCURRENT, STUCK, SAFE_STOP, LOW_BATTERY, TRAPPED), SAFE_STOP resume command (PR #13), robots follow dispatched plans (PR #15), robots perceive through the trained detector with decoys in the floor plan (PR #14 + #17). Seed 7, 3 robots: S1 found dark at 182.3 s, on Command at 187.3 s, 4 relays.
+- **In flight (not merged):** `rayan/demo-runbook`: `docs/DEMO.md`, `survivor_found.crop/conf`, `hotspot_rejected` event. (Detector hookup + decoys merged as PR #17.)
 - **Blocked on / need from others:** Aziz: decoys in `RobotIO.thermal()` (see Blocked in the newest entry), plus the two director values O (overload) and resume (safe-stop-resume entry). Keep `PEER_FRESH_S` in robot.py (sim.py imports it).
 - **Promises to others:** states final: DEPLOYING, EXPLORING, LOST_LINK_EXPLORING, RETURNING_TO_SIGNAL, RETURNING_HOME, REPLANNING, FAULT, DONE. Faults final: null, OVERCURRENT, STUCK, LOW_BATTERY, TRAPPED, SAFE_STOP. `tasks` slices as in PR #7, `missed` can now be true. Robot hooks: `inject_overcurrent(seconds=1.0)`, `inject_perception_overload(seconds=3.0, wcet_ms=400)`.
 
 ## Log
+
+### 2026-11-07 19:20 · rayan/demo-runbook · docs/DEMO.md demo runbook
+- **Did:** wrote `docs/DEMO.md`: seed 7, 3 robots, 2x, plan P-1 (R1 west offices, **R2 north-east + steel cage as the dark zone**, R3 break room) preloaded, judges fix it on the phone ("Allow ZNE to go dark") and dispatch before Space. Beat sheet measured headless on merged main with the model live: S3 at +0:07, radiator rejected +0:28, RL1 +0:29, R2 dark +0:59.5, **S1 found dark +1:04.5, on Command +1:11.5 (14.1 s late)**, then R / F / O / G beats, all rehearsed in the dry run. Every director key with status, lines to say per beat, PowerShell plan / fault / report fallbacks, recovery table, judge answers. Also: `_read_commands` now learns peer telemetry if `io.radio.receive()` hands any over (PR #12 drains `robot.inbox` too), so peers can't be lost if the read order changes. 146 tests pass with the model and with `DETECTOR=sim`.
+- **Contract changes:** none
+- **Heads-up for others:** everyone: read `docs/DEMO.md` before the first rehearsal; the beat times assume P-1 with ZNE dark-OK dispatched before Space. Yusuf: F / G / O keys (M4) are the only missing keys in the runbook. Aziz: O (overload) and resume director values are still open (see the safe-stop-resume entry).
+- **Next:** task 6 director pieces when O / resume / decoys land; rehearsal fixes.
 
 ### 2026-11-07 18:55 · rayan/demo-runbook · Detection events carry the crop and confidence
 - **Did:** `survivor_found` events now carry the thermal crop file the detector scored and its confidence. New `hotspot_rejected` event when the detector turns a hot spot down (once per robot per hot spot). Survivor records (and so the Command view after delivery) carry `crop`. 115 tests pass with the model and with `DETECTOR=sim`.

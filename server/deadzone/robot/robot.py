@@ -186,10 +186,13 @@ class Robot:
 
     # ------------------------------------------------------------------ comms in
     def _read_commands(self, io):
-        """Plan and command bundles from the command post, delivered by the network."""
+        """Plan and command bundles from the command post, delivered by the network. receive()
+        can also hand over peer telemetry the inbox reader didn't take, so learn from it too."""
         for b in io.radio.receive():
             p = b.get("payload") or {}
-            if b["kind"] == "command" and p.get("cmd") == "resume":
+            if b["kind"] == "telemetry":
+                self._learn_peer(b)
+            elif b["kind"] == "command" and p.get("cmd") == "resume":
                 self._resume_from_safe_stop()
             elif b["kind"] == "plan":
                 if self.plan is None or self.plan.get("_t", -1) <= b["created"]:
@@ -249,14 +252,17 @@ class Robot:
     def _read_inbox(self):
         """Learn peer targets from telemetry bundles the network delivered to us."""
         for b in self.inbox:
-            p = b["payload"]
-            if b["kind"] != "telemetry" or p.get("id") == self.id:
-                continue
-            prev = self.peers.get(p["id"])
-            if prev is None or prev["t"] <= b["created"]:
-                self.peers[p["id"]] = {"target": p.get("target"), "pose": p.get("pose"),
-                                       "relays": p.get("relays", []), "t": b["created"]}
+            self._learn_peer(b)
         self.inbox.clear()
+
+    def _learn_peer(self, b):
+        p = b["payload"]
+        if b["kind"] != "telemetry" or p.get("id") in (None, self.id):
+            return
+        prev = self.peers.get(p["id"])
+        if prev is None or prev["t"] <= b["created"]:
+            self.peers[p["id"]] = {"target": p.get("target"), "pose": p.get("pose"),
+                                   "relays": p.get("relays", []), "t": b["created"]}
 
     def _claimed_targets(self):
         """Fresh targets of higher-priority peers. Lower rank wins, so claims never oscillate."""
