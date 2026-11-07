@@ -325,7 +325,7 @@ class Robot:
         beacon = None
         if self.relays_left > 0 and not self.linked:
             try:
-                beacon = io.drop_relay()
+                beacon = io.drop_relay(beacon_for=rec["id"])   # tagged beacon (None if refused)
             except ValueError:
                 beacon = None              # the deployer refused this spot (wall / no-go)
             if beacon is not None:

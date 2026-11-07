@@ -11,6 +11,12 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 
 ## Log
 
+### 2026-11-07 22:05 · rayan/beacon-tag · Survivor beacons are tagged with beacon_for
+- **Did:** the survivor beacon now calls `io.drop_relay(beacon_for=rec["id"])` (Aziz's PR #28 API), so its `relay_dropped` event and relay record carry `beacon_for`. A refused tagged drop (robot linked) returns None and costs no relay. Seed 7 demo re-run: RL2 at (35.1, 23.6) has `beacon_for: "S1"`; all DEMO.md beats unchanged (S1 dark 129.0 s → Command 143.1 s, S2 246.0 s). 200 tests pass (model and `DETECTOR=sim`).
+- **Contract changes:** none new from my side. Reminder for Yusuf: the Command-side arrival event is Aziz's **`rescue_route_reported`** (with `delay_s`); the robot's `rescue_route` event is Reality only.
+- **Heads-up for others:** Aziz: done, the call site you asked for.
+- **Next:** pitch assets (ML slide images, README, DEVPOST draft).
+
 ### 2026-11-07 21:15 · rayan/demo-polish · Fixes from the testing laptop's dry run
 - **Did:** (1) DEMO.md PowerShell fallbacks use `127.0.0.1` (Windows `localhost` hangs ~2 s on IPv6), plus a note that R / F / O must land on time or the S2 bonus slips past the close. (2) No more REPLANNING / EXPLORING flip-flop at rubble corners (R3 near (30.2, 26.8)): an obstacle seen again within 5 s of a replan is replanned silently in place; only if that fails does the robot stop and show REPLANNING. (3) A robot that sees an already-reported survivor in the dark (peer's `found` list) keeps exploring instead of returning to signal (R1 / R3 for S1). Seed 7 demo re-run: every beat through S1 unchanged (S1 dark 129.0 s → Command 143.1 s); RL1 57.7 → 57.1 s; S2 bonus moves to 245.8 s (+2:03, clock 2:43, R2 finds it now). DEMO.md updated. 167 tests pass (model and `DETECTOR=sim`).
 - **Contract changes:** none. Fewer `replan` events (repeat obstacles within 5 s no longer raise one).

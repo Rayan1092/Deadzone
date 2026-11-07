@@ -46,8 +46,9 @@ class FakeIO:
         self.radio = FakeRadio(linked)
         self.drops = 0
 
-    def drop_relay(self):
+    def drop_relay(self, beacon_for=None):
         self.drops += 1
+        self.beacon_for = beacon_for
         return f"RL{self.drops}"
 
 
@@ -79,7 +80,7 @@ def test_confirmed_survivor_sends_priority_1_route_and_beacon_only_in_the_dark()
     dark.linked = False
     io = FakeIO(linked=False)
     dark._on_survivor_confirmed(io, rec)
-    assert io.drops == 1 and dark.outbox[-1]["payload"]["beacon"] == "RL1"
+    assert io.drops == 1 and dark.outbox[-1]["payload"]["beacon"] == "RL1" and io.beacon_for == "S9"
     assert dark.relays_left == 1
 
 
