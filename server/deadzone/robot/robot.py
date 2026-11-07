@@ -39,6 +39,13 @@ RELAY_MIN_SPACING = 4.0    # m from every relay this robot knows about
 
 HOME_COST_PERIOD = 2.0     # s between A* "distance home" refreshes
 
+# Lost link and replanning
+LINK_HOLD_S = 10.0         # after reconnecting, wait at most this long for the dark backlog to upload
+PATH_CHECK_M = 3.0         # look this far down the path for new obstacles
+PATH_CHECK_SKIP_M = 0.4    # ignore the robot's own footprint (it may sit in a wall's inflation)
+REPLAN_PAUSE_S = 0.6       # stop briefly in REPLANNING so the replan is visible and the map settles
+TRAPPED_AFTER_S = 10.0     # no route for this long raises a TRAPPED fault to the command post
+
 
 def is_robot_id(nid):
     """R1, R2 ... are robots. RL1 (relay), CMD and phones are infrastructure."""
@@ -80,6 +87,10 @@ class Robot:
         self.crumbs = [tuple(pose[:2])]
         self.found = {}           # survivor id -> record
         self.found_while_dark = False
+        self.dark_declared = False   # link_lost raised for the current outage
+        self.reconnect_t = None      # when the link last came back after an outage
+        self.resume_state = None     # state to go back to after REPLANNING
+        self.replan_fail_since = None
 
         self.relays_left = RELAYS_PER_ROBOT
         self.my_relays = []       # [x, y] of relays this robot dropped
@@ -161,13 +172,24 @@ class Robot:
                                 "pos": rec["pos"], "linked": self.linked})
 
     def _update_link(self, io):
+        """Track the link and raise link_lost / link_restored exactly once per outage, in any state.
+        An outage starts after LINK_LOST_AFTER s without a path to CMD (short blips are ignored)."""
         reachable = io.radio.cmd_reachable()
         x, y, _ = self.pose
         if reachable:
+            if self.dark_declared:
+                self.dark_declared = False
+                self.reconnect_t = self.t
+                self.found_while_dark = False
+                self.events.append({"kind": "link_restored", "robot": self.id,
+                                    "dark_s": round(self.t - self.last_link_t, 1)})
             self.last_link_t = self.t
             if math.dist(self.crumbs[-1], (x, y)) > CRUMB_SPACING:
                 self.crumbs.append((x, y))
                 self.crumbs = self.crumbs[-200:]
+        elif not self.dark_declared and self.t - self.last_link_t > LINK_LOST_AFTER:
+            self.dark_declared = True
+            self.events.append({"kind": "link_lost", "robot": self.id})
         self.linked = reachable
 
     # ------------------------------------------------------------------ relays
@@ -213,8 +235,8 @@ class Robot:
                 self.fault = "STUCK"
                 self.events.append({"kind": "fault", "robot": self.id, "fault": "STUCK"})
                 self._block_ahead()
-                self._replan_now()
-            else:
+                self._start_replan("stuck")
+            elif self.fault == "STUCK":
                 self.fault = None
             self.stuck_ref = (x, y, self.t)
         if odo.get("blocked"):
@@ -243,50 +265,112 @@ class Robot:
                 self._set_state("EXPLORING")
             return
 
+        if s == "REPLANNING":
+            self._replanning()
+            return
+
         if s in ("EXPLORING", "LOST_LINK_EXPLORING"):
-            if dark_for > LINK_LOST_AFTER and s == "EXPLORING":
+            if self.dark_declared and s == "EXPLORING":
                 self._set_state("LOST_LINK_EXPLORING")
-                self.found_while_dark = False
-                self.events.append({"kind": "link_lost", "robot": self.id})
             elif self.linked and s == "LOST_LINK_EXPLORING":
                 self._set_state("EXPLORING")
-                self.events.append({"kind": "link_restored", "robot": self.id})
             if self.state == "LOST_LINK_EXPLORING" and (dark_for > self.lost_budget or self.found_while_dark):
                 self._set_state("RETURNING_TO_SIGNAL")
-                self._plan_to(self.crumbs[-1])
+                if not self._plan_to_signal():
+                    self._start_replan("no_route")
                 return
             if self.battery.pct - self._pct_home() <= RESERVE_PCT:
                 self._set_state("RETURNING_HOME")
-                self._plan_to(self.entry)
+                if not self._plan_to(self.entry):
+                    self._start_replan("no_route")
                 return
-            need = (not self.path or self.t - self.last_plan_t > REPLAN_PERIOD or self._path_blocked())
-            if need:
+            if self._path_blocked():
+                self._start_replan("obstacle")
+                return
+            if not self.path or self.t - self.last_plan_t > REPLAN_PERIOD:
                 if not self._plan_frontier():
-                    self._set_state("RETURNING_HOME")
-                    self._plan_to(self.entry)
+                    self._set_state("RETURNING_HOME")   # nothing left to explore
+                    if not self._plan_to(self.entry):
+                        self._start_replan("no_route")
             return
 
         if s == "RETURNING_TO_SIGNAL":
             if self.linked:
-                # hold position until the backlog is uploaded, then go back to work
+                # hold until everything gathered in the dark has left the outbox (custody to the
+                # next hop), at most LINK_HOLD_S after the link came back, then go back to work
                 self.path = []
-                if not self.outbox or self.t - self.state_since > 20.0:
+                since = self.reconnect_t if self.reconnect_t is not None else self.t
+                backlog = any(b["created"] < since for b in self.outbox)
+                if not backlog or self.t - since >= LINK_HOLD_S:
                     self._set_state("EXPLORING")
-                    self.events.append({"kind": "link_restored", "robot": self.id})
                 return
-            if not self.path:
+            if self._path_blocked():
+                self._start_replan("obstacle")
+            elif not self.path:
                 if len(self.crumbs) > 1:
                     self.crumbs.pop()
-                self._plan_to(self.crumbs[-1])
+                if not self._plan_to(self.crumbs[-1]):
+                    self._start_replan("no_route")
             return
 
         if s == "RETURNING_HOME":
             if math.dist(self.pose[:2], self.entry) < 0.6:
                 self.path = []
                 self._set_state("DONE")
-            elif not self.path or self._path_blocked():
-                self._plan_to(self.entry)
+            elif self._path_blocked():
+                self._start_replan("obstacle")
+            elif not self.path and not self._plan_to(self.entry):
+                self._start_replan("no_route")
             return
+
+    # ------------------------------------------------------------------ replanning
+    def _start_replan(self, reason):
+        """Stop, mark REPLANNING, and replan for whatever we were doing."""
+        if self.state in ("DEPLOYING", "DONE"):
+            return
+        if self.state != "REPLANNING":
+            self.resume_state = self.state
+            self.events.append({"kind": "replan", "robot": self.id, "reason": reason})
+        self.path = []
+        self._set_state("REPLANNING")
+
+    def _replanning(self):
+        if self.t - self.state_since < REPLAN_PAUSE_S:
+            return
+        if self.replan_fail_since is not None and self.t - self.last_plan_t < REPLAN_PERIOD:
+            return   # throttle retries while no route exists
+        resume = self.resume_state or "EXPLORING"
+        if resume in ("EXPLORING", "LOST_LINK_EXPLORING"):
+            ok = self._plan_frontier()
+            if not ok and self._plan_to(self.entry):
+                ok, resume = True, "RETURNING_HOME"   # nothing reachable left to explore
+        elif resume == "RETURNING_TO_SIGNAL":
+            ok = self._plan_to_signal()
+        else:
+            ok = self._plan_to(self.entry)
+        if ok:
+            self.replan_fail_since = None
+            if self.fault == "TRAPPED":
+                self.fault = None
+            self._set_state(resume)
+            return
+        if self.replan_fail_since is None:
+            self.replan_fail_since = self.t
+        elif self.t - self.replan_fail_since >= TRAPPED_AFTER_S and self.fault != "TRAPPED":
+            self.fault = "TRAPPED"
+            x, y, _ = self.pose
+            rec = {"robot": self.id, "fault": "TRAPPED", "pos": [round(x, 2), round(y, 2)], "t": round(self.t, 1)}
+            self.events.append({"kind": "fault", "robot": self.id, "fault": "TRAPPED"})
+            self.outbox.append(make_bundle(self.id, "CMD", "fault", rec, self.t, 120))
+
+    def _plan_to_signal(self):
+        """A* back to the newest breadcrumb we can still reach (older ones if rubble cut us off).
+        Crumbs are only dropped once an older one works, so being trapped never erases them."""
+        for k in range(1, min(5, len(self.crumbs)) + 1):
+            if self._plan_to(self.crumbs[-k]):
+                del self.crumbs[len(self.crumbs) - k + 1:]
+                return True
+        return False
 
     # ------------------------------------------------------------------ planning
     def _cell(self, x, y):
@@ -339,17 +423,27 @@ class Robot:
         self.path = []
         return False
 
-    def _replan_now(self):
-        self.path = []
-        self.events.append({"kind": "replan", "robot": self.id})
-
     def _path_blocked(self):
-        from ..floorplan import OCC
-        for px, py in self.path[:8]:
-            ix, iy = self._cell(px, py)
-            if self.map.grid[iy, ix] == OCC:
-                self.events.append({"kind": "replan", "robot": self.id})
-                return True
+        """True when the next PATH_CHECK_M of path, sampled every half cell, leaves the
+        inflated traversable area of our own map (a new wall, rubble or no-go seen on it)."""
+        if not self.path:
+            return False
+        trav = self._trav()
+        pts = [tuple(self.pose[:2])] + [tuple(p) for p in self.path]
+        along = 0.0
+        for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+            seg = math.dist((ax, ay), (bx, by))
+            n = max(1, int(seg / (self.cell / 2)))
+            for k in range(1, n + 1):
+                d = along + seg * k / n
+                if d < PATH_CHECK_SKIP_M:
+                    continue
+                if d > PATH_CHECK_M:
+                    return False
+                ix, iy = self._cell(ax + (bx - ax) * k / n, ay + (by - ay) * k / n)
+                if 0 <= ix < self.map.w and 0 <= iy < self.map.h and not trav[iy, ix]:
+                    return True
+            along += seg
         return False
 
     def _pct_home(self):
