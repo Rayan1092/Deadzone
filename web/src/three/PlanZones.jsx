@@ -22,7 +22,7 @@ function Region({ poly, color, label, dashed, fill }) {
       </mesh>
       <Line points={outline} color={color} lineWidth={2} dashed={dashed} dashSize={0.5} gapSize={0.3} />
       <Html position={w2t((Math.min(...xs) + Math.max(...xs)) / 2, Math.max(...ys) - 0.6, Y)} center
-            distanceFactor={40} style={{ pointerEvents: 'none' }}>
+            zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
         <div className="tag zone" style={{ borderColor: color }}>{label}</div>
       </Html>
     </group>

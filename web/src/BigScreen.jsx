@@ -4,6 +4,8 @@ import Pane from './three/Pane'
 import { Sidebar, TopBar, useKeyboard } from './panels/Panels'
 import { JoinOverlay } from './panels/JoinPanel'
 import Toasts from './panels/Toasts'
+import Timeline from './panels/Timeline'
+import ReportPanel from './panels/ReportPanel'
 
 export default function BigScreen() {
   useEffect(() => connectScreen(), [])
@@ -15,9 +17,10 @@ export default function BigScreen() {
         <Pane which="reality" title="Reality" subtitle="where the robots are and what they found" />
         <Pane which="command" title="Command post knows" subtitle="only what reached the antenna" />
         <Toasts />
+        <ReportPanel />
       </main>
       <Sidebar />
-      <footer className="timeline muted">Task timeline (Motion, Mapping, Comms, Safety) lands at 10 PM</footer>
+      <Timeline />
       <JoinOverlay />
     </div>
   )

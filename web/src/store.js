@@ -25,6 +25,8 @@ export const useSim = create((set) => ({
   showTruth: false,    // T key: faint truth survivors on the Reality pane only
   plan: null,          // shared search plan from plan_state (null when none)
   dispatchedPlans: [], // plan IDs with an accepted dispatch (plan_dispatched events)
+  follow: null,        // robot id the cameras follow (keys 1-3), null = overview
+  report: null,        // briefing from /api/report: { text, generated_at, source } | { loading } | { error }
   set,
 }))
 
@@ -70,6 +72,9 @@ export function handleMessage(msg) {
               ...(TOAST_KINDS.has(ev.kind) && !repeat ? { toasts: [...s.toasts, { ...ev, at: Date.now() }].slice(-5) } : {}) })
       break
     }
+    case 'report':
+      s.set({ report: data })
+      break
     case 'plan_state':
       s.set({ plan: data })
       break

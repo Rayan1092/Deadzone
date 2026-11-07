@@ -58,7 +58,7 @@ function RobotBody({ pose, color, ghost = false, label, sub, headlight = true })
       </mesh>
       {!ghost && headlight && <Headlight />}
       {label && (
-        <Html position={[0, 0.8, 0]} center distanceFactor={40} style={{ pointerEvents: 'none' }}>
+        <Html position={[0, 0.8, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
           <div className={ghost ? 'tag ghost' : 'tag'}>
             <b>{label}</b>{sub ? <span>{sub}</span> : null}
           </div>
@@ -125,16 +125,16 @@ function Survivor({ pos, label, born }) {
         </mesh>
       )}
       <pointLight ref={light} position={[0, 0.8, 0]} color={COLORS.red} intensity={3} distance={4} />
-      <Html position={[0, 1.1, 0]} center distanceFactor={40} style={{ pointerEvents: 'none' }}>
+      <Html position={[0, 1.1, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
         <div className="tag alert"><b>{label}</b></div>
       </Html>
     </group>
   )
 }
 
-// Ground truth the robots have not found yet (T key). Reality pane only, never Command.
-// Drawn just above the fog layer, since undiscovered survivors sit in unmapped rooms.
-function TruthMarker({ pos, id }) {
+// Ground truth the robots have not found yet (T key): survivors in red, thermal
+// decoys in amber. Reality pane only, never Command. Drawn just above the fog layer.
+function TruthMarker({ pos, id, sub = 'not found yet', color = COLORS.red, decoy = false }) {
   const ring = useRef()
   useFrame(({ clock }) => {
     if (ring.current) ring.current.material.opacity = 0.35 + 0.2 * Math.sin(clock.elapsedTime * 2)
@@ -143,10 +143,10 @@ function TruthMarker({ pos, id }) {
     <group position={w2t(pos[0], pos[1], 0)}>
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, FOG_H + 0.03, 0]} renderOrder={3}>
         <ringGeometry args={[0.35, 0.42, 32]} />
-        <meshBasicMaterial color={COLORS.red} transparent side={THREE.DoubleSide} depthWrite={false} />
+        <meshBasicMaterial color={color} transparent side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
-      <Html position={[0, FOG_H + 0.6, 0]} center distanceFactor={40} style={{ pointerEvents: 'none' }}>
-        <div className="tag ghost truth"><b>{id}</b><span>not found yet</span></div>
+      <Html position={[0, FOG_H + 0.6, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
+        <div className={`tag ghost truth${decoy ? ' decoy' : ''}`}><b>{id}</b><span>{sub}</span></div>
       </Html>
     </group>
   )
@@ -186,6 +186,9 @@ export function RealityActors() {
       {survivors_found.map((s) => <Survivor key={s.id} pos={s.pos} label={`${s.id} found by ${s.by}`} />)}
       {showTruth && (fp.survivors ?? []).filter((s) => !found.has(s.id)).map((s) => (
         <TruthMarker key={s.id} pos={s.pos} id={s.id} />
+      ))}
+      {showTruth && (fp.decoys ?? []).map((d) => (
+        <TruthMarker key={d.id} pos={d.pos} id={d.id} sub={`${d.label} · decoy`} color={COLORS.amber} decoy />
       ))}
     </group>
   )
