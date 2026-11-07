@@ -3,7 +3,7 @@ import { create } from 'zustand'
 // Events worth a toast on the big screen. replan, deadline_miss and deliveries
 // fire too often and stay in the sidebar feed or the timeline.
 const TOAST_KINDS = new Set(['survivor_found', 'survivor_reported', 'link_lost', 'link_restored',
-  'relay_dropped', 'fault', 'rubble_fall', 'safety_reject'])
+  'relay_dropped', 'fault', 'rubble_fall', 'safety_reject', 'plan_dispatched', 'plan_applied', 'resumed'])
 const COLLAPSE_KINDS = new Set(['replan', 'deadline_miss'])
 let eventId = 0
 
@@ -23,6 +23,8 @@ export const useSim = create((set) => ({
   joinOpen: false,     // full screen QR overlay (Q key)
   joinUrl: null,       // phone join URL from /api/join
   showTruth: false,    // T key: faint truth survivors on the Reality pane only
+  plan: null,          // shared search plan from plan_state (null when none)
+  dispatchedPlans: [], // plan IDs with an accepted dispatch (plan_dispatched events)
   set,
 }))
 
@@ -42,7 +44,7 @@ export function handleMessage(msg) {
       const reset = time < s.time
       s.set({ floorplan: data.floorplan, grid: data.grid, robotsMeta: data.robots,
               running: data.running, speed: data.speed, time,
-              ...(reset ? { events: [], toasts: [], tick: null } : {}) })
+              ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [] } : {}) })
       break
     }
     case 'tick':
@@ -63,10 +65,14 @@ export function handleMessage(msg) {
       const fold = COLLAPSE_KINDS.has(ev.kind) && top && top.kind === ev.kind && top.robot === ev.robot &&
         top.reason === ev.reason && top.task === ev.task
       const events = fold ? [{ ...ev, count: (top.count ?? 1) + 1 }, ...s.events.slice(1)] : [ev, ...s.events]
+      if (ev.kind === 'plan_dispatched') s.set({ dispatchedPlans: [...s.dispatchedPlans, ev.plan_id] })
       s.set({ events: events.slice(0, 40),
               ...(TOAST_KINDS.has(ev.kind) && !repeat ? { toasts: [...s.toasts, { ...ev, at: Date.now() }].slice(-5) } : {}) })
       break
     }
+    case 'plan_state':
+      s.set({ plan: data })
+      break
     case 'control':
       s.set({ running: data.running, speed: data.speed })
       break

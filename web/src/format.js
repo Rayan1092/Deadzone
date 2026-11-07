@@ -41,9 +41,15 @@ export function describeEvent(e) {
     case 'link_restored': return e.dark_s ? `${e.robot} back online after ${Math.round(e.dark_s)}s dark` : `${e.robot} link restored`
     case 'replan': return `${e.robot} replanned${e.reason ? `: ${REPLAN_REASON[e.reason] ?? e.reason}` : ''}`
     case 'fault': return `${e.robot} fault: ${FAULT_LABEL[e.fault] ?? e.fault}`
-    case 'relay_dropped': return e.owner ? `${e.owner} dropped relay ${e.id}` : `Relay ${e.id} placed`
+    case 'relay_dropped': // owner is a robot id, a relay phone's client label, or null
+      if (/^R\d+$/.test(e.owner ?? '')) return `${e.owner} dropped relay ${e.id}`
+      return e.owner ? `Phone ${e.owner} joined as relay ${e.id}` : `Relay ${e.id} placed`
     case 'deadline_miss': return `${e.robot} missed a ${e.task} deadline`
     case 'rubble_fall': return 'Rubble fell'
+    case 'plan_dispatched': return `Plan ${e.plan_id} dispatched to the robots`
+    case 'plan_applied': return `${e.robot} is following ${e.plan_id}${e.zones?.length ? ` (${e.zones.join(', ')})` : ''}`
+    case 'resumed': return `${e.robot} resumed after safe stop`
+    case 'fault_injected': return `Director: ${e.type} injected on ${e.robot}`
     case 'safety_reject': return `Plan ${e.plan_id} rejected: ${e.violations?.[0]?.msg ?? 'safety check failed'}`
     default: return e.kind
   }
