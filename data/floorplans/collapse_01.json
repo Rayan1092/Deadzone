@@ -70,6 +70,11 @@
     {"id": "S2", "pos": [29.0, 4.0],  "thermal": "pos_0002.png"},
     {"id": "S3", "pos": [5.0, 26.0],  "thermal": "pos_0003.png"}
   ],
+  "decoys": [
+    {"id": "D1", "label": "radiator",       "pos": [15.0, 28.0], "thermal": "neg_0001.png"},
+    {"id": "D2", "label": "engine",         "pos": [37.0, 12.0], "thermal": "neg_0002.png"},
+    {"id": "D3", "label": "coffee machine", "pos": [22.0, 28.0], "thermal": "neg_0003.png"}
+  ],
   "entry": [1.0, 15.0],
   "command_post": {"pos": [-2.0, 15.0], "tx_dbm": 20}
 }
