@@ -6,6 +6,11 @@
 - `docs/PLAN.md` is the full build plan: data formats, WebSocket protocol, algorithms, hour by hour plan.
 - Message shapes in `docs/PLAN.md` sections "Data formats" and "APIs and WebSocket protocol" are the contract between server and web. Do not change a message shape without saying so in the PR description.
 
+## Team context (3 laptops, 3 Claude sessions)
+- Follow `docs/team/INSTRUCTIONS.md`. The repo is the only shared memory between laptops.
+- Read every `docs/team/history/*.md` `## Now` section before starting work, and again whenever the team-sync hook reports new commits.
+- Every commit carries an entry in your own `docs/team/history/<you>.md` (a hook enforces this). Never edit a teammate's history file.
+
 ## Ownership (ask before editing someone else's area)
 - Rayan: `server/deadzone/robot/`, `ml/`, `data/floorplans/`
 - Person 2: `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`
