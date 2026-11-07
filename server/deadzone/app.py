@@ -26,12 +26,14 @@ from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
 from .command.controls import FaultRequest, RelayPlace, RelayPower, director_adapter
 from .command.reports import local_report
 from .command.safety import SafetyChecker
+from .robot.perception import get_detector
 from .robot.robot import resume_command
 from .sim import DT, ROBOT_DEFS, Sim
 
 MAPS_EVERY = 5
 MAX_PHONE_RELAYS = 32
 WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
+CROPS_DIR = Path(__file__).resolve().parents[2] / "ml" / "crops" / "runtime"
 
 
 class Hub:
@@ -68,8 +70,14 @@ class Hub:
         for ws in dead:
             clients.discard(ws)
 
+    def detector_status(self):
+        detector = get_detector()
+        return {"detector": detector.mode,
+                "detector_reason": getattr(detector, "reason", None) if detector.mode == "sim" else None}
+
     def hello(self):
-        return self.envelope("hello", self.sim.hello() | {"speed": self.speed, "running": self.running})
+        return self.envelope("hello", self.sim.hello() | {"speed": self.speed, "running": self.running}
+                             | self.detector_status())
 
     def phone_hello(self, client, role):
         robots = [{"id": rid, "name": name, "color": color,
@@ -79,7 +87,7 @@ class Hub:
         return {"floorplan": self.sim.prior.planning_data(),
                 "grid": {"w": self.sim.prior.w, "h": self.sim.prior.h, "cell": self.sim.prior.cell},
                 "robots": robots, "plan": self.plans.current(), "client": client, "role": role,
-                "relay_id": self.relay_clients.get(client) if role == "relay" else None}
+                "relay_id": self.relay_clients.get(client) if role == "relay" else None} | self.detector_status()
 
     def attach_relay(self, client):
         if client not in self.relay_clients:
@@ -447,6 +455,10 @@ def phone_page():
         raise HTTPException(503, "Build the frontend or use the Vite frontend address")
     return FileResponse(index)
 
+
+# Thermal crops the detector judged, for the frontend's detection cards (/crops/pos_0001.png).
+if CROPS_DIR.exists():
+    app.mount("/crops", StaticFiles(directory=CROPS_DIR), name="crops")
 
 if WEB_DIST.exists():
     app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")

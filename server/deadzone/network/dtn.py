@@ -10,7 +10,7 @@ from copy import deepcopy
 
 from .propagation import throughput_bps
 
-PRIO = {"survivor": 0, "fault": 1, "command": 1, "plan": 1, "telemetry": 2, "map_patch": 3}
+PRIO = {"survivor": 0, "fault": 1, "command": 1, "plan": 1, "rescue_route": 1, "telemetry": 2, "map_patch": 3}
 RELAY_QUEUE_BYTES = 2_000_000
 _seq = itertools.count(1)
 

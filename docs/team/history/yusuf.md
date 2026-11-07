@@ -17,6 +17,12 @@ Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Log
 
+### 2026-11-07 22:05 · p3/backend-for-aziz · Backend asks implemented for Aziz's review (not merged by Yusuf)
+- **Did:** to take load off Aziz, wrote the three small backend items the frontend and Rayan were waiting on, as a PR **for Aziz to review, merge or close** (his area): `rescue_route` is priority 1 in `PRIO`; Command keeps the newest delivered route per survivor and exposes `routes` in the Command view and phone `cmd_view`, raising `rescue_route_reported`; `/crops/<file>` serves `ml/crops/runtime/`; screen and phone `hello` carry `detector` (`model` / `sim`) and `detector_reason`. 5 new tests; full suite 170 passed. Headless seed-7 run: S1 route computed dark at 182.3 s, on Command at 187.3 s.
+- **Contract changes:** implements the already agreed shapes: Command `routes: [{survivor, by, path, length_m, clearance_m, beacon, reported_t}]`, event `rescue_route_reported {survivor, by, length_m, delay_s}`, `hello.detector` / `hello.detector_reason`, `GET /crops/<file>`.
+- **Heads-up for others:** Aziz: please review the PR before anything else of yours touches `post.py` / `app.py`; close it if you already wrote these. Recorder/replay: I am building a browser-side `?record` / `?replay` in `web/`, so you can drop it from your list unless you want a server-side one too.
+- **Next:** browser replay fallback, DEMO.md keys.
+
 ### 2026-11-07 21:20 · p3/visual-pass · M7 part 2: robot's-eye view
 - **Did:** V (or a robot card's Camera button) opens a small picture-in-picture on the Reality pane from that robot's forward camera (Reality telemetry pose, smoothed). Thermal toggle: walls cold blue, survivors glow white-hot and decoys glow amber, so judges see why the detector has to decide. It is a third small WebGL canvas (dpr 1, low-power) that only exists while open.
 - **Contract changes:** none. New key V.

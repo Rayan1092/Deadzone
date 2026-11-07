@@ -10,6 +10,7 @@ class CommandPost:
         self.relays = {}
         self.survivors = {}   # id -> record + reported_t
         self.faults = {}
+        self.routes = {}      # survivor id -> newest delivered rescue route
         self.delivered = 0
         self.events = []
         self._seen = {}
@@ -47,6 +48,14 @@ class CommandPost:
             prev = self.faults.get(robot)
             if prev is None or prev["sent_t"] <= b["created"]:
                 self.faults[robot] = dict(p, sent_t=b["created"], reported_t=round(now, 1))
+        elif k == "rescue_route":
+            sid = p["survivor"]
+            prev = self.routes.get(sid)
+            if prev is None or prev["t"] <= p["t"]:
+                self.routes[sid] = {key: p[key] for key in ("survivor", "by", "path", "length_m", "clearance_m", "beacon", "t")}
+                self.routes[sid]["reported_t"] = round(now, 1)
+                self.events.append({"kind": "rescue_route_reported", "survivor": sid, "by": p["by"],
+                                    "length_m": p["length_m"], "delay_s": round(now - p["t"], 1)})
         elif k == "survivor":
             if p["id"] not in self.survivors:
                 rec = dict(p)
@@ -64,4 +73,6 @@ class CommandPost:
                           | {"stale_s": round(now - r["sent_t"], 1)})
         relays = [{"id": r["id"], "pos": list(r["pos"])} for r in self.relays.values()]
         faults = [{k: v for k, v in f.items() if k != "sent_t"} for f in self.faults.values()]
-        return {"robots": robots, "survivors": list(self.survivors.values()), "relays": relays, "faults": faults}
+        routes = [{k: v for k, v in r.items() if k != "t"} for r in self.routes.values()]
+        return {"robots": robots, "survivors": list(self.survivors.values()), "relays": relays, "faults": faults,
+                "routes": routes}
