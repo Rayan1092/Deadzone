@@ -20,3 +20,6 @@ ml/*.pt
 # FLIR extraction leftovers (safety net, dataset lives in ml/data/flir)
 ml/images_*/
 ml/video*/
+
+# claude code: personal settings stay local
+.claude/settings.local.json
