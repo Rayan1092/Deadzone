@@ -3,13 +3,27 @@
 Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions edit this file.
 
 ## Now
-- **Working on:** `rayan/rescue-route`: beacon relay at a confirmed survivor + safe A* route entrance → survivor sent to CMD (priority 1). Owners/targets: Added scope table in `docs/PLAN.md`.
+- **Working on:** `rayan/rescue-route` (PR open): safe A* route entrance → survivor sent to CMD (priority 1), beacon relay when the survivor is in a dead zone. Owners/targets: Added scope table in `docs/PLAN.md`.
 - **Works on main:** frontier exploration, 3-robot target sharing, relay auto-drop, A* return home, lost-link + 10 s reconnect hold, REPLANNING around rubble, rate monotonic scheduler with carry-over and deadline misses, full fault FSM (OVERCURRENT, STUCK, SAFE_STOP, LOW_BATTERY, TRAPPED), SAFE_STOP resume command (PR #13), robots follow dispatched plans (PR #15), robots perceive through the trained detector with decoys in the floor plan (PR #14 + #17). Seed 7, 3 robots: S1 found dark at 182.3 s, on Command at 187.3 s, 4 relays.
-- **In flight (not merged):** `rayan/scope-sync` (PLAN.md Added scope). On main since last update: `docs/DEMO.md`, `survivor_found.crop/conf`, `hotspot_rejected` (PR #19), detector hookup + decoys (PR #17).
-- **Blocked on / need from others:** Aziz: `/crops` static, `hello.detector`, decoys in `RobotIO.thermal()` + none in sim fallback, O and resume director values. Yusuf: detector chip, survivor figure, detection cards, bigger robots, robot's-eye view (offer to build), phone robot tap, liquid glass, rescue route drawing. Details in the Blocked sections below; owners/targets in `docs/PLAN.md` Added scope. Keep `PEER_FRESH_S` in robot.py (sim.py imports it).
+- **In flight (not merged):** `rayan/rescue-route`: rescue route + beacon. On main: `docs/DEMO.md`, `survivor_found.crop/conf`, `hotspot_rejected` (PR #19), PLAN.md Added scope (PR #21), detector hookup + decoys (PR #17).
+- **Blocked on / need from others:** Aziz: `/crops` static, `hello.detector`, decoys in `RobotIO.thermal()` + none in sim fallback, O and resume director values, `rescue_route` in PRIO + `command.routes`. Yusuf: detector chip, survivor figure, detection cards, bigger robots, robot's-eye view (offer to build), phone robot tap, liquid glass, rescue route drawing. Details in the Blocked sections below; owners/targets in `docs/PLAN.md` Added scope. Keep `PEER_FRESH_S` in robot.py (sim.py imports it).
 - **Promises to others:** states final: DEPLOYING, EXPLORING, LOST_LINK_EXPLORING, RETURNING_TO_SIGNAL, RETURNING_HOME, REPLANNING, FAULT, DONE. Faults final: null, OVERCURRENT, STUCK, LOW_BATTERY, TRAPPED, SAFE_STOP. `tasks` slices as in PR #7, `missed` can now be true. Robot hooks: `inject_overcurrent(seconds=1.0)`, `inject_perception_overload(seconds=3.0, wcet_ms=400)`.
 
 ## Log
+
+### 2026-11-07 20:30 · rayan/rescue-route · Rescue route + beacon relay
+- **Did:** when a robot confirms a survivor (first confirmation only; robots skip survivors a peer already reported, via the `found` list in peer telemetry) it computes the safest A* route **from the entrance to the survivor on its own map**: known free cells only, never through rubble, walls, unknown space or no-go areas, centered by the wall cost, with a cost band 1 m around hazards. It sends the route to CMD as a **priority-1 bundle**, so Command only knows it when it arrives. If the survivor is in a **dead zone** (robot has no link) and the robot still has a relay, it also drops a **beacon relay** next to them; where there is coverage no beacon is needed (Rayan's call: beacons in covered areas reshaped the relay network and removed the S1 dark moment). Seed 7 demo plan: S3 route 14.2 m at 14.4 s (instant); S1 found dark at 129.0 s, beacon RL2 in the cage, 49.7 m route delivered to CMD at 143.1 s with the survivor report; every DEMO.md beat unchanged. 150 tests pass (model and `DETECTOR=sim`).
+- **Contract changes:**
+  - Robot event (Reality knowledge, at computation): `rescue_route {robot, survivor, path:[[x,y],...], length_m, clearance_m, beacon}`. `path` starts at the entrance `[1.0, 15.0]` and ends at the survivor position; `beacon` is the relay id (e.g. `"RL2"`) or null.
+  - Bundle to CMD: `kind:"rescue_route"`, `prio:1`, payload `{survivor, by, path, length_m, clearance_m, beacon, t}`. Delivery raises the existing `bundle_delivered` event with `bundle_kind:"rescue_route"`.
+  - The beacon is a normal relay: it raises the usual `relay_dropped` event and shows in `reality.relays`.
+- **Heads-up for others:** Yusuf: draw routes on **Command only from delivered data** (Aziz's `command.routes`, below), never from the robot's `rescue_route` event, which is Reality knowledge. The Reality pane may draw from the event. Phones get routes through `cmd_view` once Aziz adds them.
+- **Blocked:**
+  - **Aziz:**
+    1. `network/dtn.py`: add `"rescue_route": 1` to `PRIO`. Robots already send the bundle with `prio:1` (built from a known kind until then), so nothing breaks today.
+    2. `command/post.py`: on a delivered `rescue_route` bundle, keep one route per survivor (newest `t` wins) and expose it in the Command view as `routes: [{survivor, by, path, length_m, clearance_m, beacon, reported_t}]` (also in phone `cmd_view`). Raise event `rescue_route_reported {survivor, by, length_m, delay_s}`.
+  - **Yusuf:** draw `command.routes[]` on the Command pane: a bright dashed line from the entrance to the survivor with "Route to S1 · 49.7 m" at the survivor end, and the beacon relay highlighted when `beacon` is set. Same on the phone map from `cmd_view.routes`.
+- **Next:** wait for Yusuf's answer on which scope items he takes (robot's-eye view offer stands); ML slide for the freeze.
 
 ### 2026-11-07 19:50 · rayan/scope-sync · Added scope (5:45 PM) in docs/PLAN.md
 - **Did:** committed Rayan's updated `docs/PLAN.md`, which has a new **"Added scope (5:45 PM Saturday)"** table: owners and target times for the AI detection card, detector chip, decoy safety, rescue route + beacon, survivor figures, robot's-eye view, liquid glass, ML slide. Also final states/faults/tasks/relay_dropped wording and names in the roles table.

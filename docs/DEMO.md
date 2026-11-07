@@ -72,19 +72,21 @@ Space is pressed at **0:40**. Times after it come from a headless seed-7 run wit
 | 0:15 | paused | Q: judges scan the QR and see **P-1** on the phone. A judge taps **Run safety check**: the card rejects it, *"Zone ZNE predicts a dead zone; use a relay chain or lost_link_ok"*, and ZNE pulses red | Yusuf | "The safety checker only uses what the command post knows. It predicts the steel cage is a radio dead zone, so it blocks the plan until we say that zone may go dark." |
 | 0:30 | paused | Judge taps **Allow ZNE to go dark**, runs the check again (pass), taps **Dispatch** | Yusuf | "Robot 2 is now allowed to lose signal in the north-east for up to 60 seconds." |
 | 0:40 | 0 | **Space.** Robots enter. Each takes its zone (`plan_applied`) | Aziz | "Every message, even this plan, travels over the simulated radio." |
-| 0:47 | +0:07 (14.4) | R1 finds **S3** in Office A while linked. It appears on both sides at once | Aziz | "With signal, the report is instant." |
+| 0:47 | +0:07 (14.4) | R1 finds **S3** in Office A while linked. It appears on both sides at once, with its **rescue route** from the entrance (14.2 m) | Aziz | "With signal, the report is instant, and the robot sends responders the safest route in." |
 | 1:08 | +0:28 (56.7) | R1's camera sees the **radiator** (D1). The detector rejects it | Rayan | "That's a radiator. Our model, trained on real FLIR thermal images, says it's not a person, so no false alarm." |
 | 1:09 | +0:29 (57.7) | R3 drops **relay RL1** | Aziz | "Robots drop relays just before the link breaks, like the DARPA SubT teams did." |
 | 1:38 | +0:58 | Press **2**: follow R2 | Rayan | |
 | 1:40 | +0:59.5 (119.1) | R2 enters the **steel cage** and loses link. Command shows a **ghost R2** (its camera stays at the last reported pose) | Rayan | "Steel kills radio. Command post goes blind, but Robot 2 keeps searching." |
-| 1:44 | +1:04.5 (129.0) | R2 finds **S1** in the dark, confidence 1.0. **Reality side only** | Rayan | Point at the ghost: "Command doesn't know yet. The report waits in the robot's outbox." |
-| 1:52 | +1:11.5 (143.1) | R2 reconnects. Map and **S1 burst onto Command**, 14 s after detection | Rayan | "Store and forward: nothing lost, just late." |
+| 1:44 | +1:04.5 (129.0) | R2 finds **S1** in the dark, confidence 1.0, and drops **beacon relay RL2** next to them. **Reality side only** | Rayan | Point at the ghost: "Command doesn't know yet. The report and the rescue route wait in the robot's outbox. It leaves a beacon so responders get radio at the survivor." |
+| 1:52 | +1:11.5 (143.1) | R2 reconnects. Map, **S1 and its 49.7 m rescue route burst onto Command**, 14 s after detection | Rayan | "Store and forward: nothing lost, just late. Responders now have the way in." |
 | 1:55 | +1:15 (150) | Press **1** then **R**: rubble falls ahead of R1, which goes **REPLANNING** and drives around | Rayan | "Rubble falls. The robot sees it, stops and replans on its own." |
 | 2:02 | +1:22.5 (165) | Press **3** then **F**: R3 gets an **OVERCURRENT** fault, backs up 0.5 m and replans | Rayan | "A wheel jams. Fault protection stops it, backs off and tries another way." |
 | 2:07 | +1:27.5 (175) | Press **1** then **O**: the scheduler strip shows **perception missing deadlines** (red) for 3 s, while **safety still runs at 0 and 50 ms** | Rayan | "Rate monotonic scheduling: when the AI overloads the CPU, perception misses deadlines, but the safety task always runs on time." |
 | 2:20 | | Press **0**, then **G**: briefing panel appears | Yusuf | "This briefing only uses what reached the antenna." |
 | 2:33 | +1:53 (226–248) | **S2** found while linked (bonus, if still running) | | |
 | 2:45 | | | Rayan | "The robots are autonomous, and AI detects survivors. Collapsed buildings, mines, wildfires, tunnels." |
+
+Rescue routes show on Command only once Aziz stores delivered routes in the Command view and Yusuf draws them (contract in `docs/team/history/rayan.md`). Until then, say the route lines over the survivor burst.
 
 If O isn't wired yet, skip that beat and say the line over the scheduler strip anyway. R and F hit the **followed** robot, so check the follow key first.
 

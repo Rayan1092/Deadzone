@@ -9,7 +9,7 @@ import numpy as np
 
 from ..floorplan import UNKNOWN
 from ..geometry import points_in_poly, wrap_angle
-from ..network.dtn import make_bundle
+from ..network.dtn import PRIO, make_bundle
 from . import planning
 from .mapping import OccupancyMap
 from .perception import filter_hits, get_detector
@@ -66,6 +66,12 @@ PERCEPTION_OVERLOAD_S = 3.0
 # Dispatched plans
 ZONE_PULL_PER_M = 0.7      # before the zone is on our map: score falls with distance to the zone
 ZONE_DONE_KNOWN = 0.8      # stop pulling once this share of the zone's cells is mapped
+
+# Rescue route: safest known route entrance -> survivor for responders. Clearance is the
+# planner's 1-cell inflation (2 cells would close the 1.2 m doors) plus the wall cost, which
+# keeps the route centered in corridors and doors.
+HAZARD_MARGIN_CELLS = 4    # 1 m band around no-go areas ...
+HAZARD_COST = 3.0          # ... costs this much extra per cell
 
 # Final contract (telemetry): `state` is one of STATES, `fault` is None or one of FAULTS.
 STATES = ("DEPLOYING", "EXPLORING", "LOST_LINK_EXPLORING", "RETURNING_TO_SIGNAL",
@@ -262,7 +268,8 @@ class Robot:
         prev = self.peers.get(p["id"])
         if prev is None or prev["t"] <= b["created"]:
             self.peers[p["id"]] = {"target": p.get("target"), "pose": p.get("pose"),
-                                   "relays": p.get("relays", []), "t": b["created"]}
+                                   "relays": p.get("relays", []), "found": p.get("found", []),
+                                   "t": b["created"]}
 
     def _claimed_targets(self):
         """Fresh targets of higher-priority peers. Lower rank wins, so claims never oscillate."""
@@ -299,6 +306,58 @@ class Robot:
             self.events.append({"kind": "survivor_found", "robot": self.id, "survivor": s["id"],
                                 "pos": rec["pos"], "linked": self.linked,
                                 "crop": rec["crop"], "conf": rec["conf"]})
+            self._on_survivor_confirmed(io, rec)
+
+    # ------------------------------------------------------------------ rescue route
+    def _on_survivor_confirmed(self, io, rec):
+        """Send responders the safest route from the entrance to the survivor, computed on our
+        own map, to CMD as a priority-1 bundle. If the survivor is in a dead zone (no link here)
+        also drop a beacon relay next to them, so responders get radio at the survivor. Where
+        there is coverage no beacon is needed (and spending relays there reshapes the network)."""
+        if any(rec["id"] in (info.get("found") or []) for info in self.peers.values()):
+            return                         # a peer already confirmed this survivor: no 2nd beacon/route
+        beacon = None
+        if self.relays_left > 0 and not self.linked:
+            try:
+                beacon = io.drop_relay()
+            except ValueError:
+                beacon = None              # the deployer refused this spot (wall / no-go)
+            if beacon is not None:
+                x, y, _ = self.pose
+                self.relays_left -= 1
+                self.my_relays.append([round(x, 2), round(y, 2)])
+        route = self._rescue_route(rec["pos"])
+        if route is None:
+            return
+        path, length_m, clearance_m = route
+        payload = {"survivor": rec["id"], "by": self.id, "path": path, "length_m": length_m,
+                   "clearance_m": clearance_m, "beacon": beacon, "t": round(self.t, 1)}
+        self.outbox.append(self._bundle("rescue_route", payload, 64 + 12 * len(path)))
+        self.events.append({"kind": "rescue_route", "robot": self.id, "survivor": rec["id"], "path": path,
+                            "length_m": length_m, "clearance_m": clearance_m, "beacon": beacon})
+
+    def _rescue_route(self, goal):
+        """A* entrance -> survivor over known free cells only: never through rubble, walls, unknown
+        space or no-go, centered by the wall cost, with a cost band around hazards.
+        Returns (points, length_m, clearance_m) or None."""
+        grid = self.map.grid
+        cost = planning.wall_cost(grid) + HAZARD_COST * planning.dilate(self.nogo, HAZARD_MARGIN_CELLS)
+        trav = planning.traversable(grid, self.nogo)
+        cells = planning.astar(trav, self._cell(*self.entry), self._cell(*goal), cost)
+        if not cells:
+            return None
+        centers = [((cx + 0.5) * self.cell, (cy + 0.5) * self.cell) for cx, cy in cells]
+        pts = [list(self.entry)] + [list(p) for p in planning.simplify(cells, self.cell)] + [list(goal)]
+        pts = [[round(px, 2), round(py, 2)] for px, py in pts]
+        length = math.dist(self.entry, centers[0]) + planning.path_length(centers) + math.dist(centers[-1], goal)
+        return pts, round(length, 1), planning.INFLATE_CELLS * self.cell
+
+    def _bundle(self, kind, payload, size):
+        """Bundle to CMD. `rescue_route` is priority 1; until network/dtn.py lists the kind in
+        PRIO we build it from a known kind and set kind/prio ourselves (DTN orders by b["prio"])."""
+        b = make_bundle(self.id, "CMD", kind if kind in PRIO else "plan", payload, self.t, size)
+        b["kind"], b["prio"] = kind, PRIO.get(kind, 1)
+        return b
 
     def _update_link(self, io):
         """Track the link and raise link_lost / link_restored exactly once per outage, in any state.
