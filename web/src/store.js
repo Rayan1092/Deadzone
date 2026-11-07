@@ -46,6 +46,8 @@ export const useSim = create((set) => ({
   detections: [],      // AI detection cards: { eid, side: 'reality' | 'command', verdict, crop, conf, ... }
   routes: {},          // Reality rescue routes from robot `rescue_route` events, by survivor id
   perf: readPerf(),    // P key: lighter rendering for a slow demo laptop (remembered per browser)
+  recorder: null,      // ?record: { frames, ms, bytes } of the captured stream
+  replay: null,        // ?replay: { loaded, playing, rate, pos, dur, ended }
   set,
 }))
 

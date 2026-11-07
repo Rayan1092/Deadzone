@@ -6,9 +6,11 @@ import { JoinOverlay } from './panels/JoinPanel'
 import Toasts from './panels/Toasts'
 import Timeline from './panels/Timeline'
 import ReportPanel from './panels/ReportPanel'
+import { ReplayLoader } from './panels/ReplayPanel'
+import { REPLAY } from './net/replay'
 
 export default function BigScreen() {
-  useEffect(() => connectScreen(), [])
+  useEffect(() => (REPLAY ? undefined : connectScreen()), []) // replay plays a file, no server
   useKeyboard()
   return (
     <div className="app">
@@ -22,6 +24,7 @@ export default function BigScreen() {
       <Sidebar />
       <Timeline />
       <JoinOverlay />
+      <ReplayLoader />
     </div>
   )
 }

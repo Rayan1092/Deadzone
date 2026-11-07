@@ -4,12 +4,14 @@ import { control } from '../net/socket'
 import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt } from '../format'
 import { JoinCard } from './JoinPanel'
 import { requestReport } from './ReportPanel'
+import { ReplayChip } from './ReplayPanel'
+import { RECORDING, REPLAY, saveRecording } from '../net/replay'
 import { followRobot, overview } from '../three/camera'
 
 const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot'], ['0', 'overview'], ['R', 'rubble ahead of robot'],
   ['F', 'wheel overcurrent'], ['O', 'perception overload'], ['U', 'resume after safe stop'],
-  ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'], ['Q', 'phone join QR'], ['+ / −', 'speed'], ['⌫', 'reset'],
+  ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'], ['P', 'performance mode'], ['S', 'save recording (?record)'], ['Q', 'phone join QR'], ['+ / −', 'speed'], ['⌫', 'reset'],
 ]
 
 export function TopBar() {
@@ -37,9 +39,9 @@ export function TopBar() {
           Detector: {detector.mode === 'model' ? 'AI model' : 'sim fallback'}
         </span>
       )}
+      <ReplayChip />
       {perf && <span className="perf-chip" title="Press P to turn off">Performance mode</span>}
       <div className="stats">
-        <span><b>{stats?.robots ?? 0}</b> robots</span>
         <span><b>{stats?.relays ?? 0}</b> relays</span>
         <span><b>{stats?.links_up ?? 0}</b> links up</span>
         <span><b>{stats?.in_flight ?? 0}</b> bundles waiting</span>
@@ -51,7 +53,7 @@ export function TopBar() {
         <span className="mono">{speed}x</span>
         <button onClick={() => control('speed', speed * 2)}>+</button>
         <button onClick={() => control('reset')}>Reset</button>
-        <span className={connected ? 'conn ok' : 'conn bad'}>{connected ? 'live' : 'offline'}</span>
+        {!REPLAY && <span className={connected ? 'conn ok' : 'conn bad'}>{connected ? 'live' : 'offline'}</span>}
       </div>
     </header>
   )
@@ -67,7 +69,7 @@ export function Sidebar() {
   const cmdRobots = Object.fromEntries((tick?.command.robots ?? []).map((r) => [r.id, r]))
   return (
     <aside className="sidebar">
-      <JoinCard />
+      {!REPLAY && <JoinCard />}
       <h3>Robots</h3>
       {robots.map((r) => {
         const pct = r.battery.pct
@@ -141,6 +143,7 @@ export function useKeyboard() {
       if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null })
       if (key === 'v' && target) s.set({ eyeRobot: s.eyeRobot === target.id ? null : target.id })
       if (key === 'p') setPerf(!s.perf)
+      if (key === 's' && RECORDING) saveRecording()
       if (key === 't') s.set({ showTruth: !s.showTruth })
       if (e.code === 'Space') { e.preventDefault(); control('toggle') }
       if (e.code === 'Backspace') control('reset')

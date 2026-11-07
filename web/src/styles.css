@@ -227,6 +227,19 @@ button:hover { border-color: var(--teal); }
 
 /* top bar stays one line as chips are added: the incident name gives way first */
 .topbar { gap: 16px; white-space: nowrap; }
-.incident { min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.incident { min-width: 9ch; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .stats { gap: 12px; flex: none; }
 .survivor-count, .controls { flex: none; }
+
+/* ?record / ?replay backup */
+.rec-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font-size: 12px; border-radius: 999px;
+  background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.5); color: #fecaca; }
+.rec-chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: miss-pulse .8s ease-in-out infinite alternate; }
+.replay-chip { font: 600 12px 'JetBrains Mono', ui-monospace, monospace; padding: 3px 10px; border-radius: 999px;
+  background: rgba(167,139,250,.16); color: #ddd6fe; }
+.replay-loader { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(12,14,17,.9); }
+.replay-box { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 32px 40px; max-width: 460px;
+  text-align: center; border-radius: 16px; border: 1px dashed var(--glass-edge); background: var(--glass-strong); }
+.replay-box > b { font-size: 22px; }
+.replay-pick { padding: 10px 20px; border-radius: 20px; background: var(--teal); color: #00201c; font-weight: 600; cursor: pointer; }
+.replay-error { color: var(--red); font-size: 13px; }
