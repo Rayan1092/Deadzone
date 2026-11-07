@@ -36,9 +36,9 @@ Command still changes only when a complete bundle reaches `CMD`.
 
 `io.drop_relay()` now places a relay at the robot's odometry position and returns
 its ID, such as `RL1`. The robot's own code must enforce its two-relay inventory,
-upstream RSSI threshold, spacing and deployment policy. No robot policy or automatic
-relay drops were added in this milestone. Existing robot telemetry still reports
-`relays_left: 0` until Rayan implements that inventory.
+upstream RSSI threshold, spacing and deployment policy. Rayan's merged relay work
+now implements automatic deployment, two-relay inventory and actual `relays_left`
+telemetry. This backend preserves that policy.
 
 For backend scenarios:
 
@@ -55,6 +55,35 @@ are a later milestone.
 Outgoing commands can be placed in `sim.network.queues["CMD"]` with a robot ID as
 `dst`. Delivered commands collect in `sim.inboxes[robot_id]`; `io.radio.receive()`
 consumes that inbox. Robot policy is responsible for executing the commands.
+
+## Peer telemetry
+
+The temporary direct inbox-copy shortcut has been removed. Each fresh robot
+telemetry report is fanned out at its source into one unicast bundle per other
+deployed robot. Copies are queued even if the peer is offline, then use the same
+priority ordering, shared link budgets, custody, retry and expiry as other traffic.
+Robots remain endpoints; relay nodes and CMD can carry peer traffic.
+
+`DTNNetwork.fanout_telemetry` creates independent payload snapshots. Each peer copy
+uses `bid = original_bid + "/" + recipient_id`, keeping delivery/dedupe separate
+from the CMD report and other recipients. Repeating fanout of an already queued or
+forwarded report does not create another copy. The source and original destination
+are excluded from recipient fanout.
+
+Peer copies keep the original creation time and expire after the lesser of the
+source TTL and Rayan's `PEER_FRESH_S` (currently 15 sim seconds). The original CMD
+report retains its normal TTL, so a long outage can still produce a delayed report
+to Command without resurrecting an old peer target claim.
+
+On destination delivery, peer telemetry is appended to the existing robot `inbox`
+for Rayan's `_read_inbox()` on the next robot tick. Plans and commands still use
+`Sim.inboxes` / `io.radio.receive()`. No robot policy changes are required.
+
+Telemetry byte estimates now use at least the UTF-8 JSON payload length plus a
+64-byte envelope allowance, on both the CMD report and peer copies. The old fixed
+120-byte estimate did not account for targets and relay lists. `in_flight` includes
+queued peer copies. Existing WebSocket shapes and telemetry payload fields remain
+unchanged; only internal bundle IDs, timing and queue counts change.
 
 ## Frontend and protocol integration (Person 3)
 
@@ -86,7 +115,10 @@ transfers, duplicate replays, disconnected TTL expiry, shared-link bandwidth,
 priority/queue pressure, rerouting, reverse-direction commands, relay power/reset,
 and delayed Command knowledge. A 100-bundle scenario toggles the middle link every
 3 seconds and checks exactly-once delivery. A real floorplan/RSSI scenario also
-connects an east-wing robot through a relay at `(33, 15)`.
+connects an east-wing robot through a relay at `(33, 15)`. The combined suite passes
+89 tests, including peer payload snapshots, dedupe, disconnected/relay TTL expiry,
+outage recovery, partial-transfer retry, survivor priority, shared bandwidth,
+endpoint-only routing and preservation of the separate command inbox.
 
 Safety/plan APIs and planner phone sessions are described in
 [`PHONE-PLANNING.md`](PHONE-PLANNING.md). Phone relay controls, FEC, Gemini,

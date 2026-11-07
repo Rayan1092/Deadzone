@@ -13,7 +13,7 @@ from .geometry import wrap_angle
 from .network.dtn import DTNNetwork, RELAY_QUEUE_BYTES, make_bundle
 from .network.propagation import LinkGraph
 from .robot.lidar import raycast
-from .robot.robot import BATTERY_TIME_SCALE, Robot
+from .robot.robot import BATTERY_TIME_SCALE, PEER_FRESH_S, Robot
 
 DT = 0.1
 ROOT = Path(__file__).resolve().parents[2]
@@ -212,31 +212,28 @@ class Sim:
         for b in self.bodies.values():
             self._integrate(b, dt)
         self._update_links()
-        self._share_telemetry(fresh)
+        self._queue_peer_telemetry(fresh)
         self._move_bundles(dt)
         self.events.extend(self.post.events)
         self.post.events.clear()
 
-    def _share_telemetry(self, fresh):
-        """TEMPORARY shim (Rayan, task 1, approved): robot-to-robot telemetry so robots can
-        share frontier targets. Every robot with a link path to the sender gets a copy in its
-        inbox. Robots never forward for other robots (team decision), so a path only counts if
-        every intermediate hop is a non-robot node (relay, phone, CMD).
-        Person 2 replaces this with dst = robot id / broadcast bundles in network/dtn.py."""
-        for src, bundles in fresh.items():
+    def _queue_peer_telemetry(self, fresh):
+        """Fan out reports before transport; disconnected peers wait in custody."""
+        for bundles in fresh.values():
             for b in bundles:
                 if b["kind"] != "telemetry":
                     continue
-                for rid, other in self.robots.items():
-                    path = self.radio_path(src, rid) if rid != src else None
-                    if path:
-                        other.inbox.append(dict(b, dst=rid, hops=path, custodian=rid))
+                self.network.fanout_telemetry(b, self.robots, ttl=PEER_FRESH_S)
 
     def _move_bundles(self, dt):
         """Only destination deliveries may update a consumer's knowledge."""
         for bundle in self.network.step(self.links, dt, self.time):
             if bundle["dst"] == "CMD":
                 self.post.receive(bundle, self.time)
+            elif bundle["kind"] == "telemetry" and bundle["dst"] in self.robots:
+                # Preserve Rayan's peer-inbox contract. Plans/commands stay in
+                # the separate IO inbox so his telemetry reader cannot drop them.
+                self.robots[bundle["dst"]].inbox.append(bundle)
             else:
                 self.inboxes.setdefault(bundle["dst"], []).append(bundle)
 
