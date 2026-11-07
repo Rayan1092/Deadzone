@@ -19,7 +19,6 @@ export default function Timeline() {
           {TASKS.map((t) => <span key={t}><i className={`task ${t}`} />{t}</span>)}
           <span><i className="task missed" />missed deadline</span>
         </div>
-        <span className="tl-keys muted">1–3 follow · 0 overview · R rubble · F fault · G briefing · T truth · Q join</span>
       </div>
       {!robots?.length && <div className="tl-empty muted">Waiting for robot telemetry</div>}
       {robots?.map((r) => {

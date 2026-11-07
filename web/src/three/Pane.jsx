@@ -10,6 +10,7 @@ import PlanZones from './PlanZones'
 import { COLORS } from './util'
 import { useSim } from '../store'
 import { fitOverview, shared } from './camera'
+import DetectionCards from '../panels/DetectionCards'
 
 function SyncedControls({ id }) {
   const ctrl = useRef()
@@ -89,6 +90,7 @@ export default function Pane({ which, title, subtitle }) {
           <span><i className="lg-relay" />Relay</span>
         </div>
       )}
+      <DetectionCards side={which} />
       <Canvas shadows dpr={[1, 2]} camera={{ fov: 50, near: 0.1, far: 300 }}>
         <color attach="background" args={[COLORS.bg]} />
         <fog attach="fog" args={[COLORS.bg, 90, 170]} />

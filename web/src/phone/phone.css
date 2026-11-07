@@ -180,3 +180,4 @@
 .signal.s1 i:nth-child(-n+1), .signal.s2 i:nth-child(-n+2), .signal.s3 i:nth-child(-n+3), .signal.s4 i { background: var(--green); }
 .signal.s1 i:nth-child(1) { background: var(--amber); }
 .tool-relay { width: 12px; height: 12px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 3px rgba(45,212,191,.3); }
+.robot .following { color: var(--teal); }

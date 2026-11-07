@@ -30,8 +30,28 @@ export const useSim = create((set) => ({
   dispatchedPlans: [], // plan IDs with an accepted dispatch (plan_dispatched events)
   follow: null,        // robot id the cameras follow (keys 1-3), null = overview
   report: null,        // briefing from /api/report: { text, generated_at, source } | { loading } | { error }
+  detector: null,      // { mode: 'model' | 'sim', reason } from hello, null until the server sends it
+  detections: [],      // AI detection cards: { eid, side: 'reality' | 'command', verdict, crop, conf, ... }
   set,
 }))
+
+// What the detector judged, as a card. Reality cards come straight from the robot's
+// event; the Command card only appears once the survivor report is delivered.
+function detectionCard(ev, repeat, tick) {
+  const base = { eid: ev.eid, at: Date.now(), robot: ev.robot ?? ev.by }
+  if (ev.kind === 'survivor_found' && !repeat) {
+    return { ...base, side: 'reality', verdict: 'person', crop: ev.crop, conf: ev.conf, subject: ev.survivor, linked: ev.linked }
+  }
+  if (ev.kind === 'hotspot_rejected') {
+    return { ...base, side: 'reality', verdict: 'rejected', crop: ev.crop, conf: ev.conf, subject: ev.id }
+  }
+  if (ev.kind === 'survivor_reported') {
+    const rec = tick?.command.survivors.find((r) => r.id === ev.survivor)
+    return { ...base, side: 'command', verdict: 'person', crop: rec?.crop, conf: rec?.conf, subject: ev.survivor,
+             robot: ev.by, delay: ev.delay_s }
+  }
+  return null
+}
 
 export function decodeMap(b64) {
   const bin = atob(b64)
@@ -49,7 +69,8 @@ export function handleMessage(msg) {
       const reset = time < s.time
       s.set({ floorplan: data.floorplan, grid: data.grid, robotsMeta: data.robots,
               running: data.running, speed: data.speed, time,
-              ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [] } : {}) })
+              detector: data.detector ? { mode: data.detector, reason: data.detector_reason } : null,
+              ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [], detections: [] } : {}) })
       break
     }
     case 'tick': {
@@ -80,6 +101,8 @@ export function handleMessage(msg) {
         top.reason === ev.reason && top.task === ev.task
       const events = fold ? [{ ...ev, count: (top.count ?? 1) + 1 }, ...s.events.slice(1)] : [ev, ...s.events]
       if (ev.kind === 'plan_dispatched') s.set({ dispatchedPlans: [...s.dispatchedPlans, ev.plan_id] })
+      const card = detectionCard(ev, repeat, s.tick)
+      if (card) s.set({ detections: [...s.detections, card].slice(-6) })
       s.set({ events: events.slice(0, 40),
               ...(TOAST_KINDS.has(ev.kind) && !repeat ? { toasts: [...s.toasts, { ...ev, at: Date.now() }].slice(-5) } : {}) })
       break

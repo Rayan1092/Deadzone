@@ -1,10 +1,16 @@
-import { useEffect } from 'react'
+import { Fragment, useEffect } from 'react'
 import { useSim } from '../store'
 import { control } from '../net/socket'
 import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt } from '../format'
 import { JoinCard } from './JoinPanel'
 import { requestReport } from './ReportPanel'
 import { followRobot, overview } from '../three/camera'
+
+const KEYS = [
+  ['Space', 'start / pause'], ['1–3', 'follow robot'], ['0', 'overview'], ['R', 'rubble ahead of robot'],
+  ['F', 'wheel overcurrent'], ['O', 'perception overload'], ['U', 'resume after safe stop'],
+  ['G', 'briefing'], ['T', 'truth overlay'], ['Q', 'phone join QR'], ['+ / −', 'speed'], ['⌫', 'reset'],
+]
 
 export function TopBar() {
   const fp = useSim((s) => s.floorplan)
@@ -15,6 +21,7 @@ export function TopBar() {
   const connected = useSim((s) => s.connected)
   const running = useSim((s) => s.running)
   const speed = useSim((s) => s.speed)
+  const detector = useSim((s) => s.detector)
   return (
     <header className="topbar">
       <div className="brand">DEADZONE</div>
@@ -24,6 +31,11 @@ export function TopBar() {
         <span><b>{found}</b> found</span>
         <span className={reported < found ? 'gap' : ''}><b>{reported}</b> reported</span>
       </div>
+      {detector && (
+        <span className={`detector-chip ${detector.mode}`} title={detector.reason ?? ''}>
+          Detector: {detector.mode === 'model' ? 'AI model' : 'sim fallback'}
+        </span>
+      )}
       <div className="stats">
         <span><b>{stats?.robots ?? 0}</b> robots</span>
         <span><b>{stats?.relays ?? 0}</b> relays</span>
@@ -70,6 +82,12 @@ export function Sidebar() {
               {STATE_LABEL[r.state] ?? r.state}
               {r.fault && <span className={`fault-pill ${r.fault === 'SAFE_STOP' ? 'stop' : ''}`}>{FAULT_LABEL[r.fault] ?? r.fault}</span>}
             </div>
+            {r.fault === 'SAFE_STOP' && (
+              // goes out as a radio command bundle; the robot needs a route to CMD to get it
+              <button className="resume-btn" onClick={(e) => { e.stopPropagation(); control('director', { do: 'resume', robot: r.id }) }}>
+                Send resume command
+              </button>
+            )}
             {r.plan_id && <div className="following muted small">Following {r.plan_id}{r.zone ? ` · zone ${r.zone}` : ''}</div>}
             <div className="bar"><div className={low ? 'fill low' : 'fill'} style={{ width: `${pct}%` }} /></div>
             <div className="row muted small">
@@ -94,6 +112,10 @@ export function Sidebar() {
             {e.count > 1 && <span className="count">×{e.count}</span>}
           </div>
         ))}
+      </div>
+      <h3>Keys</h3>
+      <div className="keys">
+        {KEYS.map(([k, what]) => <Fragment key={k}><kbd>{k}</kbd><span>{what}</span></Fragment>)}
       </div>
     </aside>
   )
@@ -123,6 +145,8 @@ export function useKeyboard() {
         control('director', { do: 'rubble', at: [x + Math.cos(th) * 1.5, y + Math.sin(th) * 1.5] })
       }
       if (key === 'f' && target) control('director', { do: 'overcurrent', robot: target.id })
+      if (key === 'o' && target) control('director', { do: 'overload', robot: target.id })
+      if (key === 'u' && target) control('director', { do: 'resume', robot: target.id })
       if (key === 'g') {
         if (s.report && !s.report.loading) s.set({ report: null })
         else requestReport()
