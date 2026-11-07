@@ -27,11 +27,20 @@ from .command.controls import FaultRequest, RelayPlace, RelayPower, director_ada
 from .command.reports import local_report
 from .command.safety import SafetyChecker
 from .robot.robot import resume_command
+from .robot.perception import CROP_DIR, get_detector
 from .sim import DT, ROBOT_DEFS, Sim
 
 MAPS_EVERY = 5
 MAX_PHONE_RELAYS = 32
 WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
+
+
+def detector_status():
+    detector = get_detector()
+    status = {"detector": detector.mode}
+    if detector.mode == "sim":
+        status["detector_reason"] = detector.reason
+    return status
 
 
 class Hub:
@@ -69,7 +78,8 @@ class Hub:
             clients.discard(ws)
 
     def hello(self):
-        return self.envelope("hello", self.sim.hello() | {"speed": self.speed, "running": self.running})
+        return self.envelope("hello", self.sim.hello() | {"speed": self.speed, "running": self.running}
+                             | detector_status())
 
     def phone_hello(self, client, role):
         robots = [{"id": rid, "name": name, "color": color,
@@ -79,7 +89,8 @@ class Hub:
         return {"floorplan": self.sim.prior.planning_data(),
                 "grid": {"w": self.sim.prior.w, "h": self.sim.prior.h, "cell": self.sim.prior.cell},
                 "robots": robots, "plan": self.plans.current(), "client": client, "role": role,
-                "relay_id": self.relay_clients.get(client) if role == "relay" else None}
+                "relay_id": self.relay_clients.get(client) if role == "relay" else None,
+                **detector_status()}
 
     def attach_relay(self, client):
         if client not in self.relay_clients:
@@ -446,6 +457,9 @@ def phone_page():
     if not index.exists():
         raise HTTPException(503, "Build the frontend or use the Vite frontend address")
     return FileResponse(index)
+
+
+app.mount("/crops", StaticFiles(directory=CROP_DIR), name="crops")
 
 
 if WEB_DIST.exists():

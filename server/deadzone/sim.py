@@ -1,7 +1,9 @@
 """Fixed-tick simulation. Owns the truth and wires robots, network and command post."""
 import base64
+import json
 import math
 import random
+import re
 from pathlib import Path
 
 import numpy as np
@@ -80,9 +82,11 @@ class RobotIO:
         b = self.sim.bodies[self.rid]
         b["cmd_v"], b["cmd_w"] = v, w
 
-    def drop_relay(self):
+    def drop_relay(self, beacon_for=None):
         """Place a relay here; robot policy owns inventory and when to drop."""
-        return self.sim.add_relay(self.odometry()["pose"][:2], owner=self.rid)
+        if beacon_for is not None and self.radio.cmd_reachable():
+            return None  # survivor beacons are only dropped while dark
+        return self.sim.add_relay(self.odometry()["pose"][:2], owner=self.rid, beacon_for=beacon_for)
 
     def thermal(self):
         """Thermal hot spots in the forward camera cone; classification belongs to the robot."""
@@ -175,14 +179,19 @@ class Sim:
             nodes[rid] = (*relay["pos"], 20.0, relay["on"])
         return nodes
 
-    def add_relay(self, pos, owner=None, phone=False):
+    def add_relay(self, pos, owner=None, phone=False, beacon_for=None):
         """Backend hook for the robot drop rule and future phone relay controls."""
+        if beacon_for is not None and (not isinstance(beacon_for, str) or
+                                       re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", beacon_for) is None):
+            raise ValueError("beacon_for must be a survivor identifier or None")
         x, y = self._relay_position(pos)
         rid = f"RL{len(self.relays) + 1}"
-        self.relays[rid] = {"id": rid, "pos": [x, y], "owner": owner, "on": True, "phone": bool(phone)}
+        self.relays[rid] = {"id": rid, "pos": [x, y], "owner": owner, "on": True,
+                            "phone": bool(phone), "beacon_for": beacon_for}
         self.network.register(rid, capacity_bytes=RELAY_QUEUE_BYTES)
         self._relay_telemetry(rid)
-        self.events.append({"kind": "relay_dropped", "id": rid, "pos": [x, y], "owner": owner})
+        self.events.append({"kind": "relay_dropped", "id": rid, "pos": [x, y], "owner": owner,
+                            "beacon_for": beacon_for})
         self._update_links()
         return rid
 
@@ -234,8 +243,9 @@ class Sim:
         # positions. Never discard bundles carried for somebody else.
         queue[:] = [b for b in queue if not (b["src"] == rid and b["kind"] == "telemetry"
                                              and b["payload"].get("node_type") == "relay")]
-        if sum(b["size"] for b in queue) + 160 <= RELAY_QUEUE_BYTES:
-            queue.append(make_bundle(rid, "CMD", "telemetry", payload, self.time, 160))
+        size = max(160, len(json.dumps(payload, separators=(",", ":")).encode()) + 64)
+        if sum(b["size"] for b in queue) + size <= RELAY_QUEUE_BYTES:
+            queue.append(make_bundle(rid, "CMD", "telemetry", payload, self.time, size))
 
     def _update_links(self):
         for a, b, change in self.links.update(self.fp, self._nodes()):

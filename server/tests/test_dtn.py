@@ -232,7 +232,7 @@ def test_command_knows_survivor_and_map_only_after_last_hop():
     sim._move_bundles(DT)
     assert sim.post.survivors == {}
     assert not sim.post.map.any()
-    assert sim.post.view(sim.time)["relays"] == [{"id": relay, "pos": [8.0, 15.0]}]
+    assert sim.post.view(sim.time)["relays"] == [{"id": relay, "pos": [8.0, 15.0], "beacon_for": None}]
     assert sim.snapshot()["stats"]["in_flight"] == 2
     sim.links = graph(("R1", relay))
     sim.time = 0.2
