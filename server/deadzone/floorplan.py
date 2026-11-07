@@ -1,5 +1,6 @@
 """Load a floor plan JSON and rasterize it into a truth grid."""
 import json
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -56,6 +57,15 @@ class FloorPlan:
         xs = (np.arange(self.w) + 0.5) * self.cell
         ys = (np.arange(self.h) + 0.5) * self.cell
         return np.meshgrid(xs, ys)
+
+    def planning_data(self):
+        """Public pre-collapse structure, without hidden survivors or debris."""
+        keys = ("id", "name", "size", "cell", "wall_height", "materials", "walls",
+                "doors", "rooms", "hazards", "entry", "command_post")
+        data = {key: deepcopy(self.data[key]) for key in keys if key in self.data}
+        for door in data.get("doors", []):
+            door["state"] = "open"  # post-collapse door damage is not part of the prior
+        return data
 
     def to_cell(self, x, y):
         return int(x // self.cell), int(y // self.cell)

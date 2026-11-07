@@ -50,8 +50,8 @@ Placement rejects obstacles, no-go zones and positions outside the building.
 are a later milestone.
 
 Outgoing commands can be placed in `sim.network.queues["CMD"]` with a robot ID as
-`dst`. Delivered commands collect in `sim.inboxes[robot_id]`. Executing those commands
-through robot policy/IO remains future work; transport alone does not change behavior.
+`dst`. Delivered commands collect in `sim.inboxes[robot_id]`; `io.radio.receive()`
+consumes that inbox. Robot policy is responsible for executing the commands.
 
 ## Frontend and protocol integration (Person 3)
 
@@ -85,5 +85,6 @@ and delayed Command knowledge. A 100-bundle scenario toggles the middle link eve
 3 seconds and checks exactly-once delivery. A real floorplan/RSSI scenario also
 connects an east-wing robot through a relay at `(33, 15)`.
 
-Safety/plan APIs, phone sessions, FEC, Gemini, recorder/replay and the full soak test
-are subsequent Person 2 milestones.
+Safety/plan APIs and planner phone sessions are described in
+[`PHONE-PLANNING.md`](PHONE-PLANNING.md). Phone relay controls, FEC, Gemini,
+recorder/replay and the full soak test remain subsequent Person 2 milestones.

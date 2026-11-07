@@ -7,12 +7,13 @@ from pathlib import Path
 import numpy as np
 
 from .command.post import CommandPost
+from .command.safety import RobotSpec
 from .floorplan import FloorPlan, OCC, NOGO
 from .geometry import wrap_angle
 from .network.dtn import DTNNetwork, RELAY_QUEUE_BYTES, make_bundle
 from .network.propagation import LinkGraph
 from .robot.lidar import raycast
-from .robot.robot import Robot
+from .robot.robot import BATTERY_TIME_SCALE, Robot
 
 DT = 0.1
 ROOT = Path(__file__).resolve().parents[2]
@@ -36,6 +37,13 @@ class RadioIO:
 
     def neighbors(self):
         return self.sim.links.neighbors(self.rid)
+
+    def receive(self):
+        """Consume delivered plan/command bundles; never bypass the network."""
+        inbox = self.sim.inboxes[self.rid]
+        delivered = list(inbox)
+        inbox.clear()
+        return delivered
 
 
 class RobotIO:
@@ -93,6 +101,9 @@ class Sim:
         random.seed(self.seed)
         np.random.seed(self.seed)
         self.fp = FloorPlan.load(self.plan_path)
+        self.prior = FloorPlan(self.fp.planning_data())
+        self.robot_specs = {rid: RobotSpec() for rid, _, _ in ROBOT_DEFS[:self.n_robots]}
+        self.energy_time_scale = BATTERY_TIME_SCALE
         self.time = 0.0
         self.tick_n = 0
         self.links = LinkGraph()

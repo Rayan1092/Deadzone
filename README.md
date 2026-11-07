@@ -53,4 +53,5 @@ python -m pytest -q
 - `web/src/panels/` top bar and sidebar
 - `data/floorplans/` the building
 
-The full plan is in `docs/PLAN.md`.
+The full plan is in `docs/PLAN.md`. The phone planning API and robot integration
+contract are in [`docs/PHONE-PLANNING.md`](docs/PHONE-PLANNING.md).
