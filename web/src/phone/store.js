@@ -11,7 +11,9 @@ export const usePhone = create((set) => ({
   draft: null,       // shared search plan being edited (server plan_state, or local edits)
   pending: false,    // local edits not sent yet, so our own plan_state echoes are ignored
   selected: null,    // zone or no-go id open in the editor
-  mode: 'view',      // 'view' | 'zone' | 'nogo' (drawing on the map)
+  mode: 'view',      // 'view' | 'zone' | 'nogo' (drawing on the map) | 'place' (moving my relay)
+  relay: null,       // relay role: my node's relay_state { id, on, pos, queue, neighbors }
+  relayPending: null, // power value sent but not yet confirmed by relay_state
   safety: null,      // last safety result
   checking: false,   // waiting for a safety or dispatch answer
   dispatched: [],    // plan IDs this phone dispatched or saw rejected as dispatched
@@ -25,7 +27,7 @@ export function handlePhoneMessage(msg) {
   const s = usePhone.getState()
   switch (t) {
     case 'hello':
-      s.set({ hello: data, draft: data.plan, selected: null, mode: 'view', safety: null,
+      s.set({ hello: data, draft: data.plan, selected: null, mode: 'view', safety: null, relay: null, relayPending: null,
               checking: false, error: null, time, ...(time < s.time ? { dispatched: [] } : {}) })
       break
     case 'cmd_view': {
@@ -40,11 +42,14 @@ export function handlePhoneMessage(msg) {
       s.set({ draft: data, ...(theirs ? { safety: null } : {}) })
       break
     }
+    case 'relay_state':
+      s.set({ relay: data, relayPending: s.relayPending === data.on ? null : s.relayPending })
+      break
     case 'safety':
       s.set({ safety: data, checking: false })
       break
     case 'error':
-      s.set({ error: { ...data, at: Date.now() }, checking: false })
+      s.set({ error: { ...data, at: Date.now() }, checking: false, relayPending: null })
       break
     default:
       break

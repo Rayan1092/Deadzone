@@ -6,9 +6,6 @@ import { JoinCard } from './JoinPanel'
 import { requestReport } from './ReportPanel'
 import { followRobot, overview } from '../three/camera'
 
-// Radio edges flap constantly and deliveries happen every tick; the feed shows stories.
-const HIDDEN_EVENTS = new Set(['link_up', 'link_down', 'bundle_delivered'])
-
 export function TopBar() {
   const fp = useSim((s) => s.floorplan)
   const time = useSim((s) => s.time)
@@ -91,7 +88,7 @@ export function Sidebar() {
       })}
       <h3>Events</h3>
       <div className="events">
-        {events.filter((e) => !HIDDEN_EVENTS.has(e.kind)).slice(0, 14).map((e) => (
+        {events.slice(0, 14).map((e) => (
           <div key={e.eid} className={`event ${e.kind}`}>
             <i /><span className="mono muted">{fmt(e.time)}</span> {describeEvent(e)}
             {e.count > 1 && <span className="count">×{e.count}</span>}

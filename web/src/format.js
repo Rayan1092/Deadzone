@@ -44,6 +44,7 @@ export function describeEvent(e) {
     case 'relay_dropped': // owner is a robot id, a relay phone's client label, or null
       if (/^R\d+$/.test(e.owner ?? '')) return `${e.owner} dropped relay ${e.id}`
       return e.owner ? `Phone ${e.owner} joined as relay ${e.id}` : `Relay ${e.id} placed`
+    case 'relay_power': return `${e.phone ? `Phone relay ${e.id}` : `Relay ${e.id}`} switched ${e.on ? 'on' : 'off'}`
     case 'deadline_miss': return `${e.robot} missed a ${e.task} deadline`
     case 'rubble_fall': return 'Rubble fell'
     case 'plan_dispatched': return `Plan ${e.plan_id} dispatched to the robots`

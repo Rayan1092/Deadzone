@@ -5,6 +5,9 @@ import { create } from 'zustand'
 const TOAST_KINDS = new Set(['survivor_found', 'survivor_reported', 'link_lost', 'link_restored',
   'relay_dropped', 'fault', 'rubble_fall', 'safety_reject', 'plan_dispatched', 'plan_applied', 'resumed'])
 const COLLAPSE_KINDS = new Set(['replan', 'deadline_miss'])
+// Radio edges flap constantly and every CMD delivery is an event (several per second);
+// keeping them would push the real stories out of the capped feed.
+const SKIP_KINDS = new Set(['link_up', 'link_down', 'bundle_delivered'])
 let eventId = 0
 
 // One store for everything streamed from the sim. Components select what they need.
@@ -49,14 +52,23 @@ export function handleMessage(msg) {
               ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [] } : {}) })
       break
     }
-    case 'tick':
-      s.set({ tick: data, time })
+    case 'tick': {
+      // No server event for relay power changes; derive them from consecutive Reality ticks
+      // so "turn your phone relay off" shows up on the big screen.
+      const was = Object.fromEntries((s.tick?.reality.relays ?? []).map((r) => [r.id, r.on]))
+      const flips = data.reality.relays
+        .filter((r) => r.id in was && was[r.id] !== r.on)
+        .map((r) => ({ kind: 'relay_power', id: r.id, on: r.on, phone: r.phone, owner: r.owner, time, eid: ++eventId, at: Date.now() }))
+      s.set({ tick: data, time, ...(flips.length ? {
+        events: [...flips, ...s.events].slice(0, 40), toasts: [...s.toasts, ...flips].slice(-5) } : {}) })
       break
+    }
     case 'maps':
       s.set({ maps: { reality: decodeMap(data.reality), command: decodeMap(data.command),
                       version: s.maps.version + 1 } })
       break
     case 'event': {
+      if (SKIP_KINDS.has(data.kind)) break
       // eid, not id: some events (relay_dropped) carry their own id field
       const ev = { ...data, time, eid: ++eventId }
       // every robot that sees a survivor reports it; only the first sighting is news
