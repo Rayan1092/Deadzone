@@ -3,7 +3,8 @@ import { useFrame } from '@react-three/fiber'
 import { Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { useSim } from '../store'
-import { COLORS, w2t } from './util'
+import { COLORS, FOG_H, w2t } from './util'
+import { CommandRelays, RealityLinks, RealityRelays } from './Network'
 
 // --------------------------------------------------------------- robot body
 function Headlight() {
@@ -85,14 +86,27 @@ function Lidar({ robot }) {
 }
 
 // --------------------------------------------------------------- survivor marker
-function Survivor({ pos, label }) {
+const BURST_S = 2.5
+
+// `born` (performance.now ms) plays a shockwave when Command first learns a survivor.
+function Survivor({ pos, label, born }) {
   const ring = useRef()
+  const shock = useRef()
+  const light = useRef()
   useFrame(({ clock }) => {
     const s = 1 + 0.5 * ((clock.elapsedTime * 1.2) % 1)
     if (ring.current) {
       ring.current.scale.set(s, s, s)
       ring.current.material.opacity = 1.2 - s * 0.7
     }
+    const age = born ? (performance.now() - born) / 1000 : BURST_S
+    const k = Math.min(1, age / BURST_S)
+    if (shock.current) {
+      shock.current.visible = k < 1
+      shock.current.scale.setScalar(1 + k * 9)
+      shock.current.material.opacity = 0.9 * (1 - k)
+    }
+    if (light.current) light.current.intensity = 3 + 25 * (1 - k)
   })
   return (
     <group position={w2t(pos[0], pos[1], 0)}>
@@ -104,7 +118,13 @@ function Survivor({ pos, label }) {
         <ringGeometry args={[0.45, 0.6, 32]} />
         <meshBasicMaterial color={COLORS.red} transparent opacity={0.8} side={THREE.DoubleSide} />
       </mesh>
-      <pointLight position={[0, 0.8, 0]} color={COLORS.red} intensity={3} distance={4} />
+      {born && (
+        <mesh ref={shock} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]}>
+          <ringGeometry args={[0.5, 0.62, 48]} />
+          <meshBasicMaterial color="#fecaca" transparent side={THREE.DoubleSide} depthWrite={false} />
+        </mesh>
+      )}
+      <pointLight ref={light} position={[0, 0.8, 0]} color={COLORS.red} intensity={3} distance={4} />
       <Html position={[0, 1.1, 0]} center distanceFactor={40} style={{ pointerEvents: 'none' }}>
         <div className="tag alert"><b>{label}</b></div>
       </Html>
@@ -112,13 +132,42 @@ function Survivor({ pos, label }) {
   )
 }
 
+// Ground truth the robots have not found yet (T key). Reality pane only, never Command.
+// Drawn just above the fog layer, since undiscovered survivors sit in unmapped rooms.
+function TruthMarker({ pos, id }) {
+  const ring = useRef()
+  useFrame(({ clock }) => {
+    if (ring.current) ring.current.material.opacity = 0.35 + 0.2 * Math.sin(clock.elapsedTime * 2)
+  })
+  return (
+    <group position={w2t(pos[0], pos[1], 0)}>
+      <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, FOG_H + 0.03, 0]} renderOrder={3}>
+        <ringGeometry args={[0.35, 0.42, 32]} />
+        <meshBasicMaterial color={COLORS.red} transparent side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      <Html position={[0, FOG_H + 0.6, 0]} center distanceFactor={40} style={{ pointerEvents: 'none' }}>
+        <div className="tag ghost truth"><b>{id}</b><span>not found yet</span></div>
+      </Html>
+    </group>
+  )
+}
+
 // --------------------------------------------------------------- views
+// survivors_found has one record per robot that saw a survivor; keep the earliest.
+function firstFinds(records) {
+  const byId = new Map()
+  for (const rec of records) if (!byId.has(rec.id) || rec.t < byId.get(rec.id).t) byId.set(rec.id, rec)
+  return [...byId.values()]
+}
+
 export function RealityActors() {
   const tick = useSim((s) => s.tick)
   const fp = useSim((s) => s.floorplan)
+  const showTruth = useSim((s) => s.showTruth)
   if (!tick || !fp) return null
-  const cmd = fp.command_post.pos
-  const { robots, survivors_found } = tick.reality
+  const { robots } = tick.reality
+  const survivors_found = firstFinds(tick.reality.survivors_found)
+  const found = new Set(survivors_found.map((s) => s.id))
   return (
     <group>
       {robots.map((r) => (
@@ -130,12 +179,14 @@ export function RealityActors() {
             <Line points={[[r.pose[0], 0.06, -r.pose[1]], ...r.path.map(([px, py]) => [px, 0.06, -py])]}
                   color={r.color} lineWidth={1.5} dashed dashSize={0.25} gapSize={0.15} transparent opacity={0.7} />
           )}
-          <Line points={[w2t(r.pose[0], r.pose[1], 0.5), w2t(cmd[0], cmd[1], 2.4)]}
-                color={r.link.up ? COLORS.green : COLORS.red} lineWidth={r.link.up ? 2 : 1}
-                transparent opacity={r.link.up ? 0.7 : 0.35} dashed={!r.link.up} dashSize={0.4} gapSize={0.3} />
         </group>
       ))}
+      <RealityLinks />
+      <RealityRelays />
       {survivors_found.map((s) => <Survivor key={s.id} pos={s.pos} label={`${s.id} found by ${s.by}`} />)}
+      {showTruth && (fp.survivors ?? []).filter((s) => !found.has(s.id)).map((s) => (
+        <TruthMarker key={s.id} pos={s.pos} id={s.id} />
+      ))}
     </group>
   )
 }
@@ -143,8 +194,12 @@ export function RealityActors() {
 export function CommandActors() {
   const tick = useSim((s) => s.tick)
   const time = useSim((s) => s.time)
+  const births = useRef(new Map()) // survivor id -> when Command first learned it
   if (!tick) return null
   const { robots, survivors } = tick.command
+  const ids = new Set(survivors.map((s) => s.id))
+  for (const id of births.current.keys()) if (!ids.has(id)) births.current.delete(id) // reset
+  for (const s of survivors) if (!births.current.has(s.id)) births.current.set(s.id, performance.now())
   return (
     <group>
       {robots.map((r) => {
@@ -156,7 +211,8 @@ export function CommandActors() {
                      sub={ghost ? `last seen ${stale.toFixed(0)}s ago` : r.state.replaceAll('_', ' ').toLowerCase()} />
         )
       })}
-      {survivors.map((s) => <Survivor key={s.id} pos={s.pos} label={`${s.id} reported`} />)}
+      <CommandRelays />
+      {survivors.map((s) => <Survivor key={s.id} pos={s.pos} label={`${s.id} reported`} born={births.current.get(s.id)} />)}
     </group>
   )
 }

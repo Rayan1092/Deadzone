@@ -1,13 +1,18 @@
 import { useEffect } from 'react'
 import { useSim } from '../store'
 import { control } from '../net/socket'
-import { STATE_LABEL, fmtClock as fmt } from '../format'
+import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt } from '../format'
 import { JoinCard } from './JoinPanel'
+
+// Radio edges flap constantly and deliveries happen every tick; the feed shows stories.
+const HIDDEN_EVENTS = new Set(['link_up', 'link_down', 'bundle_delivered'])
 
 export function TopBar() {
   const fp = useSim((s) => s.floorplan)
   const time = useSim((s) => s.time)
   const stats = useSim((s) => s.tick?.stats)
+  const found = useSim((s) => new Set(s.tick?.reality.survivors_found.map((f) => f.id)).size)
+  const reported = useSim((s) => s.tick?.command.survivors.length ?? 0)
   const connected = useSim((s) => s.connected)
   const running = useSim((s) => s.running)
   const speed = useSim((s) => s.speed)
@@ -16,6 +21,10 @@ export function TopBar() {
       <div className="brand">DEADZONE</div>
       <div className="incident">{fp ? fp.name : 'Waiting for sim'}</div>
       <div className="clock mono">T+{fmt(time)}</div>
+      <div className="survivor-count" title="Found by robots vs known at the command post">
+        <span><b>{found}</b> found</span>
+        <span className={reported < found ? 'gap' : ''}><b>{reported}</b> reported</span>
+      </div>
       <div className="stats">
         <span><b>{stats?.robots ?? 0}</b> robots</span>
         <span><b>{stats?.relays ?? 0}</b> relays</span>
@@ -56,10 +65,19 @@ export function Sidebar() {
               <b>{r.name}</b>
               <span className={`pill ${r.link.up ? 'ok' : 'bad'}`}>{r.link.up ? `${r.link.rssi} dBm` : 'No link'}</span>
             </div>
-            <div className="state">{STATE_LABEL[r.state] ?? r.state}{r.fault ? ` · ${r.fault}` : ''}</div>
+            <div className="state">
+              {STATE_LABEL[r.state] ?? r.state}
+              {r.fault && <span className={`fault-pill ${r.fault === 'SAFE_STOP' ? 'stop' : ''}`}>{FAULT_LABEL[r.fault] ?? r.fault}</span>}
+            </div>
             <div className="bar"><div className={low ? 'fill low' : 'fill'} style={{ width: `${pct}%` }} /></div>
             <div className="row muted small">
               <span>{pct.toFixed(0)}% battery</span>
+              {r.wheel_a != null && (
+                <span className={`amps ${r.wheel_a >= 6 ? 'bad' : r.wheel_a >= 4 ? 'warn' : ''}`}>{r.wheel_a.toFixed(1)} A</span>
+              )}
+              <span title="Relays still carried">{'◆'.repeat(r.relays_left ?? 0) || 'no'} relays</span>
+            </div>
+            <div className="row muted small">
               <span>{r.outbox} queued</span>
               <span>cmd sees {cmd ? `${(time - cmd.last_seen).toFixed(0)}s old` : 'nothing'}</span>
             </div>
@@ -68,27 +86,15 @@ export function Sidebar() {
       })}
       <h3>Events</h3>
       <div className="events">
-        {events.filter((e) => !['link_up', 'link_down'].includes(e.kind)).slice(0, 14).map((e, i) => (
-          <div key={i} className={`event ${e.kind}`}>
-            <span className="mono muted">{fmt(e.time)}</span> {describe(e)}
+        {events.filter((e) => !HIDDEN_EVENTS.has(e.kind)).slice(0, 14).map((e) => (
+          <div key={e.eid} className={`event ${e.kind}`}>
+            <i /><span className="mono muted">{fmt(e.time)}</span> {describeEvent(e)}
+            {e.count > 1 && <span className="count">×{e.count}</span>}
           </div>
         ))}
       </div>
     </aside>
   )
-}
-
-function describe(e) {
-  switch (e.kind) {
-    case 'survivor_found': return `${e.robot} found ${e.survivor}${e.linked ? '' : ' (no link, holding report)'}`
-    case 'survivor_reported': return `${e.survivor} reached command post (${e.delay_s}s after detection)`
-    case 'link_lost': return `${e.robot} lost link, keeps exploring`
-    case 'link_restored': return `${e.robot} link restored`
-    case 'replan': return `${e.robot} replanned`
-    case 'fault': return `${e.robot} fault: ${e.fault}`
-    case 'rubble_fall': return 'Rubble fell'
-    default: return e.kind
-  }
 }
 
 export function useKeyboard() {
@@ -98,6 +104,7 @@ export function useKeyboard() {
       const s = useSim.getState()
       if (e.key === 'q' || e.key === 'Q') s.set({ joinOpen: !s.joinOpen })
       if (e.key === 'Escape') s.set({ joinOpen: false })
+      if (e.key === 't' || e.key === 'T') s.set({ showTruth: !s.showTruth })
       if (e.code === 'Space') { e.preventDefault(); control('toggle') }
       if (e.code === 'Backspace') control('reset')
       if (e.key === '+' || e.key === '=') control('speed', s.speed * 2)
