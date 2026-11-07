@@ -7,12 +7,13 @@ from pathlib import Path
 import numpy as np
 
 from .command.post import CommandPost
+from .command.safety import RobotSpec
 from .floorplan import FloorPlan, OCC, NOGO
 from .geometry import wrap_angle
 from .network.dtn import DTNNetwork, RELAY_QUEUE_BYTES, make_bundle
 from .network.propagation import LinkGraph
 from .robot.lidar import raycast
-from .robot.robot import Robot
+from .robot.robot import BATTERY_TIME_SCALE, Robot
 
 DT = 0.1
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,10 +33,17 @@ class RadioIO:
         self.sim, self.rid = sim, rid
 
     def cmd_reachable(self):
-        return self.sim.links.path(self.rid, "CMD") is not None
+        return self.sim.radio_path(self.rid, "CMD") is not None
 
     def neighbors(self):
         return self.sim.links.neighbors(self.rid)
+
+    def receive(self):
+        """Consume delivered plan/command bundles; never bypass the network."""
+        inbox = self.sim.inboxes[self.rid]
+        delivered = list(inbox)
+        inbox.clear()
+        return delivered
 
 
 class RobotIO:
@@ -93,6 +101,9 @@ class Sim:
         random.seed(self.seed)
         np.random.seed(self.seed)
         self.fp = FloorPlan.load(self.plan_path)
+        self.prior = FloorPlan(self.fp.planning_data())
+        self.robot_specs = {rid: RobotSpec() for rid, _, _ in ROBOT_DEFS[:self.n_robots]}
+        self.energy_time_scale = BATTERY_TIME_SCALE
         self.time = 0.0
         self.tick_n = 0
         self.links = LinkGraph()
@@ -111,7 +122,7 @@ class Sim:
             self.robots[rid] = Robot(rid, name, color, pose, (self.fp.h, self.fp.w), self.fp.cell,
                                      self.fp.entry, nogo=self.fp.nogo.copy())
             self.ios[rid] = RobotIO(self, rid)
-            self.network.register(rid, self.robots[rid].outbox)
+            self.network.register(rid, self.robots[rid].outbox, can_forward=False)
             self.inboxes[rid] = []
         self._update_links()
 
@@ -182,6 +193,10 @@ class Sim:
         for a, b, change in self.links.update(self.fp, self._nodes()):
             self.events.append({"kind": "link_up" if change == "up" else "link_down", "a": a, "b": b})
 
+    def radio_path(self, src, dst):
+        """Robots are radio endpoints; only relays and CMD forward for peers."""
+        return self.links.path(src, dst, avoid=set(self.robots) - {src, dst})
+
     # ------------------------------------------------------------------ tick
     def tick(self):
         dt = DT
@@ -213,8 +228,8 @@ class Sim:
                 if b["kind"] != "telemetry":
                     continue
                 for rid, other in self.robots.items():
-                    path = self.links.path(src, rid) if rid != src else None
-                    if path and not any(n in self.robots for n in path[1:-1]):
+                    path = self.radio_path(src, rid) if rid != src else None
+                    if path:
                         other.inbox.append(dict(b, dst=rid, hops=path, custodian=rid))
 
     def _move_bundles(self, dt):
@@ -236,7 +251,7 @@ class Sim:
     def snapshot(self):
         robots = []
         for rid, r in self.robots.items():
-            path = self.links.path(rid, "CMD")
+            path = self.radio_path(rid, "CMD")
             via = path[1] if path and len(path) > 1 else None
             rssi = self.links.link_rssi(rid, via) if via else max(
                 [x[1] for x in self.links.neighbors(rid)] + [self.links.link_rssi(rid, "CMD")])

@@ -1,6 +1,6 @@
 # Multi-hop network milestone (Person 2)
 
-The simulation now transfers bundles one hop at a time through robots and relays.
+The simulation now transfers bundles one hop at a time through relay nodes.
 Command still changes only when a complete bundle reaches `CMD`.
 
 ## Transfer rules
@@ -12,6 +12,9 @@ Command still changes only when a complete bundle reaches `CMD`.
   bundle cannot make another hop until the next tick.
 - A physical link has one RSSI-dependent byte budget shared by both directions.
   Large bundles take multiple ticks. Other independent links can transfer in parallel.
+- Following the multi-robot team contract, simulation robots are endpoints and do
+  not forward other nodes' bundles. Route checks, screen status and transport all
+  exclude robots as intermediate hops; relays and CMD can forward.
 - The sender retains the complete bundle until the receiver stores it and returns
   a custody acknowledgement. The simulation models receipt and acknowledgement as
   one atomic operation, without separate acknowledgement delay or packet loss.
@@ -50,8 +53,8 @@ Placement rejects obstacles, no-go zones and positions outside the building.
 are a later milestone.
 
 Outgoing commands can be placed in `sim.network.queues["CMD"]` with a robot ID as
-`dst`. Delivered commands collect in `sim.inboxes[robot_id]`. Executing those commands
-through robot policy/IO remains future work; transport alone does not change behavior.
+`dst`. Delivered commands collect in `sim.inboxes[robot_id]`; `io.radio.receive()`
+consumes that inbox. Robot policy is responsible for executing the commands.
 
 ## Frontend and protocol integration (Person 3)
 
@@ -85,5 +88,6 @@ and delayed Command knowledge. A 100-bundle scenario toggles the middle link eve
 3 seconds and checks exactly-once delivery. A real floorplan/RSSI scenario also
 connects an east-wing robot through a relay at `(33, 15)`.
 
-Safety/plan APIs, phone sessions, FEC, Gemini, recorder/replay and the full soak test
-are subsequent Person 2 milestones.
+Safety/plan APIs and planner phone sessions are described in
+[`PHONE-PLANNING.md`](PHONE-PLANNING.md). Phone relay controls, FEC, Gemini,
+recorder/replay and the full soak test remain subsequent Person 2 milestones.
