@@ -3,14 +3,19 @@
 Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions edit this file.
 
 ## Now
-<!-- seeded 2026-11-07 ~16:30 ET from git history by Yusuf's Claude. Rayan's Claude: overwrite this on your next commit. -->
-- **Working on:** unknown after PR #7. Rayan's Claude, fill this in.
-- **Works on main:** frontier exploration, multi-robot target sharing, relay dropping, A* return home, lost-link behaviour, REPLANNING around rubble, TRAPPED fault, scheduler + `tasks` timeline in telemetry (PR #7)
-- **In flight (not merged):** none known
-- **Blocked on / need from others:** Aziz to replace the temporary peer-telemetry shim in `sim.py` (see `p2/peer-telemetry-dtn`)
-- **Promises to others:** robots will follow dispatched zones and no-go areas after the scheduler task. States are final: DEPLOYING, EXPLORING, LOST_LINK_EXPLORING, RETURNING_TO_SIGNAL, RETURNING_HOME, REPLANNING, FAULT, DONE. Faults are final: null, OVERCURRENT, STUCK, LOW_BATTERY, TRAPPED, SAFE_STOP
+- **Working on:** `rayan/safe-stop-resume` next (a CMD `resume` command clears SAFE_STOP), then `rayan/plans` (robots follow dispatched zones / no-go / lost_link_budget_s from `io.radio.receive()`).
+- **Works on main (after PR #8):** frontier exploration, 3-robot target sharing, relay auto-drop, A* return home, lost-link + 10 s reconnect hold, REPLANNING around rubble, rate monotonic scheduler with carry-over and deadline misses, full fault FSM (OVERCURRENT, STUCK, SAFE_STOP, LOW_BATTERY, TRAPPED). Seed 7, 3 robots: S1 found dark at 182.3 s, on Command at 187.3 s, 4 relays.
+- **In flight (not merged):** none
+- **Blocked on / need from others:** Aziz: wire director keys (see Heads-up in the PR #8 entry). Aziz's `p2/peer-telemetry-dtn` replaces my temporary shim; robots read peer telemetry from `robot.inbox` today, so tell me where peer bundles land (`robot.inbox` or `io.radio.receive()`) and I'll switch.
+- **Promises to others:** states final: DEPLOYING, EXPLORING, LOST_LINK_EXPLORING, RETURNING_TO_SIGNAL, RETURNING_HOME, REPLANNING, FAULT, DONE. Faults final: null, OVERCURRENT, STUCK, LOW_BATTERY, TRAPPED, SAFE_STOP. `tasks` slices as in PR #7, `missed` can now be true. Robot hooks: `inject_overcurrent(seconds=1.0)`, `inject_perception_overload(seconds=3.0, wcet_ms=400)`.
 
 ## Log
+
+### 2026-11-07 16:56 · rayan/scheduler-faults · PR #8 Scheduler overload and full fault FSM
+- **Did:** scheduler carries unfinished jobs across frames, flags slices past their deadline `missed: true`, skips a release while the previous job overruns. `inject_perception_overload()` makes perception cost 400 ms for 3 s: about 1 perception deadline miss per second, safety never misses (still runs at 0 and 50 ms). Fault FSM: OVERCURRENT and STUCK stop, back up 0.5 m, mark ahead, REPLANNING; 3rd motion fault within 60 s gives SAFE_STOP (state FAULT, wheels off); LOW_BATTERY label while heading home; every fault sends a priority-1 `fault` bundle `{robot, fault, pos, t, state}` to CMD.
+- **Contract changes:** new event `deadline_miss {robot, task}`. `fault` events now cover all 5 values. `tasks[].missed` can be true. New robot hook `inject_perception_overload(seconds=3.0, wcet_ms=400)`.
+- **Heads-up for others:** Aziz: please wire a director key for `sim.robots[rid].inject_perception_overload()` (suggest O). Pressing F 3 times on one robot within 60 s puts it in SAFE_STOP (until the resume command lands next). Yusuf: red `missed` slices and `deadline_miss` events now really happen. Yusuf: the `.claude` hooks call `python3` and match only the Bash tool; on Rayan's Windows laptop only `py` exists and commits go through PowerShell, so neither hook runs there (Rayan's Claude follows the rules by hand).
+- **Next:** SAFE_STOP resume command, then robots follow dispatched plans.
 
 ### 2026-11-07 · rayan/timeline-contract · PR #7 Timeline contract (merged)
 - **Did:** scheduler records per-robot task pieces. Overcurrent fault hook. Final state list.
