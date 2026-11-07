@@ -13,6 +13,7 @@ from .geometry import wrap_angle
 from .network.dtn import DTNNetwork, RELAY_QUEUE_BYTES, make_bundle
 from .network.propagation import LinkGraph
 from .robot.lidar import raycast
+from .robot.power import wheel_current
 from .robot.robot import BATTERY_TIME_SCALE, PEER_FRESH_S, Robot
 
 DT = 0.1
@@ -39,10 +40,12 @@ class RadioIO:
         return self.sim.links.neighbors(self.rid)
 
     def receive(self):
-        """Consume delivered plan/command bundles; never bypass the network."""
+        """Consume all delivered robot messages, including legacy peer telemetry."""
         inbox = self.sim.inboxes[self.rid]
-        delivered = list(inbox)
+        peer_inbox = getattr(self.sim.robots[self.rid], "inbox", [])
+        delivered = sorted([*inbox, *peer_inbox], key=lambda b: (b["prio"], b["created"], b["bid"]))
         inbox.clear()
+        peer_inbox.clear()
         return delivered
 
 
@@ -63,7 +66,14 @@ class RobotIO:
 
     def odometry(self):
         b = self.sim.bodies[self.rid]
-        return {"pose": (b["x"], b["y"], b["th"]), "v": b["v"], "blocked": b["blocked"]}
+        return {"pose": (b["x"], b["y"], b["th"]), "v": b["v"], "blocked": b["blocked"],
+                "wheel_current": self.motor_current()}
+
+    def motor_current(self):
+        if self.sim.time < self.sim.overcurrent_until.get(self.rid, -1):
+            return 8.0
+        b = self.sim.bodies[self.rid]
+        return wheel_current(b["cmd_v"], b["blocked"])
 
     def drive(self, v, w):
         b = self.sim.bodies[self.rid]
@@ -110,6 +120,8 @@ class Sim:
         self.network = DTNNetwork()
         self.network.register("CMD")
         self.relays = {}
+        self.relay_revisions = {}
+        self.overcurrent_until = {}
         self.inboxes = {}  # delivered robot commands, consumed by future robot IO
         self.post = CommandPost(self.fp)
         self.events = []
@@ -161,12 +173,7 @@ class Sim:
 
     def add_relay(self, pos, owner=None, phone=False):
         """Backend hook for the robot drop rule and future phone relay controls."""
-        x, y = map(float, pos)
-        if not (math.isfinite(x) and math.isfinite(y) and 0 <= x < self.fp.W and 0 <= y < self.fp.H):
-            raise ValueError("Relay must be inside the floor plan")
-        ix, iy = self.fp.to_cell(x, y)
-        if self.fp.occ[iy, ix] or self.fp.nogo[iy, ix]:
-            raise ValueError("Relay cannot be placed in an obstacle or no-go zone")
+        x, y = self._relay_position(pos)
         rid = f"RL{len(self.relays) + 1}"
         self.relays[rid] = {"id": rid, "pos": [x, y], "owner": owner, "on": True, "phone": bool(phone)}
         self.network.register(rid, capacity_bytes=RELAY_QUEUE_BYTES)
@@ -174,6 +181,36 @@ class Sim:
         self.events.append({"kind": "relay_dropped", "id": rid, "pos": [x, y], "owner": owner})
         self._update_links()
         return rid
+
+    def _relay_position(self, pos):
+        x, y = map(float, pos)
+        if not (math.isfinite(x) and math.isfinite(y) and 0 <= x < self.fp.W and 0 <= y < self.fp.H):
+            raise ValueError("Relay must be inside the floor plan")
+        ix, iy = self.fp.to_cell(x, y)
+        if self.fp.occ[iy, ix] or self.fp.nogo[iy, ix]:
+            raise ValueError("Relay cannot be placed in an obstacle or no-go zone")
+        return x, y
+
+    def move_relay(self, rid, pos):
+        x, y = self._relay_position(pos)
+        self.relays[rid]["pos"] = [x, y]
+        self._relay_telemetry(rid)
+        self._update_links()
+
+    def inject_overcurrent(self, rid, duration_s=1.0):
+        if rid not in self.robots:
+            raise ValueError(f"Unknown robot: {rid}")
+        if not math.isfinite(duration_s) or not 0.6 <= duration_s <= 10:
+            raise ValueError("Overcurrent duration must be 0.6 to 10 sim seconds")
+        self.overcurrent_until[rid] = max(self.overcurrent_until.get(rid, 0), self.time + duration_s)
+        # Rayan's timeline/fault contract provides this robot-owned recovery hook.
+        # Legacy robot code still gets the injected IO sensor reading above.
+        injector = getattr(self.robots[rid], "inject_overcurrent", None)
+        if callable(injector):
+            injector(seconds=self.overcurrent_until[rid] - self.time)
+        self.events.append({"kind": "fault_injected", "type": "overcurrent", "robot": rid,
+                            "until": self.overcurrent_until[rid]})
+        return self.overcurrent_until[rid]
 
     def set_relay_power(self, rid, on):
         """Power changes break links without deleting the relay's stored bundles."""
@@ -186,8 +223,15 @@ class Sim:
         self._update_links()
 
     def _relay_telemetry(self, rid):
-        payload = dict(self.relays[rid], node_type="relay")
-        self.network.queues[rid].append(make_bundle(rid, "CMD", "telemetry", payload, self.time, 160))
+        self.relay_revisions[rid] = self.relay_revisions.get(rid, 0) + 1
+        payload = dict(self.relays[rid], node_type="relay", revision=self.relay_revisions[rid])
+        queue = self.network.queues[rid]
+        # Dragging a relay while paused should not fill its queue with obsolete
+        # positions. Never discard bundles carried for somebody else.
+        queue[:] = [b for b in queue if not (b["src"] == rid and b["kind"] == "telemetry"
+                                             and b["payload"].get("node_type") == "relay")]
+        if sum(b["size"] for b in queue) + 160 <= RELAY_QUEUE_BYTES:
+            queue.append(make_bundle(rid, "CMD", "telemetry", payload, self.time, 160))
 
     def _update_links(self):
         for a, b, change in self.links.update(self.fp, self._nodes()):
@@ -229,10 +273,15 @@ class Sim:
         """Only destination deliveries may update a consumer's knowledge."""
         for bundle in self.network.step(self.links, dt, self.time):
             if bundle["dst"] == "CMD":
-                self.post.receive(bundle, self.time)
-            elif bundle["kind"] == "telemetry" and bundle["dst"] in self.robots:
-                # Preserve Rayan's peer-inbox contract. Plans/commands stay in
-                # the separate IO inbox so his telemetry reader cannot drop them.
+                if self.post.receive(bundle, self.time):
+                    self.events.append({"kind": "bundle_delivered",
+                        "src": bundle["src"], "dst": "CMD", "bundle_kind": bundle["kind"],
+                        "hops": list(bundle["hops"]), "delay_s": round(self.time - bundle["created"], 3)})
+            elif (bundle["kind"] == "telemetry" and bundle["dst"] in self.robots
+                  and hasattr(self.robots[bundle["dst"]], "inbox")):
+                # Compatibility for the current robot reader. IO.receive() can
+                # consume this buffer too; if Rayan removes it, all messages use
+                # the IO inbox below. No packet is copied into both buffers.
                 self.robots[bundle["dst"]].inbox.append(bundle)
             else:
                 self.inboxes.setdefault(bundle["dst"], []).append(bundle)
