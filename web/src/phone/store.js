@@ -5,12 +5,17 @@ import { decodeMap } from '../store'
 export const usePhone = create((set) => ({
   connected: false,
   hello: null,       // { floorplan, grid, robots, plan, client, role, relay_id }
-  view: null,        // delivered Command state: { robots, survivors, relays }
+  view: null,        // delivered Command state: { robots, survivors, relays, faults? }
   map: null,         // Command occupancy grid (Uint8Array, row-major, row = y)
   mapVersion: 0,
-  plan: null,        // shared draft from plan_state
+  draft: null,       // shared search plan being edited (server plan_state, or local edits)
+  pending: false,    // local edits not sent yet, so our own plan_state echoes are ignored
+  selected: null,    // zone or no-go id open in the editor
+  mode: 'view',      // 'view' | 'zone' | 'nogo' (drawing on the map)
   safety: null,      // last safety result
-  error: null,       // last error frame { code, msg }
+  checking: false,   // waiting for a safety or dispatch answer
+  dispatched: [],    // plan IDs this phone dispatched or saw rejected as dispatched
+  error: null,       // last error frame { code, msg, at }
   time: 0,
   set,
 }))
@@ -20,21 +25,26 @@ export function handlePhoneMessage(msg) {
   const s = usePhone.getState()
   switch (t) {
     case 'hello':
-      s.set({ hello: data, plan: data.plan, safety: null, error: null, time })
+      s.set({ hello: data, draft: data.plan, selected: null, mode: 'view', safety: null,
+              checking: false, error: null, time, ...(time < s.time ? { dispatched: [] } : {}) })
       break
     case 'cmd_view': {
       const { map, ...view } = data
       s.set({ view, map: decodeMap(map), mapVersion: s.mapVersion + 1, time })
       break
     }
-    case 'plan_state':
-      s.set({ plan: data })
+    case 'plan_state': {
+      // Our own edit echoing back while newer local edits wait to be sent: keep local.
+      if (s.pending && data?.author === s.hello?.client) break
+      const theirs = data?.author !== s.hello?.client
+      s.set({ draft: data, ...(theirs ? { safety: null } : {}) })
       break
+    }
     case 'safety':
-      s.set({ safety: data })
+      s.set({ safety: data, checking: false })
       break
     case 'error':
-      s.set({ error: { ...data, at: Date.now() } })
+      s.set({ error: { ...data, at: Date.now() }, checking: false })
       break
     default:
       break

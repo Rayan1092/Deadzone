@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { usePhone } from './store'
+import { MIN_SIDE, addRegion, pointInPoly, rectPoly, snap } from './plan'
 
 // 2D plan of the building: the pre-collapse prior plus delivered Command knowledge.
 // Margins in meters; the CMD antenna sits outside the west wall at x = -2.
@@ -49,6 +50,7 @@ export default function PlanMap() {
   const wrap = useRef()
   const canvas = useRef()
   const fp = usePhone((s) => s.hello?.floorplan)
+  const drawing = usePhone((s) => s.mode !== 'view')
 
   useEffect(() => {
     if (!fp) return
@@ -122,6 +124,42 @@ export default function PlanMap() {
         ctx.stroke()
       }
 
+      // search plan: responder no-go areas, then zones in their robot's color
+      const { draft, selected, safety } = usePhone.getState()
+      const flagged = new Set(safety && !safety.ok && safety.plan_id === draft?.plan_id
+        ? safety.violations.map((v) => v.zone) : [])
+      const pulse = 0.5 + 0.5 * Math.sin(t * 6)
+      for (const ng of draft?.no_go ?? []) {
+        poly(ng.poly)
+        ctx.fillStyle = hatch
+        ctx.fill()
+        ctx.setLineDash([4, 3])
+        ctx.strokeStyle = ng.id === selected ? '#fecaca' : 'rgba(239,68,68,.9)'
+        ctx.lineWidth = ng.id === selected ? 2.5 : 1.5
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
+      for (const z of draft?.zones ?? []) {
+        const color = colors[z.robot] ?? C.teal
+        poly(z.poly)
+        ctx.globalAlpha = 0.2
+        ctx.fillStyle = color
+        ctx.fill()
+        ctx.globalAlpha = 1
+        ctx.strokeStyle = flagged.has(z.id) ? `rgba(239,68,68,${0.5 + 0.5 * pulse})` : z.id === selected ? '#ffffff' : color
+        ctx.lineWidth = flagged.has(z.id) ? 3 : z.id === selected ? 2.5 : 1.5
+        ctx.stroke()
+      }
+      if (drag) {
+        const [a, b] = [drag.a, drag.b]
+        poly([[a[0], a[1]], [b[0], a[1]], [b[0], b[1]], [a[0], b[1]]])
+        ctx.setLineDash([5, 4])
+        ctx.strokeStyle = drag.kind === 'nogo' ? C.red : '#ffffff'
+        ctx.lineWidth = 2
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
+
       ctx.lineCap = 'square'
       for (const w of fp.walls) {
         ctx.strokeStyle = w.material === 'metal' ? C.metal : C.wall
@@ -148,6 +186,14 @@ export default function PlanMap() {
         lines.forEach((line, i) => {
           label(line, X(cx), Y(cy) + (i - (lines.length - 1) / 2) * roomSize * 1.2, C.room, roomSize, 500)
         })
+      }
+
+      for (const r of [...(draft?.zones ?? []), ...(draft?.no_go ?? [])]) {
+        const xs = r.poly.map((p) => p[0])
+        const ys = r.poly.map((p) => p[1])
+        const text = r.robot ? `${r.id} · ${r.robot}` : r.id
+        label(text, X((Math.min(...xs) + Math.max(...xs)) / 2), Y(Math.max(...ys)) + 9,
+              r.robot ? '#ffffff' : '#fecaca', 10, 700)
       }
 
       const [ex, ey] = fp.entry
@@ -216,10 +262,54 @@ export default function PlanMap() {
       }
     }
 
+    // ---------------------------------------------------------------- touch
+    // Drawing mode: drag a snapped rectangle. View mode: tap a zone to edit it.
+    const toWorld = (e) => {
+      const r = el.getBoundingClientRect()
+      return [(e.clientX - r.left) / s - PAD.left, H + PAD.top - (e.clientY - r.top) / s]
+    }
+    const clampSnap = ([x, y]) => [snap(Math.min(W, Math.max(0, x))), snap(Math.min(H, Math.max(0, y)))]
+    let drag = null
+    let down = null
+    const onDown = (e) => {
+      const { mode } = usePhone.getState()
+      down = toWorld(e)
+      if (mode === 'view') return
+      el.setPointerCapture(e.pointerId)
+      drag = { kind: mode, a: clampSnap(down), b: clampSnap(down) }
+      dirty = true
+    }
+    const onMove = (e) => {
+      if (!drag) return
+      drag.b = clampSnap(toWorld(e))
+      dirty = true
+    }
+    const onUp = (e) => {
+      const st = usePhone.getState()
+      if (drag) {
+        const { kind, a, b } = drag
+        drag = null
+        dirty = true
+        if (Math.abs(b[0] - a[0]) >= MIN_SIDE && Math.abs(b[1] - a[1]) >= MIN_SIDE) {
+          addRegion(kind === 'nogo' ? 'nogo' : 'zone', rectPoly(a, b))
+        }
+        return
+      }
+      const p = toWorld(e)
+      if (!down || Math.hypot(p[0] - down[0], p[1] - down[1]) > 0.5) return // a scroll, not a tap
+      const regions = [...(st.draft?.zones ?? []), ...(st.draft?.no_go ?? [])].reverse()
+      st.set({ selected: regions.find((r) => pointInPoly(p, r.poly))?.id ?? null })
+    }
+    el.addEventListener('pointerdown', onDown)
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerup', onUp)
+    el.addEventListener('pointercancel', () => { drag = null; dirty = true })
+
     const frame = (ms) => {
       const st = usePhone.getState()
-      // Only survivor pulses animate; otherwise redraw when new data arrives.
-      const animating = (st.view?.survivors?.length ?? 0) > 0
+      // Survivor pulses and flagged zones animate; otherwise redraw when new data arrives.
+      const flaggedZones = st.safety && !st.safety.ok
+      const animating = (st.view?.survivors?.length ?? 0) > 0 || flaggedZones
       if (dirty || animating) {
         draw(ms / 1000)
         dirty = false
@@ -235,7 +325,7 @@ export default function PlanMap() {
   }, [fp])
 
   return (
-    <div ref={wrap} className="plan-map">
+    <div ref={wrap} className={`plan-map${drawing ? ' drawing' : ''}`}>
       <canvas ref={canvas} />
       {!fp && <div className="map-empty">Connecting to the command post…</div>}
     </div>

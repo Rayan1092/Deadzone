@@ -69,6 +69,7 @@ export function Sidebar() {
               {STATE_LABEL[r.state] ?? r.state}
               {r.fault && <span className={`fault-pill ${r.fault === 'SAFE_STOP' ? 'stop' : ''}`}>{FAULT_LABEL[r.fault] ?? r.fault}</span>}
             </div>
+            {r.plan_id && <div className="following muted small">Following {r.plan_id}{r.zone ? ` · zone ${r.zone}` : ''}</div>}
             <div className="bar"><div className={low ? 'fill low' : 'fill'} style={{ width: `${pct}%` }} /></div>
             <div className="row muted small">
               <span>{pct.toFixed(0)}% battery</span>
