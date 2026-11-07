@@ -27,7 +27,7 @@ class FakeIO:
     """Two hot spots in view: a survivor crop and a radiator decoy crop."""
     radio = FakeRadio()
 
-    def drop_relay(self):          # beacon relay for a survivor found without a link
+    def drop_relay(self, beacon_for=None):   # beacon relay for a survivor found without a link
         return "RL9"
 
     def thermal(self):
