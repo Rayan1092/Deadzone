@@ -3,6 +3,8 @@ import { useSim } from '../store'
 import { control } from '../net/socket'
 import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt } from '../format'
 import { JoinCard } from './JoinPanel'
+import { requestReport } from './ReportPanel'
+import { followRobot, overview } from '../three/camera'
 
 // Radio edges flap constantly and deliveries happen every tick; the feed shows stories.
 const HIDDEN_EVENTS = new Set(['link_up', 'link_down', 'bundle_delivered'])
@@ -48,6 +50,7 @@ export function Sidebar() {
   const tick = useSim((s) => s.tick)
   const time = useSim((s) => s.time)
   const events = useSim((s) => s.events)
+  const follow = useSim((s) => s.follow)
   const robots = tick?.reality.robots ?? []
   const cmdRobots = Object.fromEntries((tick?.command.robots ?? []).map((r) => [r.id, r]))
   return (
@@ -59,7 +62,8 @@ export function Sidebar() {
         const low = pct < r.battery.reserve_needed_pct + 5
         const cmd = cmdRobots[r.id]
         return (
-          <div key={r.id} className="robot-card" style={{ '--c': r.color }}>
+          <div key={r.id} className={`robot-card${r.id === follow ? ' followed' : ''}`} style={{ '--c': r.color }}
+               onClick={() => (r.id === follow ? overview() : followRobot(r.id))}>
             <div className="row">
               <span className="swatch" />
               <b>{r.name}</b>
@@ -103,17 +107,28 @@ export function useKeyboard() {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT') return
       const s = useSim.getState()
-      if (e.key === 'q' || e.key === 'Q') s.set({ joinOpen: !s.joinOpen })
-      if (e.key === 'Escape') s.set({ joinOpen: false })
-      if (e.key === 't' || e.key === 'T') s.set({ showTruth: !s.showTruth })
+      const robots = s.tick?.reality.robots ?? []
+      // director keys act on the followed robot, else the first one
+      const target = robots.find((r) => r.id === s.follow) ?? robots[0]
+      const key = e.key.toLowerCase()
+      if (key === 'q') s.set({ joinOpen: !s.joinOpen })
+      if (e.key === 'Escape') s.set({ joinOpen: false, report: null })
+      if (key === 't') s.set({ showTruth: !s.showTruth })
       if (e.code === 'Space') { e.preventDefault(); control('toggle') }
       if (e.code === 'Backspace') control('reset')
       if (e.key === '+' || e.key === '=') control('speed', s.speed * 2)
       if (e.key === '-') control('speed', s.speed / 2)
-      if (e.key === 'r' || e.key === 'R') {
-        // drop rubble 1.5 m ahead of the first robot (director key)
-        const r = s.tick?.reality.robots[0]
-        if (r) control('director', { do: 'rubble', at: [r.pose[0] + Math.cos(r.pose[2]) * 1.5, r.pose[1] + Math.sin(r.pose[2]) * 1.5] })
+      if (/^[1-9]$/.test(e.key) && robots[Number(e.key) - 1]) followRobot(robots[Number(e.key) - 1].id)
+      if (e.key === '0') overview()
+      if (key === 'r' && target) {
+        // drop rubble 1.5 m ahead of the robot
+        const [x, y, th] = target.pose
+        control('director', { do: 'rubble', at: [x + Math.cos(th) * 1.5, y + Math.sin(th) * 1.5] })
+      }
+      if (key === 'f' && target) control('director', { do: 'overcurrent', robot: target.id })
+      if (key === 'g') {
+        if (s.report && !s.report.loading) s.set({ report: null })
+        else requestReport()
       }
     }
     window.addEventListener('keydown', onKey)
