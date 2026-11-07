@@ -20,6 +20,18 @@ REPLAN_PERIOD = 1.5    # s
 TELEMETRY_PERIOD = 1.0
 BATTERY_TIME_SCALE = 6.0  # demo: drain faster so bars visibly move
 
+# Multi-robot coordination through targets shared in telemetry bundles
+PEER_TARGET_RADIUS = 4.0   # m, frontiers this close to a claimed target are penalized
+PEER_TARGET_PENALTY = 12.0  # larger than the best possible size bonus (40 * 0.25)
+PEER_FRESH_S = 15.0        # ignore claims older than this (peer out of contact)
+DEPLOY_STAGGER_S = 1.5     # robot n waits n * this before exploring, so claims go out in order
+
+
+def robot_rank(rid):
+    """R1 -> 0, R2 -> 1 ... Lower rank has priority when two robots want the same frontier."""
+    digits = "".join(ch for ch in rid if ch.isdigit())
+    return int(digits) - 1 if digits else 0
+
 
 class Robot:
     def __init__(self, rid, name, color, pose, fp_shape, cell, entry, nogo=None,
@@ -52,6 +64,9 @@ class Robot:
         self.found_while_dark = False
 
         self.outbox = []
+        self.inbox = []           # bundles the network delivered to this robot
+        self.peers = {}           # peer id -> {"target", "pose", "t"} from their telemetry
+        self.rank = robot_rank(rid)
         self.last_telemetry_t = -99.0
         self.lidar_pts = []
         self.fault = None
@@ -70,6 +85,7 @@ class Robot:
         self.lidar_pts = [[round(x + math.cos(a) * r, 2), round(y + math.sin(a) * r, 2)]
                           for a, r in zip(angles[::2], ranges[::2])]
 
+        self._read_inbox()
         self._perceive(io)
         self._update_link(io)
         self._check_faults(odo)
@@ -80,6 +96,28 @@ class Robot:
         self.v = odo["v"]
         self.battery.drain(dt * BATTERY_TIME_SCALE, self.v)
         self._emit_bundles()
+
+    # ------------------------------------------------------------------ comms in
+    def _read_inbox(self):
+        """Learn peer targets from telemetry bundles the network delivered to us."""
+        for b in self.inbox:
+            p = b["payload"]
+            if b["kind"] != "telemetry" or p.get("id") == self.id:
+                continue
+            prev = self.peers.get(p["id"])
+            if prev is None or prev["t"] <= b["created"]:
+                self.peers[p["id"]] = {"target": p.get("target"), "pose": p.get("pose"), "t": b["created"]}
+        self.inbox.clear()
+
+    def _claimed_targets(self):
+        """Fresh targets of higher-priority peers. Lower rank wins, so claims never oscillate."""
+        out = []
+        for pid, info in self.peers.items():
+            if info["target"] is None or self.t - info["t"] > PEER_FRESH_S:
+                continue
+            if robot_rank(pid) < self.rank:
+                out.append(info["target"])
+        return out
 
     # ------------------------------------------------------------------ sensing
     def _perceive(self, io):
@@ -141,7 +179,7 @@ class Robot:
         s = self.state
 
         if s == "DEPLOYING":
-            if self.t - self.state_since > 1.0:
+            if self.t - self.state_since > 1.0 + DEPLOY_STAGGER_S * self.rank:
                 self._set_state("EXPLORING")
             return
 
@@ -204,19 +242,28 @@ class Robot:
         self.last_plan_t = self.t
         if not clusters:
             return False
-        # score: prefer big frontiers that are close, keep going the same way
+        claimed = self._claimed_targets()
+
+        # score: prefer big frontiers that are close, keep going the same way,
+        # stay away from frontiers a higher-priority peer already claimed
         def score(c):
             s = min(c["size"], 40) * 0.25 - c["dist"] * self.cell * 1.0
             if self.goal_cell and abs(c["goal"][0] - self.goal_cell[0]) + abs(c["goal"][1] - self.goal_cell[1]) < 8:
                 s += 2.0
+            gx, gy = (c["goal"][0] + 0.5) * self.cell, (c["goal"][1] + 0.5) * self.cell
+            if any(math.dist((gx, gy), t) < PEER_TARGET_RADIUS for t in claimed):
+                s -= PEER_TARGET_PENALTY
             return s
         clusters.sort(key=score, reverse=True)
         for c in clusters[:4]:
             cells = planning.astar(trav, start, c["goal"], planning.wall_cost(self.map.grid))
             if cells:
+                old = self.target
                 self.goal_cell = c["goal"]
                 self.path = planning.simplify(cells, self.cell)
                 self.target = list(self.path[-1])
+                if old is None or math.dist(old, self.target) > PEER_TARGET_RADIUS:
+                    self.last_telemetry_t = -99.0   # announce the new claim on this tick
                 return True
             self.blacklist.append(c["goal"])
         return False
@@ -275,6 +322,7 @@ class Robot:
             "state": self.state,
             "battery_pct": round(self.battery.pct, 1),
             "found": list(self.found),
+            "target": [round(v, 2) for v in self.target] if self.target else None,
         }, self.t, 120))
         ix, iy, vals = self.map.take_patch()
         if len(vals):

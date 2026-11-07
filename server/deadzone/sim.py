@@ -145,16 +145,35 @@ class Sim:
         dt = DT
         self.time = round(self.time + dt, 3)
         self.tick_n += 1
+        fresh = {}
         for rid, robot in self.robots.items():
+            n0 = len(robot.outbox)
             robot.step(dt, self.ios[rid])
+            fresh[rid] = robot.outbox[n0:]   # step only appends, so these are this tick's bundles
             self.events.extend(robot.events)
             robot.events.clear()
         for b in self.bodies.values():
             self._integrate(b, dt)
         self._update_links()
+        self._share_telemetry(fresh)
         self._move_bundles(dt)
         self.events.extend(self.post.events)
         self.post.events.clear()
+
+    def _share_telemetry(self, fresh):
+        """TEMPORARY shim (Rayan, task 1, approved): robot-to-robot telemetry so robots can
+        share frontier targets. Every robot with a link path to the sender gets a copy in its
+        inbox. Robots never forward for other robots (team decision), so a path only counts if
+        every intermediate hop is a non-robot node (relay, phone, CMD).
+        Person 2 replaces this with dst = robot id / broadcast bundles in network/dtn.py."""
+        for src, bundles in fresh.items():
+            for b in bundles:
+                if b["kind"] != "telemetry":
+                    continue
+                for rid, other in self.robots.items():
+                    path = self.links.path(src, rid) if rid != src else None
+                    if path and not any(n in self.robots for n in path[1:-1]):
+                        other.inbox.append(dict(b, dst=rid, hops=path, custodian=rid))
 
     def _move_bundles(self, dt):
         """Single-hop store and forward for the first milestone (multi-hop at 5 PM)."""
