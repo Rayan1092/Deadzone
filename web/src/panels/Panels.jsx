@@ -1,23 +1,8 @@
 import { useEffect } from 'react'
 import { useSim } from '../store'
 import { control } from '../net/socket'
-
-const STATE_LABEL = {
-  DEPLOYING: 'Deploying',
-  EXPLORING: 'Exploring',
-  LOST_LINK_EXPLORING: 'No link, exploring',
-  RETURNING_TO_SIGNAL: 'Returning to signal',
-  RETURNING_HOME: 'Returning home',
-  REPLANNING: 'Replanning',
-  FAULT: 'Fault',
-  DONE: 'Done',
-}
-
-function fmt(t) {
-  const m = Math.floor(t / 60)
-  const s = Math.floor(t % 60)
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
+import { STATE_LABEL, fmtClock as fmt } from '../format'
+import { JoinCard } from './JoinPanel'
 
 export function TopBar() {
   const fp = useSim((s) => s.floorplan)
@@ -58,6 +43,7 @@ export function Sidebar() {
   const cmdRobots = Object.fromEntries((tick?.command.robots ?? []).map((r) => [r.id, r]))
   return (
     <aside className="sidebar">
+      <JoinCard />
       <h3>Robots</h3>
       {robots.map((r) => {
         const pct = r.battery.pct
@@ -110,6 +96,8 @@ export function useKeyboard() {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT') return
       const s = useSim.getState()
+      if (e.key === 'q' || e.key === 'Q') s.set({ joinOpen: !s.joinOpen })
+      if (e.key === 'Escape') s.set({ joinOpen: false })
       if (e.code === 'Space') { e.preventDefault(); control('toggle') }
       if (e.code === 'Backspace') control('reset')
       if (e.key === '+' || e.key === '=') control('speed', s.speed * 2)

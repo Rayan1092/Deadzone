@@ -1,0 +1,92 @@
+/* Phone UI: Material 3 shapes and tokens on the Deadzone palette from styles.css. */
+.phone-app {
+  --surface-1: #1a1e22;
+  --surface-2: #1f2429;
+  --surface-3: #262d34;
+  --outline: #343c44;
+  --on-primary: #00201c;
+  height: 100dvh; overflow-y: auto; overscroll-behavior: contain;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+           max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  display: flex; flex-direction: column; gap: 12px; font-size: 15px;
+  max-width: 560px; margin: 0 auto; /* stays a phone column when opened on a laptop */
+  -webkit-tap-highlight-color: transparent;
+}
+.phone-app button { touch-action: manipulation; }
+
+/* app bar */
+.appbar { display: flex; align-items: center; gap: 10px; padding: 4px 4px 0; }
+.appbar-title { margin-right: auto; min-width: 0; }
+.appbar .brand { font-size: 11px; }
+.incident { font-size: 18px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.appbar .clock { font-size: 14px; color: var(--amber); }
+
+/* chips: M3 assist chip shape */
+.chip { font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 8px; white-space: nowrap;
+  border: 1px solid var(--outline); color: var(--muted); }
+.chip.ok { background: rgba(34,197,94,.14); border-color: transparent; color: var(--green); }
+.chip.warn { background: rgba(245,158,11,.14); border-color: transparent; color: var(--amber); }
+.chip.bad { background: rgba(239,68,68,.16); border-color: transparent; color: var(--red); }
+
+/* cards: M3 filled card, medium shape */
+.m3-card { background: var(--surface-1); border-radius: 12px; padding: 12px; }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.map-card { padding: 10px; }
+.plan-map { position: relative; width: 100%; min-height: 120px; border-radius: 8px; overflow: hidden; background: var(--bg); }
+.plan-map canvas { display: block; }
+.map-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sw.scanned { background: rgba(45,212,191,.45); }
+.sw.hazard { background: repeating-linear-gradient(45deg, rgba(239,68,68,.7) 0 2px, transparent 2px 5px);
+  outline: 1px solid rgba(239,68,68,.7); }
+.sw.relay { background: var(--amber); transform: rotate(45deg) scale(.8); border-radius: 1px; }
+.sw.survivor { background: var(--red); border-radius: 50%; }
+.sw.ghost { border: 1.5px dashed #e5e7eb; background: rgba(148,163,184,.5); border-radius: 50%; }
+
+.note { display: flex; flex-direction: column; gap: 4px; border-left: 3px solid var(--amber); }
+
+.section-title { margin: 8px 4px 0; font-size: 12px; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted); }
+
+/* robot cards */
+.robot { display: flex; flex-direction: column; gap: 6px; }
+.robot-row { display: flex; align-items: center; gap: 8px; }
+.robot-row .chip { margin-left: auto; }
+.robot .swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--c); flex: none; }
+.robot-state { font-size: 14px; }
+.robot .bar { height: 6px; background: var(--surface-3); border-radius: 4px; overflow: hidden; }
+.robot .fill { height: 100%; background: var(--teal); }
+.caps { padding-top: 6px; border-top: 1px solid var(--outline); }
+
+.survivor { display: flex; gap: 10px; align-items: flex-start; }
+.dot-red { width: 10px; height: 10px; border-radius: 50%; background: var(--red); margin-top: 5px; flex: none;
+  box-shadow: 0 0 0 4px rgba(239,68,68,.2); }
+.empty { font-size: 13px; }
+
+.phone-foot { text-align: center; padding-top: 8px; margin-top: auto; }
+
+/* M3 snackbar */
+.snackbar { position: fixed; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom));
+  background: #e6edf3; color: #14171a; padding: 14px 16px; border-radius: 4px; font-size: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4); z-index: 10; }
+
+/* landing role picker */
+.landing { justify-content: center; gap: 16px; padding-left: 20px; padding-right: 20px; }
+.landing-head { margin-bottom: 12px; }
+.landing h1 { font-size: 28px; font-weight: 600; margin: 8px 0; }
+.landing p { margin: 0; line-height: 1.5; }
+.role-card { display: flex; align-items: center; gap: 16px; text-align: left; padding: 20px;
+  background: var(--surface-2); border: 1px solid var(--outline); border-radius: 16px; color: var(--text); font: inherit; }
+.role-card:active { background: var(--surface-3); }
+.role-card > span:last-child { display: flex; flex-direction: column; gap: 4px; }
+.role-card b { font-size: 17px; }
+.role-card .muted { font-size: 14px; line-height: 1.4; }
+.role-icon { width: 48px; height: 48px; border-radius: 12px; flex: none; position: relative; }
+.role-icon.planner { background: rgba(45,212,191,.16); }
+.role-icon.planner::after { content: ''; position: absolute; inset: 13px; border: 2px dashed var(--teal); border-radius: 3px; }
+.role-icon.relay { background: rgba(245,158,11,.16); }
+.role-icon.relay::after { content: ''; position: absolute; left: 17px; top: 17px; width: 14px; height: 14px;
+  background: var(--amber); transform: rotate(45deg); border-radius: 2px; }
