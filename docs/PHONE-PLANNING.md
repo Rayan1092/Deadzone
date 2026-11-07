@@ -12,6 +12,8 @@ owners. Existing screen messages and robot behavior continue to work.
 | `GET /api/join` | none | `{ "url": "http://<laptop>:5173/phone" }` in development, or the configured public frontend URL |
 | `POST /api/plan` | Search plan below | Save the shared draft, broadcast `plan_state`, run safety and return its result |
 | `POST /api/dispatch` | `{ "plan_id": "P-1" }` | Recheck current knowledge; return `{ok: true, plan_id}` and queue plan bundles, or return safety violations |
+| `POST /api/fault` | `{type: "rubble", at: [x,y]}` or `{type: "overcurrent", robot: "R1"}` | Validated director fault injection |
+| `GET /api/report` | none | `{text, generated_at, source}` briefing, also broadcast to screens |
 
 Safety rejection is HTTP 200 with `ok: false`, so the UI can show the violation card.
 Malformed data is 422, an unknown plan is 404, and changing an already dispatched
@@ -36,9 +38,11 @@ available at FastAPI's `/docs`.
 }
 ```
 
-The sample zone is close to the entry. Start the sim long enough to deliver its
-first telemetry before checking a plan: absent battery telemetry produces a
-`battery_reserve` violation with `value: null` and a message to wait for a report.
+The sample zone is close to the entry. The server now primes one real sim tick
+at startup and reset, delivering sensor/telemetry bundles through the network while
+leaving the demo paused at T+0.1 s. Safety can run before Space is pressed. Missing
+telemetry in other scenarios still produces `battery_reserve` with `value: null`;
+no live battery fallback is used.
 
 IDs contain letters, digits, `_`, `-` or `.`, up to 64 characters. Plans contain
 1–32 zones, up to 32 no-go regions, and 3–64 vertices per polygon. Coordinates must
@@ -67,8 +71,9 @@ Immediately after connecting, and again on reset:
 
 1. `hello`: `{floorplan, grid: {w,h,cell}, robots, plan, client, role, relay_id}`.
    `robots` contains static `{id,name,color,capabilities}`. `plan` is the current
-   normalized draft or `null`. `relay_id` is currently `null`.
-2. `cmd_view`: the delivered `{robots,survivors,relays}` Command state plus `map`.
+   normalized draft or `null`. `relay_id` identifies a relay-role client's node;
+   it is `null` for planners.
+2. `cmd_view`: the delivered `{robots,survivors,relays,faults}` Command state plus `map`.
    `map` is base64 of the row-major `uint8` Command occupancy grid. Dimensions and
    cell size come from `hello.grid`; values remain 0 unknown, 1 free, 2 occupied.
    Further views are sent every five sim ticks (2 Hz in simulation time).
@@ -81,7 +86,7 @@ existing big-screen `hello` still contains the full floorplan for the Reality vi
 
 Send `{ "t": "plan_edit", "data": <search plan> }`. The server sets `author` to
 the connected client label, validates the data and broadcasts a full normalized
-`plan_state` to every connected phone. The `author` field may be omitted on this
+`plan_state` to every connected phone and big screen. The `author` field may be omitted on this
 WebSocket message; it remains required on REST submissions.
 
 Send `{ "t": "plan_submit", "data": { "plan_id": "P-1" } }` to run safety.
@@ -107,8 +112,9 @@ open. Codes include `invalid_json`, `invalid_message`, `invalid_plan`, `invalid_
 (REST validation), `plan_not_found`, `plan_dispatched`, `unsupported_message`, and
 `read_only_role`. Unknown roles/invalid client labels are rejected at connection.
 
-`role=relay` can observe Command state but cannot edit plans. Phone relay placement,
-power control and `relay_state` are not implemented in this milestone.
+`role=relay` can observe Command state and control its own relay, but cannot edit
+plans. See [`FRONTEND-HANDOFF.md`](FRONTEND-HANDOFF.md) for the relay lifecycle,
+state schema, screen updates, director controls and report contract.
 
 ## What safety checks
 
@@ -141,10 +147,11 @@ from `CMD` to the robot ID. Each payload is the normalized plan filtered to that
 robot's zones, with the plan ID, author, global no-go list and lost-link budget.
 
 Read received bundles with `io.radio.receive()`. This returns and clears complete
-delivered bundle records from `Sim.inboxes[robot_id]`. It does not read truth, apply
+delivered bundle records from the IO and legacy peer buffers. It does not read truth, apply
 targets, change the robot's no-go mask, or change its state. Robot policy must handle
 `kind == "plan"` to apply those instructions. An existing robot-level peer telemetry
-inbox is separate; do not assume that reading it consumes the backend plan inbox.
+inbox can still be read separately without consuming commands. The unified IO API
+drains both buffers once, allowing Rayan to remove that legacy attribute later.
 
 ## LAN/demo setup
 
@@ -165,7 +172,7 @@ If no build exists, the backend returns 503 and the Vite frontend can still be u
 
 ## Verification
 
-`cd server` then `python -m pytest -q`: 89 tests pass. This includes the original
+`cd server` then `python -m pytest -q` runs the combined backend suite. This includes the original
 rescue story and DTN tests plus safety, schema, REST, two simultaneous planner
 WebSockets, reconnect/reset, malformed requests, Command-only map updates, join
 URLs, and the built frontend entry route. The phone UI still requires Person 3's
@@ -174,5 +181,6 @@ implementation; a live phone/Wi-Fi rehearsal remains an integration checkpoint.
 This includes merged multi-robot and relay PRs #3 and #5. Robot endpoints do not
 forward other nodes' bundles; transport, radio reachability and screen link status
 use the same rule. Peer telemetry now travels through DTN and reaches the robot's
-peer inbox only after delivery. Plan/command bundles remain in the separate
-`io.radio.receive()` inbox. See `DTN.md` for peer TTL, IDs and byte accounting.
+peer buffer only after delivery. All robot message kinds are available through
+`io.radio.receive()`; the legacy peer reader remains compatible. See `DTN.md` for
+peer TTL, IDs and byte accounting.
