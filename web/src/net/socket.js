@@ -2,7 +2,7 @@ import { useSim, handleMessage } from '../store'
 
 let ws = null
 
-function wsUrl(path) {
+export function wsUrl(path) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
   return `${proto}://${location.host}${path}`
 }

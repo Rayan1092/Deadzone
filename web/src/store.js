@@ -12,6 +12,8 @@ export const useSim = create((set) => ({
   tick: null,          // { reality, command, stats }
   maps: { reality: null, command: null, version: 0 },
   events: [],          // newest first, capped
+  joinOpen: false,     // full screen QR overlay (Q key)
+  joinUrl: null,       // phone join URL from /api/join
   set,
 }))
 
