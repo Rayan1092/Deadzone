@@ -3,10 +3,10 @@
 Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`. Only Aziz's sessions edit this file.
 
 ## Now
-- **Working on:** `p2/frontend-backend-contract`: sync and integration review against main `059dd63` (PRs #8, #10 and #11 merged). No new feature implementation during this sync.
+- **Working on:** `p2/frontend-backend-contract`: resolve PR #12's published merge conflicts and synchronize with main `5b441e5` (including resume PR #13 and detector PR #14).
 - **Works on main:** multi-hop DTN with per-hop custody, phone planning REST + WS, Command-based safety checks, peer telemetry through DTN (PR #11; direct-copy shim removed).
-- **In flight (not merged):** PR #12, `p2/frontend-backend-contract`: paused startup/reset telemetry, screen plan state, phone relay lifecycle, overcurrent director/API, local report and final-CMD delivery events. GitHub currently reports conflicts on the published PR; local branch integrates latest main and preserves published ancestry, so a normal push of this sync is pending.
-- **Blocked on / need from others:** PR #12 merge unblocks Yusuf's relay controls/screen plan/report consumers. Rayan's open PR #13 adds network-delivered SAFE_STOP resume; plan execution remains Rayan's next task. Aziz next wires `do:"overload"` and, once #13 lands, `do:"resume"` through CMD's DTN queue. Current director accepts only rubble/overcurrent. Gemini generation, real FEC and recorder/replay remain later Person 2 milestones; CRDT is optional.
+- **In flight (not merged):** PR #12, `p2/frontend-backend-contract`: paused startup/reset telemetry, screen plan state, phone relay lifecycle, overcurrent director/API, local report and final-CMD delivery events. Resolution integrates latest main and preserves the published branch ancestry; publish with a normal push, not a force push.
+- **Blocked on / need from others:** PR #12 merge unblocks Yusuf's relay controls/screen plan/report consumers. Rayan's resume PR #13 is now on main; robots store received plans, with plan execution still Rayan-owned. Aziz next wires `do:"overload"` and `do:"resume"` through CMD's DTN queue. Current director accepts only rubble/overcurrent. Detector PR #14 is on main but robot hookup/decoys are separate work; real-model verification needs optional torch dependencies. Gemini generation, real FEC and recorder/replay remain later Person 2 milestones; CRDT is optional.
 - **Promises to others** (implemented in PR #12, not on main yet):
   - Reset/startup runs one real tick, then stays paused. Safety checks work before Space.
   - `plan_state` goes to `/ws/phone` AND `/ws/screen` on edits and accepted dispatch. Screens get the current plan on connect, `null` on reset. A `plan_dispatched` event marks accepted dispatch.
@@ -18,6 +18,12 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
   - Reported faults in `command.faults` / phone `cmd_view.faults` are delivered history, not live fault flags. No Command/phone truth fallback.
 
 ## Log
+
+### 2026-11-07 14:14 PT · p2/frontend-backend-contract · Resolve PR #12 against current main
+- **Did:** integrated main `5b441e5`, including Rayan's resume PR #13 and detector PR #14, into the previously resolved frontend backend branch. Kept the published PR head as an ancestor, so publishing resolves conflicts without rewriting anyone's remote history. Full backend suite: 139 passed, 1 skipped (optional trained-model test requires torch/torchvision); merge has no unresolved paths or whitespace errors. The frontend build already passed on the unchanged web files.
+- **Contract changes:** none beyond the existing PR #12 contracts. Preserved Rayan's network-delivered `command {cmd:"resume"}` reader/builder and plan storage unchanged; director overload/resume wiring remains a separate next task.
+- **Heads-up for others:** PR #12 contains latest main plus our existing backend contracts. Imported robot/ML files and teammate histories are upstream changes, not edits to their policies. Detector integration/decoys have not been added; fallback tests do not validate real inference.
+- **Next:** push this branch to update PR #12 and verify GitHub reports no merge conflicts; then proceed with the separately tracked backend controls.
 
 ### 2026-11-07 14:08 PT · p2/frontend-backend-contract · Team sync and frontend contract catch-up
 - **Did:** pulled main through `059dd63`, read all three histories plus the protocol/hooks, and integrated scheduler/fault PR #8, phone-shell PR #10 and peer-DTN PR #11 into the local backend branch. Preserved the published branch ancestry (no force push required). Combined verification: 134 backend tests pass; new QR dependency installed and production web build passes. Implementation in this entry covers the existing frontend-contract commit; this sync changes only Aziz's history.

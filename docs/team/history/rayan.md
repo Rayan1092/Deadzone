@@ -3,13 +3,22 @@
 Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions edit this file.
 
 ## Now
-- **Working on:** `rayan/safe-stop-resume` next (a CMD `resume` command clears SAFE_STOP), then `rayan/plans` (robots follow dispatched zones / no-go / lost_link_budget_s from `io.radio.receive()`).
-- **Works on main (after PR #8):** frontier exploration, 3-robot target sharing, relay auto-drop, A* return home, lost-link + 10 s reconnect hold, REPLANNING around rubble, rate monotonic scheduler with carry-over and deadline misses, full fault FSM (OVERCURRENT, STUCK, SAFE_STOP, LOW_BATTERY, TRAPPED). Seed 7, 3 robots: S1 found dark at 182.3 s, on Command at 187.3 s, 4 relays.
-- **In flight (not merged):** none
-- **Blocked on / need from others:** Aziz: wire director keys (see Heads-up in the PR #8 entry). Aziz's `p2/peer-telemetry-dtn` replaces my temporary shim; robots read peer telemetry from `robot.inbox` today, so tell me where peer bundles land (`robot.inbox` or `io.radio.receive()`) and I'll switch.
+- **Working on:** `rayan/plans` next: robots follow dispatched zones / no-go / `lost_link_budget_s` from `io.radio.receive()`.
+- **Works on main:** frontier exploration, 3-robot target sharing, relay auto-drop, A* return home, lost-link + 10 s reconnect hold, REPLANNING around rubble, rate monotonic scheduler with carry-over and deadline misses, full fault FSM (OVERCURRENT, STUCK, SAFE_STOP, LOW_BATTERY, TRAPPED). Seed 7, 3 robots: S1 found dark at 182.3 s, on Command at 187.3 s, 4 relays.
+- **In flight (not merged):** `rayan/safe-stop-resume`: CMD `resume` command bundle clears SAFE_STOP.
+- **Blocked on / need from others:** Aziz: two director values (see Blocked in the newest entry). Aziz's `p2/peer-telemetry-dtn` replaces my temporary shim; robots read peer telemetry from `robot.inbox` today, so tell me where peer bundles land (`robot.inbox` or `io.radio.receive()`) and I'll switch.
 - **Promises to others:** states final: DEPLOYING, EXPLORING, LOST_LINK_EXPLORING, RETURNING_TO_SIGNAL, RETURNING_HOME, REPLANNING, FAULT, DONE. Faults final: null, OVERCURRENT, STUCK, LOW_BATTERY, TRAPPED, SAFE_STOP. `tasks` slices as in PR #7, `missed` can now be true. Robot hooks: `inject_overcurrent(seconds=1.0)`, `inject_perception_overload(seconds=3.0, wcet_ms=400)`.
 
 ## Log
+
+### 2026-11-07 17:10 · rayan/safe-stop-resume · SAFE_STOP can be resumed from CMD
+- **Did:** robots now read `io.radio.receive()` every step. A `command` bundle with payload `{"cmd": "resume"}` clears SAFE_STOP and the fault counter, raises a `resumed` event, then the robot replans and carries on. Plan bundles that arrive are stored on the robot (acted on in `rayan/plans`). The resume only reaches a robot that has a route to CMD; a robot that safe-stopped in a dead zone stays stopped until a relay reaches it (realistic, by design).
+- **Contract changes:** new command bundle `kind:"command"`, `src:"CMD"`, `dst:<robot id>`, `payload:{"cmd":"resume"}` (builder `deadzone.robot.robot.resume_command(rid, now)`). New event `resumed {robot}`.
+- **Heads-up for others:** Yusuf: optional toast for the `resumed` event.
+- **Blocked:** Aziz, please wire two director values in `app.py` (nothing else needed from my side):
+  1. Key **O** → `control {action:"director", value:{do:"overload", robot:"R1"}}` → `sim.robots[robot].inject_perception_overload()`. The scheduler overload moment: perception misses deadlines for 3 s, safety never does.
+  2. `{do:"resume", robot:"R1"}` → `sim.network.queues["CMD"].append(resume_command(robot, sim.time))` with `from .robot.robot import resume_command`. Must go through the CMD queue, never straight into the robot, so it obeys the network like every other bundle.
+- **Next:** robots follow dispatched plans.
 
 ### 2026-11-07 16:56 · rayan/scheduler-faults · PR #8 Scheduler overload and full fault FSM
 - **Did:** scheduler carries unfinished jobs across frames, flags slices past their deadline `missed: true`, skips a release while the previous job overruns. `inject_perception_overload()` makes perception cost 400 ms for 3 s: about 1 perception deadline miss per second, safety never misses (still runs at 0 and 50 ms). Fault FSM: OVERCURRENT and STUCK stop, back up 0.5 m, mark ahead, REPLANNING; 3rd motion fault within 60 s gives SAFE_STOP (state FAULT, wheels off); LOW_BATTERY label while heading home; every fault sends a priority-1 `fault` bundle `{robot, fault, pos, t, state}` to CMD.
