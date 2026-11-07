@@ -54,6 +54,12 @@ INJECTED_SPIKE_A = 5.0     # director F key: extra amps on top of the normal whe
 REVERSE_M = 0.5
 REVERSE_V = 0.3
 REVERSE_TIMEOUT_S = 4.0
+SAFE_STOP_FAULTS = 3       # motion faults ...
+SAFE_STOP_WINDOW_S = 60.0  # ... within this window -> SAFE_STOP
+
+# Scheduler overload moment (director): perception inference suddenly costs this much
+PERCEPTION_OVERLOAD_MS = 400
+PERCEPTION_OVERLOAD_S = 3.0
 
 # Final contract (telemetry): `state` is one of STATES, `fault` is None or one of FAULTS.
 STATES = ("DEPLOYING", "EXPLORING", "LOST_LINK_EXPLORING", "RETURNING_TO_SIGNAL",
@@ -131,6 +137,9 @@ class Robot:
         self.fault_resume = None     # state to resume after a fault recovery
         self.reverse_from = None     # pose where the reverse maneuver started
         self.reverse_t = 0.0
+        self.fault_times = []        # motion faults in the SAFE_STOP window
+        self.low_battery = False
+        self.overload_until = None
 
     # ------------------------------------------------------------------ main step
     def step(self, dt, io):
@@ -148,7 +157,7 @@ class Robot:
         self._perceive(io)
         self._update_link(io)
         self._maybe_drop_relay(io)
-        self.tasks = self.scheduler.run_frame(int(round(self.t / dt)))
+        self._run_scheduler(dt)
         self._check_faults(odo)
         self._behave()
         v, w = self._reverse() if self.state == "FAULT" else self._follow()
@@ -249,10 +258,29 @@ class Robot:
         self.my_relays.append([round(x, 2), round(y, 2)])
         self.last_telemetry_t = -99.0   # tell peers right away so they keep their spacing
 
+    # ------------------------------------------------------------------ onboard scheduler
+    def _run_scheduler(self, dt):
+        if self.overload_until is not None and self.t >= self.overload_until:
+            self.scheduler.reset_wcet("perception")
+            self.overload_until = None
+        self.tasks = self.scheduler.run_frame(int(round(self.t / dt)))
+        for name in dict.fromkeys(self.scheduler.new_misses):
+            self.events.append({"kind": "deadline_miss", "robot": self.id, "task": name})
+
+    # ------------------------------------------------------------------ fault protection FSM
+    #   NOMINAL --(wheel > 6 A for 0.5 s)--> OVERCURRENT -+
+    #   NOMINAL --(v > 0.2 but < 5 cm in 3 s)--> STUCK ---+--> FAULT: stop, back up 0.5 m,
+    #                                                       mark ahead occupied -> REPLANNING
+    #   3 motion faults within 60 s --> SAFE_STOP (state FAULT, wheels off, stays stopped)
+    #   battery - trip home <= reserve --> LOW_BATTERY (label) + RETURNING_HOME
+    #   no route for 10 s --> TRAPPED (label, keeps retrying in REPLANNING)
+    # Every fault raises a `fault` event and a priority-1 fault bundle to the command post.
     def _check_faults(self, odo):
-        """Overcurrent and stuck detection. The full fault FSM (3 faults in 60 s -> SAFE_STOP,
-        LOW_BATTERY) lands with the scheduler work."""
+        """Runs every frame, conceptually inside the 50 ms safety task."""
         x, y, _ = self.pose
+        if self.fault == "SAFE_STOP":
+            self.wheel_a = wheel_current(0.0, False)
+            return
         spike = INJECTED_SPIKE_A if self.t < self.spike_until else 0.0
         self.wheel_a = wheel_current(self.cmd_v, bool(odo.get("blocked"))) + spike
         if self.wheel_a > OVERCURRENT_A and self.state not in ("DEPLOYING", "DONE", "FAULT"):
@@ -260,19 +288,16 @@ class Robot:
                 self.over_since = self.t
             elif self.t - self.over_since >= OVERCURRENT_HOLD_S:
                 self._enter_fault("OVERCURRENT")
+                return
         else:
             self.over_since = None
         rx, ry, rt = self.stuck_ref
         if self.t - rt > 3.0:
             moved = math.dist((x, y), (rx, ry))
-            if self.cmd_v > 0.2 and moved < 0.05 and self.state not in ("DONE", "FAULT"):
-                self.fault = "STUCK"
-                self.events.append({"kind": "fault", "robot": self.id, "fault": "STUCK"})
-                self._block_ahead()
-                self._start_replan("stuck")
-            elif self.fault == "STUCK":
-                self.fault = None
             self.stuck_ref = (x, y, self.t)
+            if self.cmd_v > 0.2 and moved < 0.05 and self.state not in ("DEPLOYING", "DONE", "FAULT"):
+                self._enter_fault("STUCK")
+                return
         if odo.get("blocked"):
             self._block_ahead()
 
@@ -281,21 +306,45 @@ class Robot:
         as if a wheel jammed on debris. Detection and recovery then run as for a real spike."""
         self.spike_until = self.t + seconds
 
-    def _enter_fault(self, fault):
-        """Stop, back up REVERSE_M, mark what stopped us as occupied, then replan."""
+    def inject_perception_overload(self, seconds=PERCEPTION_OVERLOAD_S, wcet_ms=PERCEPTION_OVERLOAD_MS):
+        """Director hook (scheduler overload moment): model inference suddenly costs `wcet_ms`
+        per 500 ms frame for `seconds`. Perception and battery miss deadlines, safety never does."""
+        self.scheduler.set_wcet("perception", wcet_ms)
+        self.overload_until = self.t + seconds
+
+    def _raise_fault(self, fault):
         self.fault = fault
+        x, y, _ = self.pose
+        rec = {"robot": self.id, "fault": fault, "pos": [round(x, 2), round(y, 2)],
+               "t": round(self.t, 1), "state": self.state}
         self.events.append({"kind": "fault", "robot": self.id, "fault": fault})
+        self.outbox.append(make_bundle(self.id, "CMD", "fault", rec, self.t, 120))
+
+    def _clear_fault(self):
+        """Back to nominal, but a robot heading home on low battery keeps that label."""
+        self.fault = "LOW_BATTERY" if self.low_battery else None
+
+    def _enter_fault(self, fault):
+        """Motion fault: stop, back up REVERSE_M, mark what stopped us as occupied, then replan.
+        The third motion fault within SAFE_STOP_WINDOW_S stops the robot for good."""
         self.fault_resume = self.resume_state if self.state == "REPLANNING" else self.state
-        self.reverse_from = list(self.pose)
-        self.reverse_t = self.t
+        self.fault_times = [t for t in self.fault_times if self.t - t < SAFE_STOP_WINDOW_S] + [self.t]
         self.over_since = None
         self.path = []
         self._set_state("FAULT")
+        if len(self.fault_times) >= SAFE_STOP_FAULTS:
+            self._raise_fault("SAFE_STOP")
+            return
+        self._raise_fault(fault)
+        self.reverse_from = list(self.pose)
+        self.reverse_t = self.t
 
     def _reverse(self):
-        return -REVERSE_V, 0.0
+        return (0.0, 0.0) if self.fault == "SAFE_STOP" else (-REVERSE_V, 0.0)
 
     def _fault_recovery(self):
+        if self.fault == "SAFE_STOP":
+            return                       # needs a human (or a command bundle, later)
         backed = math.dist(self.pose[:2], self.reverse_from[:2])
         if backed < REVERSE_M and self.t - self.reverse_t < REVERSE_TIMEOUT_S:
             return
@@ -345,6 +394,8 @@ class Robot:
                     self._start_replan("no_route")
                 return
             if self.battery.pct - self._pct_home() <= RESERVE_PCT:
+                self.low_battery = True
+                self._raise_fault("LOW_BATTERY")
                 self._set_state("RETURNING_HOME")
                 if not self._plan_to(self.entry):
                     self._start_replan("no_route")
@@ -416,17 +467,13 @@ class Robot:
         if ok:
             self.replan_fail_since = None
             if self.fault in ("TRAPPED", "OVERCURRENT", "STUCK"):
-                self.fault = None   # recovered
+                self._clear_fault()   # recovered
             self._set_state(resume)
             return
         if self.replan_fail_since is None:
             self.replan_fail_since = self.t
         elif self.t - self.replan_fail_since >= TRAPPED_AFTER_S and self.fault != "TRAPPED":
-            self.fault = "TRAPPED"
-            x, y, _ = self.pose
-            rec = {"robot": self.id, "fault": "TRAPPED", "pos": [round(x, 2), round(y, 2)], "t": round(self.t, 1)}
-            self.events.append({"kind": "fault", "robot": self.id, "fault": "TRAPPED"})
-            self.outbox.append(make_bundle(self.id, "CMD", "fault", rec, self.t, 120))
+            self._raise_fault("TRAPPED")
 
     def _plan_to_signal(self):
         """A* back to the newest breadcrumb we can still reach (older ones if rubble cut us off).
