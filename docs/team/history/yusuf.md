@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/ai-scope` (M6) committed, PR not open yet. Next (by 3 AM): survivor figures + bigger/brighter robots, phone tap-a-robot with last crop, liquid-glass pass, rescue route drawing once Rayan's contract lands, then robot's-eye view last.
+- **Working on:** `p3/visual-pass` (M7, stacked on M6 / PR #24): survivor figures, bigger robots, phone tap-a-robot, liquid glass done; robot's-eye view next; rescue route when Rayan's contract lands.
 - **Works on main:** M1 phone + QR (PR #10), M2 network visuals + toasts + T (PR #16), M3 plan editor + safety card (PR #18), M4 scheduler strip + follow cam + F/G (PR #20), M5 relay phone mode (PR #23).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,12 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-07 21:00 · p3/visual-pass · M7 part 1: survivor figures, bigger robots, phone last crop, liquid glass
+- **Did:** survivors are low-poly people lying down in thermal colors (head hottest) with a warm floor glow, pulsing ring and arrival shockwave kept. Robots draw 1.8× with stronger emissive and a colored glow pool (ghosts stay dim). Phone: tap a robot card to see the last thermal crop and verdict it reported (delivered `cmd_view.survivors[]` with `by` = that robot). Liquid glass: frosted overlays on the panes, translucent top bar / sidebar / scheduler, phone cards frosted over a soft color wash.
+- **Contract changes:** none.
+- **Heads-up for others:** robots now look ~0.9 m wide on screen (the physics body is unchanged). Branch is stacked on PR #24 (M6), which still needs merging.
+- **Next:** robot's-eye view (`web/src/three/RobotEye.jsx`), rescue route drawing.
 
 ### 2026-11-07 20:30 · p3/ai-scope · M6 AI detection cards, detector chip, O / resume, phone plan status
 - **Did:** judges now see what the onboard model judged: a card with the crop and verdict when a robot finds a person or rejects a hot spot (Reality), and again when the report reaches Command. O overloads the followed robot's perception, U or a card button sends resume. Tested on main with PR #22 and the CPU model loaded: "Person · 100%" (S3), "Not a person · 0% · hot spot D1 · R2 · rejected", S2 at 88.9%; O → R1 row "perception missed" while safety runs at 0/50 ms; F×3 → SAFE_STOP → resume button → "R2 resumed after safe stop".

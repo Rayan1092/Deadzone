@@ -19,6 +19,8 @@ function Headlight() {
   )
 }
 
+const ROBOT_SCALE = 1.8 // drawn larger than the 0.5 m body so robots read on a projector
+
 function RobotBody({ pose, color, ghost = false, label, sub, headlight = true }) {
   const group = useRef()
   const sensor = useRef()
@@ -41,10 +43,18 @@ function RobotBody({ pose, color, ghost = false, label, sub, headlight = true })
   const op = ghost ? 0.35 : 1
   return (
     <group ref={group} position={target.current.toArray()}>
+      <group scale={ROBOT_SCALE}>
+      {!ghost && (
+        // colored pool of light under the robot so it reads from across the room
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}>
+          <circleGeometry args={[0.42, 32]} />
+          <meshBasicMaterial color={color} transparent opacity={0.35} blending={THREE.AdditiveBlending} depthWrite={false} />
+        </mesh>
+      )}
       <mesh position={[0, 0.16, 0]} castShadow>
         <boxGeometry args={[0.5, 0.18, 0.36]} />
         <meshStandardMaterial color={color} transparent={ghost} opacity={op}
-                              emissive={color} emissiveIntensity={ghost ? 0.1 : 0.25} />
+                              emissive={color} emissiveIntensity={ghost ? 0.1 : 0.7} />
       </mesh>
       {[[-0.15, 0.2], [0.15, 0.2], [-0.15, -0.2], [0.15, -0.2]].map(([x, z], i) => (
         <mesh key={i} position={[x, 0.08, z]} rotation={[Math.PI / 2, 0, 0]}>
@@ -54,11 +64,13 @@ function RobotBody({ pose, color, ghost = false, label, sub, headlight = true })
       ))}
       <mesh ref={sensor} position={[0.05, 0.32, 0]}>
         <cylinderGeometry args={[0.07, 0.07, 0.1, 12]} />
-        <meshStandardMaterial color="#e5e7eb" transparent={ghost} opacity={op} />
+        <meshStandardMaterial color="#e5e7eb" transparent={ghost} opacity={op}
+                              emissive="#ffffff" emissiveIntensity={ghost ? 0 : 0.6} />
       </mesh>
       {!ghost && headlight && <Headlight />}
+      </group>
       {label && (
-        <Html position={[0, 0.8, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
+        <Html position={[0, 0.8 * ROBOT_SCALE, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
           <div className={ghost ? 'tag ghost' : 'tag'}>
             <b>{label}</b>{sub ? <span>{sub}</span> : null}
           </div>
@@ -88,8 +100,36 @@ function Lidar({ robot }) {
 // --------------------------------------------------------------- survivor marker
 const BURST_S = 2.5
 
+// Fixed per-survivor angle so each person lies differently but never jumps between frames.
+function lieAngle(id = '') {
+  let h = 0
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) % 360
+  return (h * Math.PI) / 180
+}
+
+// Low-poly person lying down, colored like a thermal image: head hottest, limbs cooler.
+const HOT = { color: '#ffd166', emissive: '#ffb02e', emissiveIntensity: 1.6, flatShading: true, roughness: 0.7 }
+const WARM = { color: '#ff7a3d', emissive: '#ff4d1a', emissiveIntensity: 1.3, flatShading: true, roughness: 0.7 }
+const COOL = { color: '#c2410c', emissive: '#9a2a0a', emissiveIntensity: 1.0, flatShading: true, roughness: 0.8 }
+function PersonFigure({ id }) {
+  return (
+    <group rotation={[0, lieAngle(id), 0]} scale={1.5}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+        <circleGeometry args={[0.75, 32]} />
+        <meshBasicMaterial color="#ff5a1f" transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
+      <mesh position={[0.44, 0.11, 0]}><icosahedronGeometry args={[0.12, 0]} /><meshStandardMaterial {...HOT} /></mesh>
+      <mesh position={[0.13, 0.1, 0]}><boxGeometry args={[0.4, 0.15, 0.28]} /><meshStandardMaterial {...WARM} /></mesh>
+      <mesh position={[0.16, 0.08, 0.2]} rotation={[0, 0.25, 0]}><boxGeometry args={[0.36, 0.08, 0.08]} /><meshStandardMaterial {...COOL} /></mesh>
+      <mesh position={[0.16, 0.08, -0.2]} rotation={[0, -0.25, 0]}><boxGeometry args={[0.36, 0.08, 0.08]} /><meshStandardMaterial {...COOL} /></mesh>
+      <mesh position={[-0.27, 0.08, 0.075]} rotation={[0, 0.08, 0]}><boxGeometry args={[0.46, 0.1, 0.11]} /><meshStandardMaterial {...COOL} /></mesh>
+      <mesh position={[-0.27, 0.08, -0.075]} rotation={[0, -0.12, 0]}><boxGeometry args={[0.46, 0.1, 0.11]} /><meshStandardMaterial {...COOL} /></mesh>
+    </group>
+  )
+}
+
 // `born` (performance.now ms) plays a shockwave when Command first learns a survivor.
-function Survivor({ pos, label, born }) {
+function Survivor({ pos, label, born, id }) {
   const ring = useRef()
   const shock = useRef()
   const light = useRef()
@@ -110,12 +150,9 @@ function Survivor({ pos, label, born }) {
   })
   return (
     <group position={w2t(pos[0], pos[1], 0)}>
-      <mesh position={[0, 0.35, 0]}>
-        <sphereGeometry args={[0.22, 16, 16]} />
-        <meshStandardMaterial color={COLORS.red} emissive={COLORS.red} emissiveIntensity={2} />
-      </mesh>
+      <PersonFigure id={id} />
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
-        <ringGeometry args={[0.45, 0.6, 32]} />
+        <ringGeometry args={[0.95, 1.12, 48]} />
         <meshBasicMaterial color={COLORS.red} transparent opacity={0.8} side={THREE.DoubleSide} />
       </mesh>
       {born && (
@@ -183,7 +220,7 @@ export function RealityActors() {
       ))}
       <RealityLinks />
       <RealityRelays />
-      {survivors_found.map((s) => <Survivor key={s.id} pos={s.pos} label={`${s.id} found by ${s.by}`} />)}
+      {survivors_found.map((s) => <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} found by ${s.by}`} />)}
       {showTruth && (fp.survivors ?? []).filter((s) => !found.has(s.id)).map((s) => (
         <TruthMarker key={s.id} pos={s.pos} id={s.id} />
       ))}
@@ -215,7 +252,7 @@ export function CommandActors() {
         )
       })}
       <CommandRelays />
-      {survivors.map((s) => <Survivor key={s.id} pos={s.pos} label={`${s.id} reported`} born={births.current.get(s.id)} />)}
+      {survivors.map((s) => <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} reported`} born={births.current.get(s.id)} />)}
     </group>
   )
 }
