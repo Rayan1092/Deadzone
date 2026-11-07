@@ -9,8 +9,8 @@ import numpy as np
 from .command.post import CommandPost
 from .floorplan import FloorPlan, OCC, NOGO
 from .geometry import wrap_angle
-from .network.dtn import drain_outbox
-from .network.propagation import LinkGraph, throughput_bps
+from .network.dtn import DTNNetwork, RELAY_QUEUE_BYTES, make_bundle
+from .network.propagation import LinkGraph
 from .robot.lidar import raycast
 from .robot.robot import Robot
 
@@ -61,6 +61,10 @@ class RobotIO:
         b = self.sim.bodies[self.rid]
         b["cmd_v"], b["cmd_w"] = v, w
 
+    def drop_relay(self):
+        """Place a relay here; robot policy owns inventory and when to drop."""
+        return self.sim.add_relay(self.odometry()["pose"][:2], owner=self.rid)
+
     def thermal(self):
         """Survivors in the forward camera cone with line of sight (sim sensor fallback)."""
         b = self.sim.bodies[self.rid]
@@ -92,6 +96,10 @@ class Sim:
         self.time = 0.0
         self.tick_n = 0
         self.links = LinkGraph()
+        self.network = DTNNetwork()
+        self.network.register("CMD")
+        self.relays = {}
+        self.inboxes = {}  # delivered robot commands, consumed by future robot IO
         self.post = CommandPost(self.fp)
         self.events = []
         self.robots, self.bodies, self.ios = {}, {}, {}
@@ -103,6 +111,8 @@ class Sim:
             self.robots[rid] = Robot(rid, name, color, pose, (self.fp.h, self.fp.w), self.fp.cell,
                                      self.fp.entry, nogo=self.fp.nogo.copy())
             self.ios[rid] = RobotIO(self, rid)
+            self.network.register(rid, self.robots[rid].outbox)
+            self.inboxes[rid] = []
         self._update_links()
 
     # ------------------------------------------------------------------ physics + world
@@ -134,7 +144,39 @@ class Sim:
         nodes = {"CMD": (*self.fp.cmd_pos, self.fp.cmd_tx, True)}
         for rid, b in self.bodies.items():
             nodes[rid] = (b["x"], b["y"], 20.0, True)
+        for rid, relay in self.relays.items():
+            nodes[rid] = (*relay["pos"], 20.0, relay["on"])
         return nodes
+
+    def add_relay(self, pos, owner=None, phone=False):
+        """Backend hook for the robot drop rule and future phone relay controls."""
+        x, y = map(float, pos)
+        if not (math.isfinite(x) and math.isfinite(y) and 0 <= x < self.fp.W and 0 <= y < self.fp.H):
+            raise ValueError("Relay must be inside the floor plan")
+        ix, iy = self.fp.to_cell(x, y)
+        if self.fp.occ[iy, ix] or self.fp.nogo[iy, ix]:
+            raise ValueError("Relay cannot be placed in an obstacle or no-go zone")
+        rid = f"RL{len(self.relays) + 1}"
+        self.relays[rid] = {"id": rid, "pos": [x, y], "owner": owner, "on": True, "phone": bool(phone)}
+        self.network.register(rid, capacity_bytes=RELAY_QUEUE_BYTES)
+        self._relay_telemetry(rid)
+        self.events.append({"kind": "relay_dropped", "id": rid, "pos": [x, y], "owner": owner})
+        self._update_links()
+        return rid
+
+    def set_relay_power(self, rid, on):
+        """Power changes break links without deleting the relay's stored bundles."""
+        relay = self.relays[rid]
+        if relay["on"] == bool(on):
+            return
+        relay["on"] = bool(on)
+        if relay["on"]:
+            self._relay_telemetry(rid)
+        self._update_links()
+
+    def _relay_telemetry(self, rid):
+        payload = dict(self.relays[rid], node_type="relay")
+        self.network.queues[rid].append(make_bundle(rid, "CMD", "telemetry", payload, self.time, 160))
 
     def _update_links(self):
         for a, b, change in self.links.update(self.fp, self._nodes()):
@@ -176,16 +218,12 @@ class Sim:
                         other.inbox.append(dict(b, dst=rid, hops=path, custodian=rid))
 
     def _move_bundles(self, dt):
-        """Single-hop store and forward for the first milestone (multi-hop at 5 PM)."""
-        for rid, robot in self.robots.items():
-            path = self.links.path(rid, "CMD")
-            if not path or not robot.outbox:
-                continue
-            worst = min(self.links.link_rssi(path[i], path[i + 1]) for i in range(len(path) - 1))
-            for bundle in drain_outbox(robot.outbox, throughput_bps(worst) * dt, self.time):
-                bundle["hops"] = path
-                bundle["custodian"] = "CMD"
+        """Only destination deliveries may update a consumer's knowledge."""
+        for bundle in self.network.step(self.links, dt, self.time):
+            if bundle["dst"] == "CMD":
                 self.post.receive(bundle, self.time)
+            else:
+                self.inboxes.setdefault(bundle["dst"], []).append(bundle)
 
     # ------------------------------------------------------------------ views
     def reality_map(self):
@@ -207,9 +245,11 @@ class Sim:
             robots.append(r.telemetry(link))
         found = [rec for r in self.robots.values() for rec in r.found.values()]
         links = self.links.as_list()
-        reality = {"robots": robots, "relays": [], "links": links, "survivors_found": found}
-        stats = {"robots": len(self.robots), "relays": 0, "links_up": sum(1 for l in links if l["up"]),
-                 "delivered": self.post.delivered, "in_flight": sum(len(r.outbox) for r in self.robots.values())}
+        relays = [dict(relay, queue=len(self.network.queues[rid])) for rid, relay in self.relays.items()]
+        reality = {"robots": robots, "relays": relays, "links": links, "survivors_found": found}
+        stats = {"robots": len(self.robots), "relays": len(relays),
+                 "links_up": sum(1 for l in links if l["up"]),
+                 "delivered": self.post.delivered, "in_flight": sum(map(len, self.network.queues.values()))}
         return {"reality": reality, "command": self.post.view(self.time), "stats": stats}
 
     def maps(self):
