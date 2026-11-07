@@ -24,6 +24,7 @@ Match `git config user.email` to a file:
 | yanodiya@gmail.com | `history/rayan.md` | `server/deadzone/robot/`, `ml/`, `data/floorplans/` |
 | a.captain.b@gmail.com, 171593652+acaptainb@users.noreply.github.com | `history/aziz.md` | `sim.py`, `app.py`, `floorplan.py`, `network/`, `command/` |
 | yusnus2007@gmail.com | `history/yusuf.md` | `web/` |
+| rhd4675@g.rit.edu (Rayan's ML session on the testing laptop) | `history/rayan-ml.md` | `ml/`, `server/deadzone/robot/perception.py` |
 
 If your email isn't listed, ask the user which person they are and add the email here.
 
