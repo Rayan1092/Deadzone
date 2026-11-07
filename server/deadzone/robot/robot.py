@@ -12,6 +12,7 @@ from ..geometry import points_in_poly, wrap_angle
 from ..network.dtn import make_bundle
 from . import planning
 from .mapping import OccupancyMap
+from .perception import filter_hits
 from .power import Battery, RESERVE_PCT, wheel_current
 from .scheduler import Scheduler
 
@@ -268,7 +269,8 @@ class Robot:
 
     # ------------------------------------------------------------------ sensing
     def _perceive(self, io):
-        for s in io.thermal():
+        # every hot spot goes through the trained detector (sim sensor fallback if no model)
+        for s in filter_hits(io.thermal()):
             if s["id"] in self.found:
                 continue
             rec = {"id": s["id"], "pos": [round(s["pos"][0], 2), round(s["pos"][1], 2)],
