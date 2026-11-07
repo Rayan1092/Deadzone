@@ -33,19 +33,16 @@ function QR({ value, size }) {
   return <QRCodeSVG value={value} size={size} level="M" marginSize={2} bgColor="#ffffff" fgColor="#14171a" />
 }
 
-export function JoinCard() {
+// Slim top-bar button; the full-screen overlay (Q) has the planner and relay QR codes.
+export function JoinButton() {
   const error = useJoinLoader()
   const url = useSim((s) => s.joinUrl)
   const set = useSim((s) => s.set)
   return (
-    <div className="join-card" onClick={() => url && set({ joinOpen: true })}>
-      {url ? <QR value={link(url, 'planner')} size={92} /> : <div className="join-qr-empty" />}
-      <div className="join-text">
-        <b>Plan on your phone</b>
-        <span className="muted small">{url ? 'Scan, then draw search zones' : error || 'Loading link'}</span>
-        {url && <span className="muted small">Press Q for relay QR</span>}
-      </div>
-    </div>
+    <button className="join-btn" disabled={!url} title={url ? 'Phone QR codes (Q)' : error || 'Loading join link'}
+            onClick={() => set({ joinOpen: true })}>
+      Join on phone
+    </button>
   )
 }
 

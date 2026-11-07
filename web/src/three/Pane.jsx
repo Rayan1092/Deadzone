@@ -75,19 +75,27 @@ export default function Pane({ which, title, subtitle }) {
   const showTruth = useSim((s) => s.showTruth)
   const follow = useSim((s) => s.follow)
   const perf = useSim((s) => s.perf)
+  const delivered = useSim((s) => s.tick?.stats.delivered ?? 0)
+  const waiting = useSim((s) => s.tick?.stats.in_flight ?? 0)
   return (
     <div className={`pane pane-${which}`}>
       <div className="pane-title">
         <span className={`dot ${which}`} />
         <b>{title}</b>
         <span className="muted">{subtitle}</span>
+        {which === 'command' && (
+          <span className="pane-stats mono" title="Bundles delivered to the command post · still in transit">
+            {delivered.toLocaleString()} delivered · {waiting} in transit
+          </span>
+        )}
         {which === 'reality' && showTruth && <span className="truth-chip">Truth overlay · T</span>}
         {follow && <span className="follow-chip">{which === 'reality' ? `Following ${follow}` : `${follow} last report`} · 0</span>}
       </div>
       {which === 'reality' && (
         <div className="pane-legend">
-          <span><i className="lg-link up" />Link</span>
-          <span><i className="lg-link weak" />Weak link</span>
+          <span><i className="lg-link home" />Path home</span>
+          <span><i className="lg-link up" />Radio link</span>
+          <span><i className="lg-link weak" />Weak</span>
           <span><i className="lg-link down" />No link</span>
           <span><i className="lg-relay" />Relay</span>
         </div>

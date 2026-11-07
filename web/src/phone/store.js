@@ -46,6 +46,9 @@ export function handlePhoneMessage(msg) {
       s.set({ relay: data, relayPending: s.relayPending === data.on ? null : s.relayPending })
       break
     case 'safety':
+      // Only answer a check this phone asked for: a laptop preload (POST /api/plan) or
+      // another phone's check would otherwise show a rejection before anyone tapped.
+      if (!s.checking) break
       s.set({ safety: data, checking: false })
       break
     case 'error':

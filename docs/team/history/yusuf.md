@@ -3,19 +3,25 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/replay` committed: browser-side record/replay backup. Next: rehearsal fixes on the demo laptop and phones.
-- **Works on main:** M1–M8 (#10, #16, #18, #20, #23, #24, #26, #27). With Aziz's #28: real crop images in the AI cards, detector chip, rescue routes on Command and phones from delivered data.
+- **Working on:** UI design pass. `p3/ui-calm` (Steps 0–1: preload spoiler fix + declutter) committed; next Step 2 Command pane as a blueprint, Step 3 bloom/materials.
+- **Works on main:** M1–M8 and replay (#10, #16, #18, #20, #23, #24, #26, #27, #31). With #28: real crop images, detector chip, routes on Command and phones.
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
   - Detector chip in the top bar from `hello.detector` (hidden until the server sends it).
   - Keys O (`do:"overload"`) and U (`do:"resume"`), plus a "Send resume command" button on a robot card in SAFE_STOP. Key list moved to the sidebar.
   - Phone robot cards: "Following P-1 · zone Z1 (last report)" from delivered `cmd_view.robots[].plan_id/zone` (PR #22).
-- **Blocked on / need from others:** nothing. (#28 delivered `/crops`, `hello.detector`, `command.routes`; my duplicate #30 was closed. Rayan's #29 adds V and P to DEMO.md.)
+- **Blocked on / need from others:** nothing.
 - **Promises to others:**
   - Rayan's asks (19:50 entry): 1 bigger/brighter robots: yes, 3 AM. 2 robot's-eye view: **Yusuf keeps it** (`web/src/three/RobotEye.jsx`), built last, cut first. 3 phone tap-a-robot with `cmd_view.survivors[].crop`: yes, 3 AM. 4 liquid glass: yes, started on the detection cards, full pass by 3 AM. 5 rescue route on Command: yes, as soon as the contract is posted.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-07 23:30 · p3/ui-calm · Preload spoiler fix (Rayan's ask) + calm declutter pass
+- **Did:** Step 0, Rayan's quiet-preload ask, done in the frontend: phones only show a safety result for a check they ran themselves, and the big screen hides a `safety_reject` that arrives within 1 s of a fresh `plan_state` (the signature of `POST /api/plan`, which saves and checks in one request). The phone no longer re-saves an unchanged draft before checking. Tested: preload → phone shows "Ready to check P-1", big screen silent; judge taps Run safety check → phone "Safety check failed" + big-screen headline and feed line. Step 1 declutter: one headline at a time (ranked, survivor news never bumped), one AI card per pane, links faint except each robot's path home in its color (server routing rules), relays unlabeled and pulsing only while carrying data, lidar as one soft fan per robot, robot tags name only (dBm moved to signal bars), survivor labels/pulses for 10 s then calm, shockwave only when Command learns a survivor, antenna pulse only for survivor/route/fault deliveries, compact robot cards (followed card expands), QR card → "Join on phone" button, key list → `?` overlay, network stats in the Command pane title, feed 10 lines.
+- **Contract changes:** none. New key `?` (also H) for the key list.
+- **Heads-up for others:** Rayan: the P-1 preload in DEMO.md can stay as is (no `?check=false` needed); the judges' own check is now the first rejection anyone sees. The sidebar no longer has the QR card: press Q or click "Join on phone".
+- **Next:** Step 2 (Command pane as a blueprint), Step 3 (bloom + materials).
 
 ### 2026-11-07 22:40 · p3/replay · Browser record/replay backup, key list fix
 - **Did:** demo backup #3 without a server. Open the big screen with `?record`: a REC chip shows time and size, **S** saves the WebSocket stream as a gzipped JSON file. Open `/?replay` and drop the file in (or `/?replay=<url>`): it plays through the same store with the original timing; Space pauses, Backspace restarts, +/- change playback speed; the QR card and live pill are hidden. Tested: 34 s live recording 27.4 MB raw → 1.8 MB gzipped, round-trips through the loader (2,396 frames, starts with `hello`); a 40 s recording replays with routes, cards and toasts. The loader sniffs gzip magic bytes because the dev server sends `.gz` with `Content-Encoding: gzip`. Also added P and S to the sidebar key list (P was silently missing since M8) and dropped the static robot count so the top bar fits in record/replay.

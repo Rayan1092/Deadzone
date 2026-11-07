@@ -82,21 +82,26 @@ function RobotBody({ pose, color, ghost = false, label, sub, headlight = true })
   )
 }
 
-// --------------------------------------------------------------- lidar rays
+// --------------------------------------------------------------- lidar coverage
+// What the lidar sees right now, as one soft fan in the robot's color (a visibility
+// polygon from the beam endpoints) instead of dozens of individual rays.
 function Lidar({ robot }) {
   const geom = useMemo(() => new THREE.BufferGeometry(), [])
   const perf = useSim((s) => s.perf)
   const [x, y] = robot.pose
-  const pts = []
-  for (const [lx, ly] of perf ? robot.lidar.filter((_, i) => i % 2 === 0) : robot.lidar) {
-    pts.push(x, 0.3, -y, lx, 0.3, -ly)
-  }
+  const ends = perf ? robot.lidar.filter((_, i) => i % 2 === 0) : robot.lidar
+  if (ends.length < 3) return null
+  const pts = [x, 0.05, -y]
+  for (const [lx, ly] of ends) pts.push(lx, 0.05, -ly)
+  const index = []
+  for (let i = 1; i <= ends.length; i++) index.push(0, i, (i % ends.length) + 1)
   geom.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
+  geom.setIndex(index)
   geom.computeBoundingSphere()
   return (
-    <lineSegments geometry={geom}>
-      <lineBasicMaterial color={COLORS.teal} transparent opacity={0.18} />
-    </lineSegments>
+    <mesh geometry={geom} renderOrder={1}>
+      <meshBasicMaterial color={robot.color} transparent opacity={0.09} depthWrite={false} side={THREE.DoubleSide} />
+    </mesh>
   )
 }
 
@@ -132,24 +137,29 @@ export function PersonFigure({ id }) {
 }
 
 // `born` (performance.now ms) plays a shockwave when Command first learns a survivor.
-function Survivor({ pos, label, born, id }) {
+const SETTLE_S = 10 // seconds a new survivor pulses and keeps its label
+
+function Survivor({ pos, label, born, id, burst = false }) {
   const ring = useRef()
   const shock = useRef()
   const light = useRef()
+  const tag = useRef()
   useFrame(({ clock }) => {
-    const s = 1 + 0.5 * ((clock.elapsedTime * 1.2) % 1)
+    const age = born ? (performance.now() - born) / 1000 : SETTLE_S
+    const fresh = age < SETTLE_S
     if (ring.current) {
+      const s = fresh ? 1 + 0.5 * ((clock.elapsedTime * 1.2) % 1) : 1
       ring.current.scale.set(s, s, s)
-      ring.current.material.opacity = 1.2 - s * 0.7
+      ring.current.material.opacity = fresh ? 1.2 - s * 0.7 : 0.35
     }
-    const age = born ? (performance.now() - born) / 1000 : BURST_S
+    if (tag.current) tag.current.style.display = fresh ? '' : 'none'
     const k = Math.min(1, age / BURST_S)
     if (shock.current) {
       shock.current.visible = k < 1
       shock.current.scale.setScalar(1 + k * 9)
       shock.current.material.opacity = 0.9 * (1 - k)
     }
-    if (light.current) light.current.intensity = 3 + 25 * (1 - k)
+    if (light.current) light.current.intensity = 3 + (burst ? 25 * (1 - k) : 0)
   })
   return (
     <group position={w2t(pos[0], pos[1], 0)}>
@@ -158,7 +168,7 @@ function Survivor({ pos, label, born, id }) {
         <ringGeometry args={[0.95, 1.12, 48]} />
         <meshBasicMaterial color={COLORS.red} transparent opacity={0.8} side={THREE.DoubleSide} />
       </mesh>
-      {born && (
+      {burst && born && (
         <mesh ref={shock} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]}>
           <ringGeometry args={[0.5, 0.62, 48]} />
           <meshBasicMaterial color="#fecaca" transparent side={THREE.DoubleSide} depthWrite={false} />
@@ -166,7 +176,7 @@ function Survivor({ pos, label, born, id }) {
       )}
       <pointLight ref={light} position={[0, 0.8, 0]} color={COLORS.red} intensity={3} distance={4} />
       <Html position={[0, 1.1, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
-        <div className="tag alert"><b>{label}</b></div>
+        <div ref={tag} className="tag alert"><b>{label}</b></div>
       </Html>
     </group>
   )
@@ -200,31 +210,41 @@ function firstFinds(records) {
   return [...byId.values()]
 }
 
+// When each survivor id first appeared in a list, so new ones pulse and fade calm.
+function useBirths(ids) {
+  const births = useRef(new Map())
+  for (const id of births.current.keys()) if (!ids.includes(id)) births.current.delete(id) // reset
+  for (const id of ids) if (!births.current.has(id)) births.current.set(id, performance.now())
+  return births.current
+}
+
 export function RealityActors() {
   const tick = useSim((s) => s.tick)
   const fp = useSim((s) => s.floorplan)
   const showTruth = useSim((s) => s.showTruth)
+  const survivors_found = firstFinds(tick?.reality.survivors_found ?? [])
+  const births = useBirths(survivors_found.map((s) => s.id))
   if (!tick || !fp) return null
   const { robots } = tick.reality
-  const survivors_found = firstFinds(tick.reality.survivors_found)
   const found = new Set(survivors_found.map((s) => s.id))
   return (
     <group>
       {robots.map((r) => (
         <group key={r.id}>
-          <RobotBody pose={r.pose} color={r.color} label={r.name}
-                     sub={r.link.up ? `${r.link.rssi} dBm` : 'NO LINK'} />
+          <RobotBody pose={r.pose} color={r.color} label={r.name} sub={r.link.up ? null : 'no link'} />
           <Lidar robot={r} />
           {r.path.length > 1 && (
             <Line points={[[r.pose[0], 0.06, -r.pose[1]], ...r.path.map(([px, py]) => [px, 0.06, -py])]}
-                  color={r.color} lineWidth={1.5} dashed dashSize={0.25} gapSize={0.15} transparent opacity={0.7} />
+                  color={r.color} lineWidth={1.2} dashed dashSize={0.25} gapSize={0.15} transparent opacity={0.45} />
           )}
         </group>
       ))}
       <RealityLinks />
       <RealityRelays />
       <RealityRoutes />
-      {survivors_found.map((s) => <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} found by ${s.by}`} />)}
+      {survivors_found.map((s) => (
+        <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} found by ${s.by}`} born={births.get(s.id)} />
+      ))}
       {showTruth && (fp.survivors ?? []).filter((s) => !found.has(s.id)).map((s) => (
         <TruthMarker key={s.id} pos={s.pos} id={s.id} />
       ))}
@@ -238,12 +258,9 @@ export function RealityActors() {
 export function CommandActors() {
   const tick = useSim((s) => s.tick)
   const time = useSim((s) => s.time)
-  const births = useRef(new Map()) // survivor id -> when Command first learned it
+  const births = useBirths((tick?.command.survivors ?? []).map((s) => s.id)) // when Command first learned each
   if (!tick) return null
   const { robots, survivors } = tick.command
-  const ids = new Set(survivors.map((s) => s.id))
-  for (const id of births.current.keys()) if (!ids.has(id)) births.current.delete(id) // reset
-  for (const s of survivors) if (!births.current.has(s.id)) births.current.set(s.id, performance.now())
   return (
     <group>
       {robots.map((r) => {
@@ -251,13 +268,14 @@ export function CommandActors() {
         const ghost = stale > 3
         return (
           <RobotBody key={r.id} pose={r.pose} color={ghost ? '#94a3b8' : '#2dd4bf'} ghost={ghost}
-                     headlight={false} label={r.id}
-                     sub={ghost ? `last seen ${stale.toFixed(0)}s ago` : r.state.replaceAll('_', ' ').toLowerCase()} />
+                     headlight={false} label={r.id} sub={ghost ? `${stale.toFixed(0)}s ago` : null} />
         )
       })}
       <CommandRelays />
       <CommandRoutes />
-      {survivors.map((s) => <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} reported`} born={births.current.get(s.id)} />)}
+      {survivors.map((s) => (
+        <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} reported`} born={births.get(s.id)} burst />
+      ))}
     </group>
   )
 }

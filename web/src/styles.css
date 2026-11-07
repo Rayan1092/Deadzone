@@ -243,3 +243,51 @@ button:hover { border-color: var(--teal); }
 .replay-box > b { font-size: 22px; }
 .replay-pick { padding: 10px 20px; border-radius: 20px; background: var(--teal); color: #00201c; font-weight: 600; cursor: pointer; }
 .replay-error { color: var(--red); font-size: 13px; }
+
+/* ---------------------------------------------------------------- calm pass (Step 1) */
+/* one headline instead of a toast stack */
+.toast.headline { font-size: 17px; font-weight: 600; padding: 12px 20px; border-radius: 14px; letter-spacing: .005em; }
+.toast.headline i { width: 10px; height: 10px; }
+.toast.route i { background: #facc15; box-shadow: 0 0 10px #facc15; }
+.toast.route { border-color: rgba(250,204,21,.45); }
+
+/* top bar buttons */
+.join-btn, .icon-btn { padding: 6px 12px; }
+.icon-btn { width: 32px; padding: 6px 0; font-weight: 700; }
+.join-btn:disabled { opacity: .45; cursor: default; }
+
+/* command pane stats live in its title */
+.pane-stats { font-size: 11px; color: var(--amber); opacity: .85; }
+
+/* robot cards: signal bars, details only on the followed card */
+.sig { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+.sig i { width: 4px; border-radius: 1px; background: #343c44; }
+.sig i:nth-child(1) { height: 5px; } .sig i:nth-child(2) { height: 8px; }
+.sig i:nth-child(3) { height: 11px; } .sig i:nth-child(4) { height: 14px; }
+.sig i.on { background: var(--teal); }
+.sig.none { font-size: 11px; color: var(--red); align-items: center; }
+.robot-card .bar { margin-bottom: 0; }
+.robot-detail { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.robot-detail .row { display: flex; justify-content: space-between; gap: 8px; }
+.robot-detail .following { color: var(--teal); }
+
+/* legend for the new link styles */
+.lg-link.home { border-top: 3px solid var(--teal); }
+.lg-link.up { border-top: 1px solid rgba(203,213,225,.55); }
+.lg-link.weak { border-top: 1px solid rgba(245,158,11,.8); }
+
+/* key list overlay */
+.help-overlay { position: fixed; inset: 0; z-index: 55; display: grid; place-items: center; background: rgba(12,14,17,.75); }
+.help-box { display: flex; flex-direction: column; gap: 14px; padding: 24px 28px; border-radius: 16px; min-width: 340px;
+  background: var(--glass-strong); border: 1px solid var(--glass-edge); box-shadow: 0 16px 40px rgba(0,0,0,.5), var(--glass-hi);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+.help-box > b { font-size: 18px; }
+.help-box .keys { margin-top: 0; font-size: 13px; }
+
+/* scheduler colors a step quieter; misses stay loud */
+.slice.task:not(.missed) { opacity: .78; }
+
+/* pane titles stay one line; the AI card sits above the legend row */
+.pane-title { white-space: nowrap; max-width: calc(100% - 24px); }
+.pane-title .muted { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.det-cards { bottom: 50px; }

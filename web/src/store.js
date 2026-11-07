@@ -6,10 +6,14 @@ const TOAST_KINDS = new Set(['survivor_found', 'survivor_reported', 'link_lost',
   'relay_dropped', 'fault', 'rubble_fall', 'safety_reject', 'plan_dispatched', 'plan_applied', 'resumed',
   'rescue_route', 'rescue_route_reported'])
 const COLLAPSE_KINDS = new Set(['replan', 'deadline_miss'])
+// Deliveries worth an antenna pulse; telemetry and map patches arrive several times a second.
+const BIG_DELIVERIES = new Set(['survivor', 'rescue_route', 'fault'])
 // Radio edges flap constantly and every CMD delivery is an event (several per second);
 // keeping them would push the real stories out of the capped feed.
 const SKIP_KINDS = new Set(['link_up', 'link_down', 'bundle_delivered'])
 let eventId = 0
+let planSavedAt = 0
+const PRELOAD_WINDOW_MS = 1000
 
 function readPerf() {
   try { return localStorage.getItem('dz-perf') === '1' } catch { return false }
@@ -34,6 +38,7 @@ export const useSim = create((set) => ({
   events: [],          // newest first, capped
   toasts: [],          // { id, kind, ... } oldest first, removed by Toasts after a few seconds
   joinOpen: false,     // full screen QR overlay (Q key)
+  helpOpen: false,     // key list overlay (? key)
   joinUrl: null,       // phone join URL from /api/join
   showTruth: false,    // T key: faint truth survivors on the Reality pane only
   plan: null,          // shared search plan from plan_state (null when none)
@@ -45,6 +50,7 @@ export const useSim = create((set) => ({
   detector: null,      // { mode: 'model' | 'sim', reason } from hello, null until the server sends it
   detections: [],      // AI detection cards: { eid, side: 'reality' | 'command', verdict, crop, conf, ... }
   routes: {},          // Reality rescue routes from robot `rescue_route` events, by survivor id
+  bigDeliveries: 0,    // count of survivor / route / fault reports delivered to CMD (antenna pulse)
   perf: readPerf(),    // P key: lighter rendering for a slow demo laptop (remembered per browser)
   recorder: null,      // ?record: { frames, ms, bytes } of the captured stream
   replay: null,        // ?replay: { loaded, playing, rate, pos, dur, ended }
@@ -105,7 +111,14 @@ export function handleMessage(msg) {
                       version: s.maps.version + 1 } })
       break
     case 'event': {
+      if (data.kind === 'bundle_delivered' && BIG_DELIVERIES.has(data.bundle_kind)) {
+        s.set({ bigDeliveries: s.bigDeliveries + 1 })
+      }
       if (SKIP_KINDS.has(data.kind)) break
+      // POST /api/plan saves and checks in one request, so its rejection lands right after
+      // plan_state. That is the demo's laptop preload: keep it off screen so the judges'
+      // own "Run safety check" is the first rejection anyone sees.
+      if (data.kind === 'safety_reject' && Date.now() - planSavedAt < PRELOAD_WINDOW_MS) break
       // eid, not id: some events (relay_dropped) carry their own id field
       const ev = { ...data, time, eid: ++eventId }
       // every robot that sees a survivor reports it; only the first sighting is news
@@ -122,13 +135,14 @@ export function handleMessage(msg) {
       const card = detectionCard(ev, repeat, s.tick)
       if (card) s.set({ detections: [...s.detections, card].slice(-6) })
       s.set({ events: events.slice(0, 40),
-              ...(TOAST_KINDS.has(ev.kind) && !repeat ? { toasts: [...s.toasts, { ...ev, at: Date.now() }].slice(-5) } : {}) })
+              ...(TOAST_KINDS.has(ev.kind) && !repeat ? { toasts: [...s.toasts, { ...ev, at: Date.now() }].slice(-8) } : {}) })
       break
     }
     case 'report':
       s.set({ report: data })
       break
     case 'plan_state':
+      planSavedAt = Date.now()
       s.set({ plan: data })
       break
     case 'control':
