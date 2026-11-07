@@ -2,10 +2,14 @@
 
 Each robot runs these tasks on its onboard computer. The sim tick is one 100 ms frame. We
 simulate the frame at 1 ms resolution and report the execution slices so the big screen can
-draw a task timeline. A preempted job shows up as several slices with the same name.
+draw a task timeline. A preempted job shows up as several slices with the same name. Jobs that
+do not finish in a frame carry over to the next one.
 
 Contract (robot telemetry `tasks`): list of {name, start, dur, missed}, start and dur in
-virtual ms within the frame (0 to 100), missed = that job overran its deadline.
+virtual ms within the frame (0 to 100), missed = the job behind that slice is past its deadline.
+
+Overrun policy: if a task's previous job is still unfinished when the next one is released, the
+new release is skipped and counted as a miss (bounded queue, like a real frame-skip policy).
 """
 import math
 
@@ -38,40 +42,82 @@ def hyperperiod_frames(tasks=TASKS):
     return max(1, lcm // FRAME_MS)
 
 
+class Job:
+    __slots__ = ("prio", "name", "left", "deadline", "missed")
+
+    def __init__(self, prio, name, wcet, deadline):
+        self.prio, self.name, self.left, self.deadline, self.missed = prio, name, wcet, deadline, False
+
+
 class Scheduler:
     def __init__(self, tasks=TASKS):
         self.tasks = list(tasks)
         self.cycle = hyperperiod_frames(self.tasks)   # 1000 ms = 10 frames for the plan table
+        self.wcet = {name: c for name, _, c in self.tasks}
+        self.jobs = []                 # unfinished jobs carried between frames
+        self.misses = {name: 0 for name in NAMES}
+        self.new_misses = []           # task names that missed a deadline in the last frame
         self._cache = {}
 
-    def run_frame(self, frame):
-        """Slices for frame number `frame`. With no overrun nothing carries over between frames,
-        so the schedule repeats every hyperperiod and is cached (treat the result as read-only)."""
-        key = frame % self.cycle
-        if key not in self._cache:
-            self._cache[key] = self._simulate(key)
-        return self._cache[key]
+    def set_wcet(self, name, ms):
+        self.wcet[name] = int(ms)
 
-    def _simulate(self, frame):
-        """Simulate frame number `frame` (global time frame*100 ms) at 1 ms resolution."""
+    def reset_wcet(self, name):
+        self.wcet[name] = next(c for n, _, c in self.tasks if n == name)
+
+    def nominal(self):
+        return all(self.wcet[n] == c for n, _, c in self.tasks)
+
+    def run_frame(self, frame):
+        """Slices for frame number `frame`. A clean nominal frame (nothing carried over, plan
+        WCETs) repeats every hyperperiod, so it is cached. Treat the result as read-only."""
+        if not self.jobs and self.nominal():
+            key = frame % self.cycle
+            if key not in self._cache:
+                slices, left = self._simulate(key)
+                if left:                     # cannot happen at U = 0.377, but stay correct
+                    self.jobs = left
+                    return slices
+                self._cache[key] = slices
+            self.new_misses = []
+            return self._cache[key]
+        slices, self.jobs = self._simulate(frame, self.jobs)
+        return slices
+
+    def _simulate(self, frame, carried=()):
         t0 = frame * FRAME_MS
-        jobs = []      # [priority, name, remaining, deadline_ms]
-        slices = []
+        jobs = list(carried)
+        slices, last = [], None
+        self.new_misses = []
         for ms in range(FRAME_MS):
             now = t0 + ms
-            for prio, (name, period, wcet) in enumerate(self.tasks):
-                if now % period == 0:
-                    jobs.append([prio, name, wcet, now + period])
-            ready = [j for j in jobs if j[2] > 0]
-            if not ready:
+            for prio, (name, period, _) in enumerate(self.tasks):
+                if now % period:
+                    continue
+                if any(j.name == name for j in jobs):
+                    self._miss(name)          # previous job overran: skip this release
+                    continue
+                jobs.append(Job(prio, name, self.wcet[name], now + period))
+            for j in jobs:
+                if not j.missed and now >= j.deadline:
+                    j.missed = True
+                    self._miss(j.name)
+            if not jobs:
+                last = None
                 continue
-            job = min(ready, key=lambda j: (j[0], j[3]))
-            job[2] -= 1
-            missed = now + 1 > job[3]
-            if slices and slices[-1]["name"] == job[1] and slices[-1]["start"] + slices[-1]["dur"] == ms \
-                    and slices[-1]["_job"] is job:
+            job = min(jobs, key=lambda j: (j.prio, j.deadline))
+            job.left -= 1
+            if last is job:
                 slices[-1]["dur"] += 1
-                slices[-1]["missed"] = slices[-1]["missed"] or missed
+                slices[-1]["missed"] = slices[-1]["missed"] or job.missed
             else:
-                slices.append({"name": job[1], "start": ms, "dur": 1, "missed": missed, "_job": job})
-        return [{k: v for k, v in s.items() if k != "_job"} for s in slices]
+                slices.append({"name": job.name, "start": ms, "dur": 1, "missed": job.missed})
+            last = job
+            if job.left <= 0:
+                jobs.remove(job)
+                last = None
+        return slices, jobs
+
+    def _miss(self, name):
+        self.misses[name] += 1
+        self.new_misses.append(name)
