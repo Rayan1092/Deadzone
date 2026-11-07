@@ -3,19 +3,25 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/visual-pass` (M7, stacked on M6 / PR #24): figures, bigger robots, phone last crop, liquid glass and robot's-eye view committed. Rescue route drawing when Rayan's contract lands; then rehearsal fixes and the replay fallback.
-- **Works on main:** M1 phone + QR (PR #10), M2 network visuals + toasts + T (PR #16), M3 plan editor + safety card (PR #18), M4 scheduler strip + follow cam + F/G (PR #20), M5 relay phone mode (PR #23).
+- **Working on:** `p3/rescue-route` (M8) committed: rescue routes on all three views + P performance mode. Next: rehearsal fixes with the team on the demo laptop.
+- **Works on main:** M1 phone + QR (#10), M2 network visuals (#16), M3 plan editor (#18), M4 scheduler + follow cam (#20), M5 relay phone (#23), M6 AI detection cards + O/U (#24), M7 figures, glass, robot's-eye view (#26).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
   - Detector chip in the top bar from `hello.detector` (hidden until the server sends it).
   - Keys O (`do:"overload"`) and U (`do:"resume"`), plus a "Send resume command" button on a robot card in SAFE_STOP. Key list moved to the sidebar.
   - Phone robot cards: "Following P-1 · zone Z1 (last report)" from delivered `cmd_view.robots[].plan_id/zone` (PR #22).
-- **Blocked on / need from others:** Aziz: `/crops/<file>` static route (cards show a placeholder until then) and `hello.detector` (chip hidden until then). Rayan: `rescue_route` contract.
+- **Blocked on / need from others:** Aziz: `command.routes` + phone `cmd_view.routes` + `rescue_route_reported` (Command and phone route drawing is built and waiting), `/crops/<file>` (card images), `hello.detector` (chip). Aziz: are you still doing recorder/replay? If not, I can add a browser-side `?record` / `?replay` fallback in `web/`.
 - **Promises to others:**
   - Rayan's asks (19:50 entry): 1 bigger/brighter robots: yes, 3 AM. 2 robot's-eye view: **Yusuf keeps it** (`web/src/three/RobotEye.jsx`), built last, cut first. 3 phone tap-a-robot with `cmd_view.survivors[].crop`: yes, 3 AM. 4 liquid glass: yes, started on the detection cards, full pass by 3 AM. 5 rescue route on Command: yes, as soon as the contract is posted.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-07 21:45 · p3/rescue-route · M8 rescue routes on all views, performance mode
+- **Did:** Reality draws each robot's `rescue_route` event as a bright yellow dashed line from the entrance to the survivor with "Route to S1 · 49.6 m" and a pulsing "RL5 beacon" ring on the beacon relay; toast/feed "R1 planned a safe route to S1". Command draws only delivered `command.routes[]` and the phone map only `cmd_view.routes[]` (same style, beacon ring), both empty until the backend sends them. P toggles performance mode (no shadows, dpr 1, half the lidar rays, no headlights; remembered per browser, top-bar chip); default dpr capped at 1.5. Top bar stays one line. Tested on main (PR #25): S3 14.2 m at 0:18, S2 38.2 m, S1 49.6 m with beacon RL5 in the cage; Command shows none.
+- **Contract changes:** none new. Consumes Rayan's `rescue_route` event and the agreed `command.routes` / `cmd_view.routes` / `rescue_route_reported`. New key P.
+- **Heads-up for others:** Aziz: route drawing on Command and phones lights up as soon as `routes` appear in the Command view; please keep Rayan's field names (`survivor, by, path, length_m, clearance_m, beacon, reported_t`). Demo laptop: press P if the big screen stutters. Rayan: DEMO.md can add V (robot camera) and P.
+- **Next:** rehearsal fixes.
 
 ### 2026-11-07 21:20 · p3/visual-pass · M7 part 2: robot's-eye view
 - **Did:** V (or a robot card's Camera button) opens a small picture-in-picture on the Reality pane from that robot's forward camera (Reality telemetry pose, smoothed). Thermal toggle: walls cold blue, survivors glow white-hot and decoys glow amber, so judges see why the detector has to decide. It is a third small WebGL canvas (dpr 1, low-power) that only exists while open.

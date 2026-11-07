@@ -205,3 +205,4 @@
 .safety.fail { background: rgba(239,68,68,.11); }
 .safety.sent { background: rgba(45,212,191,.1); }
 .editor, .region-row, .relay-stats > div, .neighbor, .last-crop { background: rgba(255,255,255,.05); }
+.sw.route { height: 0; border-top: 3px dashed #facc15; border-radius: 0; }

@@ -1,5 +1,5 @@
 import { Fragment, useEffect } from 'react'
-import { useSim } from '../store'
+import { setPerf, useSim } from '../store'
 import { control } from '../net/socket'
 import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt } from '../format'
 import { JoinCard } from './JoinPanel'
@@ -22,6 +22,7 @@ export function TopBar() {
   const running = useSim((s) => s.running)
   const speed = useSim((s) => s.speed)
   const detector = useSim((s) => s.detector)
+  const perf = useSim((s) => s.perf)
   return (
     <header className="topbar">
       <div className="brand">DEADZONE</div>
@@ -36,6 +37,7 @@ export function TopBar() {
           Detector: {detector.mode === 'model' ? 'AI model' : 'sim fallback'}
         </span>
       )}
+      {perf && <span className="perf-chip" title="Press P to turn off">Performance mode</span>}
       <div className="stats">
         <span><b>{stats?.robots ?? 0}</b> robots</span>
         <span><b>{stats?.relays ?? 0}</b> relays</span>
@@ -138,6 +140,7 @@ export function useKeyboard() {
       if (key === 'q') s.set({ joinOpen: !s.joinOpen })
       if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null })
       if (key === 'v' && target) s.set({ eyeRobot: s.eyeRobot === target.id ? null : target.id })
+      if (key === 'p') setPerf(!s.perf)
       if (key === 't') s.set({ showTruth: !s.showTruth })
       if (e.code === 'Space') { e.preventDefault(); control('toggle') }
       if (e.code === 'Backspace') control('reset')

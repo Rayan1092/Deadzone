@@ -59,6 +59,7 @@ function Legend() {
       <span><i className="sw relay" />Relay</span>
       <span><i className="sw survivor" />Survivor</span>
       <span><i className="sw ghost" />Old report</span>
+      <span><i className="sw route" />Rescue route</span>
     </div>
   )
 }
