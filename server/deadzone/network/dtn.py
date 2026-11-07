@@ -5,6 +5,8 @@ Until then the sender retains custody. An interrupted hop restarts on reconnect;
 ack packets themselves have no simulated latency or loss yet.
 """
 import itertools
+import json
+from copy import deepcopy
 
 from .propagation import throughput_bps
 
@@ -64,6 +66,30 @@ class DTNNetwork:
             self._seen[node] = {bid: expiry for bid, expiry in self._seen[node].items()
                                 if now <= expiry}
         self._delivered = {bid: expiry for bid, expiry in self._delivered.items() if now <= expiry}
+
+    def fanout_telemetry(self, bundle, destinations, ttl):
+        """Queue source-owned unicast copies; never deliver by inspecting links.
+
+        A recipient suffix makes bids distinct from the CMD report and from each
+        other, while repeated fanout of the same report remains idempotent.
+        """
+        src = bundle["src"]
+        recipients = sorted(set(destinations) - {src, bundle["dst"]})
+        if bundle["kind"] != "telemetry" or bundle["custodian"] != src or bundle["hops"] != [src]:
+            raise ValueError("Only source-owned telemetry can be fanned out")
+        if src not in self.queues or any(dst not in self.queues for dst in recipients):
+            raise ValueError("Telemetry source and recipients must be registered")
+        # Robot telemetry used to have a fixed 120-byte estimate. Account for
+        # variable targets/relay lists on both the CMD report and peer copies.
+        bundle["size"] = max(bundle["size"], len(json.dumps(bundle["payload"], separators=(",", ":")).encode()) + 64)
+        queued = {b["bid"] for b in self.queues[src]}
+        for dst in recipients:
+            bid = f"{bundle['bid']}/{dst}"
+            if bid in queued or bid in self._seen[src]:
+                continue
+            self.queues[src].append(dict(bundle, bid=bid, dst=dst,
+                ttl=min(bundle["ttl"], ttl), hops=[src], payload=deepcopy(bundle["payload"])))
+            queued.add(bid)
 
     def _accept(self, node, bundle):
         """Return a custody ack only after storage, or for an already stored bid."""
