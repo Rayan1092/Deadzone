@@ -5,6 +5,7 @@ import { useSim } from '../store'
 import Building from './Building'
 import Fog from './Fog'
 import { w2t } from './util'
+import { latestRoutes } from '../format'
 
 // Gap view corner inset: what the command post knows, as a top-down blueprint.
 // Only delivered data; the floorplan drawn without truth rubble.
@@ -45,7 +46,7 @@ function Known() {
   if (!cmd) return null
   return (
     <group>
-      {(cmd.routes ?? NONE).map((r) => (
+      {latestRoutes(cmd.routes ?? NONE).map((r) => (
         <Line key={r.survivor} points={r.path.map(([x, y]) => w2t(x, y, 1.9))} color="#facc15" lineWidth={2} />
       ))}
       {cmd.relays.map((r) => <Dot key={r.id} pos={r.pos} color="#b7791f" r={0.4} />)}

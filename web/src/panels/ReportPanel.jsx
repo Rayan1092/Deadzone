@@ -16,11 +16,37 @@ export async function requestReport() {
   }
 }
 
+// Read the briefing aloud on the big screen (G is a key press, so the browser allows it).
+// Remembered per browser; markdown symbols are dropped so the voice doesn't read them.
+function readSpeak() {
+  try { return localStorage.getItem('dz-speak') !== '0' } catch { return true }
+}
+function speak(text) {
+  const synth = window.speechSynthesis
+  if (!synth) return
+  synth.cancel()
+  const u = new SpeechSynthesisUtterance(text.replace(/[*#_`>]/g, '').replace(/\s*\n+\s*/g, '. '))
+  u.rate = 1.05
+  const voice = synth.getVoices().find((v) => /en[-_](US|GB)/i.test(v.lang) && /natural|premium|enhanced|google/i.test(v.name))
+  if (voice) u.voice = voice
+  synth.speak(u)
+}
+
 export default function ReportPanel() {
   const report = useSim((s) => s.report)
   const set = useSim((s) => s.set)
   const [shown, setShown] = useState(0)
+  const [voiceOn, setVoiceOn] = useState(readSpeak)
   const text = report?.text ?? ''
+  useEffect(() => {
+    if (text && voiceOn) speak(text)
+    return () => window.speechSynthesis?.cancel()
+  }, [text, voiceOn])
+  const toggleVoice = () => {
+    const next = !voiceOn
+    setVoiceOn(next)
+    try { localStorage.setItem('dz-speak', next ? '1' : '0') } catch { /* private mode */ }
+  }
   useEffect(() => {
     setShown(0)
     if (!text) return
@@ -37,6 +63,8 @@ export default function ReportPanel() {
           {report.loading ? 'Generating…' : report.error ? 'Unavailable'
             : `${gemini ? 'Gemini' : 'Local summary'} · Command data only · T+${fmtClock(report.generated_at ?? 0)}`}
         </span>
+        <button className={`report-voice${voiceOn ? ' on' : ''}`} aria-pressed={voiceOn} onClick={toggleVoice}
+                title="Read the briefing aloud">{voiceOn ? 'Voice on' : 'Voice off'}</button>
         <button className="report-close" aria-label="Close briefing" onClick={() => set({ report: null })}>×</button>
       </div>
       {report.error && <p className="muted">{report.error}</p>}
