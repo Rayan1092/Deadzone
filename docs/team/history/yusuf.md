@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/collapse`: items 4, 5, 7, 8 done (collapse look, AI Lab L, night lighting K, auto-director D). Item 6 asset pack waits on Rayan's pack. Next: 9 multi-story shell, 10 scheduler strip, voice UI when Aziz's `/api/voice` lands.
+- **Working on:** `p3/hyperreal`: photo-scanned materials and HDRI, honest scout-camera classification, true-scale sculpted survivors, rugged relays, first-glance explainer. Plan update in `docs/PLAN.md` (branch `p3/plan-v4`). Stacked on #70 → `p3/disaster`.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -17,11 +17,70 @@ Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Log
 
+### 2026-11-08 08:55 · p3/hyperreal · Rayan's Y1: AI Lab shows `curve_note`; merged main
+- **Did:** AI Lab shows `lab.curve_note` under the training curves, and as the empty state ("Training curve pending: …") when there is no curve, so it's clear the curve comes from the logged retrain (Rayan's review item Y1).
+  - Merged main. Resolved `robot.py` with Aziz's opt-in explorer: his explorer also gets the survivor-clear map (`_drive_trav`).
+  - Full suite 392 passed, demo guard green.
+- **Contract changes:** none.
+- **Heads-up for others:** Aziz: `_plan_frontier`'s explorer branch now receives `_drive_trav()` (traversable minus a 0.5 m disk around confirmed survivors) instead of `_trav()`.
+- **Next:** multi-story shell.
+
 ### 2026-11-08 08:45 · p3/plan-v4 · PLAN.md: hyper-realism, honest scout camera, judge-first UI
 - **Did:** added "Hyper-realism, honest scout camera and judge-first UI (9:50 PM update)" to `docs/PLAN.md`: what shipped, the merge order of my stacked branches (#70 → `p3/disaster` → `p3/hyperreal`, plus `p3/clinic-map`), the rule that only warm objects get classifier scores (never invented numbers for cold ones), and asks for Rayan and Aziz.
 - **Contract changes:** none (docs only).
 - **Heads-up for others:** **Rayan, Aziz: read the new section; your asks are at the end.**
 - **Next:** multi-story shell.
+
+### 2026-11-08 08:35 · p3/hyperreal · Photo-scanned world, honest scout-camera AI, true-scale people, rugged relays, explainer
+- **Did (Yusuf's ask: hyper-realistic, scout camera must match the robot, classify every object, realistic people, no run-overs, realistic beacons, judge-friendly UI):**
+  - **Photo-scanned surfaces:** 7 CC0 Poly Haven sets at 1K (color, normal, roughness): damaged concrete floor, concrete wall, red brick, cracked concrete (debris, slabs, ruins), asphalt, rusty metal, painted plaster. Plus a CC0 HDRI sky (industrial sunset) for light and reflections. 14 MB in `web/public/assets/` with `CREDITS.md`. Each texture starts procedural and swaps to the photo when it loads; the HDRI falls back to the light panels. A missing file never breaks the view.
+  - **Scout camera:**
+    - It is a chassis camera now: it always looks where the robot is heading. Before, it swung to the survivor even when the robot faced away.
+    - Every warm object in view (survivors and decoys) gets a box. Within the 5 m thermal range it shows the classifier's score for that object's real FLIR crop (`/crops/manifest.json`, the same crops and model output the robot uses): "PERSON 99.9% onboard AI" or "NOT A PERSON 0.3% rejected". Farther away: "WARM · 6 m · come closer to classify". Hidden behind walls or rubble: no box.
+    - Cold objects (walls, furniture, debris) are never scored: they never reach the classifier, and inventing scores for them would be fake.
+  - **Survivors:** sculpted at true scale (1.72 m): lathe torso (hips, waist, chest, shoulders), shaped head with nose, ears and hair, tapered limbs with joints, hands, shoes, dusty woven clothes, one arm up and one knee bent, pinned under a slab.
+    - The "run over" look was drawing scale: people were 1.35× (legs and glow reached under robots passing 2 m away). Robots also keep 0.5 m off confirmed survivors (previous entry).
+    - Thermal view still shows the real FLIR crop.
+  - **Relays and beacons:** a yellow hard case with ribs, latches and handle, an antenna mast with two whips and a blinking green LED. The phone relay is a phone in a rubber case on a stand. Destroyed relays are the same case, crushed.
+  - **First glance:**
+    - A "How to read this screen" card opens once per session (three lines: robots search where radio can't reach; amber = command hasn't heard it yet; onboard AI checks warm things and reports hop relay to relay). It closes itself after 14 s and is linked from the `?` overlay.
+    - Plain pane titles: "Inside the building", "What's really happening", "What the command post knows". Top bar reads "Survivors: 1 found · 1 at command".
+    - The scheduler opens only near overload (≥97%) or on a miss.
+- **Contract changes:** none. Static assets under `/assets/` (served from `web/public`).
+- **Heads-up for others:** Rayan: no CC0 photo-scanned human exists that we can download without an account. If your asset pack can include one (CC0/CC-BY GLB, lying pose), it drops into `Human.jsx`. Your `lab.json` is on main, so L now shows curves and examples.
+- **Perf:** the robot camera renders a lite copy (indoors only: no outside ruins, smoke or dust). Measured in this browser with the camera open: 18 → about 27 fps; overview without it about 27 fps (gap view plus inset). P mode is the fallback on the testing laptop.
+- **Next:** multi-story shell, more scanned props.
+
+### 2026-11-08 08:20 · p3/hyperreal · Robots keep 0.5 m off confirmed survivors (Rayan's robot code, please review)
+- **Did:** with Yusuf's OK, a small change in **Rayan's `server/deadzone/robot/robot.py`**: a new `_drive_trav()` used for frontier, go-to and path-blocked planning removes a 0.5 m disk around every survivor the robot has confirmed, so a motion plan never crosses a person. Rescue routes keep `_trav()` (they have to reach the survivor), and the robot's own cell stays open.
+  - Measured on seed 7: robots never came closer than 1.96 m to a survivor before or after the change. The run-over Yusuf saw was drawing scale (people drawn 1.35×; now true size, see the next entry).
+  - 0.9 m moved demo beats, so the clearance is 0.5 m. The demo guard and the full suite pass (341 passed).
+- **Contract changes:** none.
+- **Heads-up for others:** **Rayan**: please review or adjust `SURVIVOR_CLEAR_M`. It only matters on maps where a path would really cross a person (generator buildings, the clinic).
+- **Next:** frontend hyper-realism commit.
+
+### 2026-11-08 07:40 · p3/disaster · Disaster site, one rover model everywhere, scheduler redesign
+- **Did (Yusuf's ask: "an actual disaster site", "fix the scheduler", "robots hyper realistic and the same from above and in the scout camera"):**
+  - **Disaster site** (`Disaster.jsx`, Reality only, visual only):
+    - Every floor is littered with broken concrete, ceiling-tile fragments and dust, low enough to drive over. Debris is heaped against the walls with fallen ceiling boards leaning on them.
+    - The no-go hazard room holds a real collapse mound under its missing roof.
+    - Outside, the neighbouring buildings came down (jagged wall stubs, a rubble mound, pancaked slabs, beams) north and east of the building. The lot is cracked and heaved, with debris thrown across it, three crushed cars and a downed utility pole.
+    - Smoke rises from the ruins and one is on fire (flickering light, embers; off in P mode).
+    - Survivors lie pinned under a slab and chunks.
+    - Instanced, so thousands of pieces cost a few draw calls.
+  - **Rover** (`Rover.jsx`): one detailed model used by the 3D map, Command's ghosts and the robot camera.
+    - Extruded track pods with tread, sprocket and road wheels, and a gunmetal hull with a sloped glacis.
+    - The robot's color on the deck and flanks, its id painted on both sides, and a hazard-striped bumper with headlights.
+    - A pan-tilt camera with a light bar, a lidar with a glowing ring, a battery pack and roll bar, and a link-colored whip tip.
+    - The robot camera sits at the camera head and draws the other robots with the same model and scale (it used to draw boxes). Its own robot is left out so its mast never fills the frame.
+  - **Scheduler** (plan Step 4): collapsed to one line by default, with a stacked CPU bar per robot and "All deadlines met" or "R2 missed a perception deadline".
+    - It opens by itself for the followed robot, a missed deadline or an overload (≥85%), or when pinned by a click.
+    - Open rows are taller, with labelled slices, 10 ms grid, axis and an on-time / missed status.
+    - Task colors are categorical slots 1–6, which passed the palette validator on the dark surface. A missed deadline is hatched red, never color alone.
+  - **Any building:** camera framing, sun target, truck placement (parallel to the wall, away from the building), decoy objects (from `fp.decoys` by label) and lot-debris exclusion now come from the floorplan. Hand-placed furniture only loads for `collapse_01`.
+- **Contract changes:** none.
+- **Heads-up for others:** Rayan: buildings from your generator get the disaster dressing, decoy objects and framing automatically.
+- **Next:** clinic map PR, then the 9 multi-story shell.
 
 ### 2026-11-08 06:50 · p3/collapse · Items 7 + 8: night operations lighting (K), auto-director camera (D)
 - **Did:**

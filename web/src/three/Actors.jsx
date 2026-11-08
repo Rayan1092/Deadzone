@@ -1,10 +1,12 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Html, Line, RoundedBox } from '@react-three/drei'
+import { Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { useSim } from '../store'
 import { COLORS, FOG_H, w2t } from './util'
-import { materials } from './textures'
+import { materials, tiledSet } from './textures'
+import Rover, { ROBOT_SCALE } from './Rover'
+import Human from './Human'
 import { LightBeam } from './NightLights'
 import { CommandRelays, RealityLinks, RealityRelays } from './Network'
 import { CommandRoutes, RealityRoutes } from './Routes'
@@ -26,85 +28,8 @@ function Headlight() {
   )
 }
 
-// Tracked search rover, x forward, 0.5 m long before ROBOT_SCALE: rubber tracks with
-// road wheels, graphite chassis, a shell in the robot's color with LED strips, a pan-tilt
-// camera head up front, a spinning lidar puck on a mast and a radio whip at the back whose
-// tip shows the link (green up, red dark).
-let roverMats = null
-function sharedRoverMats() {
-  if (roverMats) return roverMats
-  const t = materials().tread
-  const tread = t.map.clone()
-  tread.repeat.set(6, 1)
-  tread.needsUpdate = true
-  roverMats = {
-    track: new THREE.MeshStandardMaterial({ map: tread, color: '#4b4f55', roughness: 0.9 }),
-    chassis: new THREE.MeshStandardMaterial({ color: '#2a2f35', metalness: 0.6, roughness: 0.42 }),
-    metal: new THREE.MeshStandardMaterial({ color: '#b8bec6', metalness: 0.9, roughness: 0.28 }),
-    black: new THREE.MeshStandardMaterial({ color: '#0d0f11', metalness: 0.3, roughness: 0.25 }),
-    lens: new THREE.MeshStandardMaterial({ color: '#0a1630', metalness: 1, roughness: 0.05 }),
-    lamp: new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#e8fbff', emissiveIntensity: 3, toneMapped: false }),
-    ghost: new THREE.MeshStandardMaterial({ color: '#94a3b8', transparent: true, opacity: 0.32, depthWrite: false }),
-  }
-  return roverMats
-}
 
-function Rover({ color, ghost, sensor, linkUp }) {
-  const base = sharedRoverMats()
-  const paint = useMemo(() => new THREE.MeshStandardMaterial({ color, metalness: 0.25, roughness: 0.38, emissive: color, emissiveIntensity: 0.12 }), [color])
-  const led = useMemo(() => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.6, toneMapped: false }), [color])
-  const tip = useMemo(() => new THREE.MeshStandardMaterial({ color: linkUp ? '#4ade80' : '#ef4444', emissive: linkUp ? '#22c55e' : '#ef4444', emissiveIntensity: 3, toneMapped: false }), [linkUp])
-  const M = ghost
-    ? { track: base.ghost, chassis: base.ghost, metal: base.ghost, black: base.ghost, lens: base.ghost, lamp: base.ghost, paint: base.ghost, led: base.ghost, tip: base.ghost }
-    : { ...base, paint, led, tip }
-  const shadow = false // static shadow map; ambient occlusion grounds the rover
-  return (
-    <group>
-      {[-0.15, 0.15].map((z) => (
-        <group key={z} position={[0, 0, z]}>
-          <RoundedBox args={[0.54, 0.13, 0.09]} radius={0.055} smoothness={3} position={[0, 0.075, 0]} material={M.track} castShadow={shadow} />
-          {[-0.17, 0, 0.17].map((x) => (
-            <mesh key={x} position={[x, 0.075, z > 0 ? 0.047 : -0.047]} rotation={[Math.PI / 2, 0, 0]} material={M.metal}>
-              <cylinderGeometry args={[0.04, 0.04, 0.012, 14]} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-      <RoundedBox args={[0.44, 0.1, 0.21]} radius={0.02} smoothness={2} position={[0, 0.15, 0]} material={M.chassis} castShadow={shadow} />
-      <RoundedBox args={[0.36, 0.07, 0.27]} radius={0.03} smoothness={3} position={[-0.02, 0.225, 0]} material={M.paint} castShadow={shadow} />
-      {[-0.137, 0.137].map((z) => (
-        <mesh key={z} position={[-0.02, 0.215, z]} material={M.led}>
-          <boxGeometry args={[0.3, 0.018, 0.006]} />
-        </mesh>
-      ))}
-      {/* front bumper with two lamps */}
-      <mesh position={[0.235, 0.13, 0]} material={M.black}><boxGeometry args={[0.04, 0.07, 0.24]} /></mesh>
-      {[-0.07, 0.07].map((z) => (
-        <mesh key={z} position={[0.257, 0.135, z]} rotation={[0, 0, Math.PI / 2]} material={M.lamp}>
-          <cylinderGeometry args={[0.018, 0.018, 0.006, 12]} />
-        </mesh>
-      ))}
-      {/* pan-tilt camera */}
-      <mesh position={[0.12, 0.28, 0]} material={M.chassis}><cylinderGeometry args={[0.025, 0.03, 0.05, 10]} /></mesh>
-      <RoundedBox args={[0.08, 0.055, 0.1]} radius={0.012} smoothness={2} position={[0.13, 0.325, 0]} material={M.black} castShadow={shadow} />
-      <mesh position={[0.172, 0.325, 0]} rotation={[0, 0, Math.PI / 2]} material={M.lens}><cylinderGeometry args={[0.02, 0.02, 0.012, 14]} /></mesh>
-      {/* lidar mast and spinning puck */}
-      <mesh position={[-0.06, 0.29, 0]} material={M.metal}><cylinderGeometry args={[0.012, 0.012, 0.08, 8]} /></mesh>
-      <group ref={sensor} position={[-0.06, 0.345, 0]}>
-        <mesh material={M.black} castShadow={shadow}><cylinderGeometry args={[0.05, 0.05, 0.045, 18]} /></mesh>
-        <mesh position={[0, 0.026, 0]} material={M.metal}><cylinderGeometry args={[0.04, 0.05, 0.008, 18]} /></mesh>
-        <mesh position={[0.048, 0, 0]} material={M.led}><boxGeometry args={[0.006, 0.012, 0.03]} /></mesh>
-      </group>
-      {/* radio whip */}
-      <mesh position={[-0.17, 0.42, 0.09]} material={M.black}><cylinderGeometry args={[0.004, 0.006, 0.34, 6]} /></mesh>
-      <mesh position={[-0.17, 0.595, 0.09]} material={M.tip}><sphereGeometry args={[0.012, 10, 10]} /></mesh>
-    </group>
-  )
-}
-
-const ROBOT_SCALE = 1.8 // drawn larger than the 0.5 m body so robots read on a projector
-
-function RobotBody({ pose, color, ghost = false, label, sub, headlight = true, linkUp = true }) {
+function RobotBody({ pose, color, tag, ghost = false, label, sub, headlight = true, linkUp = true }) {
   const perf = useSim((s) => s.perf)
   const group = useRef()
   const sensor = useRef()
@@ -134,7 +59,7 @@ function RobotBody({ pose, color, ghost = false, label, sub, headlight = true, l
             <meshBasicMaterial color={color} transparent opacity={0.22} blending={THREE.AdditiveBlending} depthWrite={false} />
           </mesh>
         )}
-        <Rover color={color} ghost={ghost} sensor={sensor} linkUp={linkUp} />
+        <Rover color={color} tag={tag} ghost={ghost} sensor={sensor} linkUp={linkUp} />
         {!ghost && headlight && !perf && <Headlight />}
       </group>
       {label && (
@@ -181,67 +106,38 @@ function lieAngle(id = '') {
   return (h * Math.PI) / 180
 }
 
-// A person lying where they fell: capsule limbs, clothes and skin, one arm flung up by
-// the head. Clothing varies per survivor id. A warm glow pool underneath keeps them
-// readable from across the room (the heat the thermal camera picks up).
-const OUTFITS = [
-  { top: '#2b4a7a', legs: '#2d3340', skin: '#c99a7a', hair: '#2a1d14' },
-  { top: '#7a2b2b', legs: '#3b3f47', skin: '#8d5e43', hair: '#16110d' },
-  { top: '#4f6b3a', legs: '#26303d', skin: '#e0b896', hair: '#6b4a2b' },
-  { top: '#d97706', legs: '#2f3640', skin: '#b07b5a', hair: '#1c1410' },
-]
-const personMats = new Map()
-function outfit(id) {
-  let h = 0
-  for (const ch of id ?? '') h = (h * 31 + ch.charCodeAt(0)) % 997
-  const o = OUTFITS[h % OUTFITS.length]
-  if (!personMats.has(o)) {
-    const m = (color, rough = 0.85) => new THREE.MeshStandardMaterial({ color, roughness: rough })
-    personMats.set(o, { top: m(o.top), legs: m(o.legs), skin: m(o.skin, 0.6), hair: m(o.hair, 0.9), shoe: m('#1a1a1a', 0.6) })
+// Debris pinning the legs: a broken slab and a few chunks (they are trapped, which is why
+// they need rescuing rather than walking out).
+let pinMats = null
+function Pinned() {
+  pinMats ??= {
+    slab: new THREE.MeshStandardMaterial({ ...tiledSet(materials().concrete, 0.5, 0.5), color: '#a8a299', roughness: 0.93 }),
+    rock: new THREE.MeshStandardMaterial({ color: '#8f887e', roughness: 0.95, flatShading: true }),
   }
-  return personMats.get(o)
-}
-
-function Limb({ from, to, r, m }) {
-  const a = new THREE.Vector3(...from)
-  const b = new THREE.Vector3(...to)
-  const mid = a.clone().add(b).multiplyScalar(0.5)
-  const dir = b.clone().sub(a)
-  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize())
   return (
-    <mesh position={mid} quaternion={q} material={m} castShadow>
-      <capsuleGeometry args={[r, Math.max(0.01, dir.length() - r * 2), 4, 10]} />
-    </mesh>
+    <group>
+      <mesh position={[-0.5, 0.2, 0]} rotation={[0.15, 0.3, 0.32]} material={pinMats.slab} castShadow receiveShadow>
+        <boxGeometry args={[0.62, 0.08, 0.6]} />
+      </mesh>
+      {[[-0.18, 0.06, 0.24, 0.07], [-0.8, 0.05, -0.28, 0.06], [-0.35, 0.05, -0.3, 0.05], [-0.72, 0.07, 0.3, 0.08], [-0.25, 0.32, 0.05, 0.05]].map(([x, yy, z, s], i) => (
+        <mesh key={i} position={[x, yy, z]} rotation={[i, i * 2, i * 3]} material={pinMats.rock} castShadow>
+          <dodecahedronGeometry args={[s, 0]} />
+        </mesh>
+      ))}
+    </group>
   )
 }
 
 export function PersonFigure({ id }) {
-  const M = outfit(id)
-  const y = 0.1 // limbs rest on the floor
+  // true scale: drawn bigger, their legs and glow reached under robots passing 2 m away
   return (
-    <group rotation={[0, lieAngle(id), 0]} scale={1.35}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}>
-        <circleGeometry args={[0.8, 32]} />
-        <meshBasicMaterial color="#ff5a1f" transparent opacity={0.22} blending={THREE.AdditiveBlending} depthWrite={false} />
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
+        <circleGeometry args={[0.95, 32]} />
+        <meshBasicMaterial color="#ff5a1f" transparent opacity={0.16} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
-      {/* torso and hips */}
-      <Limb from={[0.02, y + 0.02, 0]} to={[0.36, y + 0.03, 0]} r={0.12} m={M.top} />
-      <Limb from={[-0.06, y, 0]} to={[0.06, y + 0.01, 0]} r={0.105} m={M.legs} />
-      {/* head */}
-      <mesh position={[0.56, y + 0.01, 0.02]} material={M.skin} castShadow><sphereGeometry args={[0.085, 18, 14]} /></mesh>
-      <mesh position={[0.6, y + 0.03, 0.02]} scale={[0.9, 0.85, 1]} material={M.hair}><sphereGeometry args={[0.086, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2]} /></mesh>
-      {/* arms: one along the side, one flung up past the head */}
-      <Limb from={[0.34, y + 0.02, 0.15]} to={[0.08, y - 0.02, 0.2]} r={0.042} m={M.top} />
-      <Limb from={[0.08, y - 0.02, 0.2]} to={[-0.12, y - 0.04, 0.17]} r={0.036} m={M.skin} />
-      <Limb from={[0.36, y + 0.02, -0.15]} to={[0.56, y - 0.02, -0.28]} r={0.042} m={M.top} />
-      <Limb from={[0.56, y - 0.02, -0.28]} to={[0.76, y - 0.04, -0.22]} r={0.036} m={M.skin} />
-      {/* legs, one bent */}
-      <Limb from={[-0.06, y, 0.07]} to={[-0.46, y - 0.01, 0.1]} r={0.058} m={M.legs} />
-      <Limb from={[-0.46, y - 0.01, 0.1]} to={[-0.84, y - 0.03, 0.12]} r={0.05} m={M.legs} />
-      <Limb from={[-0.06, y, -0.07]} to={[-0.4, y + 0.12, -0.16]} r={0.058} m={M.legs} />
-      <Limb from={[-0.4, y + 0.12, -0.16]} to={[-0.74, y - 0.03, -0.2]} r={0.05} m={M.legs} />
-      <mesh position={[-0.89, y - 0.02, 0.12]} material={M.shoe}><boxGeometry args={[0.1, 0.08, 0.1]} /></mesh>
-      <mesh position={[-0.79, y - 0.02, -0.2]} material={M.shoe}><boxGeometry args={[0.1, 0.08, 0.1]} /></mesh>
+      <Human id={id} angle={lieAngle(id)} />
+      <group rotation={[0, lieAngle(id), 0]} scale={1.3}><Pinned /></group>
     </group>
   )
 }
@@ -395,7 +291,7 @@ export function RealityActors({ gap = false }) {
     <group>
       {robots.map((r) => (
         <group key={r.id}>
-          <RobotBody pose={r.pose} color={r.color} label={r.name} sub={r.link.up ? null : 'no link'} linkUp={r.link.up} />
+          <RobotBody pose={r.pose} color={r.color} tag={r.id} label={r.name} sub={r.link.up ? null : 'no link'} linkUp={r.link.up} />
           <Lidar robot={r} />
           {r.path.length > 1 && (
             <Line points={[[r.pose[0], 0.06, -r.pose[1]], ...r.path.map(([px, py]) => [px, 0.06, -py])]}
@@ -457,7 +353,7 @@ export function CommandActors() {
         const stale = time - r.last_seen
         const ghost = stale > 3
         return (
-          <RobotBody key={r.id} pose={r.pose} color={ghost ? '#94a3b8' : '#2dd4bf'} ghost={ghost}
+          <RobotBody key={r.id} pose={r.pose} color={ghost ? '#94a3b8' : '#2dd4bf'} tag={r.id} ghost={ghost}
                      headlight={false} label={r.id} sub={ghost ? `${stale.toFixed(0)}s ago` : null} />
         )
       })}
