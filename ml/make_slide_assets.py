@@ -210,8 +210,14 @@ def stats_card():
                         (6.55, m["recall"], "recall")):
         ax.text(x, 2.05, f"{val * 100:.1f}%", color=FG, fontsize=34, ha="center", va="center", fontweight="bold")
         ax.text(x, 1.35, lab, color=MUTED, fontsize=14, ha="center", va="center")
-    ax.text(4.0, 0.62, f"{m['n']:,} held-out FLIR thermal images   ·   MobileNetV3-Small   ·   6 MB",
+    ax.text(4.0, 0.78, f"{m['n']:,} held-out FLIR thermal images   ·   MobileNetV3-Small   ·   6 MB",
             color=WARM, fontsize=12, ha="center", va="center")
+    lab_path = ML / "results" / "lab.json"
+    indoor = json.loads(lab_path.read_text()).get("metrics_indoor") if lab_path.is_file() else None
+    if indoor:
+        # before = the FLIR-only model on the same held-out indoor frames (see rayan-ml.md, PR #95)
+        ax.text(4.0, 0.4, f"Indoor people lying or sitting: 83.9% → {indoor['accuracy'] * 100:.1f}% "
+                f"({indoor['n_test']:,} held-out frames)", color=MUTED, fontsize=11, ha="center", va="center")
     fig.savefig(OUT / "stats_card.png", dpi=200, facecolor=BG, bbox_inches="tight")
     plt.close(fig)
 
