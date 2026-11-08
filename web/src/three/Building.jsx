@@ -209,6 +209,13 @@ function Slab({ W, H }) {
   )
 }
 
+const NO_RUBBLE = []
+const staticCache = new WeakMap()
+function staticRubble(fp) {
+  if (!staticCache.has(fp)) staticCache.set(fp, (fp.rubble ?? NO_RUBBLE).filter((r) => !r.dynamic))
+  return staticCache.get(fp)
+}
+
 // `props`: furniture and decoy objects (Reality only; the command post's floorplan has none).
 export default function Building({ thermal = false, blueprint = false, props = true }) {
   const fp = useSim((s) => s.floorplan)
@@ -231,7 +238,8 @@ export default function Building({ thermal = false, blueprint = false, props = t
       {props && fp.dynamic_walls?.length > 0 && <Walls walls={fp.dynamic_walls} mode={mode} />}
       <Baked deps={[fp, mode, props]}>
         {mode === 'plain' && (fp.doors ?? []).map((d, i) => <Door key={i} door={d} walls={fp.walls} />)}
-        {!blueprint && <Debris rubble={fp.rubble || []} cold={thermal} />}
+        {/* rubble that fell during the run (R key, aftershock) is truth: Reality panes only */}
+        {!blueprint && <Debris rubble={props ? fp.rubble ?? NO_RUBBLE : staticRubble(fp)} cold={thermal} />}
         {props && !blueprint && <Interior fp={fp} cold={thermal} />}
         {!blueprint && <CommandPost pos={[cx, cy]} cold={thermal} />}
       </Baked>

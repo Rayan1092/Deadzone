@@ -11,7 +11,7 @@ import { followRobot, overview, resetOverview } from '../three/camera'
 export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
   ['R', 'rubble ahead of the robot'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
-  ['U', 'resume after safe stop'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
+  ['U', 'resume after safe stop'], ['A', 'aftershock (server needs DZ_AFTERSHOCK=1)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
   ['M', 'one view / split view'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
 ]
@@ -201,6 +201,8 @@ export function useKeyboard() {
       if (key === 'f' && target) control('director', { do: 'overcurrent', robot: target.id })
       if (key === 'o' && target) control('director', { do: 'overload', robot: target.id })
       if (key === 'u' && target) control('director', { do: 'resume', robot: target.id })
+      // server picks the spot: the first powered relay (crushing it), else the corridor
+      if (key === 'a') control('director', { do: 'aftershock' })
       if (key === 'g') {
         if (s.report && !s.report.loading) s.set({ report: null })
         else requestReport()

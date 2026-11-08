@@ -51,6 +51,9 @@ export function describeEvent(e) {
     case 'rescue_route_reported': return `Route to ${e.survivor} reached the command post · ${Math.round(e.length_m)} m`
     case 'deadline_miss': return `${e.robot} missed a ${e.task} deadline`
     case 'rubble_fall': return 'Rubble fell'
+    case 'aftershock': return `Aftershock: ceiling collapsed${e.destroyed_relay ? `, relay ${e.destroyed_relay} crushed` : ''}`
+    case 'relay_destroyed': return `Relay ${e.id} destroyed${e.lost_bundles ? `, ${e.lost_bundles} bundles lost with it` : ''}`
+    case 'control_error': return e.code === 'feature_disabled' ? 'Aftershock is off: start the server with DZ_AFTERSHOCK=1' : e.msg
     case 'plan_dispatched': return `Plan ${e.plan_id} dispatched to the robots`
     case 'plan_applied': return `${e.robot} is following ${e.plan_id}${e.zones?.length ? ` (${e.zones.join(', ')})` : ''}`
     case 'resumed': return `${e.robot} resumed after safe stop`
