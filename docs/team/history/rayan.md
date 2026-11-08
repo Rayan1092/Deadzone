@@ -11,6 +11,14 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 
 ## Log
 
+### 2026-11-09 00:55 · rayan/zone-priority · `DZ_ZONE_PRIORITY`: a zone owner heads straight for its zone on plan receipt; plan_state "heading to Z3"
+- **Did (robot.py, off by default):** with `DZ_ZONE_PRIORITY=1`, a plan arriving for a robot that is outside its first unmapped zone makes it drop its current frontier (path and keep-going bonus) and head for the zone: while heading, the frontier closest to the zone wins, whatever its size or distance from the robot; heading ends when the robot is in the zone (2-cell margin) or a frontier touches it. Telemetry **`plan_state: "heading to <zone id>"`** meanwhile (the WAITING text still wins when walled in); event `heading_to_zone` (`robot`, `zone`, `plan_id`). `DZ_SEARCH_BAYES` scoring pauses while heading.
+- **P-1 check (seed 7, obstacles + collisions on, F/O on time):** flag off: assignments ZW/ZNE/ZB and **every beat identical** (guard). Flag on: same assignments, all three announce heading at 0.3 s (R1 in ZW at 1.2, R3 at 18.6, R2 at 33.1) and the story runs earlier: S3 14.1, D1 57.9, RL1 59.5, **R2 dark 48.7, S1 found dark 59.5, reported 74.8**, S1 rerouted 163.5, S2 193.2. So it stays off for the main run (DEMO.md pre-flight line) unless Rayan re-baselines.
+- **Tests:** `tests/test_zone_priority.py`: a mid-run plan sends R1 from Storage toward an east zone "Z3" (target jumps over 5 m closer to the zone, plan_state "heading to Z3", arrives and clears), flag unset unchanged, an owner already in its zone does not head.
+- **Contract changes:** `plan_state` gains the value `"heading to <zone>"`; new event `heading_to_zone`.
+- **Heads-up for others:** **Yusuf:** show `plan_state` on the robot card (both texts).
+- **Next:** batch item 3, heat_sources in the buildings (Aziz's typed heat sources from #?? are on main; I'll use his schema).
+
 ### 2026-11-09 00:40 · rayan/crop-pool-handoff · Batch item 1 (crop pool: crouching, kneeling, slumped, lying only) needs the SDT frames: handed to the testing laptop
 - **Checked here:** the six demo crops are already in the kept poses: S1 `pos_0001` crouching, S2 `pos_0002` kneeling bent over, S3 `pos_0003` slumped in a chair (SDT indoor); D1–D3 are objects. Model Lab examples (`lab.json`): 12 people, all lying, crouching or sitting. **`gradcam_strip.png` shows only those six, so it does not change.**
 - **Must change, and can't be done on this laptop** (only FLIR street frames here, no SDT): (1) **held-out pool** `ml/results/judge_pool/`: all 20 person images are FLIR pedestrians, 7 standing, 12 walking, 1 partly hidden; (2) **`unsure_person_01.png` / `unsure_person_01_close.png`** (variants' S3 look-closer pair): the close-up is a walking pedestrian.
