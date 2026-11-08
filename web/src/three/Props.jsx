@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { MAST_H, w2t } from './util'
 import { materials, signTexture, tiledSet } from './textures'
-import { N, S, W, furnitureLayout } from './furniture'
+import { N, S, W, decoyLayout, furnitureLayout } from './furniture'
 
 // Set dressing for the Reality world: furniture against the walls, the decoy heat
 // sources as the real objects they are, boilers in the (no-go) boiler room, the command
@@ -384,9 +384,9 @@ function FloorLine({ a, b, w = 0.1, color = '#eab308' }) {
 // --------------------------------------------------------------- layout
 const DECOY = { radiator: Radiator, engine: Engine, 'coffee machine': CoffeeCart }
 function Decoys({ fp, M }) {
-  return (fp.decoys ?? []).map((d, i) => {
+  return decoyLayout(fp).map((d) => {
     const Obj = DECOY[d.label]
-    return Obj ? <At key={d.id} x={d.pos[0]} y={d.pos[1]} rot={0.15 + i * 0.1}><Obj M={M} /></At> : null
+    return Obj ? <At key={d.id} x={d.pos[0]} y={d.pos[1]} rot={d.rot}><Obj M={M} /></At> : null
   })
 }
 

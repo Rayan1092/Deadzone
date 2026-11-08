@@ -5,6 +5,7 @@ import { WALL_H, w2t } from './util'
 import { materials } from './textures'
 import { wallDamage } from './Collapse'
 import { LightBeam } from './NightLights'
+import { decoyLayout } from './furniture'
 
 // The air inside the collapsed building (Reality panes only): dust hanging in every room
 // that the lights carve shafts through, a sheared pipe spraying water into a puddle that
@@ -258,7 +259,7 @@ function wetSpot(fp) {
   const damage = wallDamage(fp)
   const doors = fp.doors ?? []
   // keep the splash off the thermal targets (decoys stand against walls, survivors lie near them)
-  const targets = [...(fp.decoys ?? []), ...(fp.survivors ?? [])].map((t) => t.pos).filter(Boolean)
+  const targets = [...decoyLayout(fp).flatMap((d) => [d.pos, d.hotspot]), ...(fp.survivors ?? []).map((t) => t.pos)].filter(Boolean)
   const pref = x0 + (x1 - x0) * 0.65
   let best = null
   for (let px = x0 + 1; px <= x1 - 1; px += 0.25) {
