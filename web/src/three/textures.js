@@ -362,13 +362,15 @@ export function materials() {
       tread: tread(),
       cracks: cracks(),
     }
-    cache.floor = scanned(cache.floor, 'damaged_concrete_floor')
+    cache.floor = scanned(cache.floor, 'cracked_concrete_floor')
     cache.concrete = scanned(cache.concrete, 'concrete_wall_008')
     cache.brick = scanned(cache.brick, 'red_brick_03')
-    cache.plaster = scanned(cache.plaster, 'painted_plaster_wall')
+    cache.plaster = scanned(cache.plaster, 'damaged_plaster')
     cache.asphalt = scanned(cache.asphalt, 'asphalt_02')
     cache.rubble = scanned(floorConcrete(), 'cracked_concrete')
     cache.rust = scanned(ribbedMetal(), 'rusty_metal_02')
+    // Rayan's crack decal (PNG with alpha) replaces the procedural one once it loads
+    imageLoader.load('/assets/decals/crack_02.png', (img) => { cache.cracks.image = img; cache.cracks.needsUpdate = true }, undefined, () => {})
   }
   return cache
 }

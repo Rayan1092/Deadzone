@@ -20,6 +20,9 @@ function EyeCamera({ robotId }) {
   const { camera } = useThree()
   const look = useRef(new THREE.Vector3())
   const at = useRef(null)
+  // the robot's own headlight rides with the camera: at night it is what lights the view
+  const lamp = useRef()
+  const lampTarget = useMemo(() => new THREE.Object3D(), [])
   useFrame((_, dt) => {
     const r = useSim.getState().tick?.reality.robots.find((x) => x.id === robotId)
     if (!r) return
@@ -33,8 +36,14 @@ function EyeCamera({ robotId }) {
     look.current.lerp(ahead, k)
     camera.position.copy(at.current)
     camera.lookAt(look.current)
+    if (lamp.current) { lamp.current.position.copy(at.current); lampTarget.position.copy(look.current) }
   })
-  return null
+  return (
+    <>
+      <primitive object={lampTarget} />
+      <spotLight ref={lamp} target={lampTarget} angle={0.62} penumbra={0.5} intensity={14} distance={16} decay={1.5} color="#e8fbff" />
+    </>
+  )
 }
 
 // Hot spots as the camera sees them: survivors and decoys both glow in thermal,
@@ -272,6 +281,7 @@ function FocusPanel({ robotId }) {
 export default function RobotEye() {
   const robotId = useSim((s) => s.eyeRobot)
   const thermal = useSim((s) => s.eyeThermal)
+  const night = useSim((s) => s.night)
   const meta = useSim((s) => s.robotsMeta.find((r) => r.id === s.eyeRobot))
   const set = useSim((s) => s.set)
   const focused = useSim((s) => s.eyeFocus?.robot === s.eyeRobot && s.eyeFocus)
@@ -294,14 +304,19 @@ export default function RobotEye() {
         <button className="eye-close" aria-label="Close camera" onClick={() => set({ eyeRobot: null })}>×</button>
       </div>
       <Canvas dpr={1} camera={{ fov: 85, near: 0.05, far: 60 }} gl={{ antialias: false, powerPreference: 'low-power' }}>
-        <color attach="background" args={[thermal ? '#030614' : '#0e1114']} />
-        {thermal ? <ambientLight intensity={0.6} /> : (
+        <color attach="background" args={[thermal ? '#030614' : night ? '#07080a' : '#0e1114']} />
+        {thermal ? <ambientLight intensity={0.6} /> : night ? (
+          <>
+            <ambientLight intensity={0.12} />
+            <hemisphereLight args={['#6f86b0', '#120f0c', 0.3]} />
+          </>
+        ) : (
           <>
             <ambientLight intensity={0.7} />
             <hemisphereLight args={['#e2e8f0', '#1f2937', 1.4]} />
           </>
         )}
-        {!thermal && <fog attach="fog" args={['#0e1114', 8, 26]} />}
+        {!thermal && <fog attach="fog" args={[night ? '#07080a' : '#0e1114', night ? 5 : 8, night ? 20 : 26]} />}
         <Building thermal={thermal} lite />
         <HotSpots thermal={thermal} />
         <Robots robotId={robotId} thermal={thermal} />
