@@ -34,7 +34,7 @@ export function setView(view) {
 // K key: night operations lighting (dark interior, headlights, emergency lights). Off by
 // default until a dry run passes; remembered per browser.
 function readNight() {
-  try { return localStorage.getItem('dz-night') === '1' } catch { return false }
+  try { return localStorage.getItem('dz-night') !== '0' } catch { return true }
 }
 export function setNight(on) {
   try { localStorage.setItem('dz-night', on ? '1' : '0') } catch { /* storage blocked: session only */ }
@@ -80,7 +80,7 @@ export const useSim = create((set) => ({
   bigDeliveries: 0,    // count of survivor / route / fault reports delivered to CMD (antenna pulse)
   director: false,     // D key: auto-director camera
   shot: null,          // { caption, at } of the director's current shot
-  night: readNight(),  // K key: night operations lighting
+  night: readNight(),  // night operations lighting is the default scene; K switches to day
   perf: readPerf(),    // P key: lighter rendering for a slow demo laptop (remembered per browser)
   view: readView(),    // M key: 'split' (two panes) or 'gap' (one view + Command gap), remembered
   recorder: null,      // ?record: { frames, ms, bytes } of the captured stream

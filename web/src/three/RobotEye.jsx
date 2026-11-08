@@ -5,7 +5,8 @@ import * as THREE from 'three'
 import { FOCUS_HOLD_MS, useSim } from '../store'
 import Building from './Building'
 import { PersonFigure } from './Actors'
-import Rover, { ROBOT_SCALE } from './Rover'
+import { ROBOT_SCALE } from './Rover'
+import RoverModel from './RoverModel'
 import { w2t } from './util'
 
 // Picture-in-picture from a robot's forward camera (V key or the card's Camera
@@ -112,7 +113,7 @@ function EyeRover({ r, thermal }) {
   return (
     <group ref={g} position={w2t(r.pose[0], r.pose[1], 0)} rotation={[0, r.pose[2], 0]}>
       <group scale={ROBOT_SCALE}>
-        <Rover color={r.color} tag={r.id} thermal={thermal} sensor={sensor} linkUp={r.link?.up ?? true} />
+        <RoverModel color={r.color} tag={r.id} thermal={thermal} sensor={sensor} linkUp={r.link?.up ?? true} />
       </group>
     </group>
   )
