@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { useSim } from '../store'
+import { commandPostLayout } from './furniture'
 
 // Shared camera so the Reality and Command panes always show the same angle.
 // `pos - target` is the shared view offset (orbit angle + zoom). In follow mode
@@ -75,11 +76,29 @@ export function followRobot(rid, offset = CHASE) {
 
 export function overview() {
   useSim.getState().set({ follow: null })
+  shared.cmdFramed = false
   if (!shared.home) return
   shared.pos.copy(shared.home.pos)
   shared.target.copy(shared.home.target)
   shared.src = null
   shared.rev++
+}
+
+// C in split view: look down on the command post (the tent, the operators, the mast every radio
+// link ends at); C again returns to the overview.
+export function frameCommandPost() {
+  const fp = useSim.getState().floorplan
+  if (!fp?.command_post) return
+  if (shared.cmdFramed) { overview(); return }
+  const [mx, my] = fp.command_post.pos
+  const { tent } = commandPostLayout(fp.command_post.pos, fp.entry)
+  const [x, y] = [(mx + tent[0]) / 2, (my + tent[1]) / 2] // between the mast and the operators' canopy
+  useSim.getState().set({ follow: null })
+  shared.target.set(x, 0.8, -y)
+  shared.pos.set(x + 5, 12, -y + 8) // from above at about 45 degrees: the tent, the operators and the mast together
+  shared.src = null
+  shared.rev++
+  shared.cmdFramed = true
 }
 
 // A new layout means a new pane shape: forget the fitted overview so the next pane refits.

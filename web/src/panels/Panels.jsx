@@ -8,7 +8,7 @@ import { JoinButton } from './JoinPanel'
 import { requestReport } from './ReportPanel'
 import { ReplayChip } from './ReplayPanel'
 import { RECORDING, REPLAY, saveRecording } from '../net/replay'
-import { followRobot, overview, resetOverview } from '../three/camera'
+import { followRobot, frameCommandPost, overview, resetOverview } from '../three/camera'
 import { pickAftershock } from '../quake'
 import { lock, presenterLocked, unlock } from '../net/presenter'
 import { heldByOthers } from '../net/leaseState'
@@ -19,7 +19,7 @@ export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
   ['R', 'rubble ahead of the followed robot (R1 on the overview)'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
   ['U', 'resume after safe stop'], ['A', 'aftershock at a random spot (server needs DZ_AFTERSHOCK=1)'], ['⇧A', 'strong aftershock: three areas, two relays'], ['N', 'new random building (Q&A)'], ['⇧N', 'back to the main building'], ['B', 'baseline: robots without Deadzone (with control leases on: Unlock first)'], ['L', 'Model Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
-  ['M', 'one view / split view'], ['C', 'one view: swap the Command post inset and the main view'], ['Y', 'belief map: where survivors may still be'], ['E', 'Operator view / Engineering view (sidebar, scheduler, legends)'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save the mission recording (open with ?record)'],
+  ['M', 'one view / split view'], ['C', 'one view: swap the Command post inset and the main view · split view: top-down on the command post'], ['Y', 'belief map: where survivors may still be'], ['E', 'Operator view / Engineering view (sidebar, scheduler, legends)'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save the mission recording (open with ?record)'],
   ['J', 'Model test: a held-out sample (Q&A)'], ['I', 'under the hood (Q&A)'], ['?replay', 'mission replay: plays a saved mission recording, no server'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
 ]
@@ -351,7 +351,7 @@ export function useKeyboard() {
       if (key === 'm') toggleView()
       if (key === 'c' && !e.repeat) {
         if (s.view === 'gap') s.set({ insetSwap: !s.insetSwap })
-        else s.set({ toasts: [...s.toasts, { kind: 'note', msg: 'C swaps the Command post inset in one view: press M first', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
+        else frameCommandPost() // split view: top-down on the command post, again for the overview
       }
       if (key === 'y') { const on = !s.beliefOn; try { localStorage.setItem('dz-belief', on ? '1' : '0') } catch { /* session only */ } s.set({ beliefOn: on }) }
       if (key === 'e') {
