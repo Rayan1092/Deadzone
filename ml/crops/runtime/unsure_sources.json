@@ -4,12 +4,12 @@
   "unsure_person_01.png": {
    "label": "person",
    "split": "images_thermal_val (held out, never trained on)",
-   "frame": "video-zp8ed5vPKfAJ2fKWh-frame-001938-DJCRyQ7WeetwmSLnG.jpg",
+   "frame": "video-zp8ed5vPKfAJ2fKWh-frame-005941-6oERBrdPrLP9vga8Z.jpg",
    "box_xyxy": [
-    472,
-    214,
-    556,
-    298
+    394,
+    215,
+    457,
+    278
    ],
    "role": "unsure from a distance"
   },
@@ -28,12 +28,12 @@
   "unsure_object_01.png": {
    "label": "car",
    "split": "images_thermal_val (held out, never trained on)",
-   "frame": "video-nMfT5vK8MfEEjQ44W-frame-001500-ZFpATxvREwp4jKX8T.jpg",
+   "frame": "video-Qk8msXvMopoYNDdco-frame-003155-kRRgsHh4qrgkZjcv2.jpg",
    "box_xyxy": [
-    166,
-    206,
-    249,
-    289
+    395,
+    83,
+    526,
+    214
    ],
    "role": "unsure from a distance"
   },

@@ -2,7 +2,8 @@
  "threshold": 0.6,
  "layer": "features[8]",
  "size_px": 192,
- "note": "Grad-CAM for the person class. Paths are relative to /crops.",
+ "caption": "Real FLIR thermal frame, same input as the AI",
+ "note": "Grad-CAM for the person class. Paths are relative to /crops. Crops are held-out FLIR ADAS v2 frames picked by ml/real_crops.py; `object` is the decoy's role in the building, `shows` is what the real image is.",
  "crops": [
   {
    "id": "D1",
@@ -10,14 +11,18 @@
    "heatmap": "heatmaps/neg_0001.png",
    "heatmap_alpha": "heatmaps/neg_0001_alpha.png",
    "label": "not person",
-   "conf": 0.0,
+   "conf": 0.002,
    "predicted": "not person",
    "role": "decoy",
    "object": "radiator",
    "pos": [
     15.0,
     28.0
-   ]
+   ],
+   "pose": null,
+   "shows": "hot slatted panel on a vehicle (stand-in for a radiator)",
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": "video_thermal_test/data/video-ePoikf5LyTTfqchga-frame-000707-GXdT2g9hBZaTf3Pks.jpg#468,275,528,335"
   },
   {
    "id": "D2",
@@ -25,14 +30,18 @@
    "heatmap": "heatmaps/neg_0002.png",
    "heatmap_alpha": "heatmaps/neg_0002_alpha.png",
    "label": "not person",
-   "conf": 0.0,
+   "conf": 0.038,
    "predicted": "not person",
    "role": "decoy",
    "object": "engine",
    "pos": [
     37.0,
     12.0
-   ]
+   ],
+   "pose": null,
+   "shows": "hot truck machinery and fuel tanks (stand-in for an engine)",
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": "video_thermal_test/data/video-ePoikf5LyTTfqchga-frame-000617-GTN9AuR6myAx99oMy.jpg#533,319,600,386"
   },
   {
    "id": "D3",
@@ -40,14 +49,18 @@
    "heatmap": "heatmaps/neg_0003.png",
    "heatmap_alpha": "heatmaps/neg_0003_alpha.png",
    "label": "not person",
-   "conf": 0.003,
+   "conf": 0.009,
    "predicted": "not person",
    "role": "decoy",
    "object": "coffee machine",
    "pos": [
     22.0,
     28.0
-   ]
+   ],
+   "pose": null,
+   "shows": "boxy panel with two round dials (stand-in for a coffee machine)",
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": "images_thermal_val/data/video-AP7PvpujjZZGLnsJt-frame-002477-ZnhHGtXJbJcMn9TJ5.jpg#429,125,548,244"
   },
   {
    "id": "S1",
@@ -62,7 +75,11 @@
    "pos": [
     36.0,
     27.0
-   ]
+   ],
+   "pose": "crouching",
+   "shows": "person crouched low on a floor, indoor overhead view",
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": "sdt/image_t_1830.png#104,153,431,480"
   },
   {
    "id": "S2",
@@ -70,14 +87,18 @@
    "heatmap": "heatmaps/pos_0002.png",
    "heatmap_alpha": "heatmaps/pos_0002_alpha.png",
    "label": "person",
-   "conf": 0.889,
+   "conf": 1.0,
    "predicted": "person",
    "role": "survivor",
    "object": null,
    "pos": [
     29.0,
     4.0
-   ]
+   ],
+   "pose": "bent",
+   "shows": "person kneeling, bent over, indoor overhead view",
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": "sdt/image_t_1910.png#59,82,456,480"
   },
   {
    "id": "S3",
@@ -85,14 +106,18 @@
    "heatmap": "heatmaps/pos_0003.png",
    "heatmap_alpha": "heatmaps/pos_0003_alpha.png",
    "label": "person",
-   "conf": 0.999,
+   "conf": 1.0,
    "predicted": "person",
    "role": "survivor",
    "object": null,
    "pos": [
     5.0,
     26.0
-   ]
+   ],
+   "pose": "sitting",
+   "shows": "person slumped in a chair, indoor overhead view",
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": "sdt/image_t_3620.png#63,0,543,480"
   },
   {
    "id": null,
@@ -100,11 +125,15 @@
    "heatmap": "heatmaps/unsure_object_01.png",
    "heatmap_alpha": "heatmaps/unsure_object_01_alpha.png",
    "label": "not person",
-   "conf": 0.497,
+   "conf": 0.441,
    "predicted": "not person",
    "role": null,
    "object": null,
-   "pos": null
+   "pos": null,
+   "pose": null,
+   "shows": null,
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": null
   },
   {
    "id": null,
@@ -116,7 +145,11 @@
    "predicted": "not person",
    "role": null,
    "object": null,
-   "pos": null
+   "pos": null,
+   "pose": null,
+   "shows": null,
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": null
   },
   {
    "id": null,
@@ -124,11 +157,15 @@
    "heatmap": "heatmaps/unsure_person_01.png",
    "heatmap_alpha": "heatmaps/unsure_person_01_alpha.png",
    "label": "person",
-   "conf": 0.519,
+   "conf": 0.584,
    "predicted": "not person",
    "role": null,
    "object": null,
-   "pos": null
+   "pos": null,
+   "pose": null,
+   "shows": null,
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": null
   },
   {
    "id": null,
@@ -140,7 +177,11 @@
    "predicted": "person",
    "role": null,
    "object": null,
-   "pos": null
+   "pos": null,
+   "pose": null,
+   "shows": null,
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": null
   }
  ]
 }

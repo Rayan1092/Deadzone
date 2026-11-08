@@ -74,6 +74,19 @@ def render(crop_path, cam, out_dir):
     return f"heatmaps/{stem}.png", f"heatmaps/{stem}_alpha.png"
 
 
+def selection():
+    """crop file -> pose / what the image shows / source frame, from ml/real_crops.json."""
+    sel_path = ML_DIR / "real_crops.json"
+    if not sel_path.is_file():
+        return {}, None
+    sel = json.loads(sel_path.read_text(encoding="utf-8"))
+    out = {}
+    for group, prefix in (("survivors", "pos"), ("decoys", "neg")):
+        for k, e in enumerate(sel[group], 1):
+            out[f"{prefix}_{k:04d}.png"] = {"pose": e.get("pose"), "shows": e.get("shows"), "source": e["key"]}
+    return out, sel.get("caption")
+
+
 def floorplan_uses():
     """crop file -> the survivor / decoy that uses it in collapse_01."""
     fp = json.loads(FLOORPLAN.read_text(encoding="utf-8"))
@@ -99,6 +112,7 @@ def main():
     thr = float(ckpt.get("threshold", common.THRESHOLD))
     tf = common.eval_transform()
     uses = floorplan_uses()
+    picks, caption = selection()
 
     entries = []
     for p in sorted(crops.glob("*.png")):
@@ -119,11 +133,17 @@ def main():
             "role": use.get("role"),             # survivor / decoy
             "object": use.get("object"),         # decoy stand-in: radiator, engine, coffee machine
             "pos": use.get("pos"),               # where it sits in the building (m)
+            "pose": picks.get(p.name, {}).get("pose"),     # survivors: sitting / crouching / lying / bent
+            "shows": picks.get(p.name, {}).get("shows"),   # what the real image actually shows
+            "caption": caption,
+            "source": picks.get(p.name, {}).get("source"),  # FLIR split/frame#crop box (held out)
         })
         print(f"{p.name}: {entries[-1]['id']} conf {conf:.3f} -> {heatmap}")
 
-    manifest = {"threshold": thr, "layer": f"features[{LAYER}]", "size_px": OUT_PX,
-                "note": "Grad-CAM for the person class. Paths are relative to /crops.",
+    manifest = {"threshold": thr, "layer": f"features[{LAYER}]", "size_px": OUT_PX, "caption": caption,
+                "note": ("Grad-CAM for the person class. Paths are relative to /crops. Crops are held-out "
+                         "FLIR ADAS v2 frames picked by ml/real_crops.py; `object` is the decoy's role in "
+                         "the building, `shows` is what the real image is."),
                 "crops": entries}
     (crops / "manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     print(f"wrote {len(entries)} crops to {crops / 'manifest.json'}")
