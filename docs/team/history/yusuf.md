@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/ai-eye`: plan items 1–3 done (route replace, key B, AI recognition in the robot camera, phone Ask Gemini, spoken G). Next: item 4 collapse look, then 5 AI Lab (waits on Rayan's `ml/results/lab.json`).
+- **Working on:** `p3/collapse`: items 4, 5, 7, 8 done (collapse look, AI Lab L, night lighting K, auto-director D). Item 6 asset pack waits on Rayan's pack. Next: 9 multi-story shell, 10 scheduler strip, voice UI when Aziz's `/api/voice` lands.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,50 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 06:50 · p3/collapse · Items 7 + 8: night operations lighting (K), auto-director camera (D)
+- **Did:**
+  - **K, night operations** (off by default until a dry run, remembered per browser, "Night ops" chip):
+    - Sun, sky and environment drop to a weak cold moon. The truck mast gets a flood light aimed through the entrance, with a visible beam.
+    - Amber strobes on tripods stand against walls (by the truck, the corridor, the warehouse).
+    - Robot headlights become the main light, with soft beams. Lit fluorescent fittings flicker and cast light with a downward shaft.
+    - Light film grain and a deeper vignette. Light shafts are additive fading cones, so the airborne dust reads as lit.
+  - **D, auto-director** (off by default; caption "Auto camera · …" at the bottom):
+    - `link_lost`, `survivor_found` and `fault` cut to a close follow shot of that robot for 9 s. `survivor_reported` (the reveal), `aftershock` and a rerouted `rescue_route_reported` cut to the wide shot.
+    - No cut sooner than 4 s unless the news is bigger. After 12 s quiet, a slow orbit.
+    - Dragging a view, the wheel or a 0–9 key hands the camera back to the presenter for 20 s.
+  - **Tested live at 4x:** the director cut to the wide shot on "S3 reached the command post", then to a close follow on "Scout 1 lost its link, still searching". Night mode checked from the overview: robots and labels stay readable. About 37 fps day or night with the robot camera open.
+- **Contract changes:** none. New keys K and D.
+- **Heads-up for others:** Rayan: try K and D in the dry run. D is a hands-free option for the demo video. Item 6 (asset pack) is still waiting on your pack; until then the built-in models and textures stay (as in the cut order).
+- **Next:** 9 multi-story shell, 10 scheduler strip.
+
+### 2026-11-08 06:10 · p3/collapse · Item 5: AI Lab overlay (key L)
+- **Did:** glass overlay on **L** (Esc closes).
+  - **Live panel:** the crop a robot just judged (latest `survivor_found` / `hotspot_rejected`), the verdict with the real `conf`, robot and time, and a toggle for the Grad-CAM overlay (manifest `heatmap_alpha`, else the event's `heatmap`).
+  - **Held-out test panel:** accuracy, precision, recall and F1 tiles, plus a 2x2 confusion matrix with counts ("correct / missed / false alarm"), from `/ai-lab/results/metrics.json`.
+  - **Training curves:** loss and accuracy (train vs val, one measure per chart, legend plus direct labels, hover crosshair) appear only when `/ai-lab/results/lab.json` has `curve`. The colors (`#0d9488` / `#d97706`) passed the palette validator on the dark surface.
+  - **Examples:** a training-examples grid from `lab.json.examples` once exported. Until then it shows "Thermal crops in this building" from `/crops/manifest.json` (model verdict and conf per crop).
+  - **No data served:** the panel says "start the server with DZ_AI_LAB=1" and invents nothing. Vite proxies `/ai-lab` in dev.
+  - New state labels for Rayan's voice commands: `GOING_TO_POINT` "Going to point", `HOLDING` "Holding".
+  - **Tested** against Aziz's `p2/ai-lab-assets` branch with `DZ_AI_LAB=1`: real metrics (96.2 / 96.3 / 96.0 / 96.2, confusion 576 / 24 / 22 / 578), Live showed S3 by R3, then D2 rejected by R2, with Grad-CAM. The curve charts were checked with a throwaway file in a scratch worktree (deleted, never committed).
+- **Contract changes:** none. Reads Aziz's reserved `/ai-lab/results/*`; `lab.json` schema as in my plan entry.
+- **Heads-up for others:** Aziz: needs your AI Lab PR merged and `DZ_AI_LAB=1` on the demo server. Rayan: when you export `ml/results/lab.json` (`curve`, `examples` with files under `ml/results/`), the curves and the examples grid light up with no frontend change.
+- **Next:** item 6 asset pack (if Rayan's pack is in), 7 lighting, 8 auto-director.
+
+### 2026-11-08 05:30 · p3/collapse · Item 4: collapse look
+- **Did:** the Reality world now reads as a collapse (Rayan's item 3). All of it is derived from the floorplan, so generated buildings get it too, and all of it is visual only (truth grid, radio and robots unchanged; nothing blocks a path).
+  - **Outer walls:** windows every 3.6 m, three quarters blown out with shards left in the frames, and on long walls one in four becomes a ragged breach. Some interior walls longer than 6 m get a jagged breach above floor level, with broken blocks piled against both faces.
+  - **Cracks:** decals on walls and floors.
+  - **Roof:** a surviving piece of roof over each hazard zone (no-go, so it hides nothing robots do), with a broken edge and rebar hanging off it.
+  - **Beams:** a steel beam across every other room, about half of them sagging, with a fluorescent fitting swinging on its cable (some flicker, some dead).
+  - **Fallen ceiling slab:** one per rubble pile (runtime falls included), leaning on the pile.
+  - **Furniture and dust:** a bookshelf toppled face down, a filing cabinet on its side, and 700 dust motes drifting in the air (off in P mode).
+  - **Command pane:** keeps the intact building, because damage is truth.
+  - **Route flash:** a replaced rescue route flashes and its tag says "rerouted" for 2.5 s (Rayan's suggestion for the S1 reroute at 2:08 and 185 s).
+  - 60 fps measured in this browser at full quality (static damage merged per material).
+- **Contract changes:** none.
+- **Heads-up for others:** Rayan: windows, breaches and the hazard roof follow your generator's walls, hazards and rooms automatically.
+- **Next:** item 5 AI Lab.
 
 ### 2026-11-08 04:40 · p3/ai-eye · Plan items 1–3: route replace, key B, AI recognition in the robot camera, Ask Gemini, spoken briefing
 - **Did:**

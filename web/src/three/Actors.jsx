@@ -5,18 +5,23 @@ import * as THREE from 'three'
 import { useSim } from '../store'
 import { COLORS, FOG_H, w2t } from './util'
 import { materials } from './textures'
+import { LightBeam } from './NightLights'
 import { CommandRelays, RealityLinks, RealityRelays } from './Network'
 import { CommandRoutes, RealityRoutes } from './Routes'
 
 // --------------------------------------------------------------- robot body
+// At night (K) the headlights are the main light in the building, with a visible beam.
+const BEAM_Q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), new THREE.Vector3(1, -0.12, 0).normalize())
 function Headlight() {
   // the target must live in the scene graph or three.js never updates its matrix
   const tgt = useMemo(() => new THREE.Object3D(), [])
+  const night = useSim((s) => s.night)
   return (
     <>
       <primitive object={tgt} position={[3, 0, 0]} />
-      <spotLight position={[0.3, 0.3, 0]} angle={0.7} penumbra={0.6} intensity={6} distance={7}
-                 decay={1.5} color="#cffaf5" target={tgt} />
+      <spotLight position={[0.3, 0.3, 0]} angle={night ? 0.6 : 0.7} penumbra={0.55} intensity={night ? 22 : 6}
+                 distance={night ? 13 : 7} decay={1.5} color="#cffaf5" target={tgt} />
+      {night && <group position={[0.26, 0.14, 0]} quaternion={BEAM_Q}><LightBeam length={3.2} radius={1.2} color="#d9fbff" opacity={0.12} /></group>}
     </>
   )
 }

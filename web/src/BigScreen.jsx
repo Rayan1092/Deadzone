@@ -6,6 +6,8 @@ import { JoinOverlay } from './panels/JoinPanel'
 import Toasts from './panels/Toasts'
 import Timeline from './panels/Timeline'
 import ReportPanel from './panels/ReportPanel'
+import AILab from './panels/AILab'
+import { DirectorChip, useDirector } from './panels/Director'
 import { ReplayLoader } from './panels/ReplayPanel'
 import { REPLAY } from './net/replay'
 import { useSim } from './store'
@@ -13,6 +15,7 @@ import { useSim } from './store'
 export default function BigScreen() {
   useEffect(() => (REPLAY ? undefined : connectScreen()), []) // replay plays a file, no server
   useKeyboard()
+  useDirector()
   const view = useSim((s) => s.view)
   return (
     <div className="app">
@@ -27,6 +30,7 @@ export default function BigScreen() {
           </>
         )}
         <Toasts />
+        <DirectorChip />
         <ReportPanel />
       </main>
       <Sidebar />
@@ -34,6 +38,7 @@ export default function BigScreen() {
       <JoinOverlay />
       <ReplayLoader />
       <HelpOverlay />
+      <AILab />
     </div>
   )
 }

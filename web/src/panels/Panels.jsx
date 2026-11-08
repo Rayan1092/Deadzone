@@ -1,5 +1,5 @@
 import { Fragment, useEffect } from 'react'
-import { setPerf, setView, useSim } from '../store'
+import { setNight, setPerf, setView, useSim } from '../store'
 import { control } from '../net/socket'
 import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt } from '../format'
 import { JoinButton } from './JoinPanel'
@@ -11,7 +11,7 @@ import { followRobot, overview, resetOverview } from '../three/camera'
 export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
   ['R', 'rubble ahead of the robot'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
-  ['U', 'resume after safe stop'], ['A', 'aftershock (server needs DZ_AFTERSHOCK=1)'], ['B', 'baseline: robots without Deadzone'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
+  ['U', 'resume after safe stop'], ['A', 'aftershock (server needs DZ_AFTERSHOCK=1)'], ['B', 'baseline: robots without Deadzone'], ['L', 'AI Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
   ['M', 'one view / split view'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
 ]
@@ -34,6 +34,7 @@ export function TopBar() {
   const set = useSim((s) => s.set)
   const view = useSim((s) => s.view)
   const mode = useSim((s) => s.mode)
+  const night = useSim((s) => s.night)
   return (
     <header className="topbar">
       <div className="brand">DEADZONE</div>
@@ -50,6 +51,7 @@ export function TopBar() {
       )}
       <ReplayChip />
       {perf && <span className="perf-chip" title="Press P to turn off">Performance mode</span>}
+      {night && <span className="perf-chip" title="Press K to turn off">Night ops</span>}
       {mode === 'baseline' && (
         <span className="baseline-chip" title="Press B to switch Deadzone back on">Baseline · without Deadzone</span>
       )}
@@ -184,7 +186,10 @@ export function useKeyboard() {
       const target = robots.find((r) => r.id === s.follow) ?? robots[0]
       const key = e.key.toLowerCase()
       if (key === 'q') s.set({ joinOpen: !s.joinOpen })
-      if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null, helpOpen: false })
+      if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null, helpOpen: false, labOpen: false })
+      if (key === 'l') s.set({ labOpen: !s.labOpen })
+      if (key === 'k') setNight(!s.night)
+      if (key === 'd') { if (s.director) overview(); s.set({ director: !s.director, shot: null }) }
       if (e.key === '?' || key === 'h') s.set({ helpOpen: !s.helpOpen })
       if (key === 'v' && target) s.set({ eyeRobot: s.eyeRobot === target.id ? null : target.id })
       if (key === 'p') setPerf(!s.perf)

@@ -290,6 +290,34 @@ export function signTexture(lines, { w = 256, h = 128, bg = '#facc15', fg = '#11
   return t
 }
 
+// Crack decal: branching dark fractures on transparent, for walls and floors.
+function cracks() {
+  const S = 256
+  const c = document.createElement('canvas')
+  c.width = c.height = S
+  const ctx = c.getContext('2d')
+  const r = rng(131)
+  ctx.lineCap = 'round'
+  const branch = (x, y, ang, len, w, depth) => {
+    ctx.strokeStyle = `rgba(18,16,14,${0.55 + depth * 0.1})`
+    ctx.lineWidth = w
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    for (let i = 0; i < len; i++) {
+      ang += (r() - 0.5) * 0.9
+      x += Math.cos(ang) * 4
+      y += Math.sin(ang) * 4
+      ctx.lineTo(x, y)
+      if (depth < 3 && r() < 0.06) { ctx.stroke(); branch(x, y, ang + (r() - 0.5) * 2, len * 0.5, w * 0.6, depth + 1); ctx.beginPath(); ctx.moveTo(x, y) }
+    }
+    ctx.stroke()
+  }
+  for (let k = 0; k < 3; k++) branch(S / 2, S / 2, r() * Math.PI * 2, 30, 3, 0)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  return t
+}
+
 let cache = null
 export function materials() {
   if (!cache) {
@@ -307,6 +335,7 @@ export function materials() {
       fence: chainLink(),
       puff: puff(),
       tread: tread(),
+      cracks: cracks(),
     }
   }
   return cache
