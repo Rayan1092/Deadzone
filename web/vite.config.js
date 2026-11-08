@@ -12,6 +12,7 @@ export default defineConfig({
       '/api': { target: 'http://localhost:8000', changeOrigin: false },
       '/ws': { target: 'ws://localhost:8000', ws: true },
       '/crops': 'http://localhost:8000', // detector thermal crops (served by the backend)
+      '/ai-lab': 'http://localhost:8000', // AI Lab exports (DZ_AI_LAB=1)
     },
   },
 })

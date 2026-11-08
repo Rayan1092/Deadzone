@@ -31,6 +31,16 @@ export function setView(view) {
   useSim.getState().set({ view })
 }
 
+// K key: night operations lighting (dark interior, headlights, emergency lights). Off by
+// default until a dry run passes; remembered per browser.
+function readNight() {
+  try { return localStorage.getItem('dz-night') === '1' } catch { return false }
+}
+export function setNight(on) {
+  try { localStorage.setItem('dz-night', on ? '1' : '0') } catch { /* storage blocked: session only */ }
+  useSim.getState().set({ night: on })
+}
+
 export function setPerf(on) {
   try { localStorage.setItem('dz-perf', on ? '1' : '0') } catch { /* storage blocked: session only */ }
   useSim.getState().set({ perf: on })
@@ -58,6 +68,7 @@ export const useSim = create((set) => ({
   follow: null,        // robot id the cameras follow (keys 1-3), null = overview
   eyeRobot: null,      // robot whose forward camera is open (V key / card button)
   eyeThermal: false,   // thermal palette in the robot's-eye view
+  labOpen: false,      // L key: AI Lab overlay
   eyeFocus: null,      // the hot spot the onboard classifier just judged: { kind, subject, robot, pos, conf, linked, born }
   mode: null,          // 'deadzone' | 'baseline' | 'mixed' from hello/control (Rayan's baseline mode)
   aftershock: null,    // { at, born } of the latest aftershock, for the shake and dust
@@ -66,6 +77,9 @@ export const useSim = create((set) => ({
   detections: [],      // AI detection cards: { eid, side: 'reality' | 'command', verdict, crop, conf, ... }
   routes: {},          // Reality rescue routes from robot `rescue_route` events, by survivor id
   bigDeliveries: 0,    // count of survivor / route / fault reports delivered to CMD (antenna pulse)
+  director: false,     // D key: auto-director camera
+  shot: null,          // { caption, at } of the director's current shot
+  night: readNight(),  // K key: night operations lighting
   perf: readPerf(),    // P key: lighter rendering for a slow demo laptop (remembered per browser)
   view: readView(),    // M key: 'split' (two panes) or 'gap' (one view + Command gap), remembered
   recorder: null,      // ?record: { frames, ms, bytes } of the captured stream
