@@ -98,7 +98,12 @@ HAZARD_COST = 3.0          # ... costs this much extra per cell
 # Final contract (telemetry): `state` is one of STATES, `fault` is None or one of FAULTS.
 STATES = ("DEPLOYING", "EXPLORING", "LOST_LINK_EXPLORING", "RETURNING_TO_SIGNAL",
           "RETURNING_HOME", "REPLANNING", "FAULT", "DONE", "WAITING_FOR_LINK",
-          "GOING_TO_POINT", "HOLDING")
+          "GOING_TO_POINT", "HOLDING", "SHUTDOWN")
+# SHUTDOWN: back at the command post (DONE, including after LOW_BATTERY) with the outbox empty for
+# SHUTDOWN_AFTER_S, the robot powers down: scheduler stopped (tasks empty), lidar, camera and
+# headlights off (`lights: false` in telemetry), battery drain stops, the radio sends one final
+# telemetry bundle (state SHUTDOWN) and then nothing more. Commands are still received.
+SHUTDOWN_AFTER_S = 2.0
 
 # Direct commands (voice / phone) a robot accepts; see rayan.md voice-contract entry
 COMMANDS = ("explore_zone", "go_to", "return_home", "hold", "resume")
@@ -235,6 +240,8 @@ class Robot:
 
         self.scheduler = Scheduler()
         self.tasks = []
+        self.lights = True           # headlights (and lidar / camera power); off in SHUTDOWN
+        self.final_status_sent = False
         # Reality-side tallies for the "Under the hood" panel (Aziz sums them into tick.stats).
         # Never put in a bundle: Command learns about the robot only through delivered messages.
         # Names follow Aziz's tick.stats contract (docs/FINAL-STRETCH-BACKEND.md): detector_calls,
@@ -285,6 +292,17 @@ class Robot:
         odo = io.odometry()
         self.pose = list(odo["pose"])
         x, y, th = self.pose
+        if self.state == "SHUTDOWN":
+            # powered down at the command post: no lidar, camera, scheduler or drive; the radio
+            # still listens, and sends the one final status queued by _shutdown
+            self._read_inbox()
+            self._read_commands(io)
+            io.drive(0.0, 0.0)
+            self.cmd_v, self.v = 0.0, odo["v"]
+            if not self.final_status_sent:
+                self._emit_bundles()
+                self.final_status_sent = True
+            return
 
         angles, ranges, hits = io.lidar()
         self.map.integrate(self.pose, angles, ranges, hits)
@@ -960,6 +978,18 @@ class Robot:
             self.state = s
             self.state_since = self.t
 
+    def _shutdown(self):
+        """DONE -> SHUTDOWN: stop the scheduler, lights, lidar and camera; queue the final status."""
+        self._set_state("SHUTDOWN")
+        self.tasks = []
+        self.lights = False
+        self.lidar_pts = []
+        self.path, self.target = [], None
+        self.camera_frame = None
+        self.last_telemetry_t = -99.0            # the final status goes out on the next step
+        self.events.append({"kind": "robot_shutdown", "robot": self.id,
+                            "battery_pct": round(self.battery.pct, 1), "found": sorted(self.found)})
+
     def _behave(self):
         dark_for = self.t - self.last_link_t
         s = self.state
@@ -1049,6 +1079,12 @@ class Robot:
 
         if s == "HOLDING":
             self.path = []                   # stays put; still maps, perceives and reports
+            return
+
+        if s == "DONE":
+            # home with nothing left to send: power down (radio stays on for one final status)
+            if self.t - self.state_since >= SHUTDOWN_AFTER_S and not self.outbox:
+                self._shutdown()
             return
 
         if s == "GOING_TO_POINT":
@@ -1350,6 +1386,7 @@ class Robot:
             "fault": self.fault,
             "wheel_a": round(self.wheel_a, 2),
             "tasks": self.tasks,
+            "lights": self.lights,
             "outbox": len(self.outbox),
             "last_link_t": round(self.last_link_t, 1),
         }
