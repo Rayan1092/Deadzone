@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from .rescue import RescueRoute
 from .ack import CommandAck, STATUS_ORDER
 from .camera import delivered_frame
+from .coverage import CoverageGrid
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class CommandPost:
         self.map_sent_t = np.full((fp.h, fp.w), -np.inf)
         self.robots = {}      # id -> last telemetry + last_seen
         self.camera_telemetry = os.environ.get("DZ_CAMERA_TELEMETRY") == "1"
+        self.coverage_grid = CoverageGrid(fp) if os.environ.get("DZ_COVERAGE_GRID") == "1" else None
         self.relays = {}
         self.survivors = {}   # id -> record + reported_t
         self.faults = {}
@@ -75,6 +77,8 @@ class CommandPost:
             if prev is None or (prev["sent_t"], prev.get("revision", 0)) <= version:
                 self.relays[p["id"]] = {"id": p["id"], "pos": list(p["pos"]), "sent_t": b["created"],
                                          "revision": version[1], "beacon_for": p.get("beacon_for")}
+                if self.coverage_grid is not None:
+                    self.coverage_grid.report_relay(p)
         elif k == "telemetry":
             prev = self.robots.get(p["id"])
             camera = prev.get("camera") if self.camera_telemetry and prev else None
@@ -143,6 +147,9 @@ class CommandPost:
             self.event_history.append({"kind": "relay_reported", "id": p["id"],
                                        "received_at": round(now, 1)})
         return True
+
+    def coverage(self):
+        return {} if self.coverage_grid is None else {"coverage": self.coverage_grid.view()}
 
     def view(self, now):
         robots = []

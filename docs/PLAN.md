@@ -342,6 +342,32 @@ The door `state` is visual only (`open`, `broken`, `blocked`). A blocked door mu
 
 Row-major `uint8` array of `w * h` cells, row index = y. Values: `0` unknown, `1` free, `2` occupied, `3` no-go (hazard). Sent as base64 so a 160 x 120 map is 25.6 KB raw. Cell `(ix, iy)` covers `[ix*cell, (ix+1)*cell)` in x.
 
+### Predicted Command RSSI grid (`DZ_COVERAGE_GRID`, default off)
+
+Command samples the shared radio propagation model at every map cell center:
+`((ix+0.5)*cell, (iy+0.5)*cell)`. Each value is the strongest predicted received
+power from CMD (its configured `tx_dbm`) and relays whose latest **delivered**
+telemetry says they are on (the existing fixed 20 dBm relay model). This is a
+received-power prediction, not an end-to-end connectivity or live availability
+guarantee; relays retain their last delivered position/power state until a newer
+report arrives. Out-of-order reports do not rewind the prediction. Robot radios
+are not prediction sources.
+
+Geometry is Command's own sanitized pre-collapse prior: known walls and their
+material losses, plus known furniture when `DZ_OBSTACLES=1`, using the same
+wall-crossing code/constants as `network/propagation.py:rssi`. Hidden rubble,
+dynamic walls, live relay/robot state and Reality's link graph are never inputs.
+Delivered occupied cells alone do not establish a wall material/loss and therefore
+do not add propagation segments. Each incident reset constructs a fresh prior
+and discards delivered relay predictions/caches.
+
+Wire samples are row-major **signed int8 dBm**, rounded to the nearest integer
+(ties to even), clipped to `[-128,127]`, then zlib-compressed and base64-encoded.
+Decode `coverage.data` with base64 -> zlib inflate -> `Int8Array`; index
+`iy*coverage.w+ix` is dBm (no offset/scale). `-128` is saturated weak signal,
+not an unknown-cell sentinel. All cells, including occupied/unknown occupancy
+cells, contain a model prediction. Dimensions/resolution match the occupancy map.
+
 ### Robot telemetry (one per robot per tick, Reality view)
 
 ```json
@@ -429,6 +455,26 @@ Two WebSockets carry everything live: `/ws/screen` for the big screen and `/ws/p
 | server to screen | `event` | when it happens | `kind` + fields, used for toasts, sounds and camera cues |
 | server to screen | `report` | after `/api/report` | `text`, `generated_at` |
 | screen to server | `control` | keyboard and buttons | `action`: `start`, `pause`, `reset`, `speed`, `director` + `value` |
+
+#### Optional RSSI field (`DZ_COVERAGE_GRID`, default off)
+
+When `DZ_COVERAGE_GRID=1` at CommandPost construction/reset, screen `maps.data`
+and phone `cmd_view.data` gain the same self-contained `coverage` object:
+
+```json
+{"coverage":{"w":160,"h":120,"cell":0.25,"encoding":"zlib-base64",
+ "dtype":"int8","unit":"dBm","predicted":true,"sources":["CMD","RL1"],
+ "data":"<base64(zlib(signed int8 dBm samples))>"}}
+```
+
+`sources` lists the sorted, last-known-on transmitters used. The field has its
+own encoding, independent of the surrounding occupancy map's encoding. It is
+preserved as metadata by both existing compact protocols; negotiated screen
+`map_patch.data` also carries this object, including a coverage-only update with
+`grids:{}`. Normal map cadence is unchanged, and propagation/encoding results
+are cached until the delivered source positions/on states change. It is absent
+from per-tick `command` and AI tools. With the flag off the field is absent and
+no prediction work occurs. Frontend rendering is a separate follow-up.
 
 #### Compact screen maps (`DZ_COMPACT_STREAM`, default off)
 
