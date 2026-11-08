@@ -1177,7 +1177,7 @@ class Robot:
         if self.explorer is not None and self.state in ("EXPLORING", "LOST_LINK_EXPLORING"):
             if self.explorer.scan_left > .05 and self.t < self.explorer.scan_deadline:
                 return 0.0, 1.8
-            trav = self._trav()
+            trav = self._drive_trav()     # same mask the path was planned on: never shortcut across a person
             while self.path and math.dist(self.path[0], (x, y)) < .35:
                 if (len(self.path) > 1 and math.dist(self.path[0], (x, y)) > .1
                         and not line_clear(trav, (x, y), self.path[1], self.cell)):

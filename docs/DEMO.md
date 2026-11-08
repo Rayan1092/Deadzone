@@ -46,8 +46,10 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    $env:DZ_AI_LAB=1       # key L (serves ml/results and docs/assets read-only)
    $env:DZ_GEMINI=1       # G briefing and phone Ask through Gemini (GEMINI_API_KEY in server/.env); passed the testing-laptop dry run
    # $env:DZ_VOICE=1      # voice commands: robot side and Aziz's /api/voice are on main; the push-to-talk UI isn't yet, and leases block B/U (below)
+   $env:DZ_SENSOR_VIEW=1  # safe: Aziz's Reality-only robot camera frames (#82) for Yusuf's renderer; the demo guard stays green with it on
+   # DZ_EXPLORATION_V2    # must stay unset (0) for the main run: Aziz's opt-in exploration policy (#77) moves every beat below
    ```
-   **Don't set `DZ_VOICE` or `DZ_CONTROL_LEASES` for the main run:** with control leases on, **B** and **U** from the big screen need robot leases it doesn't hold, so they fail with a toast. R, F, O and A are not affected.
+   **Don't set `DZ_VOICE`, `DZ_CONTROL_LEASES` or `DZ_EXPLORATION_V2` for the main run.** With control leases on, **B** and **U** from the big screen need robot leases it doesn't hold, so they fail with a toast (R, F, O and A are not affected). With `DZ_EXPLORATION_V2=1` the robots explore differently and every beat in the beat sheet moves (S3 found at 23.8 s instead of 14.4, S2 found at 106 s instead of 246). `DZ_SENSOR_VIEW=1` is safe: it only adds camera frames to the Reality pane.
 5. Open `http://localhost:8000` on the big screen. Phones join with **Q** (QR) on the same Wi-Fi, or on the phone hotspot. Phone microphones need https: use Aziz's tunnel (`scripts/demo_tunnel.py`, see its docs) if voice or the mic is part of the run.
 6. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
 7. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped recording, and keep the file on the demo laptop.
