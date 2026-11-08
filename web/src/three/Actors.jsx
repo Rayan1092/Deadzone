@@ -12,6 +12,7 @@ import RoverModel from './RoverModel'
 import Human from './Human'
 import { SeatChair } from './Props'
 import { cropEntry, useCropManifest } from '../crops'
+import { planCaption, zoneLabel } from '../format'
 import { LightBeam } from './NightLights'
 import { CommandRelays, RealityLinks, RealityRelays } from './Network'
 import { CommandRoutes, RealityRoutes } from './Routes'
@@ -391,7 +392,23 @@ export function RealityActors({ gap = false }) {
   const reportedIds = (tick?.command.survivors ?? []).map((s) => s.id)
   const reportBirths = useBirths(reportedIds) // when Command learned each (gap view reveal)
   const manifest = useCropManifest()
+  const dispatched = useSim((s) => s.dispatchedPlans)
+  const plan = useSim((s) => s.plan)
+  const zoneSeen = useRef(new Map()) // robot -> { key: plan|zone, at }: a new zone gets a short caption
   if (!tick || !fp) return null
+  const now = performance.now()
+  // the line under a robot's name: off, holding, plan not delivered yet, then for 8 s after it
+  // starts a zone "→ Zone 3" (so the tag reads "Scout 2 → Zone 3"); plain words, no glow
+  const caption = (r) => {
+    const key = `${r.plan_id}|${r.zone}`
+    const seen = zoneSeen.current.get(r.id)
+    if (!seen || seen.key !== key) zoneSeen.current.set(r.id, { key, at: seen ? now : -Infinity }) // not on page load
+    if (r.state === 'SHUTDOWN') return 'powered down'
+    const c = planCaption(r, { dispatched, plan })
+    if (c?.kind === 'holding' || c?.kind === 'pending') return c.text
+    if (c?.kind === 'zone' && now - zoneSeen.current.get(r.id).at < 8000) return `→ ${zoneLabel(r.zone)}`
+    return r.link.up ? null : 'no link'
+  }
   const { robots } = tick.reality
   const found = new Set(survivors_found.map((s) => s.id))
   const foundBy = new Map(survivors_found.map((s) => [s.id, s]))
@@ -401,7 +418,7 @@ export function RealityActors({ gap = false }) {
         <group key={r.id}>
           {/* Rayan's SHUTDOWN: back at command, powered down (lights, lidar and camera off) */}
           <RobotBody pose={r.pose} color={r.color} tag={r.id} label={r.name} linkUp={r.link.up} powered={r.lights !== false}
-                     sub={r.state === 'SHUTDOWN' ? 'powered down' : r.link.up ? null : 'no link'} />
+                     sub={caption(r)} />
           {r.lights !== false && <Lidar robot={r} />}
           {r.path.length > 1 && (
             <Line points={[[r.pose[0], 0.06, -r.pose[1]], ...r.path.map(([px, py]) => [px, 0.06, -py])]}

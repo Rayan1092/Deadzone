@@ -13,12 +13,12 @@ export const STATE_LABEL = {
   HOLDING: 'Holding',
   WAITING_FOR_LINK: 'No link, waiting', // baseline mode: no Deadzone, the robot stops until it hears CMD
   SHUTDOWN: 'Back at command, powered down', // Rayan's SHUTDOWN after DONE
-  WAITING: 'Holding: no-go blocks all routes', // Rayan's P0: a no-go left nothing reachable; it resumes when the no-go changes
+  WAITING: 'Holding · no-go blocks all routes', // Rayan's P0: a no-go left nothing reachable; it resumes when the no-go changes
 }
 
-// A robot's state in judge words. Holding because a no-go left it nothing reachable says so,
+// A robot's state in plain words. Holding because a no-go left it nothing reachable says so,
 // so it reads as obeying the responders, not as a frozen robot.
-export const NO_GO_HOLD = 'Holding: no-go blocks all routes'
+export const NO_GO_HOLD = 'Holding · no-go blocks all routes'
 export function robotStateLabel(r) {
   if (!r) return ''
   if (r.state === 'WAITING' || /no reachable area/i.test(r.plan_state ?? '')) return NO_GO_HOLD
@@ -194,4 +194,29 @@ export const SCENARIO_TAG = 'Scenario event'
 export function radioFailBanner(ev, label) {
   const lost = ev.lost_bundles ? ` · ${ev.lost_bundles} bundle${ev.lost_bundles === 1 ? '' : 's'} lost` : ''
   return { title: 'RADIO FAILURE', sub: `${SCENARIO_TAG} · ${label || `relay ${ev.relay} lost its radio`}${lost}`, tone: 'alert' }
+}
+
+// ------------------------------------------------------------------ plan captions
+// "Zone 3" for a zone id Z3, else "Zone ZNE"
+export function zoneLabel(id) {
+  if (!id) return null
+  const m = /^Z(\d+)$/i.exec(id)
+  return `Zone ${m ? m[1] : id}`
+}
+
+// What a robot card and the robot's on-scene caption say about the search plan (Reality: the
+// robot's own telemetry). Holding (a no-go left nothing reachable) comes first; then a dispatched
+// plan that gives this robot a zone but has not reached it ("plan pending · robot dark" while it
+// has no link); then the zone it is searching ("Scout 2 → Zone 3"). null when there is nothing to say.
+// `dispatched`: plan ids with an accepted dispatch; `plan`: the shared plan (its zones name robots).
+export function planCaption(r, { dispatched = [], plan = null } = {}) {
+  if (!r) return null
+  if (r.state === 'WAITING' || /no reachable area/i.test(r.plan_state ?? '')) return { kind: 'holding', text: NO_GO_HOLD }
+  const latest = dispatched.at(-1)
+  const assigned = latest && plan?.plan_id === latest && (plan.zones ?? []).some((z) => z.robot === r.id)
+  if (assigned && r.plan_id !== latest) {
+    return { kind: 'pending', text: r.link?.up === false ? 'plan pending · robot dark' : 'plan pending' }
+  }
+  if (r.plan_id && r.zone) return { kind: 'zone', text: `${r.name ?? r.id} → ${zoneLabel(r.zone)}` }
+  return null
 }
