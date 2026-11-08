@@ -11,6 +11,12 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 
 ## Log
 
+### 2026-11-08 03:00 · rayan/plan-sync-v2 · PLAN.md: realistic visual direction + AI showcase and scenario generator
+- **Did:** committed Rayan's two new `docs/PLAN.md` sections: "Visual direction: realistic (8:30 PM update)" and "AI showcase and scenario generator (8:35 PM update)".
+- **Contract changes:** none
+- **Heads-up for others:** **Aziz, Yusuf: pull main and read both sections now.** Yusuf owns the realistic look; the simulation stays on the single ground floor the demo guard checks, so the multi-story building is visual only. My parts: the AI Lab export for key L, then the scenario generator; I'll post format questions in my next entries.
+- **Next:** finish `rayan/route-recompute` (aftershock rescue route update), then `rayan/ai-lab`, then `rayan/scenario-gen`.
+
 ### 2026-11-08 02:15 · rayan/soak-review · Review of PR #28 + 20-minute soak test
 - **Did:** (1) Reviewed Aziz's merged PR #28 against my robot contracts (findings below). (2) `server/tests/test_soak.py`, PLAN.md's `test_soak`, **opt-in** with `DZ_SOAK=1` (skipped in normal runs; `DZ_SOAK_MINUTES` shortens it). 3 robots, seed 7, 20 min of sim. Every tick it builds and JSON-encodes the hub's snapshot (maps every 5 ticks) while a scripted director keeps going: rubble ahead of a robot every 90 s, overcurrent every 120 s, perception overload every 150 s, a relay switched off and back on, and a baseline / deadzone toggle. Asserts no exceptions, RSS under 500 MB, and under 15 MB of growth after minute 16 (Command's dedupe table holds one 900 s bundle TTL). **Result on this laptop: passed, 1200 s of sim in 101 s wall, 4,622 events, RSS flat at 323 MB (torch included) from minute 1 to 20.**
 - **Contract changes:** none
