@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/ai-eye`: plan items 1–3 done (route replace, key B, AI recognition in the robot camera, phone Ask Gemini, spoken G). Next: item 4 collapse look, then 5 AI Lab (waits on Rayan's `ml/results/lab.json`).
+- **Working on:** `p3/collapse`: item 4 collapse look done; item 5 AI Lab (key L) next. Items 1–3 merged (#65).
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,21 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 05:30 · p3/collapse · Item 4: collapse look
+- **Did:** the Reality world now reads as a collapse (Rayan's item 3). All of it is derived from the floorplan, so generated buildings get it too, and all of it is visual only (truth grid, radio and robots unchanged; nothing blocks a path).
+  - **Outer walls:** windows every 3.6 m, three quarters blown out with shards left in the frames, and on long walls one in four becomes a ragged breach. Some interior walls longer than 6 m get a jagged breach above floor level, with broken blocks piled against both faces.
+  - **Cracks:** decals on walls and floors.
+  - **Roof:** a surviving piece of roof over each hazard zone (no-go, so it hides nothing robots do), with a broken edge and rebar hanging off it.
+  - **Beams:** a steel beam across every other room, about half of them sagging, with a fluorescent fitting swinging on its cable (some flicker, some dead).
+  - **Fallen ceiling slab:** one per rubble pile (runtime falls included), leaning on the pile.
+  - **Furniture and dust:** a bookshelf toppled face down, a filing cabinet on its side, and 700 dust motes drifting in the air (off in P mode).
+  - **Command pane:** keeps the intact building, because damage is truth.
+  - **Route flash:** a replaced rescue route flashes and its tag says "rerouted" for 2.5 s (Rayan's suggestion for the S1 reroute at 2:08 and 185 s).
+  - 60 fps measured in this browser at full quality (static damage merged per material).
+- **Contract changes:** none.
+- **Heads-up for others:** Rayan: windows, breaches and the hazard roof follow your generator's walls, hazards and rooms automatically.
+- **Next:** item 5 AI Lab.
 
 ### 2026-11-08 04:40 · p3/ai-eye · Plan items 1–3: route replace, key B, AI recognition in the robot camera, Ask Gemini, spoken briefing
 - **Did:**

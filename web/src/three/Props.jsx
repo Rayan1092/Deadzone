@@ -405,7 +405,8 @@ export function Interior({ cold: isCold = false }) {
       <At x={18.75} y={21.4} rot={E}><Chair M={M} /></At>
       <At x={18.5} y={26.2} rot={E + 1}><Chair M={M} tipped /></At>
       <At x={10.11} y={23.5} rot={W}><Whiteboard M={M} /></At>
-      <At x={12.6} y={29.67} rot={N}><Bookshelf M={M} len={1.8} /></At>
+      {/* bookshelf toppled face down off the north wall */}
+      <At x={12.6} y={29.4} rot={N}><group rotation={[Math.PI / 2, 0, 0]} position={[0, 0.17, -0.2]}><Bookshelf M={M} len={1.8} /></group></At>
       <At x={15} y={28} rot={0.25}><Radiator M={M} /></At>
       <At x={16.5} y={21}><Papers M={M} n={5} seed={23} /></At>
       {/* Break room */}
@@ -428,7 +429,7 @@ export function Interior({ cold: isCold = false }) {
       <At x={31.5} y={10.2} rot={E}><Desk M={M} /></At>
       <At x={30.4} y={9.5} rot={E + 0.8}><Chair M={M} tipped /></At>
       <At x={24.45} y={2} rot={W}><FilingCabinet M={M} /></At>
-      <At x={24.45} y={2.5} rot={W}><FilingCabinet M={M} /></At>
+      <At x={24.9} y={3.4} rot={W + 0.3}><group rotation={[0, 0, -Math.PI / 2]} position={[0.66, 0.3, 0]}><FilingCabinet M={M} /></group></At>
       <At x={27} y={8}><Papers M={M} n={6} seed={41} /></At>
       {/* Corridor */}
       <At x={8} y={13.1} rot={S}><Extinguisher M={M} /></At>

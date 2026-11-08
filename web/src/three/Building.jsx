@@ -6,6 +6,7 @@ import { materials, tiledSet } from './textures'
 import Baked from './Baked'
 import Debris from './Debris'
 import { CommandPost, GasLeak, Interior, Lot } from './Props'
+import { CollapseLive, CollapseStatic, WallDetails, holedWallGeometry, wallDamage } from './Collapse'
 
 // Thermal palette for the robot's-eye view: everything cold reads as deep blue.
 const COLD = { floor: '#070b1f', wall: '#1d3a8a', wallGlow: '#0b1d5c' }
@@ -24,8 +25,19 @@ function wallSurface(material, len, h) {
   return { ...tiledSet(m.concrete, len / 2, h / 2), roughness: 0.88, color: '#c9c6c0' }
 }
 
-function SolidWall({ len, thick, material, mode }) {
-  const surf = useMemo(() => (mode === 'plain' ? wallSurface(material, len + thick, WALL_H) : null), [mode, material, len, thick])
+// Same surfaces for an extruded wall, whose UVs are in meters (repeat = 1 / tile size).
+function holedSurface(material) {
+  const m = materials()
+  if (material === 'brick') return { ...tiledSet(m.brick, 1 / 1.6, 1 / 1.6), roughness: 0.92, color: '#d9d2cc' }
+  if (material === 'drywall') return { ...tiledSet(m.plaster, 0.5, 1 / WALL_H), roughness: 0.9, color: '#ffffff' }
+  return { ...tiledSet(m.concrete, 0.5, 0.5), roughness: 0.88, color: '#c9c6c0' }
+}
+
+function SolidWall({ len, thick, material, mode, damage }) {
+  const holed = mode === 'plain' && damage && (damage.windows.length || damage.breaches.length)
+  const surf = useMemo(() => (mode !== 'plain' ? null : holed ? holedSurface(material) : wallSurface(material, len + thick, WALL_H)),
+    [mode, material, len, thick, holed])
+  const geom = useMemo(() => (holed ? holedWallGeometry(len + thick, thick, damage) : null), [holed, len, thick, damage])
   if (mode !== 'plain') {
     const p = mode === 'blueprint' ? PRINT : COLD
     return (
@@ -37,10 +49,16 @@ function SolidWall({ len, thick, material, mode }) {
   }
   return (
     <>
-      <mesh position={[0, WALL_H / 2, 0]} castShadow receiveShadow>
-        <boxGeometry args={[len + thick, WALL_H, thick]} />
-        <meshStandardMaterial {...surf} normalScale={[0.8, 0.8]} />
-      </mesh>
+      {geom ? (
+        <mesh geometry={geom} castShadow receiveShadow>
+          <meshStandardMaterial {...surf} normalScale={[0.8, 0.8]} />
+        </mesh>
+      ) : (
+        <mesh position={[0, WALL_H / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[len + thick, WALL_H, thick]} />
+          <meshStandardMaterial {...surf} normalScale={[0.8, 0.8]} />
+        </mesh>
+      )}
       <mesh position={[0, WALL_H + 0.012, 0]} receiveShadow>
         <boxGeometry args={[len + thick + 0.01, 0.024, thick + 0.02]} />
         <meshStandardMaterial color={CAP} roughness={0.8} />
@@ -97,7 +115,27 @@ function Gate({ width }) {
   )
 }
 
-function Walls({ walls, mode }) {
+// Wall-local frame for a wall segment: centered, x along the wall.
+function wallFrame(w) {
+  const [ax, ay] = w.a
+  const [bx, by] = w.b
+  return { pos: w2t((ax + bx) / 2, (ay + by) / 2, 0), ang: Math.atan2(by - ay, bx - ax), len: Math.hypot(bx - ax, by - ay) }
+}
+
+// Window frames, glass, breach rubble and cracks for every damaged wall (static: baked).
+function WallDamageLayer({ walls, damage }) {
+  return walls.map((w, i) => {
+    if (!damage[i]) return null
+    const f = wallFrame(w)
+    return (
+      <group key={i} position={f.pos} rotation={[0, f.ang, 0]}>
+        <WallDetails damage={damage[i]} thick={THICK[w.material] ?? 0.2} />
+      </group>
+    )
+  })
+}
+
+function Walls({ walls, mode, damage }) {
   return walls.map((w, i) => {
     const [ax, ay] = w.a
     const [bx, by] = w.b
@@ -108,7 +146,7 @@ function Walls({ walls, mode }) {
       <group key={i} position={w2t((ax + bx) / 2, (ay + by) / 2, 0)} rotation={[0, ang, 0]}>
         {w.material === 'metal'
           ? <FenceWall len={len} mode={mode} />
-          : <SolidWall len={len} thick={thick} material={w.material} mode={mode} />}
+          : <SolidWall len={len} thick={thick} material={w.material} mode={mode} damage={damage?.[i]} />}
       </group>
     )
   })
@@ -219,10 +257,13 @@ function staticRubble(fp) {
 // `props`: furniture and decoy objects (Reality only; the command post's floorplan has none).
 export default function Building({ thermal = false, blueprint = false, props = true }) {
   const fp = useSim((s) => s.floorplan)
+  const perf = useSim((s) => s.perf)
+  const mode = blueprint ? 'blueprint' : thermal ? 'thermal' : 'plain'
+  // collapse damage is truth: Reality panes only (the Command pane keeps the intact plan)
+  const damage = useMemo(() => (fp && props && mode === 'plain' ? wallDamage(fp) : null), [fp, props, mode])
   if (!fp) return null
   const [W, H] = fp.size
   const [cx, cy] = fp.command_post.pos
-  const mode = blueprint ? 'blueprint' : thermal ? 'thermal' : 'plain'
   return (
     <group>
       {mode === 'plain' ? <Lot W={W} H={H} /> : (
@@ -233,7 +274,7 @@ export default function Building({ thermal = false, blueprint = false, props = t
       )}
       {mode === 'plain' && <Slab W={W} H={H} />}
       {mode === 'plain' && fp.rooms.map((r) => <RoomFloor key={r.id} room={r} />)}
-      <Walls walls={fp.walls} mode={mode} />
+      <Walls walls={fp.walls} mode={mode} damage={damage} />
       {/* aftershock walls are truth geometry: Reality panes only, never Command or the inset */}
       {props && fp.dynamic_walls?.length > 0 && <Walls walls={fp.dynamic_walls} mode={mode} />}
       <Baked deps={[fp, mode, props]}>
@@ -242,7 +283,10 @@ export default function Building({ thermal = false, blueprint = false, props = t
         {!blueprint && <Debris rubble={props ? fp.rubble ?? NO_RUBBLE : staticRubble(fp)} cold={thermal} />}
         {props && !blueprint && <Interior fp={fp} cold={thermal} />}
         {!blueprint && <CommandPost pos={[cx, cy]} cold={thermal} />}
+        {damage && <WallDamageLayer walls={fp.walls} damage={damage} />}
+        {damage && <CollapseStatic fp={fp} />}
       </Baked>
+      {damage && <CollapseLive fp={fp} dust={!perf} />}
       {mode === 'plain' && (fp.hazards ?? []).map((hz) => <GasLeak key={hz.id} hazard={hz} />)}
       {blueprint && (
         <mesh position={w2t(cx, cy, 0.5)}>

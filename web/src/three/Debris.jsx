@@ -94,6 +94,11 @@ function layout(rubble) {
         })
       }
     }
+    // the ceiling slab that came down here, one edge on the floor and one up on the pile
+    const lean = 0.55 + r() * 0.25
+    slabs.push({ pos: w2t(cx + (r() - 0.5) * hx * 0.6, cy + (r() - 0.5) * hy * 0.6, top * 0.5 + 0.15),
+      rot: [lean * (r() > 0.5 ? 1 : -1), r() * Math.PI, (r() - 0.5) * 0.25],
+      size: [Math.min(1.9, hx * 1.4 + 0.3), 0.18, Math.min(2.0, hy * 1.4 + 0.4)] })
     if (top >= 1.5) {
       beams.push({
         pos: w2t(cx - hx * 0.1, cy, top * 0.55),
