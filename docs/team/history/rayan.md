@@ -12,9 +12,9 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 ## Log
 
 ### 2026-11-09 10:45 · rayan/readme-keys · README key table matches the screen's help (H) and DEMO.md
-- **Did:** the README key table now follows the web's own help list (`web/src/panels/keys.js`, key H) and DEMO.md: E, T, K, S and `?` removed; H (help), Esc, I (under-the-hood counters) and W (predicted radio coverage) added; C described for both views; Shift+N "back to the main scenario"; Space opens from the street shot. The README no longer mentions T or S elsewhere (the recording section says "save the recording" until Yusuf confirms how; then that sentence goes into DEMO.md's recording step too). The mission clock is mentioned in the top bar.
+- **Did:** the README key table now follows the web's own help list (`web/src/panels/keys.js`, key H) and DEMO.md: E, T, K, S and `?` removed; H (help), Esc, I (under-the-hood counters) and W (predicted radio coverage) added; C described for both views; Shift+N "back to the main scenario"; Space opens from the street shot. The README no longer mentions T or S elsewhere. Recording, from Yusuf's file: open the page with `?record`, then click the **REC** chip ("Save the mission recording"); that sentence is now in DEMO.md's recording step and the README. The mission clock is mentioned in the top bar.
 - **Contract changes:** none.
-- **Heads-up for others:** **Yusuf:** how is a mission recording saved now that S is gone? One sentence in your file and I'll put it in DEMO.md and the README.
+- **Heads-up for others:** **Yusuf:** thanks, your REC chip sentence is in DEMO.md and the README.
 - **Next:** hold (code freeze 11:15).
 
 ### 2026-11-09 10:10 · rayan/hardware-readme · hardware/README.md: the io boundary on real hardware, a ROS 2 stub, one diagram

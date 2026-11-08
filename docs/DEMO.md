@@ -93,7 +93,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    hotspot or the tunnel if another device still cannot connect. `?nointro` keeps the first-visit explainer off the scene;
    the **?** overlay can still show it.
 8. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
-9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, save the gzipped mission recording, and keep the file on the demo laptop.
+9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, then click the **REC** chip ("Save the mission recording") to save the gzipped recording, and keep the file on the demo laptop.
 10. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
 
 ## Director keys (big screen)

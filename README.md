@@ -158,7 +158,7 @@ Press **L** (server started with `DZ_AI_LAB=1`): training examples, the training
 
 ### Mission recording and replay
 
-Open `http://localhost:8000/?record`, run the mission and save the recording: the browser downloads a gzipped recording of everything both views showed. Open `/?replay` and drop the file in to watch it again without the simulator (Space pauses, Backspace restarts); the detection images load only while a server is running.
+Open `http://localhost:8000/?record`, run the mission, then click the **REC** chip ("Save the mission recording"): the browser downloads a gzipped recording of everything both views showed. Open `/?replay` and drop the file in to watch it again without the simulator (Space pauses, Backspace restarts); the detection images load only while a server is running.
 
 ### Optional features
 
