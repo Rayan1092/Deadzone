@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
+from .command.crdt import MergeBatch, PlanSync
 from .command.controls import AskQuestion, FaultRequest, RelayPlace, RelayPower, director_adapter
 from .command.reports import command_report
 from .command.safety import SafetyChecker
@@ -64,6 +65,7 @@ class Hub:
     def _init_plans(self):
         checker = SafetyChecker(self.sim.prior, self.sim.robot_specs, self.sim.energy_time_scale)
         self.plans = PlanManager(self.sim, checker)
+        self.plan_sync = PlanSync(self.plans)
 
     def envelope(self, t, data):
         self.seq += 1
@@ -138,6 +140,7 @@ class Hub:
         await self.send_all(self.screens, message)
 
     async def dispatch(self, plan_id):
+        self.plan_sync.assert_valid(plan_id)
         was_dispatched = plan_id in self.plans.dispatched
         result = self.plans.dispatch(plan_id)
         if result["ok"]:
@@ -156,6 +159,7 @@ class Hub:
             "map": base64.b64encode(self.sim.post.map.tobytes()).decode()}
 
     async def check_plan(self, plan_id):
+        self.plan_sync.assert_valid(plan_id)
         result = self.plans.check(plan_id)
         await self.send_all(self.phones, self.envelope("safety", result))
         if not result["ok"]:
@@ -187,6 +191,7 @@ class Hub:
         if kind == "plan_edit":
             plan = SearchPlan.model_validate({**data, "author": client})
             state = self.plans.save(plan)
+            self.plan_sync.invalidate(plan.plan_id)
             await self.plan_state(state)
         elif kind == "plan_submit":
             ref = PlanRef.model_validate(data)
@@ -345,10 +350,42 @@ def floorplan():
 @app.post("/api/plan")
 async def save_plan(plan: SearchPlan, check: bool = True):
     state = hub.plans.save(plan)
+    hub.plan_sync.invalidate(plan.plan_id)
     await hub.plan_state(state)
     if not check:
         return {"saved": True, "plan_id": plan.plan_id, "checked": False}
     return await hub.check_plan(plan.plan_id)
+
+
+def require_plan_sync():
+    if os.environ.get("DZ_CRDT") != "1":
+        raise PlanError("feature_disabled", "Enable DZ_CRDT=1 for an offline planning dry run", 409)
+
+
+async def publish_sync(state):
+    planners = {ws for ws, (_, role) in hub.phone_sessions.items() if role == "planner"}
+    await hub.send_all(planners, hub.envelope("plan_sync", state))
+    if state["valid"]:
+        await hub.plan_state(state["plan"])
+    return state
+
+
+@app.put("/api/plan-sync")
+async def seed_sync(plan: SearchPlan):
+    require_plan_sync()
+    return await publish_sync(hub.plan_sync.seed(plan))
+
+
+@app.get("/api/plan-sync")
+def read_sync(plan_id: str):
+    require_plan_sync()
+    return hub.plan_sync.state(PlanRef(plan_id=plan_id).plan_id)
+
+
+@app.post("/api/plan-sync")
+async def merge_sync(batch: MergeBatch):
+    require_plan_sync()
+    return await publish_sync(hub.plan_sync.merge(batch))
 
 
 @app.post("/api/dispatch")
