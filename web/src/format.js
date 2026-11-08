@@ -39,7 +39,8 @@ export function fmtClock(t) {
 // One line per event, used by the sidebar feed and the toasts.
 export function describeEvent(e) {
   switch (e.kind) {
-    case 'survivor_found': return `${e.robot} found ${e.survivor}, confirmed by onboard AI${e.linked ? '' : ' (no link, holding the report)'}`
+    case 'survivor_found': return `${e.robot} found ${e.survivor}, confirmed by onboard AI${e.looked_closer ? ' after a closer look' : ''}${e.linked ? '' : ' (no link, holding the report)'}`
+    case 'hotspot_unsure': return `${e.robot}: ${e.say ?? 'AI unsure, moving closer'} (hot spot ${e.id})`
     case 'survivor_reported': return `${e.survivor} reached the command post (${e.delay_s}s after detection)`
     case 'link_lost': return `${e.robot} lost link, keeps exploring`
     case 'link_restored': return e.dark_s ? `${e.robot} back online after ${Math.round(e.dark_s)}s dark` : `${e.robot} link restored`
@@ -50,7 +51,7 @@ export function describeEvent(e) {
       if (/^R\d+$/.test(e.owner ?? '')) return `${e.owner} left a radio relay (${e.id})`
       return e.owner ? `Phone ${e.owner} joined as relay ${e.id}` : `Relay ${e.id} placed`
     case 'relay_power': return `${e.phone ? `Phone relay ${e.id}` : `Relay ${e.id}`} switched ${e.on ? 'on' : 'off'}`
-    case 'hotspot_rejected': return `${e.robot}'s detector rejected hot spot ${e.id}: not a person`
+    case 'hotspot_rejected': return `${e.robot}'s detector rejected hot spot ${e.id}: not a person${e.looked_closer ? ', after a closer look' : ''}`
     case 'rescue_route': return e.updated
       ? `Route for rescuers to ${e.survivor} redrawn around new rubble · ${Math.round(e.length_m)} m`
       : `Route for rescuers to ${e.survivor} · ${Math.round(e.length_m)} m, avoids no-go zones${e.beacon ? `, radio beacon ${e.beacon}` : ''}`

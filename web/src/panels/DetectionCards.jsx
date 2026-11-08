@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useSim } from '../store'
-import { cropCaption, cropEntry, sentence, useCropManifest } from '../crops'
+import { cropCaption, cropEntry, useCropManifest } from '../crops'
 
 const CARD_MS = 9000
 
 // The thermal crop the onboard model judged, with its verdict. Reality shows the
-// robot's own decisions (people and rejected hot spots); Command shows a person only
-// once the report has been delivered. The model's Grad-CAM (Rayan's export) fades in over
-// the crop a moment later: where the model looked to decide.
+// robot's own decisions (people, rejected hot spots, and doubtful ones it drives closer to);
+// Command shows a person only once the report has been delivered. The model's Grad-CAM
+// (Rayan's export) fades in over the crop a moment later: where the model looked to decide.
 function Crop({ crop, entry }) {
   const [failed, setFailed] = useState(false)
   const [heatFailed, setHeatFailed] = useState(false)
@@ -28,6 +28,17 @@ function pct(conf) {
   return v >= 99.5 || v <= 0.5 ? `${Math.round(v)}%` : `${v.toFixed(1)}%`
 }
 
+function headline(c) {
+  if (c.verdict === 'unsure') return c.say ?? `AI unsure · ${pct(c.conf)}, moving closer`
+  return c.verdict === 'person' ? `Person · ${pct(c.conf)}` : `Not a person · ${pct(c.conf)}`
+}
+
+function subline(c, entry) {
+  const what = `hot spot ${c.subject}${entry?.object ? ` (${entry.object})` : ''}`
+  if (c.verdict === 'unsure') return `${what} · ${c.robot} · driving in for a close-up`
+  return c.verdict === 'person' ? `${c.subject} · seen by ${c.robot}` : `${what} · ${c.robot} · rejected`
+}
+
 // sides: which cards this pane shows, latest of each (the one-view pane shows both).
 export default function DetectionCards({ side, sides = [side] }) {
   const all = useSim((s) => s.detections)
@@ -35,11 +46,12 @@ export default function DetectionCards({ side, sides = [side] }) {
   const cards = sides.map((sd) => all.filter((c) => c.side === sd).slice(-1)[0]).filter(Boolean)
   useEffect(() => {
     if (!all.length) return
-    const oldest = all[0]
+    const end = (c) => c.at + (c.ttl ?? CARD_MS)
     const id = setTimeout(() => {
       const s = useSim.getState()
-      s.set({ detections: s.detections.filter((c) => c.eid !== oldest.eid) })
-    }, Math.max(0, oldest.at + CARD_MS - Date.now()))
+      const now = Date.now()
+      s.set({ detections: s.detections.filter((c) => end(c) > now) })
+    }, Math.max(0, Math.min(...all.map(end)) - Date.now()))
     return () => clearTimeout(id)
   }, [all])
   if (!cards.length) return null
@@ -53,18 +65,22 @@ export default function DetectionCards({ side, sides = [side] }) {
             <Crop crop={c.crop} entry={entry} />
             <div className="det-body">
               <span className="det-kicker">{c.side === 'command' ? 'Reported to command' : 'Onboard AI detector'}</span>
-              <b>{person ? `Person · ${pct(c.conf)}` : `Not a person · ${pct(c.conf)}`}</b>
-              <span className="muted small">
-                {person
-                  ? `${c.subject}${entry?.pose ? ` · ${entry.pose}` : ''} · seen by ${c.robot}`
-                  : `hot spot ${c.subject}${entry?.object ? ` (${entry.object})` : ''} · ${c.robot} · rejected`}
-              </span>
+              <b>{headline(c)}</b>
+              <span className="muted small">{subline(c, entry)}</span>
+              {c.side === 'reality' && c.confFar != null && (
+                <span className="det-closer small">
+                  {c.closer
+                    ? `unsure ${pct(c.confFar)} from afar → ${person ? 'person' : 'not a person'} ${pct(c.conf)} up close`
+                    : `unsure ${pct(c.confFar)} · could not get close, decided from afar`}
+                </span>
+              )}
               {c.side === 'reality' && person && c.linked === false && (
                 <span className="det-warn small">No link, holding the report</span>
               )}
               {c.side === 'command' && c.delay != null && <span className="muted small">arrived {c.delay}s after detection</span>}
-              {/* a decoy's image is a stand-in (a hot panel for "radiator"): say what it really shows */}
-              <span className="det-caption">{sentence(cropCaption(manifest, entry))}{!person && entry?.shows ? ` Image: ${entry.shows}.` : ''}</span>
+              {/* what the real image shows (a decoy's is a stand-in: a hot panel for "radiator"), then what it is */}
+              {entry?.shows && <span className="det-shows">{entry.shows}</span>}
+              <span className="det-caption">{cropCaption(manifest, entry)}</span>
             </div>
           </div>
         )
