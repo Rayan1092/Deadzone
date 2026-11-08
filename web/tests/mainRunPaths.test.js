@@ -13,6 +13,13 @@ const fp = read('../../data/floorplans/collapse_01.json')
 const rec = read('./fixtures/seed7-paths.json')
 const MARGIN_M = 0.15   // daylight between the robot's body and the piece
 
+// FLAGS from server/tests/test_demo_guard.py, so a changed main run makes this test ask for a re-record
+function guardFlags() {
+  const src = readFileSync(new URL('../../server/tests/test_demo_guard.py', import.meta.url), 'utf8')
+  const m = /^FLAGS = (\{[^}]*\})/m.exec(src)
+  return JSON.parse(m[1].replace(/'/g, '"'))
+}
+
 const distToPoly = ([px, py], poly) => {
   let best = Infinity
   for (let i = 0; i < poly.length; i++) {
@@ -34,7 +41,8 @@ test('the recorded paths are the main run', () => {
   assert.equal(rec.floorplan, fp.id)
   assert.equal(rec.seed, 7)
   assert.deepEqual(Object.keys(rec.paths).sort(), ['R1', 'R2', 'R3'])
-  assert.deepEqual(rec.flags, { DZ_OBSTACLES: '1', DZ_SMART_RUBBLE: '1' })
+  // the guard's main-run flags when the paths were recorded (re-record when they change)
+  assert.deepEqual(rec.flags, guardFlags())
   for (const p of Object.values(rec.paths)) assert.ok(p.length > 500 && p.at(-1)[2] > 250)
 })
 

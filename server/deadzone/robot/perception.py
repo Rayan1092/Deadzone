@@ -22,6 +22,7 @@ REPO = Path(__file__).resolve().parents[3]
 ML_DIR = REPO / "ml"
 DEFAULT_MODEL = ML_DIR / "models" / "detector.pt"
 CROP_DIR = ML_DIR / "crops" / "runtime"
+DECOY_DIR = ML_DIR / "crops" / "decoys"     # real thermal look-alikes per heat-source type
 
 
 class Passthrough:
@@ -62,7 +63,10 @@ class Detector:
         if crop_name in self.cache:
             return self.cache[crop_name]
         from PIL import Image
-        path = self.crop_dir / Path(crop_name).name   # no path traversal out of crop_dir
+        name = Path(crop_name).name                   # no path traversal out of the crop folders
+        # "decoys/<type>_NN.png": the decoy crop pool (ml/make_decoy_pool.py), next to the runtime crops
+        folder = DECOY_DIR if str(crop_name).replace("\\", "/").startswith("decoys/") else self.crop_dir
+        path = folder / name
         try:
             img = Image.open(path)
             img.load()
