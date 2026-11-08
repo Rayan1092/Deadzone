@@ -5,7 +5,7 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 ## Now
 
 - **Role:** Aziz = backend/network/simulation/Command APIs, serving and integration tests. Yusuf = web/camera/phone UX; Rayan = robot policy/ML/maps. No new owner-source implementation in this audit.
-- **Working on:** `p2/demo-refresh`: refresh stale venue tunnel/backend (10-15 min), then short G briefing. Startup CLI contract before code: add `--no-leases` for the fixed demo, preserving existing launcher defaults; reject `--voice --no-leases` because voice requires leases. No API/message changes. Use current main runtime, AI Lab on, G/Ask enabled for Rayan/user use without making provider calls here; optional experiment flags remain off.
+- **Working on:** `p2/demo-refresh`: refresh stale venue tunnel/backend (10-15 min), then short G briefing. Startup CLI contract before code: add `--no-leases` for the fixed demo, preserving existing launcher defaults; reject `--voice --no-leases` because voice requires leases. Add independent DZ_MIC_CHECK=1 diagnostic gate so mic preflight does not require control leases; launcher sets it in both profiles. No API/message changes. Use current main runtime, AI Lab on, G/Ask enabled for Rayan/user use without making provider calls here; optional experiment flags remain off.
 - **Audit basis:** pulled main `d2cfbde`, including PLAN.md's V2/voice/leases/9:50 PM sections and newest team histories. #81 owner artifacts and #82 actual sensor backend are now MERGED. #83 asset pack is also merged; README asks Yusuf to copy selected files into web/public/assets, so no speculative backend mount is needed unless he requests one.
 
 ### Backend implemented on main (acceptance tracked separately)
@@ -16,7 +16,7 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 - [x] Venue phone mic check passed (user report); Rayan's latest dry run confirms G returned source gemini. Ask source and ElevenLabs end-to-end acceptance are not confirmed by that G result.
 
 ### Remaining Aziz checklist (priority order; estimates before starting each)
-- [ ] Refresh the demo/tunnel backend to current main and intended flags (10-15 min). Read-only audit: port 8020 has no /api/voice/audio or /api/voice/tts and /ai-lab/results/lab.json is 404; port 8022 has those voice routes and 5 AI Lab curve points. Running services are not automatically updated by git pull. Enable DZ_AI_LAB=1; DZ_AFTERSHOCK=1 only if A is rehearsed. Voice/leases stay off for the fixed demo until the presenter/UI acceptance below.
+- [x] Refreshed demo/tunnel backend with current main code + launcher fixed-demo profile; HTTPS/API/WSS/AI Lab/quiet preload passed. New origin https://gibson-launched-quote-said.trycloudflare.com (old URL retired). Historical audit gap: Read-only audit: port 8020 has no /api/voice/audio or /api/voice/tts and /ai-lab/results/lab.json is 404; port 8022 has those voice routes and 5 AI Lab curve points. Running services are not automatically updated by git pull. Enable DZ_AI_LAB=1; DZ_AFTERSHOCK=1 only if A is rehearsed. Voice/leases stay off for the fixed demo until the presenter/UI acceptance below.
 - [ ] Shorten G to about 3 sentences / 15 s spoken, digits for numbers (15-25 min), per Rayan's latest demo-dryrun ask. Current reports.py still asks for 80-150 words. Post any additive spoken/short field contract before building; Yusuf owns playback.
 - [ ] Resolve the presenter B/U lease flow with Yusuf (30-45 min): backend B validates all robot leases and U validates its target; screen currently has no presenter grant. Preserve exclusive control/no forced takeover. Lease enforcement itself is already built.
 - [ ] Integrate startup floorplan selection and a gated generated-scenario timeline (45-60 min plus owner dry run). Clinic loader review was accepted earlier; no DZ_FLOORPLAN or timeline player is in app.py yet. Generator/headless play belongs to Rayan; clinic map approval also stays with him. Main DEMO layout and preload must stay unchanged.
@@ -27,6 +27,13 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 - **Validation baseline:** last backend suite 404 passed / 1 opt-in soak skipped; web build 737 modules passed. `server/` and `web/` source trees are unchanged from that tested integration; this checklist audit adds no runtime changes. Keep DEMO guard green, feature gates and testing-laptop dry runs; 7:30 AM freeze still applies.
 
 ## Log
+
+### 2026-11-07 PT - p2/demo-refresh - Refreshed demo backend and independent mic preflight
+- **Did:** rebuilt latest Yusuf frontend unchanged; replaced only our owned old tunnel/backend. Current API exposes voice audio/TTS routes, trained model live, AI Lab 5-point curve served, three robots paused, P-1 quietly saved (no safety_reject), baseline/deadzone B controls pass. Fixed-demo launch uses --no-leases --gemini with DZ_AI_LAB=1; voice/leases and unaccepted experiments off. No provider call/key inspected.
+- **Contract changes:** preposted --no-leases rejects --voice combination; launcher always enables independent DZ_MIC_CHECK=1 so mic diagnostics need not enable direct controls. Default standalone gate remains off. No API/message shapes changed.
+- **Validation:** final backend **404 passed, 1 skipped** (112.30 s), web build **737 modules passed**, live HTTPS HTML/assets/API/QR + screen/two-phone WSS passed. Local actual mode/reset/quiet preload/AI Lab/mic probes passed; JSON under validation/demo-refresh-*.json. New origin https://gibson-launched-quote-said.trycloudflare.com; phone/mic-check links derive from it. Existing venue mic acceptance was on old origin; physical permission/playback on this origin remains manual.
+- **Heads-up for others:** Rayan/user: G/Ask enabled for your keyed check, no calls made by Aziz; mic preflight alone is not provider acceptance. Yusuf UI untouched. CLI defaults remain leased; use --no-leases for fixed main demo until presenter flow is accepted.
+- **Next:** publish this refresh PR, then short G text (15-25 min) as a separate PR.
 
 ### 2026-11-07 PT - p2/demo-refresh - Reserve fixed-demo launcher profile before service refresh
 - **Did:** user authorized continuing the checklist; synced d2cfbde and latest team asks. Starting stale demo deployment, estimate 10-15 min. No owner UI/policy edits.
