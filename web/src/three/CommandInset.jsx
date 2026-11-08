@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import * as THREE from 'three'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import Line from './FastLine' // drei's Line relinks its shader on every new points array
 import { useSim } from '../store'
 import Building from './Building'
-import Fog from './Fog'
 import { w2t } from './util'
 import { latestRoutes, lastContact, CONTACT_STALE_S, freshDelivery } from '../format'
 
@@ -14,8 +14,8 @@ import { latestRoutes, lastContact, CONTACT_STALE_S, freshDelivery } from '../fo
 // last reported spot with a "last contact N s" counter, and a survivor appears only when its
 // report is delivered, with a short pulse. C swaps it with the main view for the reveal.
 const NONE = []
-const PULSE_S = 1          // one ring, wall seconds
-const PULSES = 2
+const PULSE_S = 1.2        // one ring when the report arrives, then the marker stays still
+const PULSES = 1
 const PAD_SMALL = { t: 40, r: 10, b: 10, l: 10 }
 // swapped: clear of the status strip and title (top) and of the building view, now the smaller box
 // in the bottom right (styles.css .pane-gap.swapped > .pane-view, 32% wide) with the AI cards above it
@@ -40,6 +40,48 @@ function TopDown({ big }) {
     camera.updateProjectionMatrix()
   }, [camera, size.width, size.height, fp, big])
   return null
+}
+
+// The map as Command knows it (maps.command, from delivered map patches only): floor it has
+// mapped is lit, walls and debris it has seen are bright, the frontier edge teal; what it has
+// not heard about stays dark. Updates only when Command's own map changes.
+function CommandMap() {
+  const grid = useSim((s) => s.grid)
+  const version = useSim((s) => s.maps.commandVersion)
+  const tex = useMemo(() => {
+    if (!grid) return null
+    const t = new THREE.DataTexture(new Uint8Array(grid.w * grid.h * 4), grid.w, grid.h, THREE.RGBAFormat)
+    t.magFilter = THREE.NearestFilter
+    t.minFilter = THREE.LinearFilter
+    t.needsUpdate = true
+    return t
+  }, [grid])
+  useEffect(() => () => tex?.dispose(), [tex])
+  useEffect(() => {
+    const map = useSim.getState().maps.command
+    if (!tex || !map || map.length !== tex.image.width * tex.image.height) return
+    const px = tex.image.data
+    const { w } = grid
+    const unknownAt = (i) => map[i] === 0
+    for (let i = 0; i < map.length; i++) {
+      const v = map[i]
+      const o = i * 4
+      const x = i % w
+      const edge = v === 1 && ((x > 0 && unknownAt(i - 1)) || (x < w - 1 && unknownAt(i + 1)) || unknownAt(i - w) || unknownAt(i + w))
+      const [r, g, b, a] = v === 2 ? [191, 219, 254, 235] : edge ? [94, 234, 212, 170] : v === 1 ? [37, 99, 235, 95] : [0, 0, 0, 0]
+      px[o] = r; px[o + 1] = g; px[o + 2] = b; px[o + 3] = a
+    }
+    tex.needsUpdate = true
+  }, [version, tex, grid])
+  if (!tex || !grid) return null
+  const W = grid.w * grid.cell
+  const H = grid.h * grid.cell
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={w2t(W / 2, H / 2, 0.02)} renderOrder={0}>
+      <planeGeometry args={[W, H]} />
+      <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
+    </mesh>
+  )
 }
 
 function Dot({ pos, color, r = 0.55 }) {
@@ -137,6 +179,7 @@ export default function CommandInset({ big = false }) {
       </div>
       {big && (
         <div className="pane-legend inset-legend">
+          <span><i className="lg-known" />Mapped by Command</span>
           <span><i className="lg-robot" />Robot, last report</span>
           <span><i className="lg-robot dark" />No contact</span>
           <span><i className="lg-survivor" />Survivor, report delivered</span>
@@ -148,8 +191,8 @@ export default function CommandInset({ big = false }) {
               camera={{ position: [20, 60, -15], zoom: 6, near: 0.1, far: 200 }}>
         <color attach="background" args={['#081325']} />
         <ambientLight intensity={1.1} />
+        <CommandMap />
         <Building blueprint />
-        <Fog which="command" cover={false} />
         <Known />
         <TopDown big={big} />
       </Canvas>
