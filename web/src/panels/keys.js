@@ -34,5 +34,6 @@ export const KEY_GROUPS = [
     ['J', 'Try to beat the model on a held-out thermal image.'],
     ['I', 'Show the live counters from under the hood.'],
     ['Y', 'Show the belief map: where survivors may still be.'],
+    ['W', 'Show the radio coverage the command post predicts: strong, weak or dead.'],
   ] },
 ]

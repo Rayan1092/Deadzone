@@ -5,7 +5,7 @@ function bytes(b64) {
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
 }
 
-async function inflate(b64) {
+export async function inflate(b64) {
   const stream = new Blob([bytes(b64)]).stream().pipeThrough(new DecompressionStream('deflate'))
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }
