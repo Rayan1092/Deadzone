@@ -139,14 +139,15 @@ export function PersonFigure({ id }) {
 // `born` (performance.now ms) plays a shockwave when Command first learns a survivor.
 const SETTLE_S = 10 // seconds a new survivor pulses and keeps its label
 
-function Survivor({ pos, label, born, id, burst = false }) {
+// tone 'pending' = found but Command doesn't know yet (gap view): amber, keeps pulsing.
+function Survivor({ pos, label, born, id, burst = false, tone = 'alert', hold = false }) {
   const ring = useRef()
   const shock = useRef()
   const light = useRef()
   const tag = useRef()
   useFrame(({ clock }) => {
     const age = born ? (performance.now() - born) / 1000 : SETTLE_S
-    const fresh = age < SETTLE_S
+    const fresh = hold || age < SETTLE_S
     if (ring.current) {
       const s = fresh ? 1 + 0.5 * ((clock.elapsedTime * 1.2) % 1) : 1
       ring.current.scale.set(s, s, s)
@@ -166,7 +167,7 @@ function Survivor({ pos, label, born, id, burst = false }) {
       <PersonFigure id={id} />
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
         <ringGeometry args={[0.95, 1.12, 48]} />
-        <meshBasicMaterial color={COLORS.red} transparent opacity={0.8} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={tone === 'pending' ? COLORS.amber : COLORS.red} transparent opacity={0.8} side={THREE.DoubleSide} />
       </mesh>
       {burst && born && (
         <mesh ref={shock} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]}>
@@ -176,7 +177,7 @@ function Survivor({ pos, label, born, id, burst = false }) {
       )}
       <pointLight ref={light} position={[0, 0.8, 0]} color={COLORS.red} intensity={3} distance={4} />
       <Html position={[0, 1.1, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
-        <div ref={tag} className="tag alert"><b>{label}</b></div>
+        <div ref={tag} className={`tag ${tone === 'pending' ? 'pending' : 'alert'}`}><b>{label}</b></div>
       </Html>
     </group>
   )
@@ -218,12 +219,14 @@ function useBirths(ids) {
   return births.current
 }
 
-export function RealityActors() {
+export function RealityActors({ gap = false }) {
   const tick = useSim((s) => s.tick)
   const fp = useSim((s) => s.floorplan)
   const showTruth = useSim((s) => s.showTruth)
   const survivors_found = firstFinds(tick?.reality.survivors_found ?? [])
   const births = useBirths(survivors_found.map((s) => s.id))
+  const reportedIds = (tick?.command.survivors ?? []).map((s) => s.id)
+  const reportBirths = useBirths(reportedIds) // when Command learned each (gap view reveal)
   if (!tick || !fp) return null
   const { robots } = tick.reality
   const found = new Set(survivors_found.map((s) => s.id))
@@ -241,10 +244,15 @@ export function RealityActors() {
       ))}
       <RealityLinks />
       <RealityRelays />
-      <RealityRoutes />
-      {survivors_found.map((s) => (
-        <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} found by ${s.by}`} born={births.get(s.id)} />
-      ))}
+      <RealityRoutes gap={gap} />
+      {gap && <GapOverlay />}
+      {survivors_found.map((s) => {
+        if (!gap) return <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} found by ${s.by}`} born={births.get(s.id)} />
+        const reported = reportedIds.includes(s.id)
+        return reported
+          ? <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} · reported to command`} born={reportBirths.get(s.id)} burst />
+          : <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} · not reported yet`} tone="pending" hold />
+      })}
       {showTruth && (fp.survivors ?? []).filter((s) => !found.has(s.id)).map((s) => (
         <TruthMarker key={s.id} pos={s.pos} id={s.id} />
       ))}
@@ -253,6 +261,26 @@ export function RealityActors() {
       ))}
     </group>
   )
+}
+
+// Gap view: a ghost where Command last heard from a dark robot, tied to the real robot.
+const GHOST_AFTER_S = 3
+function GapOverlay() {
+  const tick = useSim((s) => s.tick)
+  const time = useSim((s) => s.time)
+  if (!tick) return null
+  const real = Object.fromEntries(tick.reality.robots.map((r) => [r.id, r]))
+  return tick.command.robots.filter((c) => time - c.last_seen > GHOST_AFTER_S && real[c.id]).map((c) => {
+    const r = real[c.id]
+    return (
+      <group key={c.id}>
+        <RobotBody pose={c.pose} color="#94a3b8" ghost headlight={false} label={c.id}
+                   sub={`last report ${Math.round(time - c.last_seen)}s ago`} />
+        <Line points={[w2t(c.pose[0], c.pose[1], 0.3), w2t(r.pose[0], r.pose[1], 0.3)]} color={COLORS.amber}
+              lineWidth={1.5} dashed dashSize={0.35} gapSize={0.25} transparent opacity={0.75} />
+      </group>
+    )
+  })
 }
 
 export function CommandActors() {

@@ -1,20 +1,25 @@
 import { Fragment, useEffect } from 'react'
-import { setPerf, useSim } from '../store'
+import { setPerf, setView, useSim } from '../store'
 import { control } from '../net/socket'
 import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt } from '../format'
 import { JoinButton } from './JoinPanel'
 import { requestReport } from './ReportPanel'
 import { ReplayChip } from './ReplayPanel'
 import { RECORDING, REPLAY, saveRecording } from '../net/replay'
-import { followRobot, overview } from '../three/camera'
+import { followRobot, overview, resetOverview } from '../three/camera'
 
 export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
   ['R', 'rubble ahead of the robot'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
   ['U', 'resume after safe stop'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
-  ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
+  ['M', 'one view / split view'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
 ]
+
+function toggleView() {
+  resetOverview()
+  setView(useSim.getState().view === 'gap' ? 'split' : 'gap')
+}
 
 export function TopBar() {
   const fp = useSim((s) => s.floorplan)
@@ -27,6 +32,7 @@ export function TopBar() {
   const detector = useSim((s) => s.detector)
   const perf = useSim((s) => s.perf)
   const set = useSim((s) => s.set)
+  const view = useSim((s) => s.view)
   return (
     <header className="topbar">
       <div className="brand">DEADZONE</div>
@@ -49,6 +55,9 @@ export function TopBar() {
         <span className="mono">{speed}x</span>
         <button onClick={() => control('speed', speed * 2)}>+</button>
         <button onClick={() => control('reset')}>Reset</button>
+        <button className="view-btn" title="Switch layout (M)" onClick={toggleView}>
+          {view === 'gap' ? 'One view' : 'Split view'}
+        </button>
         {!REPLAY && <JoinButton />}
         <button className="icon-btn" title="Keys (?)" onClick={() => set({ helpOpen: true })}>?</button>
         {!REPLAY && <span className={connected ? 'conn ok' : 'conn bad'}>{connected ? 'live' : 'offline'}</span>}
@@ -175,6 +184,7 @@ export function useKeyboard() {
       if (e.key === '?' || key === 'h') s.set({ helpOpen: !s.helpOpen })
       if (key === 'v' && target) s.set({ eyeRobot: s.eyeRobot === target.id ? null : target.id })
       if (key === 'p') setPerf(!s.perf)
+      if (key === 'm') toggleView()
       if (key === 's' && RECORDING) saveRecording()
       if (key === 't') s.set({ showTruth: !s.showTruth })
       if (e.code === 'Space') { e.preventDefault(); control('toggle') }
