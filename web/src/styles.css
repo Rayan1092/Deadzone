@@ -770,3 +770,14 @@ button:hover { border-color: var(--teal); }
 @keyframes conn-spin { to { transform: rotate(360deg); } }
 .conn-card b { font-size: 18px; color: #fde68a; }
 .conn-card span { font-size: 14px; color: rgba(230,237,243,.85); line-height: 1.4; }
+
+/* intro card: three lines and a way out */
+.intro-card .intro-line { margin: 10px 0 0; font-size: 16px; line-height: 1.5; color: rgba(230,237,243,.86); }
+.intro-card .intro-line.lead { margin-top: 8px; font-size: 20px; line-height: 1.35; font-weight: 600; color: #f1f5f9; }
+.intro-card .intro-line.go { font-weight: 600; color: #99f6e4; }
+.intro-card .intro-line kbd { font: 600 13px 'JetBrains Mono', ui-monospace, monospace; padding: 1px 8px; border-radius: 6px; background: #232a31; border: 1px solid #3a434d; border-bottom-width: 2px; color: #e6edf3; }
+.intro-foot { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
+.intro-foot .intro-go { margin: 0 0 0 auto; }
+.intro-foot .intro-hint { margin: 0; }
+.intro-never { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: rgba(230,237,243,.8); cursor: pointer; }
+.intro-never input { accent-color: #2dd4bf; width: 15px; height: 15px; }
