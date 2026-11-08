@@ -254,6 +254,10 @@ button:hover { border-color: var(--teal); }
   background: var(--glass-strong); box-shadow: 0 12px 32px rgba(0,0,0,.5), var(--glass-hi);
   backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
 .robot-eye.thermal { border-color: rgba(96,165,250,.5); }
+/* a floating window: corner resize, title bar drag (RobotEye useFloating) */
+.robot-eye { resize: both; min-width: 240px; min-height: 170px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); }
+.robot-eye .eye-head { cursor: grab; user-select: none; touch-action: none; }
+.robot-eye .eye-head:active { cursor: grabbing; }
 .eye-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 10px; font-size: 12px; }
 .eye-head .swatch { width: 9px; height: 9px; border-radius: 2px; }
 .eye-head b { margin-right: auto; }

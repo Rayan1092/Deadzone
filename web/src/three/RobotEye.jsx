@@ -304,6 +304,69 @@ function FocusPanel({ robotId }) {
   )
 }
 
+// The camera window floats over its pane: drag it by the title bar, resize it from the corner
+// (CSS resize), double-click the title bar to dock it back. Kept per browser.
+const EYE_KEY = 'dz-eye-window'
+function loadBox() { try { return JSON.parse(localStorage.getItem(EYE_KEY)) || null } catch { return null } }
+function saveBox(b) { try { if (b) localStorage.setItem(EYE_KEY, JSON.stringify(b)); else localStorage.removeItem(EYE_KEY) } catch { /* not kept */ } }
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+
+function useFloating() {
+  const win = useRef(null)
+  const [box, setBox] = useState(loadBox)   // { left, top, width?, height? } in pane px; null = docked
+  // a corner resize sets the inline size: remember it (CSS growth of .focus is not a user resize)
+  useEffect(() => {
+    const el = win.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      if (!el.style.width) return
+      setBox((b) => ({ ...(b ?? {}), width: el.offsetWidth, height: el.offsetHeight }))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  })
+  const onPointerDown = (e) => {
+    if (e.button !== 0 || e.target.closest('button')) return
+    const el = win.current
+    const parent = el.offsetParent?.getBoundingClientRect()
+    if (!parent) return
+    const r = el.getBoundingClientRect()
+    const dx = e.clientX - r.left
+    const dy = e.clientY - r.top
+    const head = e.currentTarget
+    head.setPointerCapture(e.pointerId)
+    const place = (ev) => {
+      const left = clamp(ev.clientX - parent.left - dx, 0, parent.width - 120)
+      const top = clamp(ev.clientY - parent.top - dy, 0, parent.height - 40)
+      el.style.left = `${left}px`
+      el.style.top = `${top}px`
+      el.style.right = 'auto'
+      return { left, top }
+    }
+    const move = (ev) => place(ev)
+    const up = (ev) => {
+      head.removeEventListener('pointermove', move)
+      head.removeEventListener('pointerup', up)
+      const at = place(ev)
+      setBox((b) => ({ ...(b ?? {}), ...at }))
+    }
+    head.addEventListener('pointermove', move)
+    head.addEventListener('pointerup', up)
+  }
+  // saved from the state itself, so a late drag-end or resize update cannot undo a dock
+  useEffect(() => { saveBox(box) }, [box])
+  const dock = () => {
+    const el = win.current
+    if (el) for (const k of ['left', 'top', 'right', 'width', 'height']) el.style[k] = ''
+    setBox(null)
+  }
+  const style = box ? {
+    ...(box.left != null ? { left: box.left, top: box.top, right: 'auto' } : {}),
+    ...(box.width ? { width: box.width, height: box.height } : {}),
+  } : undefined
+  return { win, style, floating: Boolean(box), onPointerDown, dock }
+}
+
 export default function RobotEye() {
   const robotId = useSim((s) => s.eyeRobot)
   const thermal = useSim((s) => s.eyeThermal)
@@ -313,6 +376,7 @@ export default function RobotEye() {
   const focused = useSim((s) => s.eyeFocus?.robot === s.eyeRobot && s.eyeFocus)
   const [, rerender] = useState(0)
   const boxes = useRef([])
+  const float = useFloating()
   // grow while a verdict is on screen, then shrink back to the corner
   const live = focused && performance.now() - focused.born < FOCUS_HOLD_MS
   useEffect(() => {
@@ -322,8 +386,8 @@ export default function RobotEye() {
   }, [live, focused])
   if (!robotId) return null
   return (
-    <div className={`robot-eye${thermal ? ' thermal' : ''}${live ? ' focus' : ''}`}>
-      <div className="eye-head">
+    <div ref={float.win} style={float.style} className={`robot-eye${thermal ? ' thermal' : ''}${live ? ' focus' : ''}${float.floating ? ' floating' : ''}`}>
+      <div className="eye-head" onPointerDown={float.onPointerDown} onDoubleClick={float.dock} title="Drag to move · corner to resize · double-click to dock">
         <i className="swatch" style={{ background: meta?.color }} />
         <b>{meta?.name ?? robotId} camera</b>
         <button className={`eye-toggle${thermal ? ' on' : ''}`} onClick={() => set({ eyeThermal: !thermal })}>Thermal</button>

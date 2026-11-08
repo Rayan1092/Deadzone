@@ -178,6 +178,7 @@ function SyncedControls({ id }) {
       ref={ctrl}
       makeDefault
       enableDamping
+      zoomToCursor // wheel zooms toward what is under the pointer; right-drag or shift-drag pans
       maxPolarAngle={Math.PI / 2.2}
       minDistance={6}
       maxDistance={110}
