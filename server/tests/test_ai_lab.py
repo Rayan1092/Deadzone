@@ -64,3 +64,19 @@ def test_read_only_and_path_boundaries(monkeypatch, tmp_path):
         for method in ("POST", "PUT", "PATCH", "DELETE"):
             assert client.request(method, "/exports/curve.json", content=b"overwrite").status_code == 405
         assert (exports / "curve.json").read_text() == '{"epochs": [1]}'
+
+
+def test_merged_lab_manifest_images_all_resolve(monkeypatch):
+    monkeypatch.setenv("DZ_AI_LAB", "1")
+    with TestClient(api.app) as client:
+        response = client.get("/ai-lab/results/lab.json")
+        assert response.status_code == 200
+        lab = response.json()
+        assert len(lab["examples"]) == 24
+        paths = ["/ai-lab/results/" + e["file"] for e in lab["examples"]]
+        paths += ["/ai-lab/results/" + lab["assets"]["confusion_png"], *lab["assets"]["slides"]]
+        paths += [r[k] for r in lab["runtime"] for k in ("file", "heatmap", "heatmap_alpha") if r.get(k)]
+        for path in paths:
+            asset = client.get(path)
+            assert asset.status_code == 200 and asset.content, path
+            assert asset.headers["content-type"].startswith("image/"), path

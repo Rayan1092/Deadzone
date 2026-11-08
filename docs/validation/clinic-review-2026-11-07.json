@@ -1,0 +1,37 @@
+{
+  "ok": true,
+  "review_branch": "origin/p3/clinic-map",
+  "review_commit": "d50ae29",
+  "default_unchanged": "collapse_01",
+  "selected_building": "clinic_02",
+  "size_m": [
+    36,
+    28
+  ],
+  "reset_retains_selected_building": true,
+  "prior_excludes_truth": true,
+  "detector": "model",
+  "simulated_s": 161.6,
+  "wall_s": 8.92,
+  "found": {
+    "S1": 19.0,
+    "S3": 111.9,
+    "S2": 161.6
+  },
+  "reported": [
+    "S1",
+    "S2",
+    "S3"
+  ],
+  "delivered_routes": [
+    "S1",
+    "S2",
+    "S3"
+  ],
+  "scope": "exact proposed loader block applied in-memory to current backend; branch/map unchanged",
+  "notes": [
+    "DZ_FLOORPLAN is startup-only trusted operator config, not remote file selection",
+    "Unset DZ_FLOORPLAN before fixed demo; clinic geometry differs",
+    "Rayan retains floorplan and robot-policy ownership"
+  ]
+}

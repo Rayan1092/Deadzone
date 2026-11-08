@@ -64,15 +64,12 @@ Rubble, aftershock, overload/overcurrent injections and global sim start/pause/r
 are disaster/presentation controls, not direct robot driving. Plan dispatch is
 explicitly shared, as required.
 
-POST `/api/voice` currently accepts `{robot,text}` at a protected boundary. It
-rejects a non-holder before voice work. A holder gets 409 when voice is disabled,
-or 501 `voice_not_ready` with `DZ_VOICE=1`: the full STT/Gemini-intent/safety/action/
-ack/TTS pipeline is **not implemented by this lease change**. Do not play a robot
-reply from this response. Rayan posted the robot action/ack contract on
-`rayan/voice-contract` while this change was being tested; it has been read, and
-the full voice pipeline will use it in a separate follow-up. Future
-async voice processing must recheck the lease immediately before command enqueue;
-passing a check before an external request is not sufficient.
+POST `/api/voice` accepts `{robot,text,request_id?}` with `DZ_VOICE=1`. It rejects
+a non-holder before provider work and checks the same grant again immediately
+before enqueue, including after safety computation. Missing provider config/failure
+returns 503 without a guessed command. Raw audio, typed manual actions and speech
+from actually delivered robot acknowledgements are in [VOICE.md](VOICE.md).
+Never play a robot reply from the queued response: wait for command_ack_reported.
 
 Yusuf: show controller names, disable taken robots, offer explicit Take/Release,
 heartbeat every 5 seconds, and merge state by revision. Do not retain private
