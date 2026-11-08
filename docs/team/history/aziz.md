@@ -22,6 +22,12 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Log
 
+### 2026-11-07 PT ? p2/soak-mode-sync ? Live baseline control and paced soak contract before code
+- **Did:** rescue ordering is pushed as PR #50 (283 tests and frontend build passed). Final integration follow-up accepts Rayan's newly merged live-mode request while running the outstanding soak.
+- **Contract changes:** screen WS `{t:"control",data:{action:"mode",value:"baseline"|"deadzone"}}` and REST POST /api/control use the existing standard action/value shape. Calls set_mode on every robot only after validating value; screen hello/control and REST control result add mode. Initial/reset mode follows DZ_MODE; default deadzone unchanged. Explicit control/key is the opt-in, no Gemini/phone tool receives this capability. Yusuf owns the key/chip and WAITING_FOR_LINK label.
+- **Heads-up for others:** Rayan: test_soak.py remains yours per accepted offer; I will add/run `scripts/soak.py` in Aziz's scripts area to exercise the real Hub loop and record process RSS/actual pace, avoiding duplicate ownership. 1200 sim seconds, target 10x, trained detector, fixed demo plan, default features, <500 decimal MB peak RSS. Output records actual duration/speed/memory; no claim of a 20-minute wall-clock run. Runner is opt-in CLI only.
+- **Next:** publish this contract before implementing; run combined tests, paced soak and final sync/push.
+
 ### 2026-11-07 PT ? p2/rescue-order ? Delivered route ranking and latest team sync
 - **Did:** implemented gated rescue-order endpoint from delivered survivors/routes, sampled Command occupancy and public hazard prior only; no truth/live robot fallback. Stable risk reasons/order and API docs included. Full suite **283 passed** with Rayan baseline merged, including the trained-model demo guard; focused rescue-order tests 5 passed. Current frontend production build passed.
 - **Contract changes:** reserved GET /api/rescue-order contract is now implemented behind DZ_RESCUE_ORDER=1; documented in RESCUE-ORDER.md and PHONE-PLANNING.md.
