@@ -151,6 +151,17 @@ const KIND = [
 export function roomKind(name = '') {
   return (KIND.find(([re]) => re.test(name)) ?? [null, 'default'])[1]
 }
+// Fisher-Yates with the seeded generator: the same order on every JS engine. (A random sort
+// comparator is engine-defined: Node 24, Node 26 and Chrome laid the same room out differently,
+// so the exported obstacles stopped matching what another machine draws.)
+function shuffle(list, r) {
+  const a = [...list]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(r() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
 function prng(seed) {
   let s = (seed % 2147483647) || 1
   return () => (s = (s * 16807) % 2147483647) / 2147483647
@@ -180,7 +191,7 @@ function roomLayout(room, fp) {
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
   const r = prng(Math.round(x0 * 7 + y0 * 13 + x1 * 3 + y1 * 5) + 101)
   const doors = fp.doors ?? []
-  const sides = ['N', 'E', 'S', 'W'].sort(() => r() - 0.5)
+  const sides = shuffle(['N', 'E', 'S', 'W'], r)
   const items = []
   const take = (side, step, inset, n, make) => {
     const slots = wallSlots(room, side, doors, step, inset)
