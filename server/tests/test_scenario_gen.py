@@ -11,7 +11,9 @@ sys.path.insert(0, str(ROOT / "server"))
 sys.path.insert(0, str(ROOT / "data" / "floorplans"))
 
 import generate  # noqa: E402
+from deadzone.command.plan import PlanManager, SearchPlan  # noqa: E402
 from deadzone.command.rescue import RescueRoute  # noqa: E402
+from deadzone.command.safety import SafetyChecker  # noqa: E402
 from deadzone.robot.robot import fit_route  # noqa: E402
 from deadzone.sim import Sim  # noqa: E402
 
@@ -76,3 +78,81 @@ def test_long_routes_fit_commands_cap_and_short_ones_are_untouched():
                                         "length_m": 74.5, "beacon": None})
     assert len(route.path) <= 60
     assert max(math.dist(p, q) for p, q in zip(fitted, fitted[1:])) < 5
+
+
+# ---------------------------------------------------------------- big buildings and default plans
+SHOWCASE = ROOT / "data" / "floorplans" / "showcase_01.json"
+
+
+def centre(poly):
+    return [(poly[0][0] + poly[2][0]) / 2, (poly[0][1] + poly[2][1]) / 2]
+
+
+def test_big_building_has_two_dead_zones_and_a_three_area_earthquake():
+    data = generate.generate(1, size=(80, 60))
+    assert generate.validate(data) == []
+    assert data["size"] == [80.0, 60.0] and data["generator"]["layout"] == "multi_hall"
+    assert len(generate.steel_rooms(data)) == 2 and len(data["rooms"]) >= 25
+    assert len(data["survivors"]) == 4 and len(data["decoys"]) == 4
+    for room in generate.steel_rooms(data):                       # one survivor deep in each dead zone
+        assert any(generate.in_poly(s["pos"], room["poly"]) for s in data["survivors"])
+        assert not any(generate.in_poly(d["pos"], room["poly"]) for d in data["decoys"])
+    shocks = [e for e in data["timeline"] if e["do"] == "aftershock"]
+    assert len(shocks) == 3 and shocks[1]["t"] == shocks[0]["t"] + 10
+    assert [e["do"] for e in data["timeline"]][:2] == ["rubble", "overcurrent"]
+    again = generate.generate(1, size=(80, 60))
+    assert json.dumps(again, sort_keys=True) == json.dumps(data, sort_keys=True)
+
+
+@pytest.mark.parametrize("kw", [dict(seed=1), dict(seed=2), dict(seed=3), dict(seed=1, size=(80, 60))],
+                         ids=["gen_1", "gen_2", "gen_3", "big_1"])
+def test_default_plan_passes_the_real_safety_checker(tmp_path, kw):
+    data = generate.generate(**kw)
+    plan = generate.default_plan(data)
+    assert plan["plan_id"] == f"P-{data['id']}" and data["default_plan"] == f"{data['id']}.plan.json"
+    assert {z["robot"] for z in plan["zones"]} == set(generate.ROBOTS)
+    dark = [z for z in plan["zones"] if z["comms"] == "lost_link_ok"]
+    for room in generate.steel_rooms(data):                       # every dead zone sits in a lost_link_ok zone
+        assert any(generate.in_poly(centre(room["poly"]), z["poly"]) for z in dark), room["id"]
+    for z in plan["zones"]:                                       # zones never cover a hazard
+        for h in data["hazards"]:
+            assert not generate.in_poly(centre(h["poly"]), z["poly"]), (z["id"], h["id"])
+    path = tmp_path / "b.json"
+    path.write_text(json.dumps(data))
+    result = generate.check_plan(path, plan)
+    assert result["ok"], result["violations"]
+
+
+def test_showcase_building_on_disk_matches_its_generator_and_plan():
+    data = json.loads(SHOWCASE.read_text(encoding="utf-8"))
+    g = data["generator"]
+    again = generate.generate(g["seed"], size=tuple(data["size"]), plan_id=data["id"], name=data["name"])
+    assert json.dumps(again, sort_keys=True) == json.dumps(data, sort_keys=True)
+    assert generate.validate(data) == [] and len(generate.steel_rooms(data)) == 2
+    assert data["size"] == [80.0, 60.0] and sum(e["do"] == "aftershock" for e in data["timeline"]) == 3
+    plan = json.loads(SHOWCASE.with_name(data["default_plan"]).read_text(encoding="utf-8"))
+    assert plan == generate.default_plan(data)
+    for name in ("gen_1", "gen_2", "gen_3"):                      # every shipped sample has its plan file
+        sample = json.loads((ROOT / "data" / "floorplans" / "generated" / f"{name}.json").read_text(encoding="utf-8"))
+        assert (ROOT / "data" / "floorplans" / "generated" / sample["default_plan"]).exists()
+
+
+def test_robots_run_the_showcase_with_its_plan_and_earthquake():
+    data = json.loads(SHOWCASE.read_text(encoding="utf-8"))
+    plan = generate.default_plan(data)
+    sim = Sim(plan_path=SHOWCASE, n_robots=3, seed=7)
+    sim.tick()
+    manager = PlanManager(sim, SafetyChecker(sim.prior, sim.robot_specs, sim.energy_time_scale))
+    manager.save(SearchPlan.model_validate(plan))
+    assert manager.dispatch(plan["plan_id"])["ok"]
+    done, kinds, found = set(), {}, set()
+    while sim.time < data["timeline"][-1]["t"] + 10:            # through the third collapse area
+        generate.play(sim, data["timeline"], done)
+        sim.tick()
+        for e in sim.drain_events():
+            kinds[e["kind"]] = kinds.get(e["kind"], 0) + 1
+            if e["kind"] == "survivor_found":
+                found.add(e["survivor"])
+    assert done == set(range(len(data["timeline"]))), "the whole earthquake script played"
+    assert kinds.get("aftershock") == 3 and kinds.get("fault")
+    assert found, "robots find survivors in the showcase building"

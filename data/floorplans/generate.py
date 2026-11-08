@@ -2,26 +2,35 @@
 
     py data/floorplans/generate.py --seed 42                   # -> data/floorplans/generated/gen_42.json
     py data/floorplans/generate.py --seed 42 --png out.png     # also draw a preview
+    py data/floorplans/generate.py --seed 3 --size 80 60 --id showcase_01 --name "..." \\
+        --out data/floorplans/showcase_01.json --png data/floorplans/showcase_01.png --check
 
 Any seed gives a different collapsed building in the same JSON format as collapse_01, so
-Sim(plan_path=...) loads it as is:
+Sim(plan_path=...) loads it as is. Every building also gets a default search plan next to it
+(`<file>.plan.json`, the P-1 format: zones per robot, `lost_link_ok` on zones the radio model
+predicts dark), referenced as `default_plan` in the building JSON.
 
+  small (default sizes 36x28 to 44x32, `--size` with height <= 34):
   layout     a central corridor from the entrance, rooms north and south of it with one door
              each, and a warehouse at the far end with a steel storage cage (metal walls)
-  materials  concrete outer walls, brick / drywall / concrete inside, metal cage
+  big (`--size 80 60` and the like):
+  layout     two or three parallel halls joined by cross halls, rooms in bands between them,
+             a warehouse across the far end with a steel cage, and a steel vault in the far
+             band: two radio dead zones, more rooms, 4 survivors and 4 decoys
+  materials  concrete outer walls, brick / drywall / concrete inside, metal cage and vault
   hazards    gas, fire, flooding, unstable floor (no-go zones), never over a door
   rubble     a few static debris piles, never sealing a room
-  people     3 survivors (one in the steel cage when it is reachable) and 3 decoys
-             (radiator, engine, coffee machine), all reachable, using the runtime crops the
-             detector already judges
+  people     survivors (one in each steel dead zone) and decoys (radiator, engine, coffee
+             machine), all reachable, using the runtime crops the detector already judges
   timeline   a disaster script made only of existing director actions (rubble, aftershock,
-             overcurrent), in the shape of the `director` control value
+             overcurrent), in the shape of the `director` control value; big buildings get a
+             three-area earthquake (second collapse 10 s after the first)
 
 Every building is validated before it is written: everything reachable from the entrance
 with the planner's wall inflation, survivors and decoys out of hazards and debris, rooms not
-cut off, and the cage verified as a radio dead zone (no direct link to the command post).
-If a draw fails, the next variant of the same seed is tried, so a seed always gives the same
-building. collapse_01.json is never touched.
+cut off, and every steel room verified as a radio dead zone (no direct link to the command
+post). If a draw fails, the next variant of the same seed is tried, so a seed always gives
+the same building. collapse_01.json is never touched.
 """
 import argparse
 import json
@@ -38,20 +47,27 @@ REPO = HERE.parents[1]
 sys.path.insert(0, str(REPO / "server"))
 
 from deadzone.floorplan import FloorPlan  # noqa: E402
-from deadzone.network.propagation import LINK_UP_DBM, rssi  # noqa: E402
+from deadzone.network.propagation import LINK_DOWN_DBM, LINK_UP_DBM, rssi  # noqa: E402
 from deadzone.robot import planning  # noqa: E402
 
-VERSION = 1
+VERSION = 2
 SIZES = [(36, 28), (40, 30), (44, 32)]
+BIG_H = 34                                         # taller than this -> multi-hall layout
 MATERIALS = {"drywall": 4, "brick": 10, "concrete": 16, "metal": 22, "rubble": 8}
 INNER = ["brick", "brick", "drywall", "concrete"]
 ROOM_NAMES = ["Office A", "Office B", "Break Room", "Storage", "Boiler Room", "Loading Office",
               "Server Room", "Lab", "Locker Room", "Workshop", "Records", "Kitchen", "First Aid"]
+MORE_NAMES = ["Open Office", "Archive", "Mail Room", "Copy Room", "Meeting Room", "Supply Closet",
+              "Pump Room", "Electrical Room", "Canteen", "Reception", "Dispatch", "Cold Store",
+              "Paint Shop", "Tool Crib", "Chemical Store", "Maintenance", "Dock Office", "Training Room",
+              "Print Shop", "Quality Lab", "Packing", "Uniform Store", "Battery Room", "Compressor Room"]
 HAZARDS = ["gas", "fire", "flooding", "unstable_floor"]
 DECOYS = [("radiator", "neg_0001.png"), ("engine", "neg_0002.png"), ("coffee machine", "neg_0003.png")]
 SURVIVOR_CROPS = ["pos_0001.png", "pos_0002.png", "pos_0003.png"]
 DOOR_W = 1.2
 MAX_VARIANTS = 40
+ROBOTS = ["R1", "R2", "R3"]                        # the default plan assumes the demo's 3 robots
+COMMS_MARGIN_DB = 6.0                              # "relay" only when the centroid is clearly in range
 
 
 def r1(v):
@@ -98,9 +114,11 @@ def split(rng, x0, x1, lo=7.0, hi=12.0):
     return xs
 
 
-def draw(seed, variant):
+def draw(seed, variant, size=None):
     rng = random.Random(f"{seed}:{variant}")
-    W, H = rng.choice(SIZES)
+    W, H = size if size else rng.choice(SIZES)
+    if H > BIG_H:
+        return draw_big(rng, float(W), float(H), seed, variant)
     cw = rng.choice([3.0, 4.0])
     cy = round(H / 2 * 2) / 2
     yS, yN = cy - cw / 2, cy + cw / 2
@@ -176,7 +194,151 @@ def draw(seed, variant):
             "rooms": rooms, "rubble": rubble, "hazards": hazards, "survivors": [], "decoys": [],
             "entry": [1.0, cy], "command_post": {"pos": [-2.0, cy], "tx_dbm": 20},
             "generator": {"seed": seed, "variant": variant, "version": VERSION}}
-    return data, rng, {"cage": cage, "north": north, "door_x": door_x, "xe": xe, "yS": yS, "yN": yN}
+    info = {"cages": [cage], "cage_doors": [(door_x, cy_wall)], "xe": xe, "yS": yS, "yN": yN,
+            "halls": [cy], "cross": [], "n_people": 3, "big": False}
+    return data, rng, info
+
+
+def draw_big(rng, W, H, seed, variant):
+    """Multi-hall layout for big buildings: parallel east-west halls, rooms in the bands between
+    them, cross halls through the middle bands, a warehouse across the east end with a steel
+    cage, and a steel vault in the band farthest from the entrance (second radio dead zone)."""
+    cw, ccw = 4.0, 3.0
+    n_halls = max(2, int(round(H / 20)))
+    hall_y = [round(H * (k + 1) / (n_halls + 1) * 2) / 2 for k in range(n_halls)]
+    wh = rng.choice([12.0, 14.0, 16.0])
+    xe = W - wh
+    m = n_halls // 2                                  # the entrance opens into this hall
+    cy = hall_y[m]
+    n_cross = 2 if xe >= 50 else 1
+    cross_x = [round(xe * (j + 1) / (n_cross + 1) * 2) / 2 for j in range(n_cross)]
+
+    walls = [{"a": [0, 0], "b": [W, 0], "material": "concrete"},
+             {"a": [W, 0], "b": [W, H], "material": "concrete"},
+             {"a": [W, H], "b": [0, H], "material": "concrete"},
+             *vwall(0, 0, H, "concrete", doors=[cy], width=2.0)]
+    doors = [{"at": [0, cy], "width": 2.0, "axis": "y", "state": "open"}]
+    rooms = []
+    for k, y in enumerate(hall_y):
+        rooms.append({"id": f"H{k + 1}", "name": f"Hall {'ABC'[k]}", "poly": rect(0, y - cw / 2, xe, y + cw / 2)})
+    for j, x in enumerate(cross_x):
+        rooms.append({"id": f"X{j + 1}", "name": f"Cross Hall {j + 1}",
+                      "poly": rect(x - ccw / 2, hall_y[0], x + ccw / 2, hall_y[-1])})
+    names = ROOM_NAMES + MORE_NAMES
+    rng.shuffle(names)
+    used = {}
+
+    def next_name():
+        base = names.pop(0) if names else rng.choice(ROOM_NAMES + MORE_NAMES)
+        used[base] = used.get(base, 0) + 1
+        return base if used[base] == 1 else f"{base} {used[base]}"
+
+    # bands between the halls (and the outer walls); each band is a row of rooms
+    bands = [(0.0, hall_y[0] - cw / 2)]
+    bands += [(hall_y[k] + cw / 2, hall_y[k + 1] - cw / 2) for k in range(n_halls - 1)]
+    bands.append((hall_y[-1] + cw / 2, H))
+    far_band = len(bands) - 1 if abs(bands[-1][0] - cy) >= abs(cy - bands[0][1]) else 0
+    room_doors, band_rooms = [], []
+    vault = None
+    for b, (y0, y1) in enumerate(bands):
+        edge = b in (0, len(bands) - 1)
+        # x segments: cross halls cut the middle bands only
+        cuts = [] if edge else [(x - ccw / 2, x + ccw / 2) for x in cross_x]
+        segs, x = [], 0.0
+        for a, c in cuts:
+            segs.append((x, a))
+            x = c
+        segs.append((x, xe))
+        row = []
+        for sx0, sx1 in segs:
+            xs = split(rng, sx0, sx1, lo=6.0, hi=11.0)
+            for a, c in zip(xs, xs[1:]):
+                row.append([a, c])
+        # the vault: the room nearest the middle of the far band
+        if b == far_band:
+            vault = min(range(len(row)), key=lambda i: abs((row[i][0] + row[i][1]) / 2 - xe / 2))
+        prefix = "ABCD"[b]
+        band_mat = rng.choice(["brick", "drywall"])
+        for i, (a, c) in enumerate(row):
+            rid = f"{prefix}{i + 1}"
+            is_vault = b == far_band and i == vault
+            # door side: edge bands open toward their one hall, middle bands alternate
+            if b == 0:
+                low = False
+            elif b == len(bands) - 1:
+                low = True
+            else:
+                low = i % 2 == 0
+            wall_y = y0 if low else y1
+            mat = "metal" if is_vault else band_mat
+            d = r1(rng.uniform(a + 1.5, c - 1.5))
+            walls += hwall(wall_y, a, c, mat, doors=[d])
+            if not edge:                              # the other long wall faces the other hall
+                walls += hwall(y1 if low else y0, a, c, mat)
+            doors.append({"at": [d, r1(wall_y)], "width": DOOR_W, "axis": "x",
+                          "state": rng.choice(["open", "open", "broken"])})
+            room_doors.append((rid, (d, wall_y)))
+            room = {"id": rid, "name": "Steel Vault" if is_vault else next_name(), "poly": rect(a, y0, c, y1)}
+            if is_vault:
+                room["steel"] = True
+            rooms.append(room)
+            band_rooms.append(room)
+            if i > 0 and abs(a - row[i - 1][1]) < 1e-6:  # divider between neighbouring rooms
+                prev_vault = b == far_band and i - 1 == vault
+                walls += vwall(a, y0, y1, "metal" if (is_vault or prev_vault) else rng.choice(INNER))
+        for a, c in cuts:                             # cross hall side walls through this band
+            walls += vwall(a, y0, y1, "concrete") + vwall(c, y0, y1, "concrete")
+    walls += vwall(xe, 0, H, "concrete", doors=hall_y, width=cw)
+    rooms.append({"id": "E1", "name": "Warehouse Floor", "poly": rect(xe, 0, W, H)})
+
+    # steel storage cage against the east wall, north or south corner, door facing the hall
+    cgw, cgh = rng.uniform(5.0, 7.0), rng.uniform(6.0, 9.0)
+    north = rng.random() < 0.5
+    cx0 = W - cgw
+    cy_wall = H - cgh if north else cgh
+    door_x = r1(W - rng.uniform(1.0, 1.8))
+    walls += hwall(cy_wall, cx0, W, "metal", doors=[door_x])
+    walls += vwall(cx0, cy_wall, H, "metal") if north else vwall(cx0, 0, cy_wall, "metal")
+    doors.append({"at": [door_x, r1(cy_wall)], "width": DOOR_W, "axis": "x", "state": "open"})
+    cage = rect(cx0, cy_wall, W, H) if north else rect(cx0, 0, W, cy_wall)
+    rooms.append({"id": "E2", "name": "Steel Storage Cage", "poly": cage, "steel": True})
+    py = cy_wall + (3.0 if north else -3.0)           # shelf inside: no line of sight from the door
+    walls.append({"a": [r1(cx0 + 1.6), r1(py)], "b": [r1(W), r1(py)], "material": "metal"})
+    for _ in range(rng.randint(1, 3)):                # loose metal shelving in the hall
+        sy = r1(rng.uniform(3, H - 3))
+        sx = r1(rng.uniform(xe + 1.5, W - cgw - 4))
+        walls.append({"a": [sx, sy], "b": [r1(sx + rng.uniform(2.5, 4)), sy], "material": "metal"})
+
+    # hazards: part of a room, on the side away from its door (never over a door, never the vault)
+    hazards = []
+    pool = [r for r in band_rooms if not r.get("steel")]
+    for k, room in enumerate(rng.sample(pool, k=min(len(pool), rng.randint(3, 5)))):
+        (x0, y0), (x1, _), (_, y1) = room["poly"][0], room["poly"][1], room["poly"][2]
+        door_y = dict(room_doors)[room["id"]][1]
+        depth = (y1 - y0) * rng.uniform(0.3, 0.55)
+        hy0, hy1 = (y1 - depth, y1 - 0.3) if abs(door_y - y0) < 1e-6 else (y0 + 0.3, y0 + depth)
+        hazards.append({"id": f"H{k + 1}", "type": rng.choice(HAZARDS),
+                        "poly": rect(x0 + 0.3, hy0, x1 - 0.3, hy1)})
+
+    rubble = []
+    for k in range(rng.randint(5, 9)):
+        s = rng.uniform(1.0, 2.0)
+        x, y = rng.uniform(2, W - 2), rng.uniform(2, H - 2)
+        rubble.append({"id": f"RB{k + 1}", "poly": rect(x - s / 2, y - s / 2, x + s / 2, y + s / 2),
+                       "height": r1(rng.uniform(0.8, 1.6))})
+
+    vault_room = next(r for r in band_rooms if r.get("steel"))
+    vault_door = dict(room_doors)[vault_room["id"]]
+    data = {"id": f"gen_{seed}", "name": f"Generated collapse #{seed}", "size": [W, H], "cell": 0.25,
+            "wall_height": 3.0, "materials": dict(MATERIALS), "walls": walls, "doors": doors,
+            "rooms": rooms, "rubble": rubble, "hazards": hazards, "survivors": [], "decoys": [],
+            "entry": [1.0, cy], "command_post": {"pos": [-2.0, cy], "tx_dbm": 20},
+            "generator": {"seed": seed, "variant": variant, "version": VERSION, "people": 4,
+                          "layout": "multi_hall", "halls": hall_y, "cross_halls": cross_x}}
+    info = {"cages": [cage, vault_room["poly"]], "cage_doors": [(door_x, cy_wall), vault_door],
+            "xe": xe, "halls": hall_y, "cross": cross_x, "n_people": 4, "big": True,
+            "entry_hall": rect(0, cy - cw / 2, xe, cy + cw / 2)}
+    return data, rng, info
 
 
 def reachable(fp):
@@ -204,7 +366,8 @@ def in_poly(pt, poly):
 
 
 def place_people(data, rng, info):
-    """Survivors and decoys on reachable cells, out of hazards. S1 goes into the cage."""
+    """Survivors and decoys on reachable cells, out of hazards. One survivor per steel dead zone
+    (as deep inside as it gets), the rest spread out; decoys never inside a dead zone."""
     fp = FloorPlan(data)
     reach = reachable(fp)
     iy, ix = np.nonzero(reach)
@@ -213,30 +376,42 @@ def place_people(data, rng, info):
     far = [p for p in pts if math.dist(p, entry) >= 8 and
            not any(in_poly(p, h["poly"]) for h in data["hazards"])]
     rng.shuffle(far)
-    cage = [p for p in far if in_poly(p, info["cage"])]
+    n = info.get("n_people", 3)
     chosen = []
-    if cage:                                          # the dark survivor
-        cage.sort(key=lambda p: -abs(p[1] - (info["cage"][0][1] if info["north"] else info["cage"][2][1])))
-        chosen.append(cage[0])
+    for cage, door in zip(info["cages"], info["cage_doors"]):
+        inside = [p for p in far if in_poly(p, cage)]
+        if not inside:
+            return False
+        inside.sort(key=lambda p: -math.dist(p, door))   # the dark survivor, far from the door
+        chosen.append(inside[0])
+    if info.get("big"):
+        # big buildings take long to search (3 robots, 4,800 m2): one person collapsed in the
+        # entrance hall 12 to 22 m in, where the robots pass in the first minute, so the showcase
+        # pays off early; the dead-zone survivors stay the hard ones
+        near = [p for p in far if 12 <= math.dist(p, entry) <= 22 and in_poly(p, info["entry_hall"])
+                and all(math.dist(p, c) >= 6 for c in chosen)]
+        if not near:
+            return False
+        chosen.append(near[0])
     for p in far:
-        if len(chosen) == 3:
+        if len(chosen) == n:
             break
         if all(math.dist(p, c) >= 6 for c in chosen):
             chosen.append(p)
-    if len(chosen) < 3:
+    if len(chosen) < n:
         return False
-    data["survivors"] = [{"id": f"S{k + 1}", "pos": [r1(x), r1(y)], "thermal": SURVIVOR_CROPS[k]}
+    data["survivors"] = [{"id": f"S{k + 1}", "pos": [r1(x), r1(y)], "thermal": SURVIVOR_CROPS[k % len(SURVIVOR_CROPS)]}
                          for k, (x, y) in enumerate(chosen)]
     decoys = []
     for p in far:
-        if len(decoys) == 3:
+        if len(decoys) == n:
             break
-        if all(math.dist(p, c) >= 4 for c in chosen + decoys) and not in_poly(p, info["cage"]):
+        if all(math.dist(p, c) >= 4 for c in chosen + decoys) and not any(in_poly(p, c) for c in info["cages"]):
             decoys.append(p)
-    if len(decoys) < 3:
+    if len(decoys) < n:
         return False
-    data["decoys"] = [{"id": f"D{k + 1}", "label": DECOYS[k][0], "pos": [r1(x), r1(y)], "thermal": DECOYS[k][1]}
-                      for k, (x, y) in enumerate(decoys)]
+    data["decoys"] = [{"id": f"D{k + 1}", "label": DECOYS[k % len(DECOYS)][0], "pos": [r1(x), r1(y)],
+                       "thermal": DECOYS[k % len(DECOYS)][1]} for k, (x, y) in enumerate(decoys)]
     return True
 
 
@@ -244,16 +419,37 @@ def make_timeline(data, rng, info):
     """Disaster script from existing director actions only (`director` control values)."""
     W, H = data["size"]
     cy = data["entry"][1]
-    x_cor = r1(rng.uniform(6, info["xe"] - 3))
-    hall = [r1(rng.uniform(info["xe"] + 2, W - 6)), r1(rng.uniform(3, H - 3))]
+    if not info.get("big"):
+        x_cor = r1(rng.uniform(6, info["xe"] - 3))
+        hall = [r1(rng.uniform(info["xe"] + 2, W - 6)), r1(rng.uniform(3, H - 3))]
+        return [
+            {"t": rng.randint(70, 110), "do": "rubble", "at": [x_cor, r1(cy + rng.uniform(-0.5, 0.5))], "size": 1.4,
+             "label": "Ceiling tiles come down in the main corridor"},
+            {"t": rng.randint(130, 170), "do": "overcurrent", "robot": rng.choice(ROBOTS), "duration_s": 1.0,
+             "label": "A wheel jams on debris"},
+            {"t": rng.randint(180, 230), "do": "aftershock", "at": hall,
+             "label": "Aftershock: part of the warehouse roof collapses (the first relay is lost if one is up)"},
+        ]
+    # big building: a three-area earthquake, the second collapse 10 s after the first
+    t1 = rng.randint(170, 190)
+    cross = rng.choice(info["cross"])
+    far_hall = info["halls"][-1] if info["halls"][-1] != cy else info["halls"][0]
     return [
-        {"t": rng.randint(70, 110), "do": "rubble", "at": [x_cor, r1(cy + rng.uniform(-0.5, 0.5))], "size": 1.4,
-         "label": "Ceiling tiles come down in the main corridor"},
-        {"t": rng.randint(130, 170), "do": "overcurrent", "robot": rng.choice(["R1", "R2", "R3"]), "duration_s": 1.0,
+        {"t": rng.randint(70, 100), "do": "rubble", "at": [r1(rng.uniform(6, 16)), r1(cy + rng.uniform(-0.5, 0.5))],
+         "size": 1.4, "label": "Ceiling tiles come down in the entrance hall"},
+        {"t": rng.randint(120, 150), "do": "overcurrent", "robot": rng.choice(ROBOTS), "duration_s": 1.0,
          "label": "A wheel jams on debris"},
-        {"t": rng.randint(180, 230), "do": "aftershock", "at": hall,
-         "label": "Aftershock: part of the warehouse roof collapses (the first relay is lost if one is up)"},
+        {"t": t1, "do": "aftershock", "at": [r1(rng.uniform(info["xe"] + 2, W - 8)), r1(rng.uniform(4, H - 4))],
+         "label": "Earthquake, area 1 of 3: the warehouse roof comes down (a powered relay is lost if one is up)"},
+        {"t": t1 + 10, "do": "aftershock", "at": [r1(cross), r1(rng.uniform(info["halls"][0] + 2, info["halls"][-1] - 2))],
+         "label": "Area 2 of 3, ten seconds later: the cross hall collapses"},
+        {"t": rng.randint(225, 250), "do": "aftershock", "at": [r1(rng.uniform(8, info["xe"] - 8)), r1(far_hall)],
+         "label": "Area 3 of 3: the far hall collapses"},
     ]
+
+
+def steel_rooms(data):
+    return [r for r in data["rooms"] if r.get("steel") or r["id"] == "E2"]
 
 
 def validate(data):
@@ -279,24 +475,94 @@ def validate(data):
         ix, iy = fp.to_cell(*d["at"])
         if fp.nogo[max(0, iy - 2):iy + 3, max(0, ix - 2):ix + 3].any():
             problems.append(f"hazard over the door at {d['at']}")
-    cage = next((r for r in data["rooms"] if r["id"] == "E2"), None)
-    if cage:
-        (x0, y0), (x1, _), (_, y1) = cage["poly"][0], cage["poly"][1], cage["poly"][2]
+    for room in steel_rooms(data):
+        (x0, y0), (x1, _), (_, y1) = room["poly"][0], room["poly"][1], room["poly"][2]
         mid = ((x0 + x1) / 2 + 0.6, (y0 + y1) / 2)
         if rssi(fp, data["command_post"]["pos"], mid, data["command_post"]["tx_dbm"]) >= LINK_UP_DBM:
-            problems.append("steel cage is not a radio dead zone")
-    if len(data["survivors"]) != 3 or len(data["decoys"]) != 3:
-        problems.append("need 3 survivors and 3 decoys")
+            problems.append(f"steel room {room['id']} is not a radio dead zone")
+    n = data.get("generator", {}).get("people", 3)
+    if len(data["survivors"]) != n or len(data["decoys"]) != n:
+        problems.append(f"need {n} survivors and {n} decoys")
     return problems
 
 
-def generate(seed):
-    """The building for this seed (first valid variant). Deterministic."""
+def default_plan(data, robots=ROBOTS):
+    """Default search plan in the P-1 format (phone plan schema), built from the rooms: zones are
+    runs of neighbouring hazard-free rooms plus the halls and the warehouse, split between the
+    deployed robots (default R1..R3) west to east by area. A zone whose centre the radio model
+    does not predict clearly in range of the command post is `lost_link_ok` (so every steel dead
+    zone is), the rest `relay`. Rooms with a hazard keep only their door-side strip, so no zone
+    overlaps a no-go area (the safety checker rejects that)."""
+    robots = list(robots)
+    fp = FloorPlan(data)
+    cmd = data["command_post"]
+    hazards = data["hazards"]
+    steel_ids = {r["id"] for r in steel_rooms(data)}
+
+    def bounds(poly):
+        xs, ys = [p[0] for p in poly], [p[1] for p in poly]
+        return min(xs), min(ys), max(xs), max(ys)
+
+    pieces = []                                       # (x0, y0, x1, y1) rectangles, hazard free
+    for room in data["rooms"]:
+        if room["id"] in steel_ids and room["id"] == "E2":
+            continue                                  # inside the warehouse zone already
+        x0, y0, x1, y1 = bounds(room["poly"])
+        inside = [bounds(h["poly"]) for h in hazards if in_poly([(h["poly"][0][0] + h["poly"][2][0]) / 2,
+                                                                   (h["poly"][0][1] + h["poly"][2][1]) / 2], room["poly"])]
+        if not inside:
+            pieces.append((x0, y0, x1, y1))
+            continue
+        hx0, hy0, hx1, hy1 = inside[0]
+        gap = 0.3
+        if hy0 - y0 > y1 - hy1:                                    # hazard at the top: keep the bottom strip
+            if (hy0 - gap) - y0 >= 2.5:
+                pieces.append((x0, y0, x1, hy0 - gap))
+        elif y1 - (hy1 + gap) >= 2.5:                              # hazard at the bottom: keep the top strip
+            pieces.append((x0, hy1 + gap, x1, y1))
+    # merge runs of neighbouring rooms with the same y extent (same band, touching in x)
+    pieces.sort(key=lambda p: (p[1], p[3], p[0]))
+    merged = []
+    for p in pieces:
+        if merged and abs(merged[-1][1] - p[1]) < 1e-6 and abs(merged[-1][3] - p[3]) < 1e-6 \
+                and abs(merged[-1][2] - p[0]) < 1e-6:
+            merged[-1] = (merged[-1][0], p[1], p[2], p[3])
+        else:
+            merged.append(p)
+    # split west to east between the robots by area
+    merged.sort(key=lambda p: ((p[0] + p[2]) / 2, p[1]))
+    total = sum((x1 - x0) * (y1 - y0) for x0, y0, x1, y1 in merged)
+    zones, acc, robot = [], 0.0, 0
+    entry = data["entry"]
+    for x0, y0, x1, y1 in merged:
+        a = (x1 - x0) * (y1 - y0)
+        if robot < len(robots) - 1 and acc + a / 2 > total * (robot + 1) / len(robots):
+            robot += 1
+        acc += a
+        centre = ((x0 + x1) / 2, (y0 + y1) / 2)
+        level = rssi(fp, cmd["pos"], centre, cmd["tx_dbm"])
+        zones.append({"robot": robots[robot], "poly": rect(x0, y0, x1, y1), "dist": math.dist(entry, centre),
+                      "comms": "relay" if level >= LINK_DOWN_DBM + COMMS_MARGIN_DB else "lost_link_ok"})
+    plan_zones = []
+    for rid in robots:
+        mine = sorted([z for z in zones if z["robot"] == rid], key=lambda z: z["dist"])
+        for k, z in enumerate(mine):
+            plan_zones.append({"id": f"Z{len(plan_zones) + 1}", "robot": rid, "priority": min(10, k + 1),
+                               "comms": z["comms"], "poly": z["poly"]})
+    # big buildings: trips out of signal are long, so the dark budget is three minutes (P-1 uses 60 s)
+    return {"plan_id": f"P-{data['id']}", "author": "generator", "lost_link_budget_s": 180 if data["size"][1] > BIG_H else 60,
+            "no_go": [], "zones": plan_zones}
+
+
+def generate(seed, size=None, plan_id=None, name=None):
+    """The building for this seed (first valid variant). Deterministic for (seed, size)."""
     if not isinstance(seed, int) or seed < 0:
         raise ValueError("seed must be a non-negative integer")
+    if size is not None and (len(size) != 2 or min(size) < 24 or max(size) > 120):
+        raise ValueError("size must be (width, height) in meters, 24 to 120")
     last = None
     for variant in range(MAX_VARIANTS):
-        data, rng, info = draw(seed, variant)
+        data, rng, info = draw(seed, variant, size)
         # drop debris piles that would cut something off or sit on a door
         keep = []
         for rb in data["rubble"]:
@@ -313,10 +579,15 @@ def generate(seed):
         data["timeline"] = make_timeline(data, rng, info)
         last = validate(data)
         if not last:
+            if plan_id:
+                data["id"] = plan_id
+            if name:
+                data["name"] = name
+            data["default_plan"] = f"{data['id']}.plan.json"
             data["validation"] = {"ok": True, "checks": [
                 "everything reachable from the entrance with 1-cell wall inflation",
                 "survivors and decoys out of hazards and debris", "no hazard over a door",
-                "every room at least 30% reachable", "steel cage has no direct link to the command post"]}
+                "every room at least 30% reachable", "every steel room has no direct link to the command post"]}
             return data
     raise RuntimeError(f"seed {seed}: no valid building in {MAX_VARIANTS} variants ({last})")
 
@@ -337,6 +608,19 @@ def play(sim, timeline, done):
             sim.aftershock(at=ev.get("at"), relay=ev.get("relay"))
 
 
+def check_plan(path, plan):
+    """Run the default plan through the real safety checker on a fresh headless sim (3 robots).
+    Returns the checker result; `ok` must be true for the plan to be dispatchable."""
+    from deadzone.command.plan import PlanManager, SearchPlan
+    from deadzone.command.safety import SafetyChecker
+    from deadzone.sim import Sim
+    sim = Sim(plan_path=path, n_robots=len(ROBOTS), seed=7)
+    sim.tick()                                        # Command hears the robots once
+    manager = PlanManager(sim, SafetyChecker(sim.prior, sim.robot_specs, sim.energy_time_scale))
+    manager.save(SearchPlan.model_validate(plan))
+    return manager.check(plan["plan_id"])
+
+
 def validate_rooms_only(data):
     fp = FloorPlan(data)
     reach = reachable(fp)
@@ -352,15 +636,21 @@ def validate_rooms_only(data):
     return bad
 
 
-def preview(data, path):
+def preview(data, path, plan=None):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.patches import Polygon
     colors = {"concrete": "#3d3d3a", "brick": "#a5532f", "drywall": "#9c9a92", "metal": "#2a78d6"}
     hz = {"gas": "#eda100", "fire": "#e34948", "flooding": "#3987e5", "unstable_floor": "#8a6d3b"}
+    robot_colors = {"R1": "#2ecc71", "R2": "#38bdf8", "R3": "#a78bfa"}
     W, H = data["size"]
-    fig, ax = plt.subplots(figsize=(W / 4, H / 4 + 0.6), facecolor="#fcfcfb")
+    fig, ax = plt.subplots(figsize=(min(W / 4, 20), min(H / 4, 15) + 0.6), facecolor="#fcfcfb")
+    if plan:
+        for z in plan["zones"]:
+            ax.add_patch(Polygon(z["poly"], facecolor=robot_colors.get(z["robot"], "#999"), alpha=0.10,
+                                 edgecolor=robot_colors.get(z["robot"], "#999"), lw=0.8,
+                                 ls="--" if z["comms"] == "lost_link_ok" else "-"))
     for h in data["hazards"]:
         ax.add_patch(Polygon(h["poly"], color=hz[h["type"]], alpha=0.25, lw=0))
         ax.text(*np.mean(h["poly"], axis=0), h["type"].replace("_", " "), ha="center", fontsize=8, color="#52514e")
@@ -385,28 +675,49 @@ def preview(data, path):
     ax.set_ylim(-1, H + 1)
     ax.set_aspect("equal")
     ax.axis("off")
-    ax.set_title(f"{data['name']} ({W} x {H} m)", loc="left", fontsize=11)
+    title = f"{data['name']} ({W:g} x {H:g} m)"
+    if plan:
+        title += "  ·  default plan: zone colours per robot, dashed = lost_link_ok"
+    ax.set_title(title, loc="left", fontsize=11)
     fig.tight_layout()
     fig.savefig(path, dpi=110, facecolor="#fcfcfb")
     plt.close(fig)
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(description="Seeded collapsed-building generator (Q&A only)")
     ap.add_argument("--seed", type=int, required=True)
+    ap.add_argument("--size", type=float, nargs=2, metavar=("W", "H"), default=None,
+                    help="building size in meters (default: a seeded choice of 36x28, 40x30, 44x32; "
+                         "heights over 34 use the multi-hall layout)")
+    ap.add_argument("--id", default=None, help="building id (default gen_<seed>)")
+    ap.add_argument("--name", default=None)
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--png", type=Path, default=None)
+    ap.add_argument("--check", action="store_true", help="run the default plan through the safety checker")
     args = ap.parse_args()
-    data = generate(args.seed)
-    out = args.out or HERE / "generated" / f"gen_{args.seed}.json"
+    data = generate(args.seed, size=tuple(args.size) if args.size else None, plan_id=args.id, name=args.name)
+    out = args.out or HERE / "generated" / f"{data['id']}.json"
     if out.resolve() == (HERE / "collapse_01.json").resolve():
         sys.exit("refusing to overwrite collapse_01.json")
     out.parent.mkdir(parents=True, exist_ok=True)
+    plan = default_plan(data)
+    plan_path = out.with_name(data["default_plan"])
     out.write_text(json.dumps(data, indent=1), encoding="utf-8")
+    plan_path.write_text(json.dumps(plan, indent=1), encoding="utf-8")
     if args.png:
-        preview(data, args.png)
-    print(f"wrote {out}: {data['size'][0]} x {data['size'][1]} m, {len(data['rooms'])} rooms, "
-          f"{len(data['hazards'])} hazards, {len(data['rubble'])} debris piles, variant {data['generator']['variant']}")
+        preview(data, args.png, plan)
+    W, H = data["size"]
+    print(f"wrote {out}: {W:g} x {H:g} m, {len(data['rooms'])} rooms, {len(steel_rooms(data))} steel dead zone(s), "
+          f"{len(data['hazards'])} hazards, {len(data['rubble'])} debris piles, {len(data['survivors'])} survivors, "
+          f"{sum(e['do'] == 'aftershock' for e in data['timeline'])} collapse area(s), variant {data['generator']['variant']}")
+    print(f"wrote {plan_path}: {len(plan['zones'])} zones, "
+          f"{sum(z['comms'] == 'lost_link_ok' for z in plan['zones'])} lost_link_ok")
+    if args.check:
+        result = check_plan(out, plan)
+        print("safety check:", "ok" if result["ok"] else result["violations"])
+        if not result["ok"]:
+            sys.exit(1)
 
 
 if __name__ == "__main__":

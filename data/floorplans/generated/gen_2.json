@@ -661,7 +661,7 @@
   {
    "id": "S1",
    "pos": [
-    36.62,
+    35.62,
     0.62
    ],
    "thermal": "pos_0001.png"
@@ -726,7 +726,7 @@
  "generator": {
   "seed": 2,
   "variant": 0,
-  "version": 1
+  "version": 2
  },
  "timeline": [
   {
@@ -756,6 +756,7 @@
    "label": "Aftershock: part of the warehouse roof collapses (the first relay is lost if one is up)"
   }
  ],
+ "default_plan": "gen_2.plan.json",
  "validation": {
   "ok": true,
   "checks": [
@@ -763,7 +764,7 @@
    "survivors and decoys out of hazards and debris",
    "no hazard over a door",
    "every room at least 30% reachable",
-   "steel cage has no direct link to the command post"
+   "every steel room has no direct link to the command post"
   ]
  }
 }
