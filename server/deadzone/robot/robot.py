@@ -54,6 +54,8 @@ PATH_CHECK_SKIP_M = 0.4    # ignore the robot's own footprint (it may sit in a w
 REPLAN_PAUSE_S = 0.6       # stop briefly in REPLANNING so the replan is visible and the map settles
 REPLAN_COOLDOWN_S = 5.0    # repeat obstacles this soon after a replan are replanned silently
 TRAPPED_AFTER_S = 10.0     # no route for this long raises a TRAPPED fault to the command post
+ROUTE_CHECK_PERIOD = 2.0   # s between "is the rescue route I sent still open on my map?" checks
+COLLAPSE_MARGINS_CELLS = (4, 2)  # rescue routes stay 1 m (else 0.5 m) clear of fresh collapse
 
 # Wheel overcurrent (plan: above 6 A for 0.5 s -> stop, reverse 0.5 m, mark ahead, replan)
 OVERCURRENT_A = 6.0
@@ -179,6 +181,8 @@ class Robot:
         self.overload_until = None
         self.plan = None             # latest plan bundle payload from CMD (acted on in step A)
         self.mode = default_mode()
+        self.routes = {}             # survivor id -> rescue route we sent (watched for new rubble)
+        self.route_check_t = -99.0
 
     # ------------------------------------------------------------------ mode toggle
     def set_mode(self, mode):
@@ -209,6 +213,7 @@ class Robot:
         self._read_inbox()
         self._read_commands(io)
         self._perceive(io)
+        self._check_routes()
         self._update_link(io)
         self._maybe_drop_relay(io)
         self._run_scheduler(dt)
@@ -363,31 +368,76 @@ class Robot:
                 x, y, _ = self.pose
                 self.relays_left -= 1
                 self.my_relays.append([round(x, 2), round(y, 2)])
-        route = self._rescue_route(rec["pos"])
+        route = self._rescue_route_cells(rec["pos"])
         if route is None:
             return
-        path, length_m, clearance_m = route
-        payload = {"survivor": rec["id"], "by": self.id, "path": path, "length_m": length_m,
-                   "clearance_m": clearance_m, "beacon": beacon, "t": round(self.t, 1)}
+        self.routes[rec["id"]] = {"goal": rec["pos"], "beacon": beacon, "cells": None, "blocked": False}
+        self._send_route(rec["id"], route, "found")
+
+    def _send_route(self, sid, route, reason):
+        """Send (or resend) the rescue route to CMD as a priority-1 bundle. A resend carries a newer
+        `t`, so Command replaces the old route when it arrives."""
+        cells, path, length_m, clearance_m = route
+        r = self.routes[sid]
+        r.update(cells=cells, blocked=False)
+        payload = {"survivor": sid, "by": self.id, "path": path, "length_m": length_m,
+                   "clearance_m": clearance_m, "beacon": r["beacon"], "t": round(self.t, 1)}
         self.outbox.append(self._bundle("rescue_route", payload, 64 + 12 * len(path)))
-        self.events.append({"kind": "rescue_route", "robot": self.id, "survivor": rec["id"], "path": path,
-                            "length_m": length_m, "clearance_m": clearance_m, "beacon": beacon})
+        self.events.append({"kind": "rescue_route", "robot": self.id, "survivor": sid, "path": path,
+                            "length_m": length_m, "clearance_m": clearance_m, "beacon": r["beacon"],
+                            "reason": reason})
+
+    def _check_routes(self):
+        """Every ROUTE_CHECK_PERIOD s: is each route we sent still open on our own map? New rubble
+        (an aftershock, a collapse) that our lidar has seen on it -> recompute and resend. If no
+        route exists any more, say so once and keep trying (the map may open up again)."""
+        if not self.routes or self.t - self.route_check_t < ROUTE_CHECK_PERIOD:
+            return
+        self.route_check_t = self.t
+        trav = self._trav()
+        for sid, r in self.routes.items():
+            if not r["blocked"] and all(trav[y, x] for x, y in r["cells"]):
+                continue
+            route = self._rescue_route_cells(r["goal"])
+            if route is not None:
+                self._send_route(sid, route, "blocked")
+            elif not r["blocked"]:
+                r["blocked"] = True
+                self.events.append({"kind": "rescue_route_blocked", "robot": self.id, "survivor": sid})
 
     def _rescue_route(self, goal):
+        """(points, length_m, clearance_m) of the rescue route to goal, or None."""
+        route = self._rescue_route_cells(goal)
+        return None if route is None else route[1:]
+
+    def _rescue_route_cells(self, goal):
         """A* entrance -> survivor over known free cells only: never through rubble, walls, unknown
         space or no-go, centered by the wall cost, with a cost band around hazards.
-        Returns (points, length_m, clearance_m) or None."""
+        Returns (cells to watch, points, length_m, clearance_m) or None. The watched cells are the
+        route's cells that were open when it was planned; if one closes, the route is blocked."""
         grid = self.map.grid
         cost = planning.wall_cost(grid) + HAZARD_COST * planning.dilate(self.nogo, HAZARD_MARGIN_CELLS)
         trav = planning.traversable(grid, self.nogo)
-        cells = planning.astar(trav, self._cell(*self.entry), self._cell(*goal), cost)
+        start, end = self._cell(*self.entry), self._cell(*goal)
+        cells = None
+        if self.map.collapsed.any():
+            # keep responders away from fresh collapse: the part we saw fall may be only the
+            # edge of it, so stay as far clear as the corridors allow (1 m, then 0.5 m)
+            for margin in COLLAPSE_MARGINS_CELLS:
+                safe = trav & ~planning.dilate(self.map.collapsed, margin)
+                cells = planning.astar(safe, start, end, cost)
+                if cells:
+                    break
+        if not cells:
+            cells = planning.astar(trav, start, end, cost)
         if not cells:
             return None
+        watch = [(cx, cy) for cx, cy in cells if trav[cy, cx]]
         centers = [((cx + 0.5) * self.cell, (cy + 0.5) * self.cell) for cx, cy in cells]
         pts = [list(self.entry)] + [list(p) for p in planning.simplify(cells, self.cell)] + [list(goal)]
         pts = [[round(px, 2), round(py, 2)] for px, py in pts]
         length = math.dist(self.entry, centers[0]) + planning.path_length(centers) + math.dist(centers[-1], goal)
-        return pts, round(length, 1), planning.INFLATE_CELLS * self.cell
+        return watch, pts, round(length, 1), planning.INFLATE_CELLS * self.cell
 
     def _bundle(self, kind, payload, size):
         """Bundle to CMD. `rescue_route` is priority 1; until network/dtn.py lists the kind in
