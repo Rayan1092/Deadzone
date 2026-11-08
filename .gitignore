@@ -14,6 +14,11 @@ ml/*.pt
 
 # misc
 .DS_Store
+Thumbs.db
+Desktop.ini
+*.orig
+*.rej
+*.tmp
 .env
 .env.*
 !.env.example
