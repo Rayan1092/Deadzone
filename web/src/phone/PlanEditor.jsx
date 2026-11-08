@@ -1,10 +1,11 @@
 import { usePhone } from './store'
 import { clearAll, flush, removeRegion, setBudget, updateZone } from './plan'
 import { unitName } from '../format'
+import { regionName, robotName } from './labels'
 
 const NONE = []
 
-function ZoneEditor({ zone, robots }) {
+function ZoneEditor({ zone, robots, draft }) {
   return (
     <div className="editor">
       <div className="field">
@@ -13,7 +14,7 @@ function ZoneEditor({ zone, robots }) {
           {robots.map((r) => (
             <button key={r.id} className={`chip-btn${zone.robot === r.id ? ' on' : ''}`} style={{ '--c': r.color }}
                     onClick={() => updateZone(zone.id, { robot: r.id })}>
-              <i className="swatch" />{r.id}
+              <i className="swatch" />{r.name}
             </button>
           ))}
         </div>
@@ -36,16 +37,16 @@ function ZoneEditor({ zone, robots }) {
             Keep a relay link
           </button>
           <button className={zone.comms === 'lost_link_ok' ? 'on' : ''} onClick={() => updateZone(zone.id, { comms: 'lost_link_ok' })}>
-            Dark is OK
+            Allow loss of signal
           </button>
         </div>
       </div>
-      <button className="text-btn danger" onClick={() => removeRegion(zone.id)}>Delete {zone.id}</button>
+      <button className="text-btn danger" onClick={() => removeRegion(zone.id)}>Delete {regionName(zone.id, draft)}</button>
     </div>
   )
 }
 
-export default function PlanEditor() {
+export default function PlanEditor({ children }) {
   const draft = usePhone((s) => s.draft)
   const pending = usePhone((s) => s.pending)
   const checking = usePhone((s) => s.checking)
@@ -66,20 +67,20 @@ export default function PlanEditor() {
   return (
     <section className="m3-card plan-card">
       <div className="card-head">
-        <b>Search plan {draft?.plan_id ?? ''}</b>
-        {draft?.author && draft.author !== me && <span className="muted small">edited by {unitName(draft.author)}</span>}
+        <b>Search plan</b>
+        {draft?.author && draft.author !== me && <span className="muted small">Edited by {unitName(draft.author)}</span>}
       </div>
 
       {draft && <p className="hint" role="status">{pending
         ? !connected ? 'Offline · changes waiting to sync' : error ? 'Changes are not saved. Retry to share them.' : 'Saving your changes…'
-        : 'Shared with the main screen and other phones. Check and dispatch to send it to robots.'}</p>}
+        : 'Shared with the main screen and other phones. Check the plan, then send it to robots.'}</p>}
       {pending && connected && error && <button className="text-btn" onClick={flush}>Retry saving changes</button>}
 
       <div className="tools">
-        <button className={`tool${mode === 'zone' ? ' on' : ''}`} onClick={() => toggle('zone')}>
+        <button className={`tool${mode === 'zone' ? ' on' : ''}`} disabled={checking} onClick={() => toggle('zone')}>
           <i className="tool-zone" />Add zone
         </button>
-        <button className={`tool${mode === 'nogo' ? ' on' : ''}`} onClick={() => toggle('nogo')}>
+        <button className={`tool${mode === 'nogo' ? ' on' : ''}`} disabled={checking} onClick={() => toggle('nogo')}>
           <i className="tool-nogo" />Add no-go
         </button>
         <button className="tool danger" disabled={!connected || checking} onClick={clearAll}>Clear all</button>
@@ -93,30 +94,32 @@ export default function PlanEditor() {
           : 'Draw a search zone on the map and assign a robot to it.'}</p>
       )}
 
+      {children}
+
       {[...zones].sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id)).map((z) => (
         <button key={z.id} className={`region-row${z.id === selected ? ' on' : ''}`} style={{ '--c': colors[z.robot] }}
                 onClick={() => set({ selected: z.id === selected ? null : z.id })}>
           <i className="swatch" />
-          <b>{z.id}</b>
-          <span>{z.robot}</span>
-          <span className="muted">priority {z.priority}</span>
-          <span className="muted">{z.comms === 'lost_link_ok' ? 'dark OK' : 'relay link'}</span>
+          <b>{regionName(z.id, draft)}</b>
+          <span>{robotName(z.robot, robots)}</span>
+          <span className="muted">Priority {z.priority}</span>
+          <span className="muted">{z.comms === 'lost_link_ok' ? 'Signal loss allowed' : 'Relay link'}</span>
         </button>
       ))}
-      {zone && <ZoneEditor zone={zone} robots={robots} />}
+      {zone && <ZoneEditor zone={zone} robots={robots} draft={draft} />}
 
       {noGo.map((g) => (
         <div key={g.id} className={`region-row nogo${g.id === selected ? ' on' : ''}`}>
           <i className="swatch" />
-          <b>{g.id}</b>
-          <span className="muted">no-go area</span>
+          <b>{regionName(g.id, draft)}</b>
+
           <button className="text-btn danger" onClick={() => removeRegion(g.id)}>Delete</button>
         </div>
       ))}
 
       {zones.some((z) => z.comms === 'lost_link_ok') && (
         <div className="field budget">
-          <span className="label">Dark for up to</span>
+          <span className="label">Allow signal loss for up to</span>
           <input type="range" min="0" max="900" step="15" value={draft.lost_link_budget_s}
                  onChange={(e) => setBudget(Number(e.target.value))} />
           <b className="mono">{draft.lost_link_budget_s}s</b>

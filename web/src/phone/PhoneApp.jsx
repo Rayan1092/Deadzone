@@ -9,13 +9,12 @@ import SafetyCard from './SafetyCard'
 import RelayPanel from './RelayPanel'
 import AskCard from './AskCard'
 import { ControlPanel, RobotCamera, useLeaseHeartbeat } from './RobotControl'
-import { holder } from './control'
+import { isDark } from './control'
+import { connectionLabel, probeServer, publicText, robotName } from './labels'
 import './phone.css'
 
-// Stable fallback: zustand selectors must not return a new [] on every call.
 const NONE = []
 
-// Keep the screen on while a responder has the page open (Safari 16.4+, Chrome).
 function useWakeLock(active) {
   useEffect(() => {
     if (!active || !navigator.wakeLock) return
@@ -28,210 +27,153 @@ function useWakeLock(active) {
   }, [active])
 }
 
+function Header({ title, status, children }) {
+  return <header className="appbar">
+    <div className="appbar-title"><div className="brand">Deadzone</div><h1>{title}</h1></div>
+    <span className={`chip ${status === 'live' ? 'ok' : 'warn'}`}>{connectionLabel(status)}</span>
+    {children}
+  </header>
+}
+
+function ConnectionBanner({ status }) {
+  if (status === 'live') return null
+  return <section className="m3-card connection-banner" role="status" aria-live="polite">
+    <b>{connectionLabel(status)}</b>
+    <p>{status === 'connecting' ? 'Connecting to the command post. Please wait.'
+      : status === 'reconnecting' ? 'Connection lost. Reconnecting automatically. Your unsaved plan stays on this phone.'
+      : 'The server is not responding. Use the same Wi-Fi as the laptop or open its tunnel link. We will keep trying.'}</p>
+  </section>
+}
+
 function Landing({ onPick }) {
-  return (
-    <div className="phone-app landing">
-      <div className="landing-head">
-        <div className="brand">DEADZONE</div>
-        <h1>Join the rescue</h1>
-        <p className="muted">Robots are searching a collapsed building. Pick how you want to help.</p>
-      </div>
-      <button className="role-card" onClick={() => onPick('planner')}>
-        <span className="role-icon planner" aria-hidden />
-        <span>
-          <b>Plan the search</b>
-          <span className="muted">Draw zones, assign robots, run the safety check</span>
-        </span>
-      </button>
-      <button className="role-card" onClick={() => onPick('relay')}>
-        <span className="role-icon relay" aria-hidden />
-        <span>
-          <b>Be a relay</b>
-          <span className="muted">Your phone carries robot data to the command post</span>
-        </span>
-      </button>
-    </div>
-  )
+  const [status, setStatus] = useState('connecting')
+  const [retry, setRetry] = useState(0)
+  useEffect(() => {
+    let closed = false, next, ctrl
+    const check = async () => {
+      ctrl = new AbortController()
+      const timeout = setTimeout(() => ctrl.abort(), 5000)
+      const ok = await probeServer(ctrl.signal)
+      clearTimeout(timeout)
+      if (closed) return
+      setStatus(ok ? 'live' : 'unreachable')
+      next = setTimeout(check, 5000)
+    }
+    setStatus('connecting')
+    check()
+    return () => { closed = true; clearTimeout(next); ctrl?.abort() }
+  }, [retry])
+  return <div className="phone-app landing">
+    <Header title="Join the rescue" status={status} />
+    <ConnectionBanner status={status} />
+    <div className="landing-head"><h2>How would you like to help?</h2><p className="muted">Choose a robot, plan the search or help carry radio messages.</p></div>
+    {[
+      ['Control a robot', 'View its last camera image and send instructions.', 'planner', 'robots'],
+      ['Plan the search', 'Draw search areas and keep robots out of unsafe areas.', 'planner', 'plan'],
+      ['Extend radio coverage', 'Use this phone as a relay for robot messages.', 'relay', 'relay'],
+    ].map(([title, detail, role, page]) => <button className="role-card" key={page} disabled={status !== 'live'} onClick={() => onPick(role, page)}>
+      <span className={`role-icon ${role}`} aria-hidden="true" /><span><b>{title}</b><span className="muted">{detail}</span></span>
+    </button>)}
+    {status === 'unreachable' && <button className="text-btn" onClick={() => setRetry((n) => n + 1)}>Try again</button>}
+    <p className="hint">No app to install. Keep this page open while you help.</p>
+  </div>
 }
 
-function Legend() {
-  return (
-    <div className="legend">
-      <span><i className="sw scanned" />Scanned</span>
-      <span><i className="sw hazard" />Hazard</span>
-      <span><i className="sw relay" />Relay</span>
-      <span><i className="sw survivor" />Survivor</span>
-      <span><i className="sw ghost" />Old report</span>
-      <span><i className="sw route" />Rescue route</span>
-    </div>
-  )
+function MapSection() {
+  return <section className="m3-card map-card" aria-label="Search map">
+    <div className="card-head"><b>Search map</b><span className="muted small">Reports received at the command post</span></div>
+    <PlanMap />
+    <div className="legend">{[['scanned', 'Mapped'], ['hazard', 'No-go'], ['relay', 'Relay'], ['survivor', 'Survivor'], ['ghost', 'Last known position'], ['route', 'Rescue route']].map(([kind, title]) => <span key={kind}><i className={`sw ${kind}`} />{title}</span>)}</div>
+  </section>
 }
 
-function RobotList() {
+function RobotPicker({ onPick }) {
   const robots = usePhone((s) => s.hello?.robots ?? NONE)
-  const reported = usePhone((s) => s.view?.robots ?? NONE)
-  const faults = usePhone((s) => s.view?.faults ?? NONE)
-  const leases = usePhone((s) => s.leases)
-  const client = usePhone((s) => s.hello?.client)
-  const [open, setOpen] = useState(null)
-  const byId = Object.fromEntries(reported.map((r) => [r.id, r]))
-  const faultById = Object.fromEntries(faults.map((f) => [f.robot, f]))
-  return robots.map((meta) => {
-    const r = byId[meta.id]
-    const fault = faultById[meta.id]
-    const caps = meta.capabilities ?? {}
-    const isOpen = open === meta.id
-    return (
-      <div key={meta.id} className={`m3-card robot${isOpen ? ' open' : ''}`} style={{ '--c': meta.color }}
-           role="button" tabIndex={0} aria-expanded={isOpen}
-           onClick={() => setOpen(isOpen ? null : meta.id)}>
-        <div className="robot-row">
-          <i className="swatch" />
-          <b>{meta.name}</b>
-          <span className="muted">{meta.id}</span>
-          {holder(leases, meta.id, client) === 'me' && <span className="chip ok">Yours</span>}
-          {holder(leases, meta.id, client) === 'other' && <span className="chip bad">Locked</span>}
-          <span className={`chip ${r ? (r.stale_s > 3 ? 'warn' : 'ok') : ''}`}>
-            {r ? (r.stale_s > 3 ? `${Math.round(r.stale_s)}s old` : 'Reporting') : 'No report yet'}
-          </span>
-        </div>
-        {r ? (
-          <>
-            <div className="robot-state">{robotStateLabel(r)}</div>
-            {r.plan_id && (
-              <div className="following small">Following {r.plan_id}{r.zone ? ` · zone ${r.zone}` : ''} (last report)</div>
-            )}
-            <div className="bar"><div className="fill" style={{ width: `${r.battery_pct}%` }} /></div>
-            <div className="muted small">{Math.round(r.battery_pct)}% battery at last report</div>
-            {fault && (
-              <div className="reported-fault small">
-                Reported fault: {FAULT_LABEL[fault.fault] ?? fault.fault} at T+{fmtClock(fault.reported_t)}
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="muted small">Waiting for this robot's first report to reach the antenna</div>
-        )}
-        {isOpen && <RobotCamera meta={meta} report={r} />}
-        {isOpen && <ControlPanel meta={meta} />}
-        <div className="caps muted small">
-          {caps.stairs ? 'Can climb stairs' : 'No stairs'} · {caps.max_rubble_height ? `Rubble up to ${caps.max_rubble_height} m` : 'No rubble climbing'}
-          <span className="tap-hint">{isOpen ? 'Tap to close' : 'Tap for camera and control'}</span>
-        </div>
-      </div>
-    )
-  })
+  const reports = usePhone((s) => s.view?.robots ?? NONE)
+  if (!robots.length) return <section className="m3-card" role="status">Waiting for the robot list.</section>
+  return <div className="robot-picker">{robots.map((meta) => {
+    const r = reports.find((report) => report.id === meta.id)
+    return <button key={meta.id} className="m3-card robot-choice" style={{ '--c': meta.color }} onClick={() => onPick(meta.id)}>
+      <i className="robot-dot" /><span><b>{meta.name}</b><span className="muted small">{r ? robotStateLabel(r) : 'Waiting for a report'}</span></span>
+      <span className={`chip ${isDark(r) ? 'warn' : 'ok'}`}>{isDark(r) ? 'Robot dark' : 'In contact'}</span>
+      <span aria-hidden="true">›</span>
+    </button>
+  })}</div>
+}
+
+function RobotScreen({ meta, onBack }) {
+  const report = usePhone((s) => s.view?.robots?.find((r) => r.id === meta.id))
+  const fault = usePhone((s) => s.view?.faults?.find((r) => r.robot === meta.id))
+  return <>
+    <button className="text-btn" onClick={onBack}>Back to robots</button>
+    <section className="m3-card robot-detail" style={{ '--c': meta.color }}>
+      <div className="card-head"><h2>{meta.name}</h2><span className={`chip ${isDark(report) ? 'warn' : 'ok'}`}>{isDark(report) ? 'Robot dark' : 'In contact'}</span></div>
+      {isDark(report) && <p className="hint">{report ? `Last contact ${Math.round(report.stale_s)} seconds ago. The image and position are from that report.` : 'No report has reached the command post yet.'}</p>}
+      {report && <><p>{robotStateLabel(report)}</p><progress max="100" value={report.battery_pct} aria-label="Last reported battery" /><p className="hint">{Math.round(report.battery_pct)}% battery at last report</p></>}
+      {fault && <p className="reported-fault">{FAULT_LABEL[fault.fault] ?? 'A fault was reported'} at {fmtClock(fault.reported_t)}</p>}
+      <RobotCamera meta={meta} report={report} />
+      <ControlPanel meta={meta} />
+    </section>
+  </>
 }
 
 function Survivors() {
   const survivors = usePhone((s) => s.view?.survivors ?? NONE)
-  if (!survivors.length) {
-    return <div className="m3-card empty muted">None reported yet. Robots hold findings until they get signal.</div>
-  }
-  return survivors.map((s) => (
-    <div key={s.id} className="m3-card survivor">
-      <i className="dot-red" />
-      <div>
-        <b>{s.id}</b> <span className="muted">found by {s.by}</span>
-        <div className="muted small">
-          Reported at T+{fmtClock(s.reported_t)} · {s.delay_s}s after detection
-        </div>
-      </div>
-    </div>
-  ))
+  const robots = usePhone((s) => s.hello?.robots ?? NONE)
+  return <section className="m3-card"><h2>Survivors reported</h2>{!survivors.length
+    ? <p className="muted">No survivors reported yet. Robots keep findings until they regain signal.</p>
+    : survivors.map((s, i) => <div key={s.id} className="survivor"><i className="dot-red" /><div><b>Survivor {i + 1}</b><p className="hint">Reported by {robotName(s.by, robots)} at {fmtClock(s.reported_t)}.</p></div></div>)}</section>
 }
 
-// The server refused a plan: a red banner that stays until it is tapped, so it cannot be missed.
-function RefusalBanner() {
-  const refusal = usePhone((s) => s.refusal)
-  const set = usePhone((s) => s.set)
-  if (!refusal) return null
-  return (
-    <button className="refusal-banner" role="alert" onClick={() => set({ refusal: null })}>
-      <b>Plan refused</b>
-      <span>{refusal.msg}</span>
-      <small>Tap to dismiss</small>
-    </button>
-  )
-}
-
-function Snackbar() {
+function Feedback() {
   const error = usePhone((s) => s.error)
-  const [shown, setShown] = useState(null)
-  useEffect(() => {
-    if (!error) return
-    setShown(error)
-    const id = setTimeout(() => setShown(null), 4000)
-    return () => clearTimeout(id)
-  }, [error])
-  return shown ? <div className="snackbar">{shown.msg}</div> : null
+  const refusal = usePhone((s) => s.refusal)
+  const notice = usePhone((s) => s.notice)
+  const hello = usePhone((s) => s.hello)
+  const draft = usePhone((s) => s.draft)
+  const set = usePhone((s) => s.set)
+  return <>
+    {(refusal || error) && <div className="refusal-banner" role="alert"><b>{refusal ? 'Plan not sent' : 'Action not completed'}</b><span>{publicText((refusal ?? error).msg, hello, draft)}</span><button className="text-btn" onClick={() => set({ refusal: null, error: null })}>Dismiss</button></div>}
+    {notice && <div className="m3-card confirmation" role="status" aria-live="polite"><span>{publicText(notice.msg, hello, draft)}</span><button className="text-btn" onClick={() => set({ notice: null })}>Dismiss</button></div>}
+  </>
 }
 
-function Shell({ role }) {
+function Shell({ role, initialPage, onJoin }) {
+  const [page, setPage] = useState(initialPage)
+  const [selected, setSelected] = useState(null)
   const hello = usePhone((s) => s.hello)
-  useLeaseHeartbeat()
+  const connection = usePhone((s) => s.connection)
   const error = usePhone((s) => s.error)
   const checking = usePhone((s) => s.checking)
-  // Another phone dispatched this plan ID first; keep editing under a new ID.
+  useLeaseHeartbeat()
   useEffect(() => { if (!checking && error?.code === 'plan_dispatched') forkDispatched() }, [error, checking])
-  const connected = usePhone((s) => s.connected)
-  const time = usePhone((s) => s.time)
-  return (
-    <div className="phone-app">
-      <header className="appbar">
-        <div className="appbar-title">
-          <div className="brand">DEADZONE</div>
-          <div className="incident">{hello?.floorplan.name ?? 'Connecting…'}</div>
-        </div>
-        <span className="mono clock">T+{fmtClock(time)}</span>
-        <span className={`chip ${connected ? 'ok' : 'bad'}`}>{connected ? 'Live' : 'Offline'}</span>
-      </header>
-
-      <RefusalBanner />
-      {role === 'relay' && <RelayPanel />}
-
-      <section className="m3-card map-card">
-        <div className="card-head">
-          <b>Command view</b>
-          <span className="muted small">Only what reached the antenna</span>
-        </div>
-        <PlanMap />
-        <Legend />
-      </section>
-
-      {role === 'planner' && <PlanEditor />}
-      {role === 'planner' && <SafetyCard />}
-
-      <AskCard />
-
-
-      <h2 className="section-title">Robots</h2>
-      <RobotList />
-
-      <h2 className="section-title">Survivors reported</h2>
-      <Survivors />
-
-      <footer className="phone-foot muted small">
-        {hello ? `${hello.client} · ${hello.role}` : role}
-      </footer>
-      <Snackbar />
-    </div>
-  )
+  const meta = hello?.robots?.find((r) => r.id === selected)
+  const changePage = (next) => { setSelected(null); setPage(next); usePhone.getState().set({ mode: 'view', selected: null }) }
+  return <div className="phone-app">
+    <Header title={meta ? 'Control' : page === 'robots' ? 'Pick a robot' : page === 'plan' ? 'Plan' : 'Radio relay'} status={connection}><button className="text-btn" onClick={onJoin}>Join</button></Header>
+    <ConnectionBanner status={connection} />
+    <nav className="phone-nav" aria-label="Phone screens">{(role === 'planner' ? [['robots', 'Robots'], ['plan', 'Plan']] : [['relay', 'Radio relay'], ['robots', 'Robots']]).map(([key, name]) => <button key={key} aria-current={page === key ? 'page' : undefined} onClick={() => changePage(key)}>{name}</button>)}</nav>
+    <Feedback />
+    {hello && <p className="incident-name muted small">{hello.floorplan.name}</p>}
+    {page === 'robots' && (meta ? <RobotScreen meta={meta} onBack={() => setSelected(null)} /> : <><RobotPicker onPick={setSelected} /><Survivors /><AskCard /></>)}
+    {page === 'plan' && <><PlanEditor><MapSection /></PlanEditor><SafetyCard /><AskCard /></>}
+    {page === 'relay' && <><RelayPanel /><MapSection /></>}
+    <footer className="phone-foot muted small">Only reports received at the command post are shown.</footer>
+  </div>
 }
 
 export default function PhoneApp() {
   const [role, setRole] = useState(roleFromUrl)
+  const [initialPage, setInitialPage] = useState(() => role === 'relay' ? 'relay' : 'robots')
   useEffect(() => (role ? connectPhone(role) : undefined), [role])
   useWakeLock(Boolean(role))
-  if (!role) {
-    return (
-      <Landing onPick={(picked) => {
-        const url = new URL(location.href)
-        url.searchParams.set('role', picked)
-        history.replaceState(null, '', url)
-        setRole(picked)
-      }} />
-    )
+  const pick = (nextRole, page) => {
+    const url = new URL(location.href)
+    if (nextRole) url.searchParams.set('role', nextRole)
+    else url.searchParams.delete('role')
+    history.replaceState(null, '', url)
+    setInitialPage(page)
+    setRole(nextRole)
   }
-  return <Shell role={role} />
+  return role ? <Shell key={role} role={role} initialPage={initialPage} onJoin={() => pick(null, 'robots')} /> : <Landing onPick={pick} />
 }

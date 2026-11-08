@@ -4,13 +4,20 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** p2/lan-access, LAN reliability PR first; phone-only empty-plan clear PR next (cross-area authorized by Rayan, web/src/phone/ only).
-- **Works on main:** A #108, B #126, camera #115, compact stream #137, preflight #143/D2 #161, RSSI #146, phone frames F #152, heat sources G #156 plus Rayan's data #173. F/E/G are complete. Base 39f25bc, merged current main 6c60e13 (decoy pool/scheduler/Windows test fixes).
-- **In flight (not merged):** default `cd server; python -m deadzone` binds 0.0.0.0:8000; routed IPv4 join URLs replace local-only hosts; preflight checks LAN HTTP and prints the inbound-8000 firewall command on failure. Public tunnel URLs preserved. Combined backend 734 passed / 1 skipped; demo guard green.
-- **Blocked on / need from others:** none. Existing :8000 service stays running. LAN check cannot prove phone access through guest-Wi-Fi isolation; same Wi-Fi/hotspot or manual tunnel needed. Web has no npm test script; upstream Windows rename.test.js fix is now merged (84 frontend tests pass).
-- **Promises to others:** one PR/merge per item, immediate main merge before PR, backend suite/demo guard. No protected source/real .env changes. Next phone PR explicitly limited to web/src/phone/ by user; overrides usual history edit outside that directory.
+- **Working on:** deployment pass item 1, p2/phone-deployment; server public text next, public-repo hygiene third, one PR/merge each.
+- **Works on main:** all A-G backend items; LAN #178 and phone empty-plan clearing #181 merged. Protected floorplan.py/command plan/safety remain untouched.
+- **In flight (not merged):** phone Join / Pick a robot / Control / Plan screens, console glass tokens, 48 px controls, connection lifecycle states and acknowledged action confirmations. Existing server protocol/DTN gates retained. npm test now invokes the existing Node runner.
+- **Blocked on / need from others:** none. Existing :8000 service stays running. No real tunnel/firewall change. Public strings change without simulation policy changes or new flags, as explicitly requested.
+- **Promises to others:** read current main before each PR, merge each before next. Own history only; no secrets. Next server pass will normalize display text at presentation boundaries while preserving machine codes and shapes, including protected modules' messages without editing them.
 
 ## Log
+
+### 2026-11-08 PT - p2/phone-deployment - Phone field screens and public wording
+- **Did:** starts from merged main 4f0acea. Reorganized phone into Join, Pick a robot, Control and Plan with relay alternative, frosted shared glass tokens, accessible focus, 48 px inputs/buttons, offline state on Join and active screens, initial connect/reconnect/handshake timeout. Display labels use scout/area names instead of internal ids; no setup flags shown. Save/send/control/relay receipts remain tied to actual acknowledgements; sent does not mean delivered to a dark robot. Added npm test entry for existing Node test runner.
+- **Contract changes:** no REST/WebSocket shape or simulation/flag change. Connection state, receipts, navigation and label mapping are frontend-only. Existing global no-go clearing, frame retention, command acknowledgements and reset/epoch behavior preserved.
+- **Validation:** 98 frontend tests pass including new connection/relay/copy regressions and prior clear-plan tests; production build passes. Full backend 734 passed / 1 skipped (171.16 s), seed-7 guard green. Real 390x844 headless browser against owned :8012: Join, robot pick, claim, Resume, map no-go draw, safety, send to 3, clear to 3, active and Join unreachable states passed. No horizontal overflow or targets below 44 px; screenshots inspected. Owned processes cleaned, existing :8000 undisturbed.
+- **Heads-up for others:** explicitly requested cross-area phone pass. Only phone source/test files plus npm test wiring and own history; no big-screen implementation changes. Audit phone setup/error/Join findings addressed; server-returned text handled next.
+- **Next:** merge latest main, publish/merge item 1; server text item 2 next.
 
 ### 2026-11-08 PT - p2/lan-access - Reliable LAN startup and phone join addresses
 - **Did:** synced main 39f25bc first. New default launcher binds all IPv4 interfaces; Q's existing /api/join chooses the routed LAN interface, including configured localhost URLs. Preflight checks LAN-IP HTTP separately from model hello, also read-only against an existing server; unreachable prints the exact Windows Firewall command, never applies it. README/DEMO say same Wi-Fi or use manual tunnel.

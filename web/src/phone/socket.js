@@ -32,15 +32,28 @@ export function connectPhone(role) {
   let closed = false
   let retry = null
   let socket = null
+  let handshake = null
+  let failures = 0
+  let joined = false
+  usePhone.getState().set({ connected: false, connection: 'connecting' })
   const open = () => {
     socket = new WebSocket(wsUrl(`/ws/phone?${qs}`))
-    ws = socket
+    const current = ws = socket
+    handshake = setTimeout(() => {
+      if (closed || current !== socket) return
+      usePhone.getState().set({ connection: 'unreachable' })
+      current.close()
+    }, 8000)
     socket.onmessage = (e) => {
-      if (closed) return
-      const msg = JSON.parse(e.data)
+      if (closed || current !== socket) return
+      let msg
+      try { msg = JSON.parse(e.data) } catch { return }
       handlePhoneMessage(msg)
       if (msg.t === 'hello') {
-        usePhone.getState().set({ connected: true })
+        clearTimeout(handshake)
+        failures = 0
+        joined = true
+        usePhone.getState().set({ connected: true, connection: 'live' })
         flush().then(() => {
           // A save may already have been failing when the hello arrived.
           if (!closed && usePhone.getState().pending && usePhone.getState().connected) flush()
@@ -48,8 +61,12 @@ export function connectPhone(role) {
       }
     }
     socket.onclose = () => {
-      if (closed) return
-      usePhone.getState().set({ connected: false })
+      if (closed || current !== socket) return
+      clearTimeout(handshake)
+      failures++
+      usePhone.getState().set({ connected: false,
+        connection: usePhone.getState().connection === 'unreachable' || !joined || failures >= 3 ? 'unreachable' : 'reconnecting',
+        relayPending: null, relayAction: null })
       retry = setTimeout(open, 1000) // phones drop off Wi-Fi a lot, keep retrying
     }
   }
@@ -57,9 +74,10 @@ export function connectPhone(role) {
   return () => {
     closed = true
     clearTimeout(retry)
+    clearTimeout(handshake)
     socket?.close()
     if (ws === socket) ws = null
-    usePhone.getState().set({ connected: false })
+    usePhone.getState().set({ connected: false, connection: 'connecting', relayPending: null, relayAction: null })
   }
 }
 

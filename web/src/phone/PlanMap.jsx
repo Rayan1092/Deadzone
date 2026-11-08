@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { usePhone } from './store'
 import { MIN_SIDE, addRegion, pointInPoly, rectPoly, snap } from './plan'
 import { sendPhone } from './socket'
+import { regionName, robotName } from './labels'
 import { latestRoutes } from '../format'
 
 // 2D plan of the building: the pre-collapse prior plus delivered Command knowledge.
@@ -193,7 +194,7 @@ export default function PlanMap() {
       for (const r of [...(draft?.zones ?? []), ...(draft?.no_go ?? [])]) {
         const xs = r.poly.map((p) => p[0])
         const ys = r.poly.map((p) => p[1])
-        const text = r.robot ? `${r.id} · ${r.robot}` : r.id
+        const text = r.robot ? `${regionName(r.id, draft)} · ${robotName(r.robot, hello?.robots)}` : regionName(r.id, draft)
         label(text, X((Math.min(...xs) + Math.max(...xs)) / 2), Y(Math.max(...ys)) + 9,
               r.robot ? '#ffffff' : '#fecaca', 10, 700)
       }
@@ -205,7 +206,9 @@ export default function PlanMap() {
       ctx.beginPath()
       ctx.arc(X(cx), Y(cy), Math.max(4, 0.35 * s), 0, Math.PI * 2)
       ctx.fill()
-      label('CMD', X(cx), Y(cy) - Math.max(10, 0.9 * s), C.amber, 10)
+      ctx.textAlign = 'left'
+      label('Command post', X(cx), Y(cy) + 16, C.amber, 10)
+      ctx.textAlign = 'center'
 
       const r0 = Math.max(5, 0.42 * s)
       for (const relay of view?.relays ?? []) {
@@ -219,7 +222,7 @@ export default function PlanMap() {
         ctx.fillRect(-r0 * 0.7, -r0 * 0.7, r0 * 1.4, r0 * 1.4)
         ctx.strokeRect(-r0 * 0.7, -r0 * 0.7, r0 * 1.4, r0 * 1.4)
         ctx.restore()
-        label(relay.id, X(x), Y(y) + r0 + 7, C.amber, 9)
+        label('Relay', X(x), Y(y) + r0 + 7, C.amber, 9)
       }
 
       // rescue routes Command has received (entrance → survivor), with the beacon relay if any
@@ -262,7 +265,7 @@ export default function PlanMap() {
         ctx.arc(X(x), Y(y), r0 * 0.9, 0, Math.PI * 2)
         ctx.fill()
         ctx.stroke()
-        label(`You · ${mine.id}${mine.on ? '' : ' off'}`, X(x), Y(y) + r0 + 9, mine.on ? C.teal : C.ghost, 10, 700)
+        label(`Your relay${mine.on ? '' : ' off'}`, X(x), Y(y) + r0 + 9, mine.on ? C.teal : C.ghost, 10, 700)
       }
 
       for (const sv of view?.survivors ?? []) {
@@ -277,7 +280,7 @@ export default function PlanMap() {
         ctx.beginPath()
         ctx.arc(X(x), Y(y), r0 * 0.75, 0, Math.PI * 2)
         ctx.fill()
-        label(sv.id, X(x), Y(y) - r0 - 8, '#fecaca', 10)
+        label('Survivor', X(x), Y(y) - r0 - 8, '#fecaca', 10)
       }
 
       for (const r of view?.robots ?? []) {
@@ -302,7 +305,7 @@ export default function PlanMap() {
         ctx.lineTo(px + Math.cos(th) * r0 * 1.7, py - Math.sin(th) * r0 * 1.7)
         ctx.stroke()
         ctx.globalAlpha = 1
-        label(ghost ? `${r.id} · ${Math.round(r.stale_s)}s ago` : r.id, px, py - r0 - 8,
+        label(ghost ? `${robotName(r.id, hello?.robots)} · ${Math.round(r.stale_s)}s ago` : robotName(r.id, hello?.robots), px, py - r0 - 8,
               ghost ? C.ghost : '#e6edf3', 10)
       }
     }
@@ -345,7 +348,9 @@ export default function PlanMap() {
       if (!down || Math.hypot(p[0] - down[0], p[1] - down[1]) > 0.5) return // a scroll, not a tap
       if (st.mode === 'place') {
         // the server rejects walls, hazards and outside positions with invalid_relay_position
-        sendPhone('relay_place', { pos: [Math.min(W - 0.1, Math.max(0.1, p[0])), Math.min(H - 0.1, Math.max(0.1, p[1]))] })
+        const pos = [Math.min(W - 0.1, Math.max(0.1, p[0])), Math.min(H - 0.1, Math.max(0.1, p[1]))]
+        st.set({ relayAction: { kind: 'place', pos } })
+        sendPhone('relay_place', { pos })
         st.set({ mode: 'view' })
         return
       }

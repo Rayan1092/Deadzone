@@ -6,6 +6,9 @@ import { retainPhoneFrames } from './control'
 // Phone state. Phones only ever receive the Command view, never Reality.
 export const usePhone = create((set) => ({
   connected: false,
+  connection: 'connecting',
+  notice: null,      // confirmation after an acknowledged action
+  relayAction: null, // awaiting the relay's own state confirmation
   hello: null,       // { floorplan, grid, robots, plan, client, role, relay_id }
   view: null,        // delivered Command state: { robots, survivors, relays, faults? }
   map: null,         // Command occupancy grid (Uint8Array, row-major, row = y)
@@ -53,9 +56,15 @@ export function handlePhoneMessage(msg) {
       s.set({ draft: data, ...(theirs ? { safety: null } : {}) })
       break
     }
-    case 'relay_state':
-      s.set({ relay: data, relayPending: s.relayPending === data.on ? null : s.relayPending })
+    case 'relay_state': {
+      const action = s.relayAction
+      const confirmed = action?.kind === 'power' ? action.on === data.on
+        : action?.kind === 'place' && action.pos.every((v, i) => Math.abs(v - data.pos[i]) < .01)
+      s.set({ relay: data, relayPending: s.relayPending === data.on ? null : s.relayPending,
+        ...(confirmed ? { relayAction: null, notice: { msg: action.kind === 'power'
+          ? `Relay turned ${data.on ? 'on' : 'off'}.` : 'Relay moved.', at: Date.now() } } : {}) })
       break
+    }
     case 'safety':
       // Our check uses its HTTP response so another phone cannot answer it.
       break
@@ -65,7 +74,7 @@ export function handlePhoneMessage(msg) {
       }
       break
     case 'error':
-      s.set({ error: { ...data, at: Date.now() }, checking: false, relayPending: null })
+      s.set({ error: { ...data, at: Date.now() }, checking: false, relayPending: null, relayAction: null })
       break
     default:
       break
