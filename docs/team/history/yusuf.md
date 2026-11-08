@@ -17,6 +17,15 @@ Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Log
 
+### 2026-11-08 10:25 · p3/collapse-geometry · Step 4 scene module integrated (atmosphere), scout camera at night
+- **Did:**
+  - `web/src/three/Atmosphere.jsx` (built by a parallel agent; usage limit killed its two reviewers, so I reviewed it: one useFrame per subsystem, no per-frame allocations, 4 lights, Reality-only, placements derived from `fp`): a lit dust haze (one instanced mesh of camera-facing quads whose shader sums the scene lights, so headlights, the truck flood, strobes and fire light the air), a broken pipe with a water jet and a growing puddle in the break room, a fire with embers and smoke in the hazard room, two flickering emergency fixtures (red beacon near the entry with a sweeping spot, amber at the far end of the largest room). About 22 extra draw calls baked. `perf` and the robot camera copy get the light version.
+  - The scout camera at night is dark with the robot's own headlight riding on the camera.
+  - Shots: `docs/visuals/after-4-*.jpg` (night + atmosphere at the pinned angles) and `after-5-e-default.jpg` (the new default view).
+- **Contract changes:** none.
+- **Heads-up for others:** the workflow that builds the ceiling and litter modules (steps 2 and 3) was cut off by the usage limit and is running again now.
+- **Next:** integrate ceiling and litter; PR for steps 2-5.
+
 ### 2026-11-08 09:55 · p3/collapse-geometry · Step 5 camera, night by default, rover glTF loader, short spoken briefing
 - **Did:**
   - **Step 5, camera:** the default overview is a low perspective from the south-west (about 34 degrees up) with a 42 degree lens instead of the 50 degree plan view; manual follow and the auto-director's close shot sit lower (eye-level cinematic). `0` returns to it.
