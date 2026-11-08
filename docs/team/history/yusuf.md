@@ -17,6 +17,14 @@ Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Log
 
+### 2026-11-08 08:55 · p3/hyperreal · Rayan's Y1: AI Lab shows `curve_note`; merged main
+- **Did:** AI Lab shows `lab.curve_note` under the training curves, and as the empty state ("Training curve pending: …") when there is no curve, so it's clear the curve comes from the logged retrain (Rayan's review item Y1).
+  - Merged main. Resolved `robot.py` with Aziz's opt-in explorer: his explorer also gets the survivor-clear map (`_drive_trav`).
+  - Full suite 392 passed, demo guard green.
+- **Contract changes:** none.
+- **Heads-up for others:** Aziz: `_plan_frontier`'s explorer branch now receives `_drive_trav()` (traversable minus a 0.5 m disk around confirmed survivors) instead of `_trav()`.
+- **Next:** multi-story shell.
+
 ### 2026-11-08 08:45 · p3/plan-v4 · PLAN.md: hyper-realism, honest scout camera, judge-first UI
 - **Did:** added "Hyper-realism, honest scout camera and judge-first UI (9:50 PM update)" to `docs/PLAN.md`: what shipped, the merge order of my stacked branches (#70 → `p3/disaster` → `p3/hyperreal`, plus `p3/clinic-map`), the rule that only warm objects get classifier scores (never invented numbers for cold ones), and asks for Rayan and Aziz.
 - **Contract changes:** none (docs only).
