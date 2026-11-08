@@ -11,6 +11,12 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 
 ## Log
 
+### 2026-11-08 03:50 · rayan/plan-sync-v3 · PLAN.md: voice control, https tunnel, one controller per robot
+- **Did:** committed Rayan's new `docs/PLAN.md` section "Voice control with ElevenLabs (8:45 PM update)", including the https tunnel and one controller per robot. The realistic visuals and AI showcase / scenario generator sections are already on main (PR #57).
+- **Contract changes:** none
+- **Heads-up for others:** **Aziz, Yusuf: pull main and read the new voice control section now.**
+- **Next:** `rayan/route-recompute` PR, then `rayan/ai-lab`, then `rayan/scenario-gen`.
+
 ### 2026-11-08 03:00 · rayan/plan-sync-v2 · PLAN.md: realistic visual direction + AI showcase and scenario generator
 - **Did:** committed Rayan's two new `docs/PLAN.md` sections: "Visual direction: realistic (8:30 PM update)" and "AI showcase and scenario generator (8:35 PM update)".
 - **Contract changes:** none
