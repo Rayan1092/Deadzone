@@ -13,6 +13,7 @@ import UnderHood from './panels/UnderHood'
 import { DirectorChip, useDirector } from './panels/Director'
 import Banner from './panels/Banner'
 import Connection from './panels/Connection'
+import FrameRelay from './three/FrameRelay'
 import { ReplayLoader } from './panels/ReplayPanel'
 import { REPLAY } from './net/replay'
 import { useSim } from './store'
@@ -56,6 +57,7 @@ export default function BigScreen() {
       <JudgeTest />
       <UnderHood />
       <Intro />
+      <FrameRelay />
     </div>
   )
 }
