@@ -4,13 +4,41 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** batch 3 p2/phone-camera, final full backend 523 passed / 1 skipped (114.80 s), 45 focused camera-producer/consumer/lease tests passed. Main 17b6400 includes Rayan producer #114 and Yusuf UI #105. Ready to publish/merge one PR before traffic.
-- **Completed:** #108 hard collisions and #111 physical shelves merged/confirmed on main; branches deleted. Both experiment flags remain default off. #101 phone draft sync is also merged.
-- **Camera contract / works:** DZ_CAMERA_TELEMETRY=1 at CommandPost construction. Only source-matching delivered telemetry camera {t,hits:[id,pos,verdict,conf,crop]} updates Command/phone robot frames. Output adds delivered_t (bundle created, Rayan's name), reported_t (arrival), last_seen_s (simulation age from supplied frame t). Out-of-order frames cannot rewind; status without a frame cannot refresh one; empty hits clears the scene; invalid camera is ignored while valid telemetry remains. Reset clears frames, off omits camera. Up to 64 bounded valid hits, finite positions/confidence, local PNG basenames/null, extra fields stripped. Camera subtree is frozen at bundle enqueue and output is copied. No Reality/Sim/live-camera reads or control bypass.
-- **Coordination / limit:** Rayan's 14:10 written request authorizes DZ_CAMERA_TELEMETRY=0 in server/.env.example. His producer currently uses telemetry send time for camera.t; this backend ages that supplied value. Rayan should preserve actual _perceive time if cached hits are reused while perception pauses; no producer edit by Aziz. Physical phone/UI acceptance remains a dry run, not inferred from backend tests.
-- **Queue:** 4 real traffic events/node queues and compatible opt-in stream optimization, then 5 trace fixes (all robot recipients for global exclusions; safe route start inside a new no-go). Robot escape and phone zone defaults remain Rayan/Yusuf. Actual shelf footprints remain their handoff. Gemini key setup remains deferred.
+- **Working on:** batch 5 p2/global-no-go (moved before 4 to fix the traced phone bug), ready for PR. Main 123c32d includes camera #115, Rayan escape #116, Yusuf phone controls/defaults #112 and display-only belief #117. Full backend 540 passed / 1 skipped (127.81 s); 10 focused no-go cases passed. Traffic/stream is the one remaining batch PR.
+- **Completed:** #108 hard bodies, #111 shelf physics and #115 delivered phone camera merged/confirmed; old branches deleted. All experiment behavior remains default off until testing-laptop dry runs. No robot/web source edited by Aziz.
+- **No-go contract / works:** DZ_GLOBAL_NO_GO=1 at PlanManager/SafetyChecker construction. Every deployed ID from robot_specs receives the full shared no_go list via normal priority-1 DTN plan bundles, filtered zones (possibly empty), including clearing old exclusions. ID immutability/idempotence and safety recheck remain intact. A delivered start inside a new responder exclusion may BFS over non-occupied/non-static-hazard cells to the nearest allowed start in Rayan's 6 m coordinate window; full exit distance counts toward energy. Goals/home stay strict. No live pose/battery/map use and no direct robot mask changes. Flag off preserves old behavior. No-go-only drafts still need a zone to dispatch, as Yusuf's card explains.
+- **Trace evidence:** exact 80-sim-second room replay: no robot enters the exclusion, including unassigned R2/R3. Real-building R3 delivered pose (3.8,10) inside the new area now passes the route estimate. DTN application and later clearing confirmed on all 3 robots; static wall/hazard/home rejection, extra energy, default recipient behavior and Command-only boundary covered.
+- **Coordination:** Rayan owns physical escape (now main #116), Yusuf owns zone defaults/card (now #112). Prior save-order fix is defensive, not the demonstrated root cause. Camera backend ages the producer's supplied t; true capture timestamp preservation is a producer follow-up. Actual shelf footprints are Rayan/Yusuf's work; Gemini key remains deferred.
 
 ## Log
+
+### 2026-11-08 PT - p2/global-no-go - Combined belief/no-go validation green
+- **Did:** final source combination on main 123c32d passed the full backend after belief integration; no-go source unchanged from the focused trace replay.
+- **Contract changes:** none; DZ_GLOBAL_NO_GO remains default off and no new belief wire fields are claimed.
+- **Validation:** 540 backend passed / 1 opt-in skipped (127.81 s), including fixed seed-7 guard; exact 80 s no-go replay and delivered inside-start checks remain green.
+- **Heads-up for others:** no robot/web/data source edited; existing scope/ownership disclosure in #118 remains accurate.
+- **Next:** merge/confirm #118 and delete its branch, then the last batch PR for traffic/stream.
+
+
+### 2026-11-08 PT - p2/global-no-go - Integrate belief main before no-go merge
+- **Did:** #118 opened with 535 backend passed/1 skipped; main advanced with Rayan's display-only belief PR #117 during creation. Integrated main 123c32d without editing his robot/data source; combined backend/guard rerun before merge.
+- **Contract changes:** none in this merge. Read Rayan's new belief-map wiring reservation; it is a separate future backend task, not silently added to the current five-item batch. Traffic compression will preserve optional future belief grid keys.
+- **Heads-up for others:** no claim that belief grids are already served by Sim.maps. Global no-go stays default off. Rayan's physical escape and Yusuf's phone UI remain included and unchanged.
+- **Next:** finish combined validation/merge #118, then the final traffic/stream PR.
+
+### 2026-11-08 PT - p2/global-no-go - Fix the traced global exclusion dispatch and route start
+- **Did:** implemented both backend break points in rayan-ml 15:10: send the shared exclusions to every statically deployed robot through DTN, and estimate an exit from a newly excluded delivered start before route planning. Clearing exclusions reaches unassigned robots too. No masks, poses or acknowledgments are injected directly into robot state.
+- **Contract changes:** DZ_GLOBAL_NO_GO=1 at construction, default off, reserved before code. Existing plan/API/result shapes remain unchanged. Zones are still required for dispatch; each robot's payload may have zero zones. Escape remains bounded, never crosses known occupied/static-hazard cells, never relaxes destination/home, and its distance counts in battery reserve.
+- **Validation:** final full backend 535 passed / 1 opt-in skipped (117.97 s), including fixed guard; 10 focused cases. Exact trace area avoided by all robots through 80 sim seconds; real-building R3 inside-start estimate passes; actual DTN apply/clear/idempotence covered.
+- **Heads-up for others:** Rayan's physical escape #116 and Yusuf's UI defaults #112 are included, but not edited. Outside source area: server/tests/test_global_no_go.py and required own history. Flag stays off until testing-laptop dry run. This is batch 5 only, intentionally before traffic.
+- **Next:** publish/merge/confirm this PR and delete branch; finish batch 4 traffic/stream separately.
+
+
+### 2026-11-08 PT - p2/global-no-go - Trace-driven dispatch/safety contract before code
+- **Did:** confirmed camera #115 on main 47805df and cleaned branch. Reordered only the remaining work: urgent traced no-go fixes first, traffic/performance last, one PR each. Read Rayan #116 escape and Yusuf #112 priority/assignment/no-go-only UI handoffs.
+- **Contract changes BEFORE code:** DZ_GLOBAL_NO_GO=1, broadcast full exclusions to all deployed IDs through ordinary filtered plan bundles; BFS escape estimate from delivered start inside a new exclusion, bounded to Rayan's 6 m coordinate window and counted in energy. Default off. Keep quiet draft vs checked dispatch distinction and >=1-zone requirement. No API/wire changes.
+- **Heads-up for others:** these fix rayan-ml 15:10 bugs 1.1/1.2. Rayan already owns/fixed physical escape in #116, and Yusuf fixed UI items in #112. No robot/web edits here, no DTN shortcut or fake plan acknowledgment. Geometry estimates remain from Command knowledge.
+- **Next:** reproduce one-zone dispatch with global exclusions, mid-run inside-zone safety, real DTN application/clearing, no-through-wall/hazard cases, idempotence and default guard; finish one PR then traffic.
 
 ### 2026-11-08 PT - p2/phone-camera - Delivered thermal frames for phone robot pickers
 - **Did:** wired validated delivered camera snapshots into Command and cmd_view, with source/arrival/capture-age metadata and reset/out-of-order handling. Frozen camera payload at DTN enqueue prevents live producer mutation of old queued frames. Integrated real producer #114 and verified real producer and outage custody paths. Existing exclusive leases remain enforced across two phones.
