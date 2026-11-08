@@ -15,14 +15,14 @@ It's all simulated, so you only need a laptop. The big screen shows two views of
 
 The gap between those two views is the whole point.
 
-## The demo story
+## A typical mission
 
-1. A judge scans a QR code and plans the search on their phone. They send Robot 2 into the north-east corner, where there's a steel storage cage. The safety checker rejects it: "that zone is a radio dead zone". They tap "Allow it to go dark" and send it.
+1. An operator scans a QR code and plans the search on their phone. They send Robot 2 into the north-east corner, where there's a steel storage cage. The safety checker rejects it: "that zone is a radio dead zone". They tap "Allow it to go dark" and send it.
 2. Three robots drive in, map the building with lidar, and drop relays as the signal gets weak.
 3. Robot 2 enters the steel cage and loses signal. The command post still shows it as a grey ghost at its last known spot.
 4. Robot 2 finds a survivor in the dark. Its AI model says "person, 100%". Only the Reality side knows. It drops a beacon next to the survivor and plans the safest route in from the entrance.
-5. It heads back to signal. 14 seconds later the map, the survivor and the 50 m rescue route all pop up on the command post at once.
-6. We drop rubble on a robot, jam a wheel, and overload its CPU. It replans, backs off, and its safety task never misses a deadline.
+5. It heads back to signal. 16 seconds later the map, the survivor and the 50 m rescue route all pop up on the command post at once.
+6. A secondary collapse drops rubble on that rescue route. The robots see it, replan, and the route on the command post redraws around it. A jammed wheel and an overloaded processor follow: fault protection backs the robot off, and its safety task never misses a deadline.
 
 Same seed every time, so the story happens on cue. The full script with timings is in [`docs/DEMO.md`](docs/DEMO.md).
 
@@ -71,23 +71,7 @@ Open http://localhost:8000. Press **Q** for the phone QR code. Phones need to be
 
 For web development, run `npm run dev` in `web/` and open http://localhost:5173.
 
-### Keys on the big screen
-
-| Key | What it does |
-| --- | --- |
-| Space | start / pause |
-| Backspace | reset |
-| + / - | faster / slower |
-| 1, 2, 3 / 0 | follow a robot / overview |
-| R | drop rubble in front of the followed robot |
-| F | jam a wheel (overcurrent) |
-| O | overload the robot's CPU |
-| U | resume a robot from safe stop |
-| G | situation briefing |
-| V | robot's-eye camera |
-| T | show the hidden truth on Reality |
-| P | performance mode |
-| Q | phone QR code |
+The keys, the phone and every optional feature are described in [Using the simulator](#using-the-simulator) below.
 
 ### Settings
 
@@ -104,6 +88,88 @@ For web development, run `npm run dev` in `web/` and open http://localhost:5173.
 cd server
 python -m pytest -q
 ```
+
+## Using the simulator
+
+Deadzone is a test bench for one question: what should a team of search robots do when the building cuts their radio? Everything below runs on one laptop; phones join as field units over Wi-Fi.
+
+### What you are looking at
+
+Two views of the same mission. **Reality** is the simulated world: where the robots really are, every survivor and heat source (press **T** to show the hidden ones). The **Command post** is only what has reached the antenna over the simulated radio: delivered maps, last reported robot positions (a grey ghost when a robot is out of contact), reported survivors and rescue routes. A test fails if the Command post ever learns something before the radio delivered it. **M** switches between one view (Reality with the Command post inset) and side by side; **C** swaps the inset and the main view.
+
+### Buildings, variants and scenarios
+
+| Building | What it is | How to load it |
+|---|---|---|
+| `collapse_01` | the reference building: 40 x 30 m offices, break room and warehouse, a steel storage cage that kills the radio, 3 survivors, 3 warm decoys (a radiator among them), a gas hazard, and a scripted secondary collapse at 162.5 s | the default |
+| `variants/collapse_01_v1` to `v5` | the same walls with the people and decoys moved (one survivor always deep in the steel cage) | **N** loads another building (these five first); **Shift+N** returns to the default |
+| `showcase_01` | 80 x 60 m, 36 rooms, two steel dead zones, 4 survivors, 4 decoys, a three-area earthquake | reset into it (below) |
+| any seed | `python data/floorplans/generate.py --seed 1234` writes `data/floorplans/generated/gen_1234.json`: a random collapsed building, validated (everything reachable, a steel dead zone, survivors, decoys, a disaster script), plus a default search plan in `data/plans/` | reset into `generated/gen_1234` |
+
+`GET /api/scenarios` lists every building the server knows. To switch, send the control `{action: "reset", value: {floorplan: "<id>", timeline: true}}`. The same seed and building always give the same run, step for step, so you can change one thing and compare.
+
+**Scenario events.** A building can script its own disasters in an `events` list, run at the same sim time on every run: `collapse` (rubble at a point or just ahead of a robot), `aftershock` (rubble, a fallen wall section, a destroyed relay) and `radio_fail` (a relay's radio dies and its stored messages are lost). `collapse_01` has one: `{"t": 162.5, "type": "collapse", "near": "R1", "at": [25.31, 15.65]}`, rubble on the first survivor's rescue route. The schema is in `docs/PLAN.md` ("Scenario events"). Generated buildings also carry a longer disaster `timeline`, played when the server runs with `DZ_SCENARIO_TIMELINE=1`.
+
+### The phone as a field unit
+
+Press **Q** for a join code. Any phone on the same network opens a web page; nothing to install.
+
+- **Plan the search:** draw search zones on the map, assign a robot and a priority to each, mark what the zone needs (stairs, climbing rubble), and draw no-go areas. "Dark for up to" sets how long a robot may stay out of radio contact.
+- **Run safety check:** the command post checks every zone against what it actually knows (not the true building): battery reserve for there and back, robot capability, reachability, no-go overlap, and whether the zone is predicted to be a radio dead zone. A dead-zone zone is refused until you allow that robot to go dark. Then **Dispatch**: the plan itself travels over the simulated radio, so a robot out of contact gets it late.
+- **Robot cards:** tap one for its delivered camera image and controls (explore, return home, move to a point). With control leases on (`DZ_CONTROL_LEASES=1`), **Take control** / **Release** hand a robot between phones and the big screen; the big screen shows an **Operator lock** while it holds the fleet.
+- **Be a relay:** the phone becomes a radio relay and carries robot data to the command post.
+- **Ask:** questions about the search, answered by Gemini from Command post data only (`DZ_GEMINI=1`).
+
+### Keys on the big screen
+
+| Key | What it does |
+| --- | --- |
+| Space / Backspace | start or pause / reset (paused) |
+| + / - | sim speed |
+| 1, 2, 3 / 0 | follow a robot (or click its card) / overview |
+| M / C | one view or side by side / swap the Command post inset and the main view |
+| E | Operator view (map first) / Engineering view (scheduler, legends, every panel) |
+| V | the followed robot's camera, with a thermal toggle |
+| T | show hidden survivors and decoys on Reality |
+| Y | belief map: where survivors may still be |
+| R | rubble on the followed robot's path (with `DZ_SMART_RUBBLE=1` it never seals anyone in) |
+| F / O | jam a wheel / overload the robot's processor (the safety task keeps its deadlines) |
+| U | resume a robot from safe stop (sent over the radio) |
+| A / Shift+A | aftershock / strong three-area aftershock (`DZ_AFTERSHOCK=1`) |
+| B | baseline: every robot behaves like a conventional one that stops when its link drops |
+| N / Shift+N | a new building / back to the default |
+| G | spoken situation briefing from Command post data (`DZ_GEMINI=1`) |
+| L / J | Model Lab / one held-out thermal sample: guess, then see the model's answer |
+| K / D | night lighting / automatic camera |
+| X / P | sound cues / performance mode (set before a run) |
+| Q / S / ? | phone join code / save the mission recording / this list |
+
+### Model Lab
+
+Press **L** (server started with `DZ_AI_LAB=1`): training examples, the training curve, the confusion matrix and held-out metrics, and the last thermal crop a robot classified with its Grad-CAM heat map ("where the model looked"). Every number shown is reproducible from a file in `ml/results/`; `docs/FACTS.md` lists each one with its source. The detector also exports to ONNX (`py ml/export_onnx.py`) for embedded boards.
+
+### Mission recording and replay
+
+Open `http://localhost:8000/?record`, run the mission, press **S**: the browser saves a gzipped recording of everything both views showed. Open `/?replay` and drop the file in to watch it again without the simulator (Space pauses, Backspace restarts); the detection images load only while a server is running.
+
+### Optional features
+
+All off unless set before starting the server.
+
+| Setting | What it adds |
+|---|---|
+| `DZ_OBSTACLES=1` | solid furniture: blocks robots and lidar, 1 dB radio loss per piece |
+| `DZ_ROBOT_COLLISIONS=1` | robots are solid to each other |
+| `DZ_SMART_RUBBLE=1` | R never traps a robot |
+| `DZ_AFTERSHOCK=1` | keys A and Shift+A |
+| `DZ_SCENARIO_TIMELINE=1` | generated buildings play their disaster timeline |
+| `DZ_SEARCH_BAYES=1` | robots steer toward where survivors are most likely, not just the nearest unexplored area |
+| `DZ_HEAT_SOURCES=1` | typed heat sources (generators, pipes, server racks...) the detector must reject |
+| `DZ_SENSOR_VIEW=1` | rendered robot camera frames on Reality |
+| `DZ_AI_LAB=1` | Model Lab (key L) |
+| `DZ_GEMINI=1` | briefings and phone questions through Gemini (`GEMINI_API_KEY` in `server/.env`) |
+| `DZ_CONTROL_LEASES=1` | one controller per robot; the big screen's Operator lock |
+| `DZ_SCENARIO_EVENTS=0` | switch a building's scripted events off |
 
 ## AI tools
 
