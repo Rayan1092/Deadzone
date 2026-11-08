@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Billboard } from '@react-three/drei'
 import * as THREE from 'three'
 import { FOCUS_HOLD_MS, useSim } from '../store'
 import { AI_CAPTION } from '../format'
@@ -11,6 +10,7 @@ import { ROBOT_SCALE } from './Rover'
 import RoverModel from './RoverModel'
 import { w2t } from './util'
 import { decoyLayout } from './furniture'
+import { HeatSources, SpotMeter, ThermalLook, ThermalOverlay } from './thermal'
 import { captureJpeg, createFrameSender } from '../net/phoneFrames'
 
 function PhoneFrameUploader({ robotId }) {
@@ -67,35 +67,9 @@ function EyeCamera({ robotId }) {
   )
 }
 
-// Hot spots as the camera sees them: survivors and decoys both glow in thermal,
-// which is exactly why the onboard detector has to judge them. In thermal mode each one
-// is the exact FLIR crop the detector scores (served at /crops), so this view and the
-// AI card show the same image. A shape stands in if the crop is unavailable.
-const loader = new THREE.TextureLoader()
-const crops = new Map()
-function cropTexture(name) {
-  if (!crops.has(name)) {
-    const tex = loader.load(`/crops/${name}`, undefined, undefined, () => crops.set(name, null))
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.anisotropy = 8 // mipmapped and anisotropic: the crop stays sharp seen at an angle, no shimmer far away
-    crops.set(name, tex)
-  }
-  return crops.get(name)
-}
-
-function ThermalCrop({ name, fallback }) {
-  const tex = name ? cropTexture(name) : null
-  if (!tex) return fallback
-  return (
-    <Billboard position={[0, 0.6, 0]}>
-      <mesh>
-        <planeGeometry args={[1.1, 1.1]} />
-        <meshBasicMaterial map={tex} toneMapped={false} />
-      </mesh>
-    </Billboard>
-  )
-}
-
+// Hot spots as the camera sees them. Plain camera: the posed survivor figures (decoys are
+// part of the building's props). Thermal: the same figures at body temperature, the decoys at
+// theirs (Props.jsx) and the floor plan's heat sources, rendered by thermal.jsx in white hot.
 function HotSpots({ thermal }) {
   const fp = useSim((s) => s.floorplan)
   const manifest = useCropManifest()
@@ -104,25 +78,10 @@ function HotSpots({ thermal }) {
     <group>
       {(fp.survivors ?? []).map((s) => (
         <group key={s.id} position={w2t(s.pos[0], s.pos[1], 0)}>
-          {thermal ? (
-            <ThermalCrop name={s.thermal} fallback={(
-              <mesh position={[0, 0.15, 0]} scale={[1.4, 0.35, 0.6]}>
-                <sphereGeometry args={[0.5, 16, 12]} />
-                <meshBasicMaterial color="#fff1b8" />
-              </mesh>
-            )} />
-          ) : <SurvivorFigure id={s.id} pose={survivorPose(s, manifest)} />}
+          <SurvivorFigure id={s.id} pose={survivorPose(s, manifest)} />
         </group>
       ))}
-      {decoyLayout(fp).map((d) => (
-        <group key={d.id} position={w2t(d.pos[0], d.pos[1], 0)}>
-          {thermal ? (
-            <ThermalCrop name={d.thermal} fallback={(
-              <mesh position={[0, 0.45, 0]}><boxGeometry args={[0.6, 0.9, 0.35]} /><meshBasicMaterial color="#ffb347" /></mesh>
-            )} />
-          ) : null /* the real object is part of the building's props */}
-        </group>
-      ))}
+      {thermal && <HeatSources fp={fp} />}
     </group>
   )
 }
@@ -153,7 +112,8 @@ function EyeRover({ r, thermal }) {
 
 function Robots({ robotId, thermal }) {
   const robots = useSim((s) => s.tick?.reality.robots)
-  return (robots ?? []).filter((r) => r.id !== robotId).map((r) => <EyeRover key={r.id} r={r} thermal={thermal} />)
+  // rovers run warm (motors, batteries): 27 C in the thermal view
+  return (robots ?? []).filter((r) => r.id !== robotId).map((r) => <group key={r.id} userData={{ thermalTemp: 27 }}><EyeRover r={r} thermal={thermal} /></group>)
 }
 
 // Every warm object in this camera's view gets a box: the hot spots the thermal camera
@@ -398,6 +358,7 @@ export default function RobotEye() {
   const focused = useSim((s) => s.eyeFocus?.robot === s.eyeRobot && s.eyeFocus)
   const [, rerender] = useState(0)
   const boxes = useRef([])
+  const spot = useRef(null) // the crosshair's temperature readout (thermal)
   const float = useFloating()
   // grow while a verdict is on screen, then shrink back to the corner
   const live = focused && performance.now() - focused.born < FOCUS_HOLD_MS
@@ -420,7 +381,7 @@ export default function RobotEye() {
           fixed share of the main view (rayan-ml's profile: drawing it every frame halved the fps) */}
       <Canvas dpr={[1, 2]} frameloop="demand" camera={{ fov: 85, near: 0.05, far: 60 }} gl={{ antialias: true }}>
         <EyeRate fps={24} />
-        <color attach="background" args={[thermal ? '#030614' : night ? '#07080a' : '#0e1114']} />
+        <color attach="background" args={[thermal ? '#141414' : night ? '#07080a' : '#0e1114']} />
         {thermal ? <ambientLight intensity={0.6} /> : night ? (
           <>
             <ambientLight intensity={0.12} />
@@ -438,14 +399,17 @@ export default function RobotEye() {
         <Robots robotId={robotId} thermal={thermal} />
         <EyeCamera robotId={robotId} />
         <ClassifyBoxes robotId={robotId} thermal={thermal} boxes={boxes} />
+        {thermal && <ThermalLook />}
+        {thermal && <SpotMeter out={spot} />}
         {frames && <PhoneFrameUploader key={`${robotId}:${frames.epoch}`} robotId={robotId} />}
       </Canvas>
       {Array.from({ length: MAX_BOXES }, (_, i) => (
         <div key={i} ref={(el) => { boxes.current[i] = el }} className="eye-box" style={{ display: 'none' }}><span className="eye-box-label" /></div>
       ))}
+      {thermal && <ThermalOverlay spot={spot} />}
       <FocusPanel robotId={robotId} />
       <span className="eye-note">
-        {thermal ? `Thermal camera · ${AI_CAPTION} Warm objects are scored by the onboard person classifier.`
+        {thermal ? 'Thermal camera, white hot · warm objects go to the onboard person classifier, which classifies their real FLIR crop (AI card)'
           : 'Forward camera · every warm object is scored by the onboard person classifier from its thermal crop'}
       </span>
     </div>

@@ -657,3 +657,22 @@ button:hover { border-color: var(--teal); }
 /* plan captions on the robot cards: "Scout 2 → Zone 3", amber while a plan has not reached the robot */
 .plan-line { margin-top: 4px; font-size: 12px; color: rgba(230,237,243,.82); }
 .plan-line.pending { color: #fcd34d; }
+
+/* thermal scout camera (thermal.jsx): white hot, slight sensor blur and noise, FLIR-style overlay */
+.robot-eye.thermal > div:not(.eye-head) canvas { filter: blur(0.8px) contrast(1.08); }
+.thermal-hud { position: absolute; left: 0; right: 0; top: 37px; bottom: 0; pointer-events: none; z-index: 1; overflow: hidden; }
+.thermal-noise { position: absolute; inset: -20px; opacity: .13; mix-blend-mode: overlay; background-size: 96px 96px; animation: th-noise .3s steps(3) infinite; }
+@keyframes th-noise { 0% { transform: translate(0, 0); } 33% { transform: translate(-13px, 7px); } 66% { transform: translate(9px, -11px); } }
+.th-mode, .th-rec { position: absolute; top: 8px; font-size: 11px; letter-spacing: .08em; color: rgba(255,255,255,.85); text-shadow: 0 1px 2px #000; }
+.th-mode { left: 10px; }
+.th-rec { right: 52px; display: inline-flex; align-items: center; gap: 6px; }
+.th-rec i { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: eye-wait 1.2s ease-in-out infinite; }
+.th-scale { position: absolute; right: 10px; top: 30px; bottom: 34px; width: 34px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-size: 10px; color: rgba(255,255,255,.85); text-shadow: 0 1px 2px #000; }
+.th-scale i { flex: 1; width: 9px; border-radius: 2px; border: 1px solid rgba(255,255,255,.5); background: linear-gradient(#fff, #6b6b6b 55%, #111); }
+.th-cross { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.th-cross i { width: 30px; height: 30px; background:
+  linear-gradient(#fff, #fff) center / 2px 10px no-repeat, linear-gradient(#fff, #fff) center / 10px 2px no-repeat;
+  border: 1px solid rgba(255,255,255,.7); border-radius: 50%; filter: drop-shadow(0 0 1px #000); }
+.th-cross b { font-size: 12px; color: #fff; text-shadow: 0 1px 2px #000; transform: translateY(18px); position: absolute; top: 30px; white-space: nowrap; }
+.robot-eye.thermal { border-color: rgba(229,231,235,.45); }
