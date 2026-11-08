@@ -1,8 +1,13 @@
 """Fine-tune MobileNetV3-Small on thermal person vs background crops.
 
   py ml/train.py --crops ml/data/crops --epochs 5
+
+With --history, every epoch's train loss / accuracy and holdout loss / accuracy go to a JSON
+file (the AI Lab training curve). It refuses to overwrite an existing model unless --overwrite,
+so a logged retrain can never replace the shipped ml/models/detector.pt by accident.
 """
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -18,16 +23,22 @@ import common  # noqa: E402
 ML_DIR = Path(__file__).resolve().parent
 
 
-def evaluate(model, loader, device):
+def evaluate(model, loader, device, loss_fn=None):
+    """Holdout accuracy at the deployed threshold, and mean loss if loss_fn is given."""
     model.eval()
     correct = total = 0
+    loss_sum = 0.0
     with torch.no_grad():
         for x, y in loader:
             x, y = x.to(device), y.to(device)
-            p = common.predict_pos_prob(model, x)
+            logits = model(x).float()
+            p = torch.softmax(logits, dim=1)[:, 1]
             correct += ((p >= common.THRESHOLD).long() == y).sum().item()
             total += y.numel()
-    return correct / max(total, 1)
+            if loss_fn is not None:
+                loss_sum += loss_fn(logits, y).item() * y.numel()
+    acc = correct / max(total, 1)
+    return (acc, loss_sum / max(total, 1)) if loss_fn is not None else acc
 
 
 def main():
@@ -40,7 +51,11 @@ def main():
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--no-pretrained", action="store_true")
+    ap.add_argument("--history", default=None, help="write per-epoch curve JSON here")
+    ap.add_argument("--overwrite", action="store_true", help="allow replacing an existing --out")
     args = ap.parse_args()
+    if Path(args.out).exists() and not args.overwrite:
+        sys.exit(f"{args.out} exists; pass a new --out (or --overwrite on purpose)")
 
     torch.manual_seed(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -72,22 +87,37 @@ def main():
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     best = -1.0
+    history = []
     for ep in range(1, args.epochs + 1):
         model.train()
-        t0, run_loss, n = time.time(), 0.0, 0
+        t0, run_loss, n, run_correct = time.time(), 0.0, 0, 0
         for x, y in train_dl:
             x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
             opt.zero_grad(set_to_none=True)
             with torch.autocast(device_type=device, enabled=device == "cuda"):
-                loss = loss_fn(model(x), y)
+                logits = model(x)
+                loss = loss_fn(logits, y)
             scaler.scale(loss).backward()
             scaler.step(opt)
             scaler.update()
             sched.step()
             run_loss += loss.item() * y.numel()
             n += y.numel()
-        acc = evaluate(model, hold_dl, device)
-        print(f"epoch {ep}/{args.epochs}  loss {run_loss / max(n, 1):.4f}  holdout acc {acc:.4f}  {time.time() - t0:.1f}s")
+            p = torch.softmax(logits.detach().float(), dim=1)[:, 1]
+            run_correct += ((p >= common.THRESHOLD).long() == y).sum().item()
+        acc, val_loss = evaluate(model, hold_dl, device, loss_fn)
+        secs = time.time() - t0
+        print(f"epoch {ep}/{args.epochs}  loss {run_loss / max(n, 1):.4f}  holdout acc {acc:.4f}  {secs:.1f}s")
+        history.append({"epoch": ep, "train_loss": round(run_loss / max(n, 1), 4),
+                        "train_acc": round(run_correct / max(n, 1), 4),
+                        "val_loss": round(val_loss, 4), "val_acc": round(acc, 4), "seconds": round(secs, 1)})
+        if args.history:
+            Path(args.history).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.history).write_text(json.dumps({
+                "arch": common.ARCH, "epochs": args.epochs, "batch": args.batch, "lr": args.lr,
+                "seed": args.seed, "device": device, "train": len(train_ds), "holdout": len(hold_ds),
+                "note": "holdout = 10% of the FLIR train crops (val_*); the test metrics use FLIR val",
+                "curve": history}, indent=1))
         if acc >= best:   # ties: keep the later, better-trained epoch
             best = acc
             common.save_checkpoint(model.cpu(), out, {"holdout_acc": acc, "epoch": ep})
