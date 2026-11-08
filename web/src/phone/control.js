@@ -55,6 +55,7 @@ export const ackFor = (view, cmdId) => (cmdId && view?.command_acks?.find((a) =>
 // Aziz as cmd_view robots[].camera), else the newest delivered thermal crop from this robot.
 // Never a frame that was not delivered.
 export function lastFrame(report, survivors, robot) {
+  if (report?.phone_frame) return { kind: 'jpeg', t: report.phone_frame.t, frame: report.phone_frame }
   if (report?.camera) return { kind: 'frame', t: report.camera.t, frame: report.camera }
   const crop = (survivors ?? []).filter((s) => s.by === robot && s.crop)
     .sort((a, b) => (b.t ?? b.reported_t) - (a.t ?? a.reported_t))[0]
@@ -62,3 +63,14 @@ export function lastFrame(report, survivors, robot) {
 }
 
 export const isDark = (report) => !report || report.stale_s > DARK_S
+
+// The server omits JPEGs while dark; retain only ones this phone already received.
+// A new incident clears view in phoneHelloState before this merge can run.
+export function retainPhoneFrames(previous, view, enabled, now) {
+  if (!enabled) return view
+  const old = Object.fromEntries((previous?.robots ?? []).map((r) => [r.id, r.phone_frame]))
+  return { ...view, robots: view.robots.map((r) => {
+    const frame = r.phone_frame ?? old[r.id]
+    return frame ? { ...r, phone_frame: { ...frame, last_seen_s: Math.max(0, now - frame.t) } } : r
+  }) }
+}

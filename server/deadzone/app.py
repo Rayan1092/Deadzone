@@ -36,6 +36,7 @@ from .command.voice import ManualCommand, SpeechRequest, VoiceRequest
 from .command.controls import AskQuestion, FaultRequest, RelayPlace, RelayPower, director_adapter
 from .command.reports import command_report
 from .command.rescue_order import rescue_order
+from .command.frames import FrameUpload, MAX_BODY_BYTES, PhoneFrames
 from .command.safety import SafetyChecker
 from .robot.robot import resume_command
 from .robot.perception import CROP_DIR, get_detector
@@ -96,6 +97,7 @@ class Hub:
         self.plan_sync = PlanSync(self.plans)
         self.command_requests = {}
         self.speech_cache = {}
+        self.phone_frames = PhoneFrames(os.environ.get("DZ_PHONE_FRAMES") == "1", self.plan_epoch)
 
     def envelope(self, t, data):
         self.seq += 1
@@ -322,7 +324,7 @@ class Hub:
                              | ({"stream": stream_profile()} if self.stream.enabled else {})
                              | {"scenario": {"id": self.scenario_id, "timeline": self.timeline_enabled}}
                              | detector_status() | {"leases": self.lease_state(), "voice":{"enabled":os.environ.get("DZ_VOICE") == "1"}}
-                             | self.controller_hello(ws))
+                             | self.controller_hello(ws) | self.phone_frames.capabilities())
 
     def control_state(self):
         modes = {r.mode for r in self.sim.robots.values()}
@@ -342,6 +344,7 @@ class Hub:
                 "leases": self.lease_state(),
                 "voice": {"enabled":os.environ.get("DZ_VOICE") == "1"},
                 **({"stream": stream_profile()} if self.stream.enabled else {}),
+                **self.phone_frames.capabilities(),
                 **detector_status()}
 
     def attach_relay(self, client):
@@ -431,8 +434,24 @@ class Hub:
 
     def phone_view(self):
         # Do not call snapshot() here: phones need no Reality objects at all.
-        return self.sim.post.view(self.sim.time) | {
+        view = self.sim.post.view(self.sim.time)
+        if self.phone_frames.enabled:
+            for robot in view["robots"]:
+                if self.phone_frames.linked(self.sim.post, robot["id"], self.sim.time):
+                    frame = self.phone_frames.view(robot["id"], self.sim.time)
+                    if frame is not None:
+                        robot["phone_frame"] = frame
+        return view | {
             "map": base64.b64encode(self.sim.post.map.tobytes()).decode()} | self.sim.post.coverage()
+
+    def receive_frame(self, rid, body):
+        if not self.phone_frames.enabled:
+            raise PlanError("feature_disabled", "Phone frames are disabled", 404)
+        if rid not in self.sim.robots:
+            raise PlanError("robot_not_found", "Unknown robot", 404)
+        if not self.phone_frames.linked(self.sim.post, rid, self.sim.time):
+            raise PlanError("frame_no_signal", "Command has no fresh report from this robot", 409)
+        return self.phone_frames.accept(rid, body, self.sim.time)
 
     async def check_plan(self, plan_id, epoch=None):
         async with self.plan_lock:
@@ -662,6 +681,23 @@ async def request_error(request, error):
 @app.exception_handler(ValidationError)
 async def control_validation_error(request, error):
     return await request_error(request, error)
+
+
+@app.post("/api/frames/{robot_id}")
+async def upload_frame(robot_id: str, request: Request):
+    if not hub.phone_frames.enabled:
+        raise PlanError("feature_disabled", "Phone frames are disabled", 404)
+    raw = bytearray()
+    async for chunk in request.stream():
+        raw.extend(chunk)
+        if len(raw) > MAX_BODY_BYTES:
+            raise PlanError("frame_size", "Frame request is too large", 413)
+    body = FrameUpload.model_validate_json(bytes(raw))
+    async with hub.plan_lock:
+        result = hub.receive_frame(robot_id, body)
+        # Also deliver while paused, without advancing the sim or reading Reality.
+        await hub.send_all(hub.phones, hub.envelope("cmd_view", hub.phone_view()))
+        return result
 
 
 @app.get("/api/health")

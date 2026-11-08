@@ -547,6 +547,46 @@ full base64 maps, preserving the existing synchronous replay format.
 
 `event.kind` values: `survivor_found`, `survivor_reported`, `relay_dropped`, `link_lost`, `link_restored`, `fault`, `replan`, `safety_reject`, `bundle_delivered`, `rubble_fall`.
 
+### Phone JPEG frames (`DZ_PHONE_FRAMES`, default off)
+
+At Hub construction/reset, `DZ_PHONE_FRAMES=1` enables screen-rendered robot-eye
+JPEG uploads and advertises this in screen/phone `hello.data`:
+`phone_frames:{epoch,max_width:320,max_height:180,max_fps:3}`. With the flag off,
+this capability and all JPEG fields are absent, no canvas capture occurs, and
+the upload endpoint returns 404. Existing thermal-hit camera data is unchanged.
+
+`POST /api/frames/{robot_id}` accepts JSON `{epoch,t,jpeg}`: the advertised
+incident epoch, capture time in sim seconds, and **bare base64 JPEG** (no data-URL
+prefix). Decoded images must be JPEG, at most 320 pixels wide and 180 high,
+and at most 128 KiB; JSON bodies are bounded too. The server validates the image,
+keeps one latest accepted frame per robot in memory, and limits acceptance to
+3 fps per robot in monotonic wall time across all uploaders. Capture times must
+not be future, more than 3 sim seconds old, or older than the last accepted image.
+Reset clears images/rate state and changes epoch, rejecting in-flight old uploads.
+
+Admission/publication uses **Command's last delivered robot report**, age <=3
+sim seconds, matching the phone's no-signal threshold; SHUTDOWN/no report is
+unavailable. Reality's current link graph is never consulted. A dark upload is
+refused (409) without changing the cached image; excess rate is 429, malformed
+images/JSON are 422, oversized bodies 413, unknown robots 404. Success returns
+`{ok:true,robot,t}` and publishes `cmd_view` to phones even when paused.
+
+Only while that Command contact gate is open, phone `cmd_view.data.robots[]`
+may contain `phone_frame:{jpeg,mime:"image/jpeg",width,height,t,last_seen_s}`.
+The age is sim time since capture. During darkness the server omits this field;
+a phone retains only its own previously received JPEG, ages it, and shows its
+existing NO SIGNAL overlay. A phone joining while dark receives no hidden image.
+New incidents clear the phone's cache. JPEGs never enter tick.command, screen
+ticks/maps, Command AI tools, DTN bundles or persistent storage.
+
+The big screen captures its **existing open robot-eye canvas** after rendering,
+fits/letterboxes into 320x180 at JPEG quality 0.7, and uploads at most 3 fps while
+connected and Command contact is fresh. It creates no extra render canvas or
+scene; changing robots closes/aborts the old sender. Closing/hiding the scout
+camera stops uploads, so the phone keeps its last received image or uses the
+existing delivered thermal-hit/crop fallback. This is rendered simulation imagery,
+not detector input or a new ML inference source.
+
 ### Phones: `WS /ws/phone?client=<id>&role=planner|relay`
 
 | Direction | `t` | `data` |
