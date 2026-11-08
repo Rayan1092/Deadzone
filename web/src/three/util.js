@@ -15,5 +15,6 @@ export const COLORS = {
   hazard: '#ef4444',
 }
 
-export const WALL_H = 1.4   // cutaway height so the overhead view reads clearly
-export const FOG_H = 1.55
+export const WALL_H = 2.2   // full-height walls; the roof is cut away
+export const FOG_H = 2.35   // fog of war sits just above the wall tops
+export const MAST_H = 4.2   // command post antenna mast, where radio links end

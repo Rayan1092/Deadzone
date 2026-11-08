@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { useSim } from '../store'
-import { COLORS, w2t } from './util'
+import { COLORS, MAST_H, w2t } from './util'
 
 const NONE = []
 const OFF = '#4b5563'
@@ -104,7 +104,7 @@ export function RealityLinks() {
   const fp = useSim((s) => s.floorplan)
   if (!tick || !fp) return null
   const [cx, cy] = fp.command_post.pos
-  const at = { CMD: w2t(cx, cy, 2.4) }
+  const at = { CMD: w2t(cx, cy, MAST_H) }
   const robots = new Set()
   for (const r of tick.reality.robots) { at[r.id] = w2t(r.pose[0], r.pose[1], 0.5); robots.add(r.id) }
   for (const r of tick.reality.relays) at[r.id] = w2t(r.pos[0], r.pos[1], 0.62)
@@ -157,7 +157,7 @@ export function AntennaPulse() {
   if (!fp) return null
   const [cx, cy] = fp.command_post.pos
   return (
-    <mesh ref={ring} position={w2t(cx, cy, 2.45)} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
+    <mesh ref={ring} position={w2t(cx, cy, MAST_H + 0.05)} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
       <ringGeometry args={[0.25, 0.32, 32]} />
       <meshBasicMaterial color={COLORS.amber} transparent side={THREE.DoubleSide} depthWrite={false} />
     </mesh>

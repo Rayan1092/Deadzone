@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** UI pass, combined with Rayan's Version 2 plan. `p3/one-view` (Step 2: one-view gap mode, key M) committed. Next: Step 3 3D realism (bloom, materials, crops in the world), Step 4 collapsed scheduler, Step 5 auto-director.
+- **Working on:** UI pass (with Rayan's Version 2 plan). `p3/realism`: Step 3 plus a high-fidelity 3D world pass (full-height walls, furnished rooms, debris, rover model, truck, AO). Next: Step 4 collapsed scheduler, Step 5 auto-director.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,27 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 02:10 · p3/realism · High-fidelity 3D world
+- **Did:** rebuilt the 3D world on Yusuf's ask ("real 3D walls and objects"):
+  - Walls are full height (2.2 m; fog of war at 2.35 m, the antenna mast at 4.2 m). Textures are procedural PBR with normal maps (no downloads): formwork concrete, brick, a chain-link cage for metal walls, polished slab floor, carpet in the offices, vinyl in the break room and corridor, and an asphalt lot.
+  - Doors from `floorplan.doors`: frames and lintels, open doors flat against the wall, broken doors lying flat in the doorway, and a roll-up shutter at the entrance.
+  - Debris on every rubble footprint, including runtime rubble falls: instanced concrete chunks in a mound, slabs with rebar, dust stains, and an I-beam on tall piles.
+  - Furniture hugs walls or sits in the gas no-go boiler room, so it never overlaps robot paths: desks, chairs, shelving, pallet racks, a forklift, boilers and pipes, signs. The decoys are their real objects at their truth positions (radiator, engine, coffee cart), Reality only.
+  - Command post: a response truck with a flashing light bar and a telescoping mast. Gas leak: floor tape plus drifting haze.
+  - Tracked rover model: treads, camera head, spinning lidar, and a radio whip whose tip is green when the link is up and red when dark. Survivors are capsule-limb people in clothes.
+  - Lighting: IBL from Lightformers, south-west sun, N8AO ambient occlusion, AgX tone mapping, vignette, SMAA. The Command pane gets the same look without props.
+  - Fog no longer paints black slabs over walls or (Reality only) rubble piles. Reality panes drop the teal scan tint; Command keeps it.
+  - Performance: static props merged per material (`Baked.jsx`), and the shadow map renders only while the scene settles. Measured in this browser: about 25 fps full quality, 28 in P mode, against a 30 fps cap.
+- **Contract changes:** none (frontend only; the DEMO.md beats are unaffected).
+- **Heads-up for others:** the overview camera is pulled back slightly to fit the truck west of the wall. Press P on a weak laptop. Aziz: merged main; aftershock `floorplan.dynamic_walls` now draw on Reality panes only (not Command, not the inset). Key A comes next.
+- **Next:** Step 4 collapsed scheduler strip, Step 5 auto-director camera.
+
+### 2026-11-08 00:50 · p3/realism · Step 3: 3D realism pass
+- **Did:** procedural concrete (generated in code, no downloads) on the floor with 4 m saw-cut joints and on the walls, metal walls metallic, light wall caps so the floorplan reads from across the room, dark ground outside; warm key light from the entrance with a shadow frustum covering the whole building (the old light only shaded ±5 m around the origin) plus a cool sky fill; bloom (`@react-three/postprocessing` 2.19.1) on the Reality / one-view canvas only, off in performance mode, so only robot LED strips, survivor figures and the antenna glow (they are not tone mapped); LED strips on each robot in its color; frontier glow on free cells at the edge of real unknown space (5x5 window, ignores lidar speckle); scanned-floor tint made subtler so materials show. Robot camera thermal mode now shows the exact FLIR crops (`floorplan.survivors[].thermal`, `decoys[].thermal` from `/crops`) as billboards, the same images as the AI card (Version 2 "AI visible in the world"); a shape stands in if a crop fails to load. Tested on main at 4x in split and one view; all six crops load (200).
+- **Contract changes:** none. New npm dependency `@react-three/postprocessing` (run `npm install` in `web/` after pulling).
+- **Heads-up for others:** demo laptop: press P if the big screen drops frames (bloom and shadows are the expensive parts). Rayan: in-world crops use the floorplan's `thermal` names today; a crop manifest is only needed if you add more images.
+- **Next:** Step 4 collapsed scheduler strip, Step 5 auto-director camera.
 
 ### 2026-11-08 00:15 · p3/one-view · Step 2: one-view "gap" mode (Version 2 plan), key M
 - **Did:** the Version 2 "one main 3D view" as a toggle: **M** (or the top-bar layout button) switches between today's split and one full-width Reality view with Command's gap drawn on it. Dark robots get a ghost at Command's last fix with an amber dashed tether to the real robot ("R2 · last report 13s ago"); found-but-unreported survivors pulse amber "S1 · not reported yet" and flip to "S1 · reported to command" with the shockwave; ground the robots mapped but Command hasn't is hazed amber and fades out as map patches arrive (the reveal); rescue routes are faint "not reported yet" until delivered. A blueprint Command inset (public floorplan without truth rubble, delivered map/robots/survivors/routes/relays) and both AI cards sit in a reserved right column; the camera frames the building in the remaining space (projection view offset), follow mode included. Split stays the default until a dry run passes (Rayan's guardrail); the choice is remembered per browser. Also: zones count as dispatched when a robot reports following the plan (no stale "draft" after a reload); the camera refits once a new canvas has a size. Tested with DEMO.md's fixed plan P-2 at 4x: R2 dark with ghost + haze at 2:08, "S1 · not reported yet" + held route at 2:22, reveal at 2:39 (14.1 s, matches DEMO.md).

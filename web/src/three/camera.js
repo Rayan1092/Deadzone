@@ -5,8 +5,8 @@ import { useSim } from '../store'
 // `pos - target` is the shared view offset (orbit angle + zoom). In follow mode
 // each pane keeps that offset but centres on its own idea of the robot.
 export const shared = {
-  pos: new THREE.Vector3(20, 50, 16),
-  target: new THREE.Vector3(20, 0, -15),
+  pos: new THREE.Vector3(19.5, 50, 16),
+  target: new THREE.Vector3(19.5, 0, -15),
   home: null,  // fitted overview { pos, target } for the 0 key
   src: null,   // pane the user is dragging
   rev: 0,      // bumps whenever pos/target change
@@ -14,7 +14,7 @@ export const shared = {
 
 // Pull the overview camera back along its viewing direction until the whole
 // building (plus the CMD antenna west of it) fits the pane, whatever its shape.
-const VIEW_W = 44 // m, x from -3 to 41
+const VIEW_W = 48 // m, x from -4.5 to 43.5 (the command truck is west of the wall)
 const VIEW_D = 32 // m, y from -1 to 31
 export function fitOverview(camera, aspect) {
   const dir = shared.pos.clone().sub(shared.target).normalize()
@@ -46,8 +46,8 @@ export function overview() {
 
 // A new layout means a new pane shape: forget the fitted overview so the next pane refits.
 export function resetOverview() {
-  shared.pos.set(20, 50, 16)
-  shared.target.set(20, 0, -15)
+  shared.pos.set(19.5, 50, 16)
+  shared.target.set(19.5, 0, -15)
   shared.home = null
   shared.src = null
   shared.rev++
