@@ -56,28 +56,18 @@ def test_collapse_near_a_robot_drops_ahead_of_it_without_any_flag(tmp_path):
     assert not any(e["kind"] == "rubble_pressed" for _, e in log), "a scenario event is not a key press"
 
 
-def test_unsafe_collapse_spot_moves_onto_the_robots_path(tmp_path):
+def test_collapse_spot_is_never_moved(tmp_path):
+    """The author owns the spot: even where the smart R key would refuse it, the collapse lands
+    exactly 1.5 m ahead of `near`."""
     sim = Sim(plan_path=plan_with(tmp_path, [{"t": 20.0, "type": "collapse", "near": "R1"}]), n_robots=3, seed=7)
     run(sim, 19.95)
     x, y, th = sim.robots["R1"].pose
     plain = (x + math.cos(th) * 1.5, y + math.sin(th) * 1.5)
     assert not sim._rubble_is_safe(plain, 1.4)
-    spot = sim._smart_rubble_spot("R1", 1.4)
-    assert spot is not None
     log = run(sim, 21.0)
     (e,) = [e for _, e in log if e["kind"] == "rubble_fall"]
     center = (sum(p[0] for p in e["poly"]) / 4, sum(p[1] for p in e["poly"]) / 4)
-    assert math.dist(center, spot) < 0.05 and e["cause"] == "collapse"
-
-
-def test_collapse_that_would_trap_moves_or_is_refused(tmp_path):
-    # Office A's only door: a collapse there would seal the room, so it is refused or moved
-    sim = Sim(plan_path=plan_with(tmp_path, [{"t": 1.0, "type": "collapse", "at": [4.6, 17.0]}]), n_robots=3, seed=7)
-    log = run(sim, 3.0)
-    falls = [e for _, e in log if e["kind"] == "rubble_fall"]
-    failed = [e for _, e in log if e["kind"] == "scenario_event_failed"]
-    assert failed or all(not (3.9 < sum(p[0] for p in e["poly"]) / 4 < 5.3
-                              and 16.3 < sum(p[1] for p in e["poly"]) / 4 < 17.7) for e in falls)
+    assert math.dist(center, plain) < 0.05 and e["cause"] == "collapse"
 
 
 def test_aftershock_and_radio_fail_events(tmp_path):
