@@ -1,0 +1,95 @@
+{
+ "threshold": 0.6,
+ "n": 74,
+ "false_alarms": 3,
+ "false_alarm_rate": 0.0405,
+ "per_type": {
+  "dog": {
+   "n": 2,
+   "false_alarms": 0,
+   "false_alarm_rate": 0.0,
+   "max_p_person": 0.121,
+   "mean_p_person": 0.074,
+   "real": true,
+   "classes": [
+    "dog"
+   ],
+   "caption": "dog, real FLIR thermal frame"
+  },
+  "sunlit": {
+   "n": 12,
+   "false_alarms": 0,
+   "false_alarm_rate": 0.0,
+   "max_p_person": 0.005,
+   "mean_p_person": 0.002,
+   "real": true,
+   "classes": [
+    "unlabelled bright patch"
+   ],
+   "caption": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)"
+  },
+  "generator": {
+   "n": 12,
+   "false_alarms": 2,
+   "false_alarm_rate": 0.167,
+   "max_p_person": 0.82,
+   "mean_p_person": 0.251,
+   "real": false,
+   "classes": [
+    "truck",
+    "other vehicle"
+   ],
+   "caption": "running truck engine and machinery (stand-in for a generator)"
+  },
+  "space_heater": {
+   "n": 12,
+   "false_alarms": 0,
+   "false_alarm_rate": 0.0,
+   "max_p_person": 0.562,
+   "mean_p_person": 0.13,
+   "real": false,
+   "classes": [
+    "car"
+   ],
+   "caption": "warm car front (stand-in for a space heater)"
+  },
+  "hot_pipe": {
+   "n": 12,
+   "false_alarms": 0,
+   "false_alarm_rate": 0.0,
+   "max_p_person": 0.127,
+   "mean_p_person": 0.026,
+   "real": false,
+   "classes": [
+    "light"
+   ],
+   "caption": "lamp post or light housing (stand-in for a hot pipe)"
+  },
+  "server_rack": {
+   "n": 12,
+   "false_alarms": 0,
+   "false_alarm_rate": 0.0,
+   "max_p_person": 0.175,
+   "mean_p_person": 0.024,
+   "real": false,
+   "classes": [
+    "bus"
+   ],
+   "caption": "boxy warm bus panel (stand-in for a server rack)"
+  },
+  "laptop": {
+   "n": 12,
+   "false_alarms": 1,
+   "false_alarm_rate": 0.083,
+   "max_p_person": 0.993,
+   "mean_p_person": 0.164,
+   "real": false,
+   "classes": [
+    "sign"
+   ],
+   "caption": "small warm panel (stand-in for a laptop)"
+  }
+ },
+ "source": "Teledyne FLIR ADAS v2 thermal, images_thermal_val + video_thermal_test (never trained on); frames used by the runtime crops, unsure pairs and the held-out test set excluded",
+ "note": "dog and sunlit are real counterparts; the other five are stand-ins (warmest crops of the closest labelled class), named as such in each caption"
+}
