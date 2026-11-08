@@ -3,8 +3,9 @@ from copy import deepcopy
 
 import numpy as np
 import pytest
+from pathlib import Path
 
-from deadzone.floorplan import FloorPlan
+from deadzone.floorplan import FURNITURE_LOSS_DB, FloorPlan
 from deadzone.network.propagation import rssi
 from deadzone.robot.lidar import raycast
 
@@ -31,14 +32,19 @@ def test_shelf_is_occupied_and_blocks_lidar():
     assert hits[forward] and 2.5 < distances[forward] < 3.5
 
 
-@pytest.mark.parametrize("material,loss", [("metal", 18), ("wood", 3)])
-def test_each_crossed_shelf_face_uses_its_declared_radio_loss(material, loss):
+@pytest.mark.parametrize("material,loss_db,loss", [("metal", None, FURNITURE_LOSS_DB), ("wood", None, FURNITURE_LOSS_DB),
+                                                   ("metal", 5.0, 5.0), ("wood", 0.0, 0.0)])
+def test_each_crossed_shelf_face_costs_the_furniture_loss_not_the_wall_table(material, loss_db, loss):
+    """Furniture is its own radio class: a desk is not a metal wall (22 dB). Each crossed footprint
+    edge costs the piece's loss_db, default FURNITURE_LOSS_DB, whatever its material tag says."""
     data = plan()
     data["obstacles"][0]["material"] = material
+    if loss_db is not None:
+        data["obstacles"][0]["loss_db"] = loss_db
     empty = deepcopy(data)
     empty["obstacles"] = []
     a, b = (2, 5), (9, 5)
-    assert rssi(FloorPlan(empty), a, b) - rssi(FloorPlan(data), a, b) == pytest.approx(2 * loss)
+    assert rssi(FloorPlan(empty), a, b) - rssi(FloorPlan(data), a, b) == pytest.approx(loss)   # in and out = one piece
 
 
 def test_very_thin_shelves_still_occupy_boundary_cells():
@@ -83,10 +89,35 @@ def test_invalid_enabled_footprints_fail_at_load(poly):
         FloorPlan(data)
 
 
-def test_missing_material_defaults_to_metal_and_unknown_material_is_rejected():
+def test_missing_material_is_metal_metadata_and_unknown_material_or_loss_is_rejected():
     data = plan()
     data["obstacles"][0].pop("material")
-    assert list(FloorPlan(data).seg_loss) == [18] * 4
+    assert list(FloorPlan(data).seg_loss) == [FURNITURE_LOSS_DB / 2] * 4
     data["obstacles"][0]["material"] = "missing"
     with pytest.raises(ValueError, match="material"):
         FloorPlan(data)
+    data["obstacles"][0]["material"] = "metal"
+    data["obstacles"][0]["loss_db"] = -1
+    with pytest.raises(ValueError, match="loss_db"):
+        FloorPlan(data)
+
+
+def test_demo_plan_is_accepted_with_the_furniture_on():
+    """collapse_01 with Yusuf's 25 solid pieces: the safety checker's radio prior must still see the
+    west and break-room zones in range (P-1 is accepted after 'allow dark' exactly as without
+    furniture) and no zone may predict dead because of desks."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from deadzone.command.plan import PlanManager, SearchPlan
+    from deadzone.command.safety import SafetyChecker
+    from deadzone.sim import Sim
+    import test_demo_guard as G
+    sim = Sim(n_robots=3, seed=7)
+    assert sim.fp.obstacles_enabled and len(sim.fp.data.get("obstacles", [])) >= 20
+    sim.tick()
+    pm = PlanManager(sim, SafetyChecker(sim.prior, sim.robot_specs, sim.energy_time_scale))
+    pm.save(SearchPlan.model_validate(G.demo_plan("P-1", "relay")))
+    rejected = pm.check("P-1")
+    assert {(v["zone"], v["rule"]) for v in rejected["violations"]} == {("ZNE", "comms_plan")}
+    pm.save(SearchPlan.model_validate(G.demo_plan("P-1", "lost_link_ok")))
+    assert pm.check("P-1")["ok"] and pm.dispatch("P-1")["ok"]

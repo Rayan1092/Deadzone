@@ -12,6 +12,17 @@ from .geometry import points_in_poly
 UNKNOWN, FREE, OCC, NOGO = 0, 1, 2, 3
 
 
+# Radio loss per furniture piece crossed (dB), DZ_OBSTACLES=1. Furniture is not a wall:
+# Rappaport, Wireless Communications: Principles and Practice (2nd ed.), Table 4.3, partition
+# losses measured at 1.3 GHz, light partitions and light machinery 1 to 4 dB. The default is the
+# low end, 1 dB, because the exported footprints are open shelving and desks; a piece can declare
+# its own `loss_db` (a loaded pallet rack 4). A straight path enters and leaves a footprint, so
+# each footprint edge carries half of the piece's loss. Walls and rubble keep the materials table.
+# Note (docs/FACTS.md): the demo plan's ZW zone has only 1.6 dB of command-post link margin by
+# design, so it is the first zone to go marginal when anything sits on that line.
+FURNITURE_LOSS_DB = 1.0
+
+
 class FloorPlan:
     def __init__(self, data: dict):
         self.data = data
@@ -82,13 +93,16 @@ class FloorPlan:
             material = obstacle.get("material", "metal")
             if not isinstance(material, str) or material not in self.data["materials"]:
                 raise ValueError(f"Obstacle {i} material must be declared in materials")
+            # Furniture is its own radio class: a desk or a shelf is not a wall of that material.
+            # Each crossed footprint edge costs the piece's `loss_db` (default FURNITURE_LOSS_DB),
+            # never the wall table's loss for its material.
             try:
-                material_loss = float(self.data["materials"][material])
+                loss_db = float(obstacle.get("loss_db", FURNITURE_LOSS_DB))
             except (TypeError, ValueError):
-                raise ValueError(f"Obstacle {i} material loss must be finite and nonnegative") from None
-            if not np.isfinite(material_loss) or material_loss < 0:
-                raise ValueError(f"Obstacle {i} material loss must be finite and nonnegative")
-            out.append((poly.tolist(), material_loss))
+                raise ValueError(f"Obstacle {i} loss_db must be finite and nonnegative") from None
+            if not np.isfinite(loss_db) or loss_db < 0:
+                raise ValueError(f"Obstacle {i} loss_db must be finite and nonnegative")
+            out.append((poly.tolist(), loss_db / 2.0))     # per edge; a crossing costs loss_db
         return out
 
     @classmethod
