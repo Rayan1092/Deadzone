@@ -517,9 +517,9 @@ export function CommandPost({ pos, entry, cold: isCold = false }) {
         <B m={M.chrome} s={[0.1, 0.3, 2.2]} p={[3.22, 0.95, 0]} />
         {/* light bar */}
         <mesh position={[2.3, 2.55, -0.45]}><boxGeometry args={[0.3, 0.14, 0.8]} />
-          <meshStandardMaterial ref={red} color="#ff3030" emissive="#ff1a1a" toneMapped={false} /></mesh>
+          <meshStandardMaterial ref={red} color="#ff3030" emissive="#ff1a1a" toneMapped={false} userData={{ live: true }} /></mesh>
         <mesh position={[2.3, 2.55, 0.45]}><boxGeometry args={[0.3, 0.14, 0.8]} />
-          <meshStandardMaterial ref={blue} color="#3060ff" emissive="#1a4dff" toneMapped={false} /></mesh>
+          <meshStandardMaterial ref={blue} color="#3060ff" emissive="#1a4dff" toneMapped={false} userData={{ live: true }} /></mesh>
         {/* roof dish and ladder */}
         <C m={M.white} rt={0.5} rb={0.12} h={0.25} p={[-2.3, 3.4, 0]} r={[0.5, 0, 0]} seg={20} />
         {[-3.0, -2.6, -2.2].map((xx) => <B key={xx} m={M.chrome} s={[0.03, 0.03, 0.5]} p={[xx, 2.0, -1.17]} r={[Math.PI / 2, 0, 0]} />)}

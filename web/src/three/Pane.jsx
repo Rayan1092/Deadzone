@@ -226,27 +226,49 @@ const Grading = memo(function Grading({ which, night }) {
   )
 })
 
-// Command's view only changes when a bundle reaches the antenna (or the map, the building or the
-// camera changes), so its canvas renders on demand: on each of those, and for 1.5 s after (the
-// antenna pulse, ghosts gliding to a newly reported pose). Reality keeps rendering every frame.
-const COMMAND_SETTLE_MS = 1500
+// Command's view only changes when something reaches the antenna, so its canvas renders on demand.
+// A change in what it shows (a robot's last report, survivors, routes, relays, faults, the map,
+// the camera, the building) draws one frame: a ghost robot then jumps to its newly reported
+// pose, which is what "last report" means. Only the antenna pulse after a big delivery keeps
+// drawing, for its 0.7 s. Routine telemetry no longer keeps the pane rendering every frame.
+const PULSE_MS = 900
+function commandSignature(s) {
+  const c = s.tick?.command
+  return [c ? c.robots.map((r) => r.last_seen).join(',') : '', c?.survivors.length, c?.routes?.length, c?.relays.length, c?.faults?.length,
+    s.maps.commandVersion, shared.rev, s.floorplan, s.night, s.follow, s.showTruth].join('|')
+}
 function CommandRedraw() {
   const invalidate = useThree((s) => s.invalidate)
   useEffect(() => {
     let raf = 0
     let until = 0
-    let last = []
+    let last = ''
+    let lastBig = -1
     const loop = () => {
       const s = useSim.getState()
       const now = performance.now()
-      const sig = [s.tick?.stats.delivered, s.bigDeliveries, s.maps.version, shared.rev, s.floorplan, s.night, s.follow, s.showTruth]
-      if (sig.some((v, i) => v !== last[i])) { last = sig; until = now + COMMAND_SETTLE_MS }
+      const sig = commandSignature(s)
+      if (sig !== last) { last = sig; invalidate() }
+      if (s.bigDeliveries !== lastBig) { lastBig = s.bigDeliveries; until = now + PULSE_MS }
       if (now < until) invalidate()
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
   }, [invalidate])
+  return null
+}
+
+// ?perfdebug: each pane's renderer and scene on window.__dzScenes, for profiling from the console
+const PERF_DEBUG = (() => { try { return new URLSearchParams(location.search).has('perfdebug') } catch { return false } })()
+function DebugExpose({ which }) {
+  const { gl, scene } = useThree()
+  useEffect(() => {
+    if (!PERF_DEBUG) return undefined
+    window.__dzScenes = { ...(window.__dzScenes ?? {}), [which]: { gl, scene } }
+    window.__dzShared = shared
+    return () => { if (window.__dzScenes) delete window.__dzScenes[which] }
+  }, [gl, scene, which])
   return null
 }
 
@@ -295,6 +317,7 @@ export default function Pane({ which, title, subtitle }) {
         <Exposure night={night} />
         {night && which !== 'command' && <NightLights />}
         <StaticShadows />
+        <DebugExpose which={which} />
         {which === 'command' ? (
           <>
             <CommandRedraw />

@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import Baked from './Baked'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { materials, signTexture } from './textures'
@@ -122,8 +123,10 @@ export default function Rover({ color, tag, ghost = false, thermal = false, sens
     return { ...B, ...C, tip: linkUp ? tips.up : tips.down }
   }, [B, C, ghost, thermal, linkUp, powered])
   const label = tag && !ghost && !thermal ? decal(tag) : null
+  // the rover's parts never move against each other: merged per look (one robot was ~50 draws,
+  // drawn again for every ghost); re-merged when its look changes; the spinning lidar stays apart
   return (
-    <group>
+    <Baked deps={[M, label]}>
       {/* track pods: tread, sprocket at the back, idler at the front, road wheels between */}
       {[-TRACK_Z, TRACK_Z].map((z) => {
         const out = z > 0 ? 1 : -1
@@ -175,7 +178,7 @@ export default function Rover({ color, tag, ghost = false, thermal = false, sens
       <mesh position={[0.135, 0.338, 0]} material={M.bar}><boxGeometry args={[0.05, 0.01, 0.1]} /></mesh>
       {/* lidar mast */}
       <mesh position={[-0.07, 0.26, 0]} material={M.metal}><cylinderGeometry args={[0.014, 0.018, 0.1, 10]} /></mesh>
-      <group ref={sensor} position={[-0.07, 0.34, 0]}>
+      <group ref={sensor} position={[-0.07, 0.34, 0]} userData={{ noBake: true }}>
         <mesh material={M.rubber}><cylinderGeometry args={[0.048, 0.048, 0.06, 24]} /></mesh>
         <mesh material={M.led}><cylinderGeometry args={[0.0495, 0.0495, 0.01, 24]} /></mesh>
         <mesh position={[0, 0.033, 0]} material={M.metal}><cylinderGeometry args={[0.04, 0.048, 0.008, 24]} /></mesh>
@@ -191,6 +194,6 @@ export default function Rover({ color, tag, ghost = false, thermal = false, sens
       {/* radio whip */}
       <mesh position={[-0.2, 0.42, -0.085]} material={M.rubber}><cylinderGeometry args={[0.003, 0.006, 0.38, 6]} /></mesh>
       <mesh position={[-0.2, 0.61, -0.085]} material={M.tip}><sphereGeometry args={[0.012, 12, 12]} /></mesh>
-    </group>
+    </Baked>
   )
 }
