@@ -11,31 +11,14 @@ import RoverModel from './RoverModel'
 import { w2t } from './util'
 import { decoyLayout } from './furniture'
 import { HeatSources, SpotMeter, ThermalLook, ThermalOverlay } from './thermal'
-import { captureJpeg, createFrameSender } from '../net/phoneFrames'
 
-function PhoneFrameUploader({ robotId }) {
-  const sender = useRef(null)
-  useEffect(() => {
-    const target = document.createElement('canvas')
-    const active = createFrameSender({ getState: useSim.getState, capture: (source) => captureJpeg(source, target) })
-    sender.current = active
-    return () => { active.close(); if (sender.current === active) sender.current = null }
-  }, [robotId])
-  // With this opt-in component mounted, own the normal render and capture before
-  // WebGL clears its drawing buffer. No extra render or preserveDrawingBuffer.
-  useFrame(({ gl, scene, camera }) => {
-    gl.render(scene, camera)
-    void sender.current?.send(robotId, gl.domElement)
-  }, 1)
-  return null
-}
 
 // Picture-in-picture from a robot's forward camera (V key or the card's Camera
 // button). Reality pane only: it shows what the robot's own camera sees. A third
 // WebGL canvas, so it only exists while open; it renders at full resolution, 24 frames a second.
 // the camera head on the drawn rover (Rover.jsx, scaled): lens height and how far forward
-const EYE_H = 0.56
-const EYE_FWD = 0.36
+export const EYE_H = 0.56
+export const EYE_FWD = 0.36
 
 function EyeCamera({ robotId }) {
   const { camera } = useThree()
@@ -70,7 +53,7 @@ function EyeCamera({ robotId }) {
 // Hot spots as the camera sees them. Plain camera: the posed survivor figures (decoys are
 // part of the building's props). Thermal: the same figures at body temperature, the decoys at
 // theirs (Props.jsx) and the floor plan's heat sources, rendered by thermal.jsx in white hot.
-function HotSpots({ thermal }) {
+export function HotSpots({ thermal }) {
   const fp = useSim((s) => s.floorplan)
   const manifest = useCropManifest()
   if (!fp) return null
@@ -110,7 +93,7 @@ function EyeRover({ r, thermal }) {
   )
 }
 
-function Robots({ robotId, thermal }) {
+export function Robots({ robotId, thermal }) {
   const robots = useSim((s) => s.tick?.reality.robots)
   // rovers run warm (motors, batteries): 27 C in the thermal view
   return (robots ?? []).filter((r) => r.id !== robotId).map((r) => <group key={r.id} userData={{ thermalTemp: 27 }}><EyeRover r={r} thermal={thermal} /></group>)
@@ -351,7 +334,6 @@ function useFloating() {
 export default function RobotEye() {
   const robotId = useSim((s) => s.eyeRobot)
   const thermal = useSim((s) => s.eyeThermal)
-  const frames = useSim((s) => s.phoneFrames)
   const night = useSim((s) => s.night)
   const meta = useSim((s) => s.robotsMeta.find((r) => r.id === s.eyeRobot))
   const set = useSim((s) => s.set)
@@ -401,7 +383,6 @@ export default function RobotEye() {
         <ClassifyBoxes robotId={robotId} thermal={thermal} boxes={boxes} />
         {thermal && <ThermalLook />}
         {thermal && <SpotMeter out={spot} />}
-        {frames && <PhoneFrameUploader key={`${robotId}:${frames.epoch}`} robotId={robotId} />}
       </Canvas>
       {Array.from({ length: MAX_BOXES }, (_, i) => (
         <div key={i} ref={(el) => { boxes.current[i] = el }} className="eye-box" style={{ display: 'none' }}><span className="eye-box-label" /></div>
