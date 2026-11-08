@@ -17,6 +17,12 @@ Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Log
 
+### 2026-11-08 08:45 · p3/plan-v4 · PLAN.md: hyper-realism, honest scout camera, judge-first UI
+- **Did:** added "Hyper-realism, honest scout camera and judge-first UI (9:50 PM update)" to `docs/PLAN.md`: what shipped, the merge order of my stacked branches (#70 → `p3/disaster` → `p3/hyperreal`, plus `p3/clinic-map`), the rule that only warm objects get classifier scores (never invented numbers for cold ones), and asks for Rayan and Aziz.
+- **Contract changes:** none (docs only).
+- **Heads-up for others:** **Rayan, Aziz: read the new section; your asks are at the end.**
+- **Next:** multi-story shell.
+
 ### 2026-11-08 06:50 · p3/collapse · Items 7 + 8: night operations lighting (K), auto-director camera (D)
 - **Did:**
   - **K, night operations** (off by default until a dry run, remembered per browser, "Night ops" chip):
