@@ -4,8 +4,9 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
+- **Working on:** p2/short-briefing, estimate 15-25 min. Contract BEFORE code: existing G/report text becomes at most 3 short sentences, <=45 words, digits for numbers; same {text,generated_at,source} fields. No short/spoken field or frontend change. Ask answers keep their separate question behavior. Gemini still calls all six read-only Command tools under one 10 s deadline; no truth counts of unreported survivors. Oversized briefings fall back honestly to concise source local; do not truncate away uncertainty.
 - **Role:** Aziz = backend/network/simulation/Command APIs, serving and integration tests. Yusuf = web/camera/phone UX; Rayan = robot policy/ML/maps. No new owner-source implementation in this audit.
-- **Working on:** `p2/demo-refresh`: refresh stale venue tunnel/backend (10-15 min), then short G briefing. Startup CLI contract before code: add `--no-leases` for the fixed demo, preserving existing launcher defaults; reject `--voice --no-leases` because voice requires leases. Add independent DZ_MIC_CHECK=1 diagnostic gate so mic preflight does not require control leases; launcher sets it in both profiles. No API/message changes. Use current main runtime, AI Lab on, G/Ask enabled for Rayan/user use without making provider calls here; optional experiment flags remain off.
+- **Previous item:** `p2/demo-refresh`: refresh stale venue tunnel/backend (10-15 min), then short G briefing. Startup CLI contract before code: add `--no-leases` for the fixed demo, preserving existing launcher defaults; reject `--voice --no-leases` because voice requires leases. Add independent DZ_MIC_CHECK=1 diagnostic gate so mic preflight does not require control leases; launcher sets it in both profiles. No API/message changes. Use current main runtime, AI Lab on, G/Ask enabled for Rayan/user use without making provider calls here; optional experiment flags remain off.
 - **Audit basis:** pulled main `d2cfbde`, including PLAN.md's V2/voice/leases/9:50 PM sections and newest team histories. #81 owner artifacts and #82 actual sensor backend are now MERGED. #83 asset pack is also merged; README asks Yusuf to copy selected files into web/public/assets, so no speculative backend mount is needed unless he requests one.
 
 ### Backend implemented on main (acceptance tracked separately)
@@ -27,6 +28,12 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 - **Validation baseline:** last backend suite 404 passed / 1 opt-in soak skipped; web build 737 modules passed. `server/` and `web/` source trees are unchanged from that tested integration; this checklist audit adds no runtime changes. Keep DEMO guard green, feature gates and testing-laptop dry runs; 7:30 AM freeze still applies.
 
 ## Log
+
+### 2026-11-07 PT - p2/short-briefing - Reserve concise G text before code
+- **Did:** refreshed demo/profile is implemented in PR #88 (an early contract-only #86 merged before implementation push). Starting Rayan's 3-sentence G request, estimate 15-25 min; synced main 309fb9d.
+- **Contract changes:** same response fields; G text at most 3 sentences / 45 words, digits, plain spoken English. Ask keeps question-specific behavior. Same six delivered-Command tools, deadline and source labels; no hidden survivor totals/unreported counts.
+- **Heads-up for others:** Yusuf: keep speaking report.text, no new field or UI implementation needed. Rayan: G shortening follows your ask; real source verification remains testing-laptop work.
+- **Next:** concise local fallback + bounded Gemini briefing, meaningful protocol/fallback/privacy tests, own PR; no actual provider calls.
 
 ### 2026-11-07 PT - p2/demo-refresh - Refreshed demo backend and independent mic preflight
 - **Did:** rebuilt latest Yusuf frontend unchanged; replaced only our owned old tunnel/backend. Current API exposes voice audio/TTS routes, trained model live, AI Lab 5-point curve served, three robots paused, P-1 quietly saved (no safety_reject), baseline/deadzone B controls pass. Fixed-demo launch uses --no-leases --gemini with DZ_AI_LAB=1; voice/leases and unaccepted experiments off. No provider call/key inspected.
