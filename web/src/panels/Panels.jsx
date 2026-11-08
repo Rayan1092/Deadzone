@@ -57,6 +57,7 @@ export function RescueStatus() {
 function PresenterLock() {
   const leases = useSim((s) => s.leases)
   const p = useSim((s) => s.presenter)
+  const connected = useSim((s) => s.connected)
   if (!leases?.enabled) return null
   const others = heldByOthers(leases, p)
   return (
@@ -65,8 +66,8 @@ function PresenterLock() {
       {p.held ? 'Console has control · field units locked out' : 'Operator lock'}
       {others.length > 0 && <small>{others.map((r) => `${r.robot}: ${unitName(r.controller.name)}`).join(' · ')}</small>}
       {!REPLAY && (
-        <button disabled={p.pending} onClick={p.held ? lock : unlock}
-                title={p.held ? 'Release the robots so field units can take them' : 'Take every robot for this console (B and U need it)'}>
+        <button disabled={p.pending || !connected} onClick={p.held ? lock : unlock}
+                title={p.held ? 'Release the robots so field units can take them' : 'Take every robot for this console (needed for baseline mode and for resuming a stopped robot)'}>
           {p.pending ? '…' : p.held ? 'Lock' : 'Unlock'}
         </button>
       )}
@@ -109,8 +110,9 @@ function MissionClock() {
 function BriefingButton() {
   const loading = useSim((s) => s.report?.loading)
   const open = useSim((s) => Boolean(s.report && !s.report.loading))
+  const offline = useSim((s) => !s.connected) && !REPLAY
   return (
-    <button className={`tb-btn${open ? ' on' : ''}`} disabled={loading} title="A short situation briefing, written only from what reached the command post (G)"
+    <button className={`tb-btn${open ? ' on' : ''}`} disabled={loading || (offline && !open)} title="A short situation briefing, written only from what reached the command post (G)"
             onClick={() => (open ? useSim.getState().set({ report: null }) : requestReport())}>
       {Icon.brief}<span>{loading ? 'Writing…' : 'Briefing'}</span>
     </button>
@@ -130,6 +132,7 @@ export function TopBar() {
   const layout = useSim((s) => s.layout)
   const robots = useSim((s) => s.tick?.reality.robots) ?? NONE_LIST
   const full = layout !== 'judge' // 'judge' is the stored id of the Operator view
+  const offline = !connected && !REPLAY
   return (
     <header className="topbar">
       <div className="brand">DEADZONE</div>
@@ -143,25 +146,25 @@ export function TopBar() {
       <ReplayChip />
       {/* run controls: always in the Engineering view, on hover in the Operator view */}
       <div className="controls tb-secondary">
-        {detector && (
+        {detector && !offline && (
           <span className={`detector-chip ${detector.mode}`} title={detector.reason ?? ''}>
             {detector.mode === 'model' ? 'AI model' : 'Simulated detector'}
           </span>
         )}
         {perf && <span className="perf-chip" title="Press P to turn off">Performance mode</span>}
-        <button onClick={() => control(running ? 'pause' : 'start')} title="Start or pause the run (Space)">{running ? 'Pause' : 'Start'}</button>
-        <button onClick={() => control('speed', speed / 2)} title="Slower (−)">−</button>
+        <button disabled={offline} onClick={() => control(running ? 'pause' : 'start')} title="Start or pause the run (Space)">{running ? 'Pause' : 'Start'}</button>
+        <button disabled={offline} onClick={() => control('speed', speed / 2)} title="Slower (−)" aria-label="Slower">−</button>
         <span className="mono" title="Simulation speed">{speed}×</span>
-        <button onClick={() => control('speed', speed * 2)} title="Faster (+)">+</button>
-        <button onClick={() => control('reset')} title="Back to the start of this scenario (Backspace)">Reset</button>
+        <button disabled={offline} onClick={() => control('speed', speed * 2)} title="Faster (+)" aria-label="Faster">+</button>
+        <button disabled={offline} onClick={() => control('reset')} title="Back to the start of this scenario (Backspace)">Reset</button>
         <button className="view-btn" title="One view or split view (M)" onClick={toggleView}>{view === 'gap' ? 'One view' : 'Split view'}</button>
         <button className="help-btn" title="Keys (H)" onClick={() => set({ helpOpen: !useSim.getState().helpOpen })}>Help</button>
         <button title="Model test on a held-out thermal sample (J)" onClick={() => set({ judgeOpen: true, hoodOpen: false, labOpen: false })}>Model test</button>
-        <button title="Live counters (I)" onClick={() => set({ hoodOpen: true, judgeOpen: false, labOpen: false })}>Counters</button>
+        <button title="Live system counters (I)" onClick={() => set({ hoodOpen: true, judgeOpen: false, labOpen: false })}>Under the hood</button>
       </div>
       {!REPLAY && <JoinButton icon={Icon.phone} />}
       <BriefingButton />
-      {!REPLAY && <span className={`tb-conn ${connected ? 'ok' : 'bad'}`} title={connected ? 'Connected to the simulation' : 'Not connected: reconnecting to the simulation'}><i />{connected ? 'Live' : 'Offline'}</span>}
+      {!REPLAY && <span className={`tb-conn ${connected ? 'ok' : 'bad'}`} role="status" title={connected ? 'Connected to the simulation' : 'The simulation server is not answering; this screen reconnects by itself'}><i />{connected ? 'Live' : 'Server disconnected · reconnecting…'}</span>}
       <button className={`tb-icon${full ? ' on' : ''}`} aria-pressed={full} title={full ? 'Hide the side panels' : 'Show the side panels (robots, events, scheduler)'}
               onClick={() => setLayout(full ? 'judge' : 'full')}>{Icon.panels}</button>
     </header>
@@ -359,7 +362,7 @@ async function nextScenario(home) {
     if (!res.ok) throw new Error(String(res.status))
     cat = await res.json()
   } catch {
-    note('New scenario needs the latest server (GET /api/scenarios)')
+    note('This server cannot switch buildings')
     return
   }
   const ids = (cat.floorplans ?? []).map((f) => f.id)

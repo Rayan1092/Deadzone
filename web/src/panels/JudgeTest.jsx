@@ -24,7 +24,7 @@ export default function JudgeTest() {
     fetch(POOL_ROOT + 'manifest.json', { signal: controller.signal, cache: 'no-cache' })
       .then((response) => {
         if (!response.ok) throw new Error(response.status === 404
-          ? 'The held-out test set is not available yet. Enable the Model Lab and wait for the held-out export.'
+          ? 'The model test is not available on this run.'
           : `The held-out test set could not load (${response.status}).`)
         return response.json()
       })
@@ -55,17 +55,18 @@ export default function JudgeTest() {
     <DataPanel title="Model test · held-out sample" onClose={() => set({ judgeOpen: false })} className="judge-test">
       <p>Can you spot a person in a real thermal image? Make your guess before the model result and label are revealed.</p>
       <div className="judge-tally" aria-live="polite">
-        <span>Model <b>{tally.model} of {tally.rounds}</b></span><span>You <b>{tally.judge} of {tally.rounds}</b></span>
+        {tally.rounds ? <><span>Model <b>{tally.model} of {tally.rounds}</b></span><span>You <b>{tally.judge} of {tally.rounds}</b></span></>
+          : <span>Make your first guess to start the score</span>}
       </div>
       {loading && <p role="status">Loading a held-out sample…</p>}
       {error && <p role="alert" className="data-panel-note">{error}</p>}
       {!loading && error && <button onClick={() => setReload((n) => n + 1)}>Retry</button>}
       {pool && current && <>
-        <figure><img key={current.id} src={current.url} alt="Thermal crop to classify"
+        <figure><img key={current.id} src={current.url} alt="Thermal image to classify"
                      onLoad={() => setImageReady(true)} onError={() => setImageError(true)} />
-          <figcaption>Real thermal camera image, Teledyne FLIR dataset: the same input a thermal camera on a rescue robot produces.</figcaption>
+          <figcaption>Real FLIR thermal frame, same input as the AI (images the model never saw in training)</figcaption>
         </figure>
-        {imageError && <p role="alert">This crop could not load. No guess or score has been recorded.</p>}
+        {imageError && <p role="alert">This image could not load. No guess or score has been recorded.</p>}
         {guess === null ? <div className="judge-actions">
           <button disabled={!imageReady || imageError} onClick={() => answer('person')}>Person</button>
           <button disabled={!imageReady || imageError} onClick={() => answer('not person')}>Not a person</button>
@@ -73,11 +74,11 @@ export default function JudgeTest() {
           <p><b>Truth:</b> {current.label === 'person' ? 'Person' : 'Not a person'}</p>
           <p><b>Model:</b> {current.predicted === 'person' ? 'Person' : 'Not a person'} · P(person) {modelProbability(current.score)}</p>
           <p><b>Your guess:</b> {guess === 'person' ? 'Person' : 'Not a person'} · {guess === current.label ? 'Correct' : 'Missed this one'}</p>
-          <button onClick={next}>Next random crop</button>
+          <button onClick={next}>Next image</button>
         </div>}
-        <p className="data-panel-note">{pool.model} · {pool.split} split · recorded model results from the export. This panel does not run new inference.</p>
+        <p className="data-panel-note">{pool.model} · the model's answers were recorded when it was tested; this panel shows them, it does not rerun the model.</p>
       </>}
-      {pool && !current && <p>All {pool.items.length} crops were tested. Reopen J to start a fresh tally.</p>}
+      {pool && !current && <p>All {pool.items.length} images were tested. Reopen J to start a fresh tally.</p>}
     </DataPanel>
   )
 }

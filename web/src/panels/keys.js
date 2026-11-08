@@ -13,7 +13,7 @@ export const KEY_GROUPS = [
   ] },
   { title: 'View', keys: [
     ['0', 'See the whole building.'],
-    ['1–3', 'Follow a robot (or click its chip or card).'],
+    ['1–9', 'Follow a robot (or click its chip or card).'],
     ['M', 'Switch between one view and the split view.'],
     ['C', 'One view: swap the command post map with the main view. Split view: look down on the command post.'],
     ['V', "Open the followed robot's camera."],
