@@ -38,10 +38,13 @@ export default function ReportPanel() {
   const [shown, setShown] = useState(0)
   const [voiceOn, setVoiceOn] = useState(readSpeak)
   const text = report?.text ?? ''
+  // Spoken version: the server's short form when it sends one (`short` or `spoken`), else the
+  // first three sentences, so the voice never talks over the demo's close (Rayan's ask).
+  const spoken = report?.short ?? report?.spoken ?? text.split(/(?<=[.!?])\s+/).slice(0, 3).join(' ')
   useEffect(() => {
-    if (text && voiceOn) speak(text)
+    if (spoken && voiceOn) speak(spoken)
     return () => window.speechSynthesis?.cancel()
-  }, [text, voiceOn])
+  }, [spoken, voiceOn])
   const toggleVoice = () => {
     const next = !voiceOn
     setVoiceOn(next)

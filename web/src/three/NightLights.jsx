@@ -37,7 +37,7 @@ export function LightBeam({ length, radius, color = '#fff4d6', opacity = 0.18 })
   return (
     <mesh geometry={geom} renderOrder={5}>
       <meshBasicMaterial color={color} alphaMap={fadeTexture()} transparent opacity={opacity} depthWrite={false}
-                         blending={THREE.AdditiveBlending} side={THREE.DoubleSide} toneMapped={false} />
+                         blending={THREE.AdditiveBlending} side={THREE.FrontSide} toneMapped={false} />
     </mesh>
   )
 }
@@ -83,10 +83,10 @@ function Flood({ from, to }) {
   return (
     <>
       <primitive object={tgt} position={to} />
-      <spotLight position={from} target={tgt} angle={0.42} penumbra={0.5} intensity={60} distance={30} decay={1.4} color="#ffe6bf" />
+      <spotLight position={from} target={tgt} angle={0.42} penumbra={0.5} intensity={26} distance={30} decay={1.4} color="#ffe6bf" />
       <group position={from} quaternion={q}>
         <mesh><boxGeometry args={[0.32, 0.12, 0.22]} /><meshStandardMaterial color="#fffbe8" emissive="#fff3cf" emissiveIntensity={3} toneMapped={false} /></mesh>
-        <LightBeam length={len} radius={len * 0.42} opacity={0.08} />
+        <LightBeam length={len} radius={len * 0.42} opacity={0.028} />
       </group>
     </>
   )

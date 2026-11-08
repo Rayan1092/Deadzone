@@ -2,6 +2,7 @@
 import asyncio
 import importlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -226,3 +227,75 @@ def test_reset_during_api_wait_does_not_broadcast_an_old_incident(monkeypatch):
         response = client.get("/api/report")
         assert response.status_code == 409
         assert response.json()["detail"]["code"] == "report_reset"
+
+
+def test_local_briefing_stays_short_with_many_delivered_records_and_hidden_truth(monkeypatch):
+    monkeypatch.setenv("DZ_GEMINI", "0")
+    sim = Sim(n_robots=3)
+    sim.tick()
+    for i in range(30):
+        deliver(sim.post, "survivor", {"id": f"S{i}", "by": "R1", "t": 0, "pos": [2, 15]})
+        deliver(sim.post, "rescue_route", {"survivor_id": f"S{i}", "by": "R1", "t": 0,
+                "path": [[1, 15], [2, 15]], "length_m": 1, "beacon_id": None})
+    deliver(sim.post, "fault", {"robot": "R1", "fault": "STUCK", "t": 0})
+    sim.time = 120.5
+    sim.robots["R1"].found["HIDDEN_PERSON"] = {"id": "HIDDEN_PERSON"}
+    sim.robots["R1"].fault = "HIDDEN_FAULT"
+    result = invoke(sim, lambda request: pytest.fail("Disabled provider must not be called"))
+    assert result == reports.local_report(sim.post, sim.time)
+    text = result["text"]
+    assert set(result) == {"text", "generated_at", "source"}
+    assert len(text.split()) <= 45
+    assert len(re.split(r"(?<=[.!?])\s+", text)) == 3
+    assert "30 survivors reported" in text and "30 rescue routes delivered" in text
+    assert "3 robots, oldest 120.4 s" in text and "1 historical faults" in text
+    assert "R1 STUCK" in text
+    assert "Current links, fault status and unreported survivors are unknown." in text
+    assert "HIDDEN" not in text
+
+
+@pytest.mark.parametrize("text,accepted", [
+    (" ".join(["Reported"] * 45) + ".", True),
+    (" ".join(["Reported"] * 46) + ".", False),
+    ("2 survivors reported. Route length is 50.5 m. Last report is 12.3 s old.", True),
+    ("2 survivors reported. Route length is 50.5 m. Last report is old. Links are unknown.", False),
+    ("No reports. No routes. No telemetry. Links unknown", False),
+    ("No reports!No routes!No telemetry!Links unknown!", False),
+    ("Three survivors reported. Current links are unknown.", False),
+])
+def test_gemini_briefing_enforces_spoken_limits_without_cutting_qualifications(text, accepted):
+    turns = []
+    def handler(request):
+        body = json.loads(request.content)
+        turns.append(body)
+        system = body["systemInstruction"]["parts"][0]["text"]
+        assert "at most 3 short sentences" in system and "45 words" in system
+        assert "numbers as digits" in system and "80 to" not in system
+        return model_response(tool_calls() if len(turns) == 1 else [{"text": text}])
+    sim = Sim()
+    result = invoke(sim, handler)
+    assert len(turns) == 2
+    if accepted:
+        assert result == {"text": text, "source": "gemini", "generated_at": 0}
+    else:
+        assert result == reports.local_report(sim.post, sim.time)
+        assert "unreported survivors are unknown" in result["text"]
+
+
+def test_ask_answer_keeps_question_behavior_instead_of_briefing_limits():
+    text = ("Two route reports have reached Command. " +
+            " ".join(["Historical"] * 40) + ". Reports can be stale. Current route safety is unknown.")
+    turns = []
+    def handler(request):
+        body = json.loads(request.content)
+        turns.append(body)
+        system = body["systemInstruction"]["parts"][0]["text"]
+        assert "answer that question directly" in system
+        assert "45 words" not in system
+        return model_response(tool_calls() if len(turns) == 1 else [{"text": text}])
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await reports.command_report(Sim().post, 0, question="What do the route reports mean?", client=client)
+    result = asyncio.run(run())
+    assert len(text.split()) > 45
+    assert result == {"text": text, "source": "gemini", "generated_at": 0}

@@ -467,11 +467,11 @@ export function Interior({ fp, cold: isCold = false }) {
 // Asphalt lot around the building: parking bays, kerb, a line of cones by the entrance.
 export function Lot({ W: w, H: h }) {
   const M = mats()
-  const surf = useMemo(() => tiledSet(materials().asphalt, (w + 40) / 3, (h + 30) / 3), [w, h])
+  const surf = useMemo(() => tiledSet(materials().asphalt, 260 / 3, 220 / 3), [w, h])
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={w2t(w / 2 - 5, h / 2, -0.01)} receiveShadow>
-        <planeGeometry args={[w + 40, h + 30]} />
+        <planeGeometry args={[260, 220]} />
         <meshStandardMaterial {...surf} color="#7c8086" roughness={0.92} normalScale={[0.5, 0.5]} />
       </mesh>
       {/* concrete apron around the walls */}
