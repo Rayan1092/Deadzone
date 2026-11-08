@@ -13,7 +13,7 @@ import re
 
 import numpy as np
 
-from ..floorplan import FREE, UNKNOWN
+from ..floorplan import FREE, OCC, UNKNOWN
 from ..geometry import points_in_poly, wrap_angle
 from ..network.dtn import PRIO, make_bundle
 from . import planning
@@ -57,6 +57,7 @@ PATH_CHECK_SKIP_M = 0.4    # ignore the robot's own footprint (it may sit in a w
 REPLAN_PAUSE_S = 0.6       # stop briefly in REPLANNING so the replan is visible and the map settles
 REPLAN_COOLDOWN_S = 5.0    # repeat obstacles this soon after a replan are replanned silently
 TRAPPED_AFTER_S = 10.0     # no route for this long raises a TRAPPED fault to the command post
+ESCAPE_M = 6.0             # walk at most this far out of a no-go area drawn over the robot
 ROUTE_CHECK_PERIOD = 2.0   # s between "is the rescue route I sent still open on my map?" checks
 COLLAPSE_MARGINS_CELLS = (4, 2)  # rescue routes stay 1 m (else 0.5 m) clear of fresh collapse
 ROUTE_MAX_POINTS = 60      # Command's RescueRoute cap (Aziz, PR #28)
@@ -192,6 +193,7 @@ class Robot:
         self.map = OccupancyMap(w, h, cell)
         self.nogo = nogo if nogo is not None else np.zeros((h, w), dtype=bool)
         self.base_nogo = self.nogo.copy()   # hazards known at deploy; plan no-go areas add to it
+        self.escaping = False     # walking out of a cell plans may not start from (no-go drawn over us)
         self.zones = []                     # this robot's dispatched zones, highest priority first
         self.battery = Battery()
         self.state = "DEPLOYING"
@@ -1001,6 +1003,16 @@ class Robot:
         dark_for = self.t - self.last_link_t
         s = self.state
 
+        if self.escaping:
+            # keep walking out until plans may start from where we stand (no obstacle check: the
+            # way out crosses the very cells the check would flag)
+            mx, my = self._cell(*self.pose[:2])
+            out = self._drive_trav()
+            if self.path and not (0 <= mx < out.shape[1] and 0 <= my < out.shape[0] and out[my, mx]):
+                return
+            self.escaping = False
+            self.path = []
+
         if s == "DEPLOYING":
             if self.t - self.state_since > 1.0 + DEPLOY_STAGGER_S * self.rank:
                 self._set_state("EXPLORING")
@@ -1049,6 +1061,8 @@ class Robot:
             if self._look_closer():                     # approaching an unsure hot spot
                 return
             if not self.path or self.t - self.last_plan_t > REPLAN_PERIOD:
+                if self._escape_blocked_cell():         # a no-go drawn over us: walk out, then plan
+                    return
                 if not self._plan_frontier():
                     self._set_state("RETURNING_HOME")   # nothing left to explore
                     if not self._plan_to(self.entry):
@@ -1153,6 +1167,8 @@ class Robot:
         if self.replan_fail_since is not None and self.t - self.last_plan_t < REPLAN_PERIOD:
             return   # throttle retries while no route exists
         ok, resume = self._plan_for(self.resume_state or "EXPLORING")
+        if not ok and self._escape_blocked_cell():
+            ok, resume = True, self.resume_state or "EXPLORING"
         if ok:
             self.last_replan_done_t = self.t
             self.replan_fail_since = None
@@ -1164,6 +1180,51 @@ class Robot:
             self.replan_fail_since = self.t
         elif self.t - self.replan_fail_since >= TRAPPED_AFTER_S and self.fault != "TRAPPED":
             self._raise_fault("TRAPPED")
+
+    def _escape_blocked_cell(self):
+        """Standing where motion plans may not start (a no-go area drawn over us by a new plan, or a
+        cell our map now calls blocked), A* has no start and the robot would sit in REPLANNING for
+        good. Walk out first: breadth-first over cells that are not occupied on our own map (no-go
+        allowed on the way out) to the nearest cell where plans may start, within ESCAPE_M; that
+        short path is followed before anything else. Returns True when a way out was set."""
+        trav = self._drive_trav()
+        sx, sy = self._cell(*self.pose[:2])
+        h, w = trav.shape
+        if not (0 <= sx < w and 0 <= sy < h) or trav[sy, sx]:
+            return False
+        if planning.nearest_traversable(trav, (sx, sy)) is not None:
+            return False                              # grazing an edge: the planners start nearby as usual
+        passable = self.map.grid != OCC
+        limit = int(ESCAPE_M / self.cell)
+        parent = {(sx, sy): None}
+        queue = [(sx, sy)]
+        goal = None
+        while queue and goal is None:
+            x, y = queue.pop(0)
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if not (0 <= nx < w and 0 <= ny < h) or (nx, ny) in parent or not passable[ny, nx]:
+                    continue
+                if abs(nx - sx) > limit or abs(ny - sy) > limit:
+                    continue
+                parent[(nx, ny)] = (x, y)
+                if trav[ny, nx]:
+                    goal = (nx, ny)
+                    break
+                queue.append((nx, ny))
+        if goal is None:
+            return False
+        cells = []
+        while goal is not None:
+            cells.append(goal)
+            goal = parent[goal]
+        cells.reverse()
+        self.path = [((cx + 0.5) * self.cell, (cy + 0.5) * self.cell) for cx, cy in cells[1:]] or \
+                    [((cells[0][0] + 0.5) * self.cell, (cells[0][1] + 0.5) * self.cell)]
+        self.target = list(self.path[-1])
+        self.last_plan_t = self.t
+        self.escaping = True
+        self.events.append({"kind": "replan", "robot": self.id, "reason": "walk_out"})
+        return True
 
     def _plan_to_signal(self):
         """A* back to the newest breadcrumb we can still reach (older ones if rubble cut us off).
