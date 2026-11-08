@@ -5,6 +5,7 @@ import Line from './FastLine' // drei's Line relinks its shader on every new poi
 import * as THREE from 'three'
 import { useSim, useStable } from '../store'
 import { COLORS, FOG_H, w2t } from './util'
+import { decoyLayout } from './furniture'
 import { materials, tiledSet } from './textures'
 import { ROBOT_SCALE } from './Rover'
 import RoverModel from './RoverModel'
@@ -381,7 +382,7 @@ export function RealityActors({ gap = false }) {
       {showTruth && (fp.survivors ?? []).filter((s) => !found.has(s.id)).map((s) => (
         <TruthMarker key={s.id} pos={s.pos} id={s.id} />
       ))}
-      {showTruth && (fp.decoys ?? []).map((d) => (
+      {showTruth && decoyLayout(fp).map((d) => (
         <TruthMarker key={d.id} pos={d.pos} id={d.id} sub={`${d.label} · decoy`} color={COLORS.amber} decoy />
       ))}
     </group>
