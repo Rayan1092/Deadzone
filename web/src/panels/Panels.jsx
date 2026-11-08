@@ -11,7 +11,7 @@ import { followRobot, overview, resetOverview } from '../three/camera'
 export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
   ['R', 'rubble ahead of the robot'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
-  ['U', 'resume after safe stop'], ['A', 'aftershock (server needs DZ_AFTERSHOCK=1)'], ['B', 'baseline: robots without Deadzone'], ['L', 'AI Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
+  ['U', 'resume after safe stop'], ['A', 'aftershock (server needs DZ_AFTERSHOCK=1)'], ['⇧A', 'strong aftershock: three areas, two relays'], ['N', 'new scenario: survivors shuffled (Q&A)'], ['B', 'baseline: robots without Deadzone'], ['L', 'AI Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
   ['M', 'one view / split view'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
   ['J', 'judge test (Q&A)'], ['I', 'under the hood (Q&A)'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
@@ -197,6 +197,32 @@ export function HelpOverlay() {
   )
 }
 
+// Key N: reset into the next registered scenario (Aziz's reset-into-floorplan control). Variants
+// of the current building come first (same walls, survivors and decoys shuffled), then any
+// other registered map. Q&A only; the "NEW SCENARIO" banner fires from the hello that follows.
+async function nextScenario() {
+  const s = useSim.getState()
+  const note = (msg) => s.set({ toasts: [...s.toasts, { kind: 'control_error', code: 'scenario', msg, time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
+  let cat
+  try {
+    const res = await fetch('/api/scenarios')
+    if (!res.ok) throw new Error(String(res.status))
+    cat = await res.json()
+  } catch {
+    note('New scenario needs the latest server (GET /api/scenarios)')
+    return
+  }
+  const all = (cat.floorplans ?? []).map((f) => f.id).filter((id) => id !== cat.selected)
+  const base = (cat.selected ?? s.floorplan?.id ?? '').split('/').pop()
+  const variants = all.filter((id) => /variant/i.test(id) && id.includes(base))
+  const pool = variants.length ? variants : all
+  if (!pool.length) { note('No other scenario is registered on this server'); return }
+  const last = useSim.getState().lastScenario
+  const next = pool[(pool.indexOf(last) + 1) % pool.length]
+  s.set({ lastScenario: next })
+  control('reset', { floorplan: next, timeline: false })
+}
+
 export function useKeyboard() {
   useEffect(() => {
     const onKey = (e) => {
@@ -236,7 +262,8 @@ export function useKeyboard() {
       if (key === 'o' && target) control('director', { do: 'overload', robot: target.id })
       if (key === 'u' && target) control('director', { do: 'resume', robot: target.id })
       // server picks the spot: the first powered relay (crushing it), else the corridor
-      if (key === 'a') control('director', { do: 'aftershock' })
+      if (key === 'a') control('director', e.shiftKey ? { do: 'aftershock', strength: 'strong' } : { do: 'aftershock' })
+      if (key === 'n') nextScenario()
       // "without Deadzone": robots stop and wait whenever they lose the link
       if (key === 'b') control('mode', s.mode === 'baseline' ? 'deadzone' : 'baseline')
       if (key === 'g') {

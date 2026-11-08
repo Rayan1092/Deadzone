@@ -76,7 +76,8 @@ export const useSim = create((set) => ({
   eyeFocus: null,      // the hot spot the onboard classifier just judged: { kind, subject, robot, pos, conf, linked, born }
   mode: null,          // 'deadzone' | 'baseline' | 'mixed' from hello/control (Rayan's baseline mode)
   aftershock: null,    // { at, born, rubble } of the latest aftershock, for the shake, slabs and dust
-  banner: null,        // { title, sub, tone, at }: AFTERSHOCK / NEW SCENARIO over the main view
+  banner: null,
+  lastScenario: null,  // key N cycles through registered scenarios        // { title, sub, tone, at }: AFTERSHOCK / NEW SCENARIO over the main view
   report: null,        // briefing from /api/report: { text, generated_at, source } | { loading } | { error }
   detector: null,      // { mode: 'model' | 'sim', reason } from hello, null until the server sends it
   detections: [],      // AI detection cards: { eid, side: 'reality' | 'command', verdict, crop, conf, ... }

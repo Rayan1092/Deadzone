@@ -17,6 +17,12 @@ Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Log
 
+### 2026-11-08 12:20 · p3/collapse-geometry · Key N wired to Aziz's reset-into-floorplan control; Shift+A strong aftershock
+- **Did:** per `docs/FINAL-STRETCH-BACKEND.md`: **N** reads `GET /api/scenarios`, prefers ids matching `variant` for the current building (Rayan's shuffled-survivor variants, once they exist), else cycles the other registered maps (`generated/gen_1..3` today), and sends `{action:"reset", value:{floorplan:<id>, timeline:false}}`; the following `hello` raises the "NEW SCENARIO" banner. On a server without the endpoint it shows "New scenario needs the latest server". **Shift+A** sends `{do:"aftershock", strength:"strong"}` (three areas, up to two relays); plain A is unchanged.
+- **Contract changes:** none (consumes Aziz's). New keys N and Shift+A.
+- **Heads-up for others:** Rayan: when `data/floorplans/variants/<name>.json` exist and are registered, N picks them before the generated buildings; name them with `variant` in the id. Aziz: thanks, both contracts worked as posted.
+- **Next:** dry-run fixes.
+
 ### 2026-11-08 12:05 · p3/collapse-geometry · Exterior shell: storey stubs, floor-slab lip, pancaked corner slab, street
 - **Did:** `web/src/three/Shell.jsx` (visual only, outside the footprint or above WALL_H, derived from `fp.size`): jagged brick and concrete stubs of an upper storey on the outer walls (tall on the far north and east sides and at the corners, low on the near sides so the overview still looks into the rooms), window frames left in the taller stubs, rebar out of the breaks, a thin floor-slab lip where the upper floor sheared off, a pancaked upper slab hanging off the north-west corner onto the ruins, and a street west of the lot (kerbs, dashed centre line). Mounted inside `Baked` on Reality panes only, not in the robot camera's copy. Shots: `docs/visuals/final-a-overview.jpg`, `final-f-street.jpg`. About 30 fps here with two WebGL tabs open; 55-60 with one.
 - **Contract changes:** none.
