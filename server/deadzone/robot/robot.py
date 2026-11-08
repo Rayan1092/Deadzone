@@ -237,8 +237,9 @@ class Robot:
         self.tasks = []
         # Reality-side tallies for the "Under the hood" panel (Aziz sums them into tick.stats).
         # Never put in a bundle: Command learns about the robot only through delivered messages.
-        # Names follow Aziz's tick.stats contract (docs/FINAL-STRETCH-BACKEND.md): his snapshot sums
-        # detector_calls, detector_rejections and scheduler_deadlines_met from telemetry().counters.
+        # Names follow Aziz's tick.stats contract (docs/FINAL-STRETCH-BACKEND.md): detector_calls,
+        # detector_rejections, scheduler_deadlines_met. Kept off telemetry() until his aggregation
+        # (and its test, which expects robots to supply none by default) reads them.
         self.counters = {"detector_calls": 0, "detector_persons": 0, "detector_rejections": 0,
                          "detector_unsure": 0, "scheduler_deadlines_met": 0, "scheduler_deadlines_missed": 0,
                          "rescue_routes": 0, "replans": 0, "dark_s": 0.0}
@@ -1351,5 +1352,4 @@ class Robot:
             "tasks": self.tasks,
             "outbox": len(self.outbox),
             "last_link_t": round(self.last_link_t, 1),
-            "counters": dict(self.counters),   # Reality view only; the telemetry bundle above omits them
         }

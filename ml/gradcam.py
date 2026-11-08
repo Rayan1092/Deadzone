@@ -113,7 +113,7 @@ def main():
             "file": p.name,                      # /crops/<file>
             "heatmap": heatmap,                  # /crops/<heatmap>, crop + heatmap blended
             "heatmap_alpha": alpha,              # /crops/<heatmap_alpha>, RGBA overlay only
-            "label": "person" if p.stem.startswith("pos") else "not person",   # ground truth
+            "label": "person" if p.stem.startswith(("pos", "unsure_person")) else "not person",   # ground truth
             "conf": conf,                        # model P(person), same as survivor_found.conf
             "predicted": "person" if conf >= thr else "not person",
             "role": use.get("role"),             # survivor / decoy

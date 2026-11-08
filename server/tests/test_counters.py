@@ -54,7 +54,7 @@ def test_robot_counters_follow_the_demo_run():
         assert c["detector_calls"] == c["detector_persons"] + c["detector_rejections"] + c["detector_unsure"]
         assert c["detector_unsure"] == 0                  # the six demo crops are never unsure
         assert c["scheduler_deadlines_met"] > 0
-        assert r.telemetry({})["counters"] == c          # the Reality snapshot carries them for tick.stats
+        assert "counters" not in r.telemetry({})         # attribute only until Aziz's aggregation reads it
     total = {k: sum(r.counters[k] for r in sim.robots.values()) for k in KEYS}
     assert total["detector_persons"] == sum(len(r.found) for r in sim.robots.values()) >= 1   # S3 at 14.4 s
     assert total["detector_rejections"] == sum(e["kind"] == "hotspot_rejected" for e in events)

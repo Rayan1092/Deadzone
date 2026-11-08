@@ -156,7 +156,9 @@ def test_variants_of_the_demo_building_keep_the_dark_survivor_and_shuffle_the_re
         assert v["id"] == f"collapse_01_v{seed}" and v["default_plan"] == generate.plan_location(f"variants/{v['id']}")
         assert not (set(generate.validate(v)) - inherited)
         assert generate.in_poly(v["survivors"][0]["pos"], cage["poly"])          # the dark find stays in the cage
-        assert [s["thermal"] for s in v["survivors"]] == [s["thermal"] for s in base["survivors"]]
+        assert [s["thermal"] for s in v["survivors"][:2]] == [s["thermal"] for s in base["survivors"][:2]]
+        assert v["survivors"][-1]["thermal"] == generate.UNSURE_PERSON     # S3 shows the look-closer moment
+        assert v["decoys"][-1]["thermal"] == generate.UNSURE_OBJECT
         assert not any(generate.in_poly(d["pos"], cage["poly"]) for d in v["decoys"])
         placement = tuple(tuple(p["pos"]) for p in v["survivors"] + v["decoys"])
         assert placement != original and placement not in seen
