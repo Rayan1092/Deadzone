@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { connectScreen } from './net/socket'
 import Pane from './three/Pane'
-import { Sidebar, TopBar, useKeyboard } from './panels/Panels'
+import { HelpOverlay, Sidebar, TopBar, useKeyboard } from './panels/Panels'
 import { JoinOverlay } from './panels/JoinPanel'
 import Toasts from './panels/Toasts'
 import Timeline from './panels/Timeline'
@@ -17,7 +17,7 @@ export default function BigScreen() {
       <TopBar />
       <main className="split">
         <Pane which="reality" title="Reality" subtitle="where the robots are and what they found" />
-        <Pane which="command" title="Command post knows" subtitle="only what reached the antenna" />
+        <Pane which="command" title="Command post knows" subtitle="what reached the antenna" />
         <Toasts />
         <ReportPanel />
       </main>
@@ -25,6 +25,7 @@ export default function BigScreen() {
       <Timeline />
       <JoinOverlay />
       <ReplayLoader />
+      <HelpOverlay />
     </div>
   )
 }

@@ -20,7 +20,7 @@ function pct(conf) {
 
 export default function DetectionCards({ side }) {
   const all = useSim((s) => s.detections)
-  const cards = all.filter((c) => c.side === side).slice(-3)
+  const cards = all.filter((c) => c.side === side).slice(-1) // one card per pane: the latest decision
   useEffect(() => {
     if (!all.length) return
     const oldest = all[0]

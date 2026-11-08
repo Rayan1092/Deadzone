@@ -10,7 +10,9 @@ const OFF = '#4b5563'
 
 // --------------------------------------------------------------- relay node
 // Reality knows power state and queue; Command only knows an announced position.
-function RelayNode({ pos, label, sub, on = true, phone = false, known = true }) {
+// Calm by default: the halo only pulses while the relay is carrying bundles, and only
+// relay phones (the audience's own devices) or switched-off relays get a label.
+function RelayNode({ pos, label, on = true, phone = false, known = true, busy = false }) {
   const halo = useRef()
   const phase = useRef(Math.random())
   useFrame(({ clock }) => {
@@ -19,7 +21,7 @@ function RelayNode({ pos, label, sub, on = true, phone = false, known = true }) 
     halo.current.scale.setScalar(1 + k * 2.5)
     halo.current.material.opacity = 0.45 * (1 - k)
   })
-  const lamp = !known ? '#9ca3af' : on ? COLORS.green : OFF
+  const lamp = !known ? '#6b7280' : on ? COLORS.teal : OFF
   const top = phone ? 0.5 : 0.62
   return (
     <group position={w2t(pos[0], pos[1], 0)}>
@@ -32,29 +34,29 @@ function RelayNode({ pos, label, sub, on = true, phone = false, known = true }) 
         <>
           <mesh position={[0, 0.07, 0]} castShadow>
             <cylinderGeometry args={[0.18, 0.22, 0.14, 16]} />
-            <meshStandardMaterial color={COLORS.amber} roughness={0.6} />
+            <meshStandardMaterial color={known ? '#b7791f' : '#6b5b3e'} roughness={0.7} />
           </mesh>
           <mesh position={[0, 0.35, 0]}>
             <cylinderGeometry args={[0.015, 0.015, 0.45, 6]} />
-            <meshStandardMaterial color="#9ca3af" />
+            <meshStandardMaterial color="#6b7280" />
           </mesh>
         </>
       )}
       <mesh position={[0, top, 0]}>
         <sphereGeometry args={[0.07, 12, 12]} />
-        <meshStandardMaterial color={lamp} emissive={lamp} emissiveIntensity={known && on ? 2 : 0} />
+        <meshStandardMaterial color={lamp} emissive={lamp} emissiveIntensity={known && on ? 1.6 : 0} />
       </mesh>
-      {known && on && (
+      {known && on && busy && (
         <mesh ref={halo} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
           <ringGeometry args={[0.3, 0.36, 32]} />
-          <meshBasicMaterial color={COLORS.green} transparent side={THREE.DoubleSide} depthWrite={false} />
+          <meshBasicMaterial color={COLORS.teal} transparent side={THREE.DoubleSide} depthWrite={false} />
         </mesh>
       )}
-      <Html position={[0, top + 0.35, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
-        <div className={`tag relay${known && !on ? ' off' : ''}`}>
-          <b>{label}</b>{sub ? <span>{sub}</span> : null}
-        </div>
-      </Html>
+      {label && (
+        <Html position={[0, top + 0.35, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
+          <div className={`tag relay${known && !on ? ' off' : ''}`}><b>{label}</b></div>
+        </Html>
+      )}
     </group>
   )
 }
@@ -62,19 +64,41 @@ function RelayNode({ pos, label, sub, on = true, phone = false, known = true }) 
 export function RealityRelays() {
   const relays = useSim((s) => s.tick?.reality.relays) ?? NONE
   return relays.map((r) => (
-    <RelayNode key={r.id} pos={r.pos} on={r.on} phone={r.phone} label={r.phone ? `${r.id} phone` : r.id}
-               sub={!r.on ? 'OFF' : r.queue ? `${r.queue} queued` : null} />
+    <RelayNode key={r.id} pos={r.pos} on={r.on} phone={r.phone} busy={r.queue > 0}
+               label={r.phone ? `${r.id} phone${r.on ? '' : ' · off'}` : r.on ? null : `${r.id} off`} />
   ))
 }
 
 export function CommandRelays() {
   const relays = useSim((s) => s.tick?.command.relays) ?? NONE
-  return relays.map((r) => <RelayNode key={r.id} pos={r.pos} label={r.id} known={false} />)
+  return relays.map((r) => <RelayNode key={r.id} pos={r.pos} known={false} />)
 }
 
 // --------------------------------------------------------------- links
-// Actual radio edges. Robot-to-robot links are skipped: robots never forward for
-// each other (team rule), so those edges are not routes.
+// Every radio link is drawn faint; only each robot's current path home to CMD is bright,
+// in the robot's color. Same rules as the server: robots never forward for each other,
+// and a hop costs 1 + (-60 - rssi) / 10.
+function pathHome(start, edges, robots) {
+  const dist = { [start]: 0 }
+  const prev = {}
+  const todo = new Set([start])
+  while (todo.size) {
+    let n = null
+    for (const m of todo) if (n === null || dist[m] < dist[n]) n = m
+    todo.delete(n)
+    if (n === 'CMD') break
+    if (n !== start && robots.has(n)) continue // robots are endpoints
+    for (const [m, cost] of edges[n] ?? []) {
+      const d = dist[n] + cost
+      if (dist[m] === undefined || d < dist[m]) { dist[m] = d; prev[m] = n; todo.add(m) }
+    }
+  }
+  if (dist.CMD === undefined) return null
+  const out = ['CMD']
+  while (out[0] !== start) out.unshift(prev[out[0]])
+  return out
+}
+
 export function RealityLinks() {
   const tick = useSim((s) => s.tick)
   const fp = useSim((s) => s.floorplan)
@@ -85,29 +109,43 @@ export function RealityLinks() {
   for (const r of tick.reality.robots) { at[r.id] = w2t(r.pose[0], r.pose[1], 0.5); robots.add(r.id) }
   for (const r of tick.reality.relays) at[r.id] = w2t(r.pos[0], r.pos[1], 0.62)
   const up = tick.reality.links.filter((l) => l.up && at[l.a] && at[l.b] && !(robots.has(l.a) && robots.has(l.b)))
+  const edges = {}
+  for (const l of up) {
+    const cost = 1 + Math.max(0, (-60 - l.rssi) / 10)
+    ;(edges[l.a] ??= []).push([l.b, cost])
+    ;(edges[l.b] ??= []).push([l.a, cost])
+  }
+  const home = []
+  for (const r of tick.reality.robots) {
+    const route = r.link.up ? pathHome(r.id, edges, robots) : null
+    if (route) home.push({ id: r.id, color: r.color, points: route.map((n) => at[n]) })
+  }
   return (
     <group>
       {up.map((l) => (
-        <Line key={`${l.a}-${l.b}`} points={[at[l.a], at[l.b]]} color={l.fec ? COLORS.amber : COLORS.green}
-              lineWidth={l.fec ? 1.5 : 2} transparent opacity={0.75} />
+        <Line key={`${l.a}-${l.b}`} points={[at[l.a], at[l.b]]} color={l.fec ? COLORS.amber : '#cbd5e1'}
+              lineWidth={1} transparent opacity={l.fec ? 0.28 : 0.16} />
+      ))}
+      {home.map((h) => (
+        <Line key={`home-${h.id}`} points={h.points} color={h.color} lineWidth={2.5} transparent opacity={0.9} />
       ))}
       {tick.reality.robots.filter((r) => !r.link.up).map((r) => (
         <Line key={`dark-${r.id}`} points={[at[r.id], at.CMD]} color={COLORS.red} lineWidth={1}
-              transparent opacity={0.35} dashed dashSize={0.4} gapSize={0.3} />
+              transparent opacity={0.3} dashed dashSize={0.4} gapSize={0.3} />
       ))}
     </group>
   )
 }
 
 // --------------------------------------------------------------- antenna pulse
-// A ring leaves the command post antenna each time a bundle is delivered to CMD.
+// A ring leaves the command post antenna when a report that matters reaches CMD.
 export function AntennaPulse() {
   const fp = useSim((s) => s.floorplan)
   const ring = useRef()
   const last = useRef(null)
   const start = useRef(-10)
   useFrame(({ clock }) => {
-    const delivered = useSim.getState().tick?.stats.delivered ?? 0
+    const delivered = useSim.getState().bigDeliveries // survivor / route / fault reports, not telemetry
     if (last.current !== null && delivered > last.current) start.current = clock.elapsedTime
     last.current = delivered
     const k = (clock.elapsedTime - start.current) / 0.7

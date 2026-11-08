@@ -66,6 +66,9 @@ export function flush() {
   clearTimeout(timer)
   timer = null
   const s = usePhone.getState()
+  // Nothing edited since the last send: don't re-save. A needless save right before a
+  // check would also look like a laptop preload to the big screen and hide the result.
+  if (!s.pending) return
   s.set({ pending: false })
   // The server requires at least one zone; no-go-only drafts stay local until then.
   if (!s.draft?.zones.length) return
