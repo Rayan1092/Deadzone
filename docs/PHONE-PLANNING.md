@@ -16,6 +16,10 @@ owners. Existing screen messages and robot behavior continue to work.
 | `POST /api/fault` | `{type: "rubble", at: [x,y]}` or `{type: "overcurrent", robot: "R1"}` | Validated director fault injection |
 | `GET /api/report` | none | `{text, generated_at, source}` briefing, also broadcast to screens |
 
+For the opt-in Gemini briefing setup, tool boundary and local fallback, see
+[`GEMINI.md`](GEMINI.md). Source is `gemini` only after a successful tool-grounded
+model reply; otherwise `local`. A reset during generation returns 409 `report_reset`.
+
 Safety rejection is HTTP 200 with `ok: false`, so the UI can show the violation card.
 Use `?check=false` to preload the demo draft without a phone `safety` message or
 screen `safety_reject` event. `saved:true` means stored, not safety-approved.

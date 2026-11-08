@@ -240,7 +240,8 @@ def test_rubble_api_updates_reality_but_not_phone_prior_or_command_map(session):
     assert "rubble" not in client.get("/api/floorplan").json()
 
 
-def test_report_contains_only_delivered_command_facts_and_is_broadcast(session):
+def test_report_contains_only_delivered_command_facts_and_is_broadcast(session, monkeypatch):
+    monkeypatch.setenv("DZ_GEMINI", "0")  # never call a user's key from this fallback test
     client, hub = session
     hub.sim.robots["R1"].found["HIDDEN"] = {"id": "HIDDEN", "pos": [36, 27]}
     hub.sim.robots["R1"].fault = "UNREPORTED"
