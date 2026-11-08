@@ -1,0 +1,789 @@
+{
+ "id": "gen_1",
+ "name": "Generated collapse #1",
+ "size": [
+  44,
+  32
+ ],
+ "cell": 0.25,
+ "wall_height": 3.0,
+ "materials": {
+  "drywall": 4,
+  "brick": 10,
+  "concrete": 16,
+  "metal": 22,
+  "rubble": 8
+ },
+ "walls": [
+  {
+   "a": [
+    0,
+    0
+   ],
+   "b": [
+    44,
+    0
+   ],
+   "material": "concrete"
+  },
+  {
+   "a": [
+    44,
+    0
+   ],
+   "b": [
+    44,
+    32
+   ],
+   "material": "concrete"
+  },
+  {
+   "a": [
+    44,
+    32
+   ],
+   "b": [
+    0,
+    32
+   ],
+   "material": "concrete"
+  },
+  {
+   "a": [
+    0.0,
+    0.0
+   ],
+   "b": [
+    0.0,
+    15.0
+   ],
+   "material": "concrete"
+  },
+  {
+   "a": [
+    0.0,
+    17.0
+   ],
+   "b": [
+    0.0,
+    32.0
+   ],
+   "material": "concrete"
+  },
+  {
+   "a": [
+    10.0,
+    18.0
+   ],
+   "b": [
+    10.0,
+    32.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    18.5,
+    18.0
+   ],
+   "b": [
+    18.5,
+    32.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    27.0,
+    18.0
+   ],
+   "b": [
+    27.0,
+    32.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    0.0,
+    18.0
+   ],
+   "b": [
+    3.5,
+    18.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    4.7,
+    18.0
+   ],
+   "b": [
+    13.32,
+    18.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    14.52,
+    18.0
+   ],
+   "b": [
+    24.55,
+    18.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    25.75,
+    18.0
+   ],
+   "b": [
+    28.03,
+    18.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    29.23,
+    18.0
+   ],
+   "b": [
+    34.0,
+    18.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    11.0,
+    0.0
+   ],
+   "b": [
+    11.0,
+    14.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    22.0,
+    0.0
+   ],
+   "b": [
+    22.0,
+    14.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    0.0,
+    14.0
+   ],
+   "b": [
+    6.39,
+    14.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    7.59,
+    14.0
+   ],
+   "b": [
+    18.49,
+    14.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    19.69,
+    14.0
+   ],
+   "b": [
+    26.04,
+    14.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    27.24,
+    14.0
+   ],
+   "b": [
+    34.0,
+    14.0
+   ],
+   "material": "brick"
+  },
+  {
+   "a": [
+    34.0,
+    0.0
+   ],
+   "b": [
+    34.0,
+    14.0
+   ],
+   "material": "concrete"
+  },
+  {
+   "a": [
+    34.0,
+    18.0
+   ],
+   "b": [
+    34.0,
+    32.0
+   ],
+   "material": "concrete"
+  },
+  {
+   "a": [
+    38.96,
+    7.13
+   ],
+   "b": [
+    42.15,
+    7.13
+   ],
+   "material": "metal"
+  },
+  {
+   "a": [
+    43.35,
+    7.13
+   ],
+   "b": [
+    44.0,
+    7.13
+   ],
+   "material": "metal"
+  },
+  {
+   "a": [
+    38.96,
+    0.0
+   ],
+   "b": [
+    38.96,
+    7.13
+   ],
+   "material": "metal"
+  },
+  {
+   "a": [
+    40.36,
+    4.13
+   ],
+   "b": [
+    44.0,
+    4.13
+   ],
+   "material": "metal"
+  },
+  {
+   "a": [
+    35.5,
+    10.23
+   ],
+   "b": [
+    39.17,
+    10.23
+   ],
+   "material": "metal"
+  }
+ ],
+ "doors": [
+  {
+   "at": [
+    0,
+    16.0
+   ],
+   "width": 2.0,
+   "axis": "y",
+   "state": "open"
+  },
+  {
+   "at": [
+    4.1,
+    18.0
+   ],
+   "width": 1.2,
+   "axis": "x",
+   "state": "broken"
+  },
+  {
+   "at": [
+    13.92,
+    18.0
+   ],
+   "width": 1.2,
+   "axis": "x",
+   "state": "open"
+  },
+  {
+   "at": [
+    25.15,
+    18.0
+   ],
+   "width": 1.2,
+   "axis": "x",
+   "state": "open"
+  },
+  {
+   "at": [
+    28.63,
+    18.0
+   ],
+   "width": 1.2,
+   "axis": "x",
+   "state": "open"
+  },
+  {
+   "at": [
+    6.99,
+    14.0
+   ],
+   "width": 1.2,
+   "axis": "x",
+   "state": "open"
+  },
+  {
+   "at": [
+    19.09,
+    14.0
+   ],
+   "width": 1.2,
+   "axis": "x",
+   "state": "open"
+  },
+  {
+   "at": [
+    26.64,
+    14.0
+   ],
+   "width": 1.2,
+   "axis": "x",
+   "state": "broken"
+  },
+  {
+   "at": [
+    42.75,
+    7.13
+   ],
+   "width": 1.2,
+   "axis": "x",
+   "state": "open"
+  }
+ ],
+ "rooms": [
+  {
+   "id": "C1",
+   "name": "Main Corridor",
+   "poly": [
+    [
+     0.0,
+     14.0
+    ],
+    [
+     34.0,
+     14.0
+    ],
+    [
+     34.0,
+     18.0
+    ],
+    [
+     0.0,
+     18.0
+    ]
+   ]
+  },
+  {
+   "id": "N1",
+   "name": "Loading Office",
+   "poly": [
+    [
+     0.0,
+     18.0
+    ],
+    [
+     10.0,
+     18.0
+    ],
+    [
+     10.0,
+     32.0
+    ],
+    [
+     0.0,
+     32.0
+    ]
+   ]
+  },
+  {
+   "id": "N2",
+   "name": "Workshop",
+   "poly": [
+    [
+     10.0,
+     18.0
+    ],
+    [
+     18.5,
+     18.0
+    ],
+    [
+     18.5,
+     32.0
+    ],
+    [
+     10.0,
+     32.0
+    ]
+   ]
+  },
+  {
+   "id": "N3",
+   "name": "Locker Room",
+   "poly": [
+    [
+     18.5,
+     18.0
+    ],
+    [
+     27.0,
+     18.0
+    ],
+    [
+     27.0,
+     32.0
+    ],
+    [
+     18.5,
+     32.0
+    ]
+   ]
+  },
+  {
+   "id": "N4",
+   "name": "Server Room",
+   "poly": [
+    [
+     27.0,
+     18.0
+    ],
+    [
+     34.0,
+     18.0
+    ],
+    [
+     34.0,
+     32.0
+    ],
+    [
+     27.0,
+     32.0
+    ]
+   ]
+  },
+  {
+   "id": "S1",
+   "name": "Office B",
+   "poly": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     11.0,
+     0.0
+    ],
+    [
+     11.0,
+     14.0
+    ],
+    [
+     0.0,
+     14.0
+    ]
+   ]
+  },
+  {
+   "id": "S2",
+   "name": "Kitchen",
+   "poly": [
+    [
+     11.0,
+     0.0
+    ],
+    [
+     22.0,
+     0.0
+    ],
+    [
+     22.0,
+     14.0
+    ],
+    [
+     11.0,
+     14.0
+    ]
+   ]
+  },
+  {
+   "id": "S3",
+   "name": "Boiler Room",
+   "poly": [
+    [
+     22.0,
+     0.0
+    ],
+    [
+     34.0,
+     0.0
+    ],
+    [
+     34.0,
+     14.0
+    ],
+    [
+     22.0,
+     14.0
+    ]
+   ]
+  },
+  {
+   "id": "E1",
+   "name": "Warehouse Floor",
+   "poly": [
+    [
+     34.0,
+     0.0
+    ],
+    [
+     44.0,
+     0.0
+    ],
+    [
+     44.0,
+     32.0
+    ],
+    [
+     34.0,
+     32.0
+    ]
+   ]
+  },
+  {
+   "id": "E2",
+   "name": "Steel Storage Cage",
+   "poly": [
+    [
+     38.96,
+     0.0
+    ],
+    [
+     44.0,
+     0.0
+    ],
+    [
+     44.0,
+     7.13
+    ],
+    [
+     38.96,
+     7.13
+    ]
+   ]
+  }
+ ],
+ "rubble": [
+  {
+   "id": "RB2",
+   "poly": [
+    [
+     8.64,
+     10.07
+    ],
+    [
+     9.77,
+     10.07
+    ],
+    [
+     9.77,
+     11.2
+    ],
+    [
+     8.64,
+     11.2
+    ]
+   ],
+   "height": 1.59
+  },
+  {
+   "id": "RB3",
+   "poly": [
+    [
+     14.14,
+     8.74
+    ],
+    [
+     15.28,
+     8.74
+    ],
+    [
+     15.28,
+     9.88
+    ],
+    [
+     14.14,
+     9.88
+    ]
+   ],
+   "height": 1.19
+  }
+ ],
+ "hazards": [
+  {
+   "id": "H1",
+   "type": "fire",
+   "poly": [
+    [
+     10.3,
+     24.83
+    ],
+    [
+     18.2,
+     24.83
+    ],
+    [
+     18.2,
+     31.7
+    ],
+    [
+     10.3,
+     31.7
+    ]
+   ]
+  }
+ ],
+ "survivors": [
+  {
+   "id": "S1",
+   "pos": [
+    39.38,
+    0.62
+   ],
+   "thermal": "pos_0001.png"
+  },
+  {
+   "id": "S2",
+   "pos": [
+    31.88,
+    25.38
+   ],
+   "thermal": "pos_0002.png"
+  },
+  {
+   "id": "S3",
+   "pos": [
+    9.88,
+    17.12
+   ],
+   "thermal": "pos_0003.png"
+  }
+ ],
+ "decoys": [
+  {
+   "id": "D1",
+   "label": "radiator",
+   "pos": [
+    38.12,
+    4.62
+   ],
+   "thermal": "neg_0001.png"
+  },
+  {
+   "id": "D2",
+   "label": "engine",
+   "pos": [
+    7.62,
+    8.88
+   ],
+   "thermal": "neg_0002.png"
+  },
+  {
+   "id": "D3",
+   "label": "coffee machine",
+   "pos": [
+    1.38,
+    29.88
+   ],
+   "thermal": "neg_0003.png"
+  }
+ ],
+ "entry": [
+  1.0,
+  16.0
+ ],
+ "command_post": {
+  "pos": [
+   -2.0,
+   16.0
+  ],
+  "tx_dbm": 20
+ },
+ "generator": {
+  "seed": 1,
+  "variant": 0,
+  "version": 1
+ },
+ "timeline": [
+  {
+   "t": 82,
+   "do": "rubble",
+   "at": [
+    26.34,
+    16.42
+   ],
+   "size": 1.4,
+   "label": "Ceiling tiles come down in the main corridor"
+  },
+  {
+   "t": 139,
+   "do": "overcurrent",
+   "robot": "R1",
+   "duration_s": 1.0,
+   "label": "A wheel jams on debris"
+  },
+  {
+   "t": 188,
+   "do": "aftershock",
+   "at": [
+    36.07,
+    8.45
+   ],
+   "label": "Aftershock: part of the warehouse roof collapses (the first relay is lost if one is up)"
+  }
+ ],
+ "validation": {
+  "ok": true,
+  "checks": [
+   "everything reachable from the entrance with 1-cell wall inflation",
+   "survivors and decoys out of hazards and debris",
+   "no hazard over a door",
+   "every room at least 30% reachable",
+   "steel cage has no direct link to the command post"
+  ]
+ }
+}
