@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { decodeMap } from '../store'
-import { phoneHelloState } from './sync'
+import { dispatchedState, phoneHelloState } from './sync'
 import { retainPhoneFrames } from './control'
 
 // Phone state. Phones only ever receive the Command view, never Reality.
@@ -18,6 +18,7 @@ export const usePhone = create((set) => ({
   relayPending: null, // power value sent but not yet confirmed by relay_state
   safety: null,      // last safety result
   checking: false,   // waiting for a safety or dispatch answer
+  lastDispatch: null, // latest known accepted plan, content flag and fleet recipient count
   dispatched: [],    // plan IDs this phone dispatched or saw rejected as dispatched
   error: null,       // last error frame { code, msg, at }
   leases: null,      // server lease table { enabled, ttl_s, robots: [{ robot, controller, expires_at }] }
@@ -60,7 +61,7 @@ export function handlePhoneMessage(msg) {
       break
     case 'event':
       if (data.kind === 'plan_dispatched') {
-        s.set({ dispatched: [...new Set([...s.dispatched, data.plan_id])] })
+        s.set(dispatchedState(s, data.plan_id))
       }
       break
     case 'error':
