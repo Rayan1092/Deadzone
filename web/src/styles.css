@@ -40,6 +40,8 @@ button:hover { border-color: var(--teal); }
 .conn { padding: 3px 8px; border-radius: 999px; font-size: 11px; }
 .conn.ok { background: rgba(34,197,94,.15); color: var(--green); }
 .conn.bad { background: rgba(239,68,68,.15); color: var(--red); }
+/* server down: visibly dead controls (the clicks would go nowhere) */
+.topbar button:disabled { opacity: .4; cursor: not-allowed; }
 
 .split { grid-area: split; position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); min-height: 0; }
 .pane { position: relative; background: var(--bg); min-height: 0; }
@@ -733,6 +735,8 @@ button:hover { border-color: var(--teal); }
 .tb-conn i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px rgba(34,197,94,.7); }
 .tb-conn.bad { color: #fca5a5; }
 .tb-conn.bad i { background: var(--red); box-shadow: 0 0 8px rgba(239,68,68,.8); animation: eye-wait 1s ease-in-out infinite; }
+/* server down: a loud pill, not just a red dot */
+.tb-conn.bad { padding: 5px 12px; border-radius: 999px; border: 1px solid rgba(239,68,68,.7); background: rgba(239,68,68,.16); font-size: 13px; }
 .tb-icon { display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 10px; color: rgba(230,237,243,.8);
   background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); }
 .tb-icon.on { color: #99f6e4; border-color: rgba(45,212,191,.5); background: rgba(45,212,191,.12); }
@@ -745,3 +749,15 @@ button:hover { border-color: var(--teal); }
   border: 1px solid rgba(255,255,255,.08); border-top: 0; box-shadow: 0 14px 30px rgba(0,0,0,.45);
   opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .18s ease, transform .18s ease; }
 .topbar:hover > .controls.tb-secondary, .topbar:focus-within > .controls.tb-secondary { opacity: 1; transform: none; pointer-events: auto; }
+
+/* H help: a compact popup under the top bar's right end (replaces the full-screen key list) */
+.help-pop { position: fixed; z-index: 40; top: 60px; right: 12px; width: min(470px, calc(100vw - 24px)); max-height: calc(100vh - 80px); overflow: auto;
+  padding: 12px 16px 14px; border-radius: 14px; background: rgba(14,18,24,.92); border: 1px solid rgba(255,255,255,.1);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 18px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.07); }
+.help-pop-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.help-pop-head b { font-size: 15px; margin-right: auto; }
+.help-pop h4 { margin: 10px 0 5px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); font-weight: 700; }
+.help-pop .keys { display: grid; grid-template-columns: 52px 1fr; gap: 5px 10px; align-items: baseline; font-size: 13px; }
+.help-pop kbd { justify-self: start; font: 600 11px 'JetBrains Mono', ui-monospace, monospace; color: var(--text); background: #232a31;
+  border: 1px solid #3a434d; border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+.help-pop span { color: rgba(230,237,243,.86); line-height: 1.35; }
