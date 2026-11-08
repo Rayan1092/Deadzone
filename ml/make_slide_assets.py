@@ -109,18 +109,43 @@ def crops_and_pipeline():
             picked.append((img, label, p))
         return picked, skipped
 
-    people, skip_p = pick(pos, True)
-    objects, skip_n = pick(neg, False)
-    print(f"person candidates {len(pos)}, picked 4, skipped {skip_p} the model got wrong")
-    print(f"warm-object candidates {len(neg)}, picked 4, skipped {skip_n} the model got wrong")
+    sel_path = ML / "real_crops.json"
+    if sel_path.is_file():
+        # the curated AI Lab examples (ml/real_crops.py): same images as key L
+        import real_crops
+        sel = json.loads(sel_path.read_text(encoding="utf-8"))
+
+        def scored(entries, field, want_person):
+            """First 4 curated examples the model gets right (the slide's rows say found / rejected)."""
+            out, skipped = [], 0
+            for e in entries:
+                if len(out) == 4:
+                    break
+                img = real_crops.crop(e["key"], prep_crops.SIZE)
+                p = float(common.predict_pos_prob(model, tf(img).unsqueeze(0))[0])
+                if (p >= thr) != want_person:
+                    skipped += 1
+                    continue
+                out.append((img, e.get(field) or "", p))
+            return out, skipped
+        (people, skip_p), (objects, skip_n) = scored(sel["lab_pos"], "pose", True), scored(sel["lab_neg"], "shows", False)
+        print(f"crops_grid: curated examples from ml/real_crops.json, skipped {skip_p} person / {skip_n} object the model got wrong")
+    else:
+        people, skip_p = pick(pos, True)
+        objects, skip_n = pick(neg, False)
+        print(f"person candidates {len(pos)}, picked 4, skipped {skip_p} the model got wrong")
+        print(f"warm-object candidates {len(neg)}, picked 4, skipped {skip_n} the model got wrong")
 
     fig, axes = plt.subplots(2, 4, figsize=(8.8, 5.2), facecolor=BG)
     for ax, (img, label, p) in zip(axes[0], people):
         ax.imshow(img, cmap="inferno")
         ax.set_title(f"Person  {p * 100:.0f}%", color=GREEN, fontsize=12, fontweight="bold")
+        if label and label != "person":
+            ax.set_xlabel(label, color=MUTED, fontsize=9)
     for ax, (img, label, p) in zip(axes[1], objects):
         ax.imshow(img, cmap="inferno")
-        ax.set_title(f"{label.capitalize()}  {p * 100:.1f}%", color=RED, fontsize=12, fontweight="bold")
+        short = " ".join(label.split(",")[0].split()[-2:]).capitalize() if label else "Not a person"
+        ax.set_title(f"{short}  {p * 100:.1f}%", color=RED, fontsize=10.5, fontweight="bold")
     for ax in axes.flat:
         ax.set_xticks([])
         ax.set_yticks([])
@@ -128,8 +153,10 @@ def crops_and_pipeline():
             s.set_color(GRID)
     fig.text(0.02, 0.73, "found", color=GREEN, rotation=90, fontsize=13, va="center", fontweight="bold")
     fig.text(0.02, 0.29, "rejected", color=RED, rotation=90, fontsize=13, va="center", fontweight="bold")
-    fig.suptitle("What the onboard model sees: held-out FLIR thermal crops, P(person)", color=FG, fontsize=13)
-    fig.text(0.5, 0.015, "Threshold 0.6  ·  images the model never trained on  ·  overall 96.2% on 1,200 held-out images",
+    fig.suptitle("What the onboard model sees: real held-out FLIR thermal frames, P(person)", color=FG, fontsize=13)
+    met = json.loads((ML / "results" / "metrics.json").read_text())
+    fig.text(0.5, 0.015, f"Threshold {thr:g}  ·  images the model never trained on  ·  overall "
+             f"{100 * met['accuracy']:.1f}% on {met['n']:,} held-out FLIR images",
              color=MUTED, fontsize=9, ha="center")
     fig.subplots_adjust(left=0.06, right=0.99, top=0.86, bottom=0.07, wspace=0.08, hspace=0.25)
     fig.savefig(OUT / "crops_grid.png", dpi=200, facecolor=BG)
