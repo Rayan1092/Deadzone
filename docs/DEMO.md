@@ -24,22 +24,36 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 
 ## Pre-flight checks (T-30 min)
 
-1. `git checkout main; git pull`.
-2. Install dependencies, including CPU PyTorch. **Without torch the detector is not used.**
+1. From the repo root, **run `scripts/preflight.ps1`** (PowerShell), or
+   `./scripts/preflight.sh` (macOS/Linux/Git Bash), before starting the demo servers.
+   Fix any `FAIL` using the setup below, then rerun until every line says `PASS`.
+   The check activates `.venv`, loads the model on CPU, checks the two local API
+   keys without printing them, verifies the effective flags against the active
+   PowerShell assignments below, checks tools/ports, then runs its own paused
+   server for 10 seconds and verifies `hello.detector == "model"`. It stops only
+   that temporary server. Export the flag blocks below before rerunning; shell
+   variables override `server/.env`. Extra nonempty `DZ_` variables fail even if
+   their value is `0`; remove them for this exact demo profile. Commented-out
+   flags are not allowed. Windows reports `py --version`; Unix reports `py` if
+   available, otherwise `python3`. `.venv` Python is used for actual checks.
+2. `git checkout main; git pull`.
+3. Install dependencies in the activated `.venv`, including CPU PyTorch.
+   **Without torch the detector is not used.** Use `python` below to select the
+   activated virtual environment explicitly.
    ```powershell
    cd server
-   py -m pip install -r requirements.txt
-   py -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-   py -m pip install pillow
+   python -m pip install -r requirements.txt
+   python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+   python -m pip install pillow
    cd ..\web; npm install; npm run build; cd ..
    ```
-3. Start the server **paused**. Leave `DZ_AUTOSTART` unset.
+4. Start the server **paused**. Leave `DZ_AUTOSTART` unset.
    ```powershell
    cd server
    $env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=2
-   py -m uvicorn deadzone.app:app --host 0.0.0.0 --port 8000
+   python -m uvicorn deadzone.app:app --host 0.0.0.0 --port 8000
    ```
-4. The server log must say `survivor detector: trained model, threshold 0.60`. If it says `sim sensor fallback (...)`, fix torch before going on stage. The top-bar detector chip shows the same thing.
+5. The server log must say `survivor detector: trained model, threshold 0.60`. If it says `sim sensor fallback (...)`, fix torch before going on stage. The top-bar detector chip shows the same thing.
    Optional features are off unless their flag is set before starting the server (only turn on what passed a dry run):
    ```powershell
    $env:DZ_AFTERSHOCK=1   # key A
@@ -51,10 +65,10 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    # DZ_OBSTACLES         # must stay unset (0) for the main run: solid furniture (#119) makes the safety checker reject P-1 and moves the dark moment to 205 s (rayan.md 17:00)
    ```
    **Don't set `DZ_VOICE`, `DZ_CONTROL_LEASES` or `DZ_EXPLORATION_V2` for the main run.** With control leases on, the top bar shows a **presenter lock**: **B** and **U** stay locked (with a hint) until you press **Unlock**, which takes every robot for the big screen (phones then see them locked; R, F, O and A are not affected). **Lock** releases the robots so phones can take them (Q&A). Unlock fails, naming the holder, while a phone holds a robot. Leases off: no lock, B and U as before. With `DZ_EXPLORATION_V2=1` the robots explore differently and every beat in the beat sheet moves (S3 found at 23.8 s instead of 14.4, S2 found at 106 s instead of 246). `DZ_SENSOR_VIEW=1` is safe: it only adds camera frames to the Reality pane.
-5. Open **`http://localhost:8000/?nointro`** on the big screen (`?nointro` keeps the first-visit explainer card from covering the scene; the **?** overlay can still show it). Phones join with **Q** (QR) on the same Wi-Fi, or on the phone hotspot. Phone microphones need https: use Aziz's tunnel (`scripts/demo_tunnel.py`, see its docs) if voice or the mic is part of the run.
-6. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
-7. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped recording, and keep the file on the demo laptop.
-8. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
+6. Open **`http://localhost:8000/?nointro`** on the big screen (`?nointro` keeps the first-visit explainer card from covering the scene; the **?** overlay can still show it). Phones join with **Q** (QR) on the same Wi-Fi, or on the phone hotspot. Phone microphones need https: use Aziz's tunnel (`scripts/demo_tunnel.py`, see its docs) if voice or the mic is part of the run.
+7. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
+8. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped recording, and keep the file on the demo laptop.
+9. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
 
 ## Director keys (big screen)
 
