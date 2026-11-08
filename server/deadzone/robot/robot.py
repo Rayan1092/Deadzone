@@ -114,6 +114,9 @@ STATES = ("DEPLOYING", "EXPLORING", "LOST_LINK_EXPLORING", "RETURNING_TO_SIGNAL"
 # `plan_state: "no reachable area, holding"` while in it (None otherwise). Never driven through,
 # never refused by the safety checker.
 WAITING_PLAN_STATE = "no reachable area, holding"
+# Every frontier left is inside a plan's no-go areas: the search is complete except what the plan
+# excluded, so the robot goes home as normal and says so (and resumes if the exclusion is lifted).
+SKIPPED_PLAN_STATE = "search complete, excluded area skipped"
 # SHUTDOWN: back at the command post (DONE, including after LOW_BATTERY) with the outbox empty for
 # SHUTDOWN_AFTER_S, the robot powers down: scheduler stopped (tasks empty), lidar, camera and
 # headlights off (`lights: false` in telemetry), battery drain stops, the radio sends one final
@@ -220,6 +223,7 @@ class Robot:
         self.search_bayes = os.environ.get("DZ_SEARCH_BAYES") == "1"
         self.zone_priority = os.environ.get("DZ_ZONE_PRIORITY") == "1"
         self.heading_zone = None   # zone id we are driving to under DZ_ZONE_PRIORITY
+        self.excluded_skipped = False   # went home with frontiers left only inside plan no-go areas
         self.belief_t = -99.0
         self.zones = []                     # this robot's dispatched zones, highest priority first
         self.battery = Battery()
@@ -406,6 +410,10 @@ class Robot:
             self.lost_budget = float(plan["lost_link_budget_s"])
         self.path = []                       # replan under the new plan right away
         self.last_plan_t = -99.0             # (also from WAITING: a plan edit is retried on the next step)
+        if self.excluded_skipped and self.state in ("RETURNING_HOME", "DONE"):
+            self.excluded_skipped = False    # the exclusions changed: search what they left again
+            self._set_state("EXPLORING")
+            self.events.append({"kind": "robot_resumed", "robot": self.id, "reason": "no_go_edited"})
         self.heading_zone = None
         if self.zone_priority:
             zone = self._active_zone()
@@ -1141,25 +1149,32 @@ class Robot:
                 if self._escape_blocked_cell():         # a no-go drawn over us: walk out, then plan
                     return
                 if not self._plan_frontier():
-                    if self._walled_in_by_no_go():
+                    if self._no_frontier_outcome() == "hold":
                         self._hold_for_plan()
                         return
-                    self._set_state("RETURNING_HOME")   # nothing left to explore
+                    self._set_state("RETURNING_HOME")   # nothing left to explore (bar excluded areas)
                     if not self._plan_to(self.entry):
                         self._start_replan("no_route")
             return
 
         if s == "WAITING":
-            # hold; retry whenever a plan arrives (last_plan_t reset) or every REPLAN_PERIOD
+            # hold where a plan edit can reach us: out of contact, go back to signal first (then
+            # EXPLORING re-checks and holds again, linked). Retry whenever a plan arrives
+            # (last_plan_t reset) or every REPLAN_PERIOD.
             self.path = []
+            if self.dark_declared and len(self.crumbs) > 1:
+                self._set_state("RETURNING_TO_SIGNAL")
+                if not self._plan_to_signal():
+                    self._start_replan("no_route")
+                return
             if self.t - self.last_plan_t > REPLAN_PERIOD:
                 if self._escape_blocked_cell():
                     return
                 if self._plan_frontier():
                     self._set_state("EXPLORING")
                     self.events.append({"kind": "robot_resumed", "robot": self.id, "reason": "no_go_edited"})
-                elif not self._walled_in_by_no_go():
-                    self._set_state("RETURNING_HOME")   # the map really is finished
+                elif self._no_frontier_outcome() != "hold":
+                    self._set_state("RETURNING_HOME")   # the map is finished (bar excluded areas)
                     if not self._plan_to(self.entry):
                         self._start_replan("no_route")
             return
@@ -1247,7 +1262,7 @@ class Robot:
         if state in ("EXPLORING", "LOST_LINK_EXPLORING"):
             if self._plan_frontier():
                 return True, state
-            if self._walled_in_by_no_go():
+            if self._no_frontier_outcome() == "hold":
                 self._hold_for_plan()              # a no-go walls us in: hold, never drive home through it
                 return True, "WAITING"
             if self._plan_to(self.entry):
@@ -1324,14 +1339,30 @@ class Robot:
         self.events.append({"kind": "replan", "robot": self.id, "reason": "walk_out"})
         return True
 
-    def _walled_in_by_no_go(self):
-        """True when the plan's no-go areas are what leaves us no frontier: without them (hazards
-        known at deploy still excluded) a frontier is reachable from where we stand."""
-        if np.array_equal(self.nogo, self.base_nogo):
-            return False
+    def _no_frontier_outcome(self):
+        """No frontier is reachable. Why? "hold": a frontier OUTSIDE the plan's no-go areas exists
+        but the no-go cuts us off from it (WAITING until the plan changes). "skipped": every frontier
+        left lies inside the no-go areas, so the search is complete except what the plan excluded
+        (go home, plan_state says so). "done": nothing left at all."""
+        self.excluded_skipped = False
+        plan_nogo = self.nogo & ~self.base_nogo
+        if not plan_nogo.any():
+            return "done"
         trav = planning.traversable(self.map.grid, self.base_nogo)
         clusters, _, _ = planning.frontier_clusters(self.map.grid, trav, self._cell(*self.pose[:2]), self.blacklist)
-        return bool(clusters)
+        if not clusters:
+            return "done"
+        inside = planning.dilate(plan_nogo, 2)        # a frontier on the no-go's edge belongs to it
+        if any(not inside[y, x] for c in clusters for x, y in c["cells"]):
+            return "hold"
+        self.excluded_skipped = True
+        self.last_telemetry_t = -99.0
+        self.events.append({"kind": "search_complete", "robot": self.id, "excluded_skipped": True,
+                            "plan_id": self.plan.get("plan_id") if self.plan else None})
+        return "skipped"
+
+    def _walled_in_by_no_go(self):
+        return self._no_frontier_outcome() == "hold"
 
     def _hold_for_plan(self):
         self.path, self.target = [], None
@@ -1610,6 +1641,7 @@ class Robot:
             "relays_left": self.relays_left,
             "plan_id": self.plan.get("plan_id") if self.plan else None,
             "plan_state": WAITING_PLAN_STATE if self.state == "WAITING" else
+                          SKIPPED_PLAN_STATE if self.excluded_skipped and self.state in ("RETURNING_HOME", "DONE", "SHUTDOWN") else
                           (f"heading to {self._heading()}" if self._heading() else None),
             "zone": (self._active_zone() or {}).get("id"),
             "target": self.target,

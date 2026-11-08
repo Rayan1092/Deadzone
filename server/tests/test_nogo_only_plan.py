@@ -138,3 +138,52 @@ def test_no_go_drawn_mid_run_is_held_not_driven_home(monkeypatch):
     assert all(s == "WAITING" for s in states.values()), states
     assert not any(e["kind"] in ("robot_shutdown",) for t, e in log)
     assert {rid: [z["id"] for z in r.zones] for rid, r in sim.robots.items()} == {"R1": ["ZW"], "R2": ["ZNE"], "R3": ["ZB"]}
+
+
+# ---- Rayan's by-eye bug (2026-11-09): WAITING only when a no-go cuts a robot off from frontiers
+# outside it; frontiers left only inside no-go areas mean "search complete, excluded area skipped".
+
+EAST_OF_10 = [[10.0, 0.0], [40.0, 0.0], [40.0, 30.0], [10.0, 30.0]]
+
+
+def test_frontiers_only_inside_the_no_go_mean_search_complete_not_waiting():
+    from deadzone.robot.robot import SKIPPED_PLAN_STATE
+    sim = Sim(n_robots=1, seed=7)
+    sim.tick()
+    plans = PlanManager(sim, SafetyChecker(sim.prior, sim.robot_specs, sim.energy_time_scale))
+    plans.save(plan("P-west", no_go=[EAST_OF_10]))
+    assert plans.dispatch("P-west")["ok"]
+    r1 = sim.robots["R1"]
+    log = []
+    while sim.time < 400 and r1.state not in ("RETURNING_HOME", "DONE", "SHUTDOWN"):
+        run(sim, sim.time + 0.5, forbidden=EAST_OF_10, log=log)
+    assert r1.state in ("RETURNING_HOME", "DONE"), r1.state
+    assert not any(e["kind"] == "robot_waiting" for _, e in log), "never held: nothing outside the no-go is cut off"
+    assert [e["robot"] for _, e in log if e["kind"] == "search_complete" and e["excluded_skipped"]] == ["R1"]
+    assert r1.telemetry(None)["plan_state"] == SKIPPED_PLAN_STATE
+    # lifting the exclusion sends it back to search the rest, within 2 s
+    plans.save(plan("P-open"))
+    assert plans.dispatch("P-open")["ok"]
+    t0 = sim.time
+    log = []
+    while sim.time < t0 + 2.0 and r1.state != "EXPLORING":
+        run(sim, sim.time + 0.1, log=log)
+    assert r1.state == "EXPLORING" and any(e["kind"] == "robot_resumed" for _, e in log)
+    assert r1.telemetry(None)["plan_state"] is None
+
+
+def test_waiting_robot_rechecks_when_the_no_go_moves_and_resumes_within_2_s():
+    sim, plans = start()
+    plans.save(plan("P-wall", no_go=[WALL_OFF]))
+    assert plans.dispatch("P-wall")["ok"]
+    run(sim, 25.0, forbidden=WALL_OFF)
+    assert all(r.state == "WAITING" for r in sim.robots.values())
+    # the no-go moves east, past the corridor doors: a way opens without clearing anything
+    plans.save(plan("P-moved", no_go=[MID_CORRIDOR]))
+    assert plans.dispatch("P-moved")["ok"]
+    t0 = sim.time
+    while sim.time < t0 + 2.0 and any(r.state == "WAITING" for r in sim.robots.values()):
+        run(sim, sim.time + 0.1)
+    assert all(r.state != "WAITING" for r in sim.robots.values()), \
+        [(rid, r.state) for rid, r in sim.robots.items()]
+    run(sim, t0 + 20.0, forbidden=MID_CORRIDOR)
