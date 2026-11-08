@@ -93,7 +93,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    hotspot or the tunnel if another device still cannot connect. `?nointro` keeps the first-visit explainer off the scene;
    the **H** help popup can still open it.
 8. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
-9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, click the **REC** chip to save the gzipped mission recording, and keep the file on the demo laptop.
+9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, then click **Save recording** next to the REC status to save the gzipped recording, and keep the file on the demo laptop.
 10. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
 
 ## Director keys (big screen)
@@ -111,7 +111,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | H | keyboard help popup, with a link to reopen the intro | live |
 | V | robot's-eye camera of the followed robot (with a Thermal toggle). It also opens by itself on a detection, with the AI box and the robot's steps | live |
 | P | performance mode (no shadows, fewer lidar rays). **Set it before the demo, never during:** toggling recompiles every material and freezes the screen for several seconds (rayan-ml's profile) | set before |
-| REC chip | save the mission recording when opened with `?record` | click the chip; S is no longer bound |
+| Save recording | download the mission recording | button beside REC, shown when opened with `?record` |
 | O | perception overload on the **followed** robot: deadline misses for 3 s | live |
 | U | resume the followed robot from SAFE_STOP (also the "Send resume command" button on its card). Travels over the radio, so it needs a route to CMD | live |
 | B | baseline toggle: every robot switches to "without Deadzone" (stops when its link drops, no relays) and back. Red "Baseline" chip while on. Q&A only, never during the beat sheet | live |

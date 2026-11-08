@@ -789,3 +789,7 @@ button:hover { border-color: var(--teal); }
 .coverage-legend { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(230,237,243,.85); }
 .coverage-legend i { width: 60px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #2dd4bf, #f59e0b 50%, #ef4444); opacity: .85; }
 .coverage-legend.in-inset { margin-left: 8px; font-size: 12px; }
+
+/* ?record only: REC status and the Save recording button */
+.rec-group { display: inline-flex; align-items: center; gap: 8px; }
+.rec-save { height: 32px; border-color: rgba(239,68,68,.55); }

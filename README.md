@@ -63,7 +63,7 @@ The detector is trained locally on thermal-image datasets and runs on CPU withou
 
 ## Mission recording and replay
 
-Open **http://localhost:8000/?record**, run the mission, then click the **REC** chip to save a compressed mission recording. The old S shortcut is no longer used.
+Open **http://localhost:8000/?record**, run the mission, then click **Save recording** next to the REC status to download a compressed mission recording.
 
 Open **http://localhost:8000/?replay** and choose or drop the saved file. Replay uses recorded messages rather than recomputing the mission. Space pauses and Backspace restarts playback. Keep an asset server available if you want the thermal images to load.
 
@@ -72,6 +72,39 @@ Open **http://localhost:8000/?replay** and choose or drop the saved file. Replay
 The reference scenario is **Riverside Block C, post-earthquake**: offices, a warehouse, a steel radio dead zone and a scripted secondary collapse. **N** loads another building; **Shift+N** returns to the reference scenario. Harborview Logistics Center and generated buildings provide larger search layouts. Names, descriptions and event labels travel with each building.
 
 **M** switches between one view and split view. **C** swaps the Command inset in one view or frames the command post in split view. Robot chips and number keys follow scouts; **V** opens the scout camera. **H** is the source of truth for controls. [PLAN.md](docs/PLAN.md) documents the formats and algorithms, and [DEMO.md](docs/DEMO.md) contains the timed reference run.
+
+<details>
+<summary>Keyboard controls</summary>
+
+The same list is on screen: press **H**.
+
+| Key | What it does |
+| --- | --- |
+| Space | start or pause the mission. The page opens on a street shot outside the building; the first Space dives in |
+| + / - | run faster or slower |
+| Backspace | restart this scenario from the beginning |
+| G | a short spoken briefing written only from what reached the command post (`DZ_GEMINI=1`) |
+| Q | the codes for joining from a phone |
+| X | sound cues on or off |
+| H / Esc | show or hide the key help / close whatever is open |
+| 0 / 1–9 | see the whole building / follow a robot (or click its chip or card) |
+| M | one view or the split view |
+| C | one view: swap the command post map with the main view; split view: look down on the command post |
+| V | the followed robot's camera |
+| D | the camera follows the action by itself |
+| P | lighter graphics on a slower computer (set before a run) |
+| R | rubble in front of the followed robot (with `DZ_SMART_RUBBLE=1` it never seals anyone in) |
+| F / O | jam the followed robot's wheels / overload its computer (the safety task keeps its deadlines) |
+| U | tell the followed robot to resume after a safety stop (sent over the radio) |
+| A / Shift+A | aftershock / strong aftershock in three areas (`DZ_AFTERSHOCK=1`) |
+| B | the same robots without Deadzone (they stop when the link drops), and back |
+| N / Shift+N | a different building / back to the main scenario |
+| L / J | Model Lab / try to beat the model on a held-out thermal image |
+| I | live counters from under the hood |
+| Y | belief map: where survivors may still be |
+| W | the radio coverage the command post predicts: strong, weak or dead |
+
+</details>
 
 ## Development and checks
 
