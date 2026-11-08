@@ -21,7 +21,8 @@ class CommandPost:
         self.map = np.zeros((fp.h, fp.w), dtype=np.uint8)
         self.map_sent_t = np.full((fp.h, fp.w), -np.inf)
         self.robots = {}      # id -> last telemetry + last_seen
-        self.camera_telemetry = os.environ.get("DZ_CAMERA_TELEMETRY") == "1"
+        self.heat_sources = os.environ.get("DZ_HEAT_SOURCES") == "1"
+        self.camera_telemetry = os.environ.get("DZ_CAMERA_TELEMETRY") == "1" or self.heat_sources
         self.coverage_grid = CoverageGrid(fp) if os.environ.get("DZ_COVERAGE_GRID") == "1" else None
         self.relays = {}
         self.survivors = {}   # id -> record + reported_t
@@ -90,7 +91,8 @@ class CommandPost:
                 if camera is not None:
                     self.robots[p["id"]]["camera"] = camera
             if self.camera_telemetry and p["id"] == b["src"] and "camera" in p:
-                frame = delivered_frame(p["camera"], b["created"], now, self.size)
+                frame = delivered_frame(p["camera"], b["created"], now, self.size,
+                                        heat_sources=self.heat_sources)
                 if frame is not None and (camera is None or
                         (frame["t"], frame["delivered_t"]) >= (camera["t"], camera["delivered_t"])):
                     self.robots[p["id"]]["camera"] = frame

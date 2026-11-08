@@ -384,6 +384,55 @@ Decode `coverage.data` with base64 -> zlib inflate -> `Int8Array`; index
 not an unknown-cell sentinel. All cells, including occupied/unknown occupancy
 cells, contain a model prediction. Dimensions/resolution match the occupancy map.
 
+### Thermal hot spots (`DZ_HEAT_SOURCES`, default off)
+
+The floor-plan producer supplies the user-agreed optional array (Rayan owns the
+floor-plan data/schema):
+
+```json
+{"heat_sources":[{"id":"H1","type":"generator","x":12.5,"y":4.0,"temp_c":65,"size_m":0.8}]}
+```
+
+`type` is one of `generator`, `space_heater`, `hot_pipe`, `server_rack`, `dog`,
+`laptop`, `sunlit`. IDs must be unique across sources/survivors/legacy decoys,
+centers must be inside the map, all numbers finite and `size_m` positive. Only
+when `DZ_HEAT_SOURCES=1` at Sim/Robot/CommandPost construction/reset does the
+sensor parse these entries. Flag off ignores the array, preserves old hit and
+telemetry shapes, and does no heat-source work.
+
+Heat sources use the **same** 5 m center range, 120-degree forward cone and
+line-of-sight test as survivors. Size/temperature do not alter those rules or
+create occupancy. A heat-source `io.thermal()` hit is the existing survivor hit
+shape plus typed metadata:
+
+```json
+{"id":"H1","pos":[12.5,4.0],"crop":"neg_0002.png","conf":0.99,
+ "kind":"decoy","type":"generator","source_id":"H1","temp_c":65}
+```
+
+Survivor hits get `kind:"survivor"`; **missing kind means survivor**, keeping old
+sensor/camera data valid. Existing decoys receive `kind:"decoy"` when enabled.
+The available `neg_0001..0003.png` runtime crops are representative thermal
+stand-ins, chosen by SHA-256 of `seed:id:type` modulo 3; this is stable across
+processes, source ordering and resets and consumes no simulation RNG. These are
+not temperature-generated images or newly trained type classifiers. The trained
+person detector still scores the actual crop: the metadata never forces a
+rejection or conceals a false positive. Without a model/crop score, new decoy
+observations stay `verdict:"unsure",conf:null` and do not create rescue targets;
+legacy survivor passthrough remains unchanged.
+
+This flag enables the existing delivered camera telemetry path itself; a second
+`DZ_CAMERA_TELEMETRY` flag is not required. `telemetry.payload.camera.hits[]` and
+delivered phone/tick Command `robots[].camera.hits[]` preserve `kind` and the
+optional `type`, `source_id`, `temp_c` alongside existing `{id,pos,crop,verdict,conf}`.
+Camera metadata crosses the normal DTN custody/dedupe/TTL/version path; unseen
+floor-plan source lists never enter phone hello, and dark phones retain their
+last delivered observation/age. Metadata byte cost is included in bundle size.
+Reality camera observations preserve it too when `DZ_SENSOR_VIEW` is enabled.
+AI events (`hotspot_rejected`, `hotspot_unsure`, `survivor_found`) carry the same
+source fields with **`hit_kind`** instead of `kind`, preserving the event name in
+`event.kind`. The model verdict/confidence remain separate from source identity.
+
 ### Robot telemetry (one per robot per tick, Reality view)
 
 ```json
