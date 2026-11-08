@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/collapse-geometry`: Rayan's collapse list. Steps 1, 4, 5 done; 2 (ceiling) and 3 (litter) integrated, one ceiling perf fix pending; 6 loader done. Step 1 is PR #85; a PR for 2-5 follows. Before/after in `docs/visuals/`.
+- **Working on:** `p3/collapse-geometry`: Rayan's collapse list, steps 1-6 built. Step 1 merged (#85); PR for steps 2-6 open next. Final shots in `docs/visuals/` (`final-*`).
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,16 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 11:00 · p3/collapse-geometry · Ceiling perf fix, Rayan's plain textures wired, final full-quality shots
+- **Did:**
+  - Ceiling: applied the review fix (hanging grid fragments never below 1.67 m even with sway; snap scraps clamped at 1.72 m; slab door gap 1.25 m); T-bars and tiles toned to dusty aluminium.
+  - Rayan's `assets-pack/plain/` (thanks, fast): `damaged_plaster` now textures the plaster skin and drywall, `cracked_concrete_floor` (Concrete Floor Damaged 01) the slab, his `crack_02.png` decal replaces the procedural cracks. Copied at 1K into `web/public/assets/textures/` (his 2K originals stay in the pack); his `cracked_concrete_wall` is the Concrete Wall 008 set I already had. Replaced sets removed; `CREDITS.md` updated.
+  - Final full-quality shots at every pinned angle: `docs/visuals/final-*.jpg`.
+  - Server suite after the merge with main: 392 passed, 1 skipped.
+- **Contract changes:** none.
+- **Heads-up for others:** Rayan: steps 1-5 done; 6 keeps the procedural rover (your note on `robot.glb`). For the dry run: night is the default scene, K switches to day, P is the fallback.
+- **Next:** PR for steps 2-6; then whatever the dry run turns up.
 
 ### 2026-11-08 10:50 · p3/collapse-geometry · Steps 2 and 3: collapsed ceiling, debris everywhere; fog of war as a veil
 - **Did:**

@@ -304,9 +304,9 @@ function buildSlab(p, a, d, inset, pancake, rr, out) {
 
 const GRID = { cell: 0.6, bar: 0.025, barH: 0.03, top: WALL_H + 0.02 }
 
-// A T-bar grid fragment hanging off the wall top, tilted so its low edge sits between 1.5
-// and 2.05 m and it reaches no further than `dCap` into the room. Bars and tiles are kept
-// in the fragment's own frame so the live one can swing on its top edge.
+// A T-bar grid fragment hanging off the wall top, tilted so its low edge sits between 1.67
+// and 2.05 m (1.6 m plus the live sway) and it reaches no further than `dCap` into the room.
+// Bars and tiles are kept in the fragment's own frame so the live one can swing on its top edge.
 function buildGrid(S, r, rr, out) {
   const cols = 2 + Math.floor(rr() * 3)
   const w = cols * GRID.cell
@@ -315,7 +315,7 @@ function buildGrid(S, r, rr, out) {
   let s = null
   for (; rows >= 2 && s == null; rows--) {
     const h = rows * GRID.cell
-    const sinMax = Math.min(1, (GRID.top - 1.5) / h)
+    const sinMax = Math.min(1, (GRID.top - 1.67) / h)
     const sinMin = Math.max((GRID.top - 2.05) / h, h > dCap ? Math.sqrt(1 - (dCap / h) ** 2) : 0)
     if (sinMin <= sinMax) s = { h, rows, sin: sinMin + rr() * (sinMax - sinMin) }
   }
@@ -407,6 +407,7 @@ function buildBeam(b, rr, out) {
     const p0 = S1.clone().add(jit())
     const p2 = S2.clone().add(jit())
     const c = p0.clone().lerp(p2, 0.5).addScaledVector(UP, -(0.1 + rr() * 0.12)).addScaledVector(side, (rr() - 0.5) * 0.3)
+    c.y = Math.max(c.y, 1.72) // the sag stays inside the 1.6 m line mid-room
     out.scraps.push(tube(p0, c, p2, 0.012))
   }
   const flip = rr() < 0.5 ? 1 : -1
@@ -482,7 +483,8 @@ function layout(fp) {
       const a = r.hazard ? 2.6 + rr() * 1.8 : 1.5 + rr() * 1.5
       const inset = 0.12
       const d = r.hazard ? Math.min(1.6 + rr() * 1.0, r.short * 0.3) : 0.3 + rr() * 0.06
-      const p = place(S, r, rr, a, inset + d + 0.1, 1.1)
+      // 1.25 m door gap: the outline wanders 0.15 m past the footprint
+      const p = place(S, r, rr, a, inset + d + 0.1, 1.25)
       if (p) buildSlab(p, a, d, inset, r.hazard, rr, out)
     }
   }
