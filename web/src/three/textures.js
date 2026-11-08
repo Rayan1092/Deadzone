@@ -318,6 +318,31 @@ function cracks() {
   return t
 }
 
+// Photo-scanned CC0 surfaces from Poly Haven (web/public/assets, see CREDITS.md). Each set
+// starts as the procedural texture and swaps its image in place once the photo loads, so a
+// missing file just leaves the procedural look (never a black surface). Clones made with
+// tiled() share the image source, so they upgrade too.
+const imageLoader = new THREE.ImageLoader()
+function blankRough() {
+  const c = document.createElement('canvas')
+  c.width = c.height = 1
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#ffffff' // roughness 1 until the real map loads
+  ctx.fillRect(0, 0, 1, 1)
+  const t = new THREE.CanvasTexture(c)
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  return t
+}
+function scanned(set, id) {
+  const base = `/assets/textures/${id}/`
+  const swap = (tex, file) => imageLoader.load(base + file, (img) => { tex.image = img; tex.needsUpdate = true }, undefined, () => {})
+  const out = { map: set.map, normalMap: set.normalMap, roughnessMap: blankRough() }
+  swap(out.map, 'diff.jpg')
+  swap(out.normalMap, 'nor_gl.jpg')
+  swap(out.roughnessMap, 'rough.jpg')
+  return out
+}
+
 let cache = null
 export function materials() {
   if (!cache) {
@@ -337,6 +362,13 @@ export function materials() {
       tread: tread(),
       cracks: cracks(),
     }
+    cache.floor = scanned(cache.floor, 'damaged_concrete_floor')
+    cache.concrete = scanned(cache.concrete, 'concrete_wall_008')
+    cache.brick = scanned(cache.brick, 'red_brick_03')
+    cache.plaster = scanned(cache.plaster, 'painted_plaster_wall')
+    cache.asphalt = scanned(cache.asphalt, 'asphalt_02')
+    cache.rubble = scanned(floorConcrete(), 'cracked_concrete')
+    cache.rust = scanned(ribbedMetal(), 'rusty_metal_02')
   }
   return cache
 }
@@ -358,6 +390,6 @@ export function tiled(tex, rx, ry) {
 // tiled() for a {map, normalMap} pair.
 export function tiledSet(set, rx, ry) {
   const out = {}
-  for (const k of ['map', 'normalMap', 'alphaMap']) if (set[k]) out[k] = tiled(set[k], rx, ry)
+  for (const k of ['map', 'normalMap', 'roughnessMap', 'alphaMap']) if (set[k]) out[k] = tiled(set[k], rx, ry)
   return out
 }

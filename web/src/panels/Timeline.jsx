@@ -8,7 +8,7 @@ import { useSim } from '../store'
 // missed or a robot is overloaded (the O beat), or when the presenter pins it open.
 const TASKS = ['safety', 'motion', 'comms', 'mapping', 'perception', 'battery']
 const MISS_HOLD_MS = 6000 // keep a miss on screen (and the panel open) this long
-const BUSY_OPEN = 85      // % of the frame: overloaded enough to open the panel
+const BUSY_OPEN = 97      // % of the frame: overloaded enough to open the panel (normal search runs ~90%)
 const NONE = []
 
 function readPinned() {

@@ -139,8 +139,8 @@ export default function Debris({ rubble, cold = false }) {
     }
     const t = materials()
     return {
-      rock: new THREE.MeshStandardMaterial({ ...tiledSet(t.concrete, 0.6, 0.6), color: '#b5aea4', roughness: 0.95, flatShading: true }),
-      slab: new THREE.MeshStandardMaterial({ ...tiledSet(t.floor, 0.4, 0.4), color: '#a9a49c', roughness: 0.9 }),
+      rock: new THREE.MeshStandardMaterial({ ...tiledSet(t.rubble, 0.6, 0.6), color: '#d6d0c6', roughness: 0.95, flatShading: true }),
+      slab: new THREE.MeshStandardMaterial({ ...tiledSet(t.rubble, 0.5, 0.5), color: '#cfc9bf', roughness: 0.9 }),
       steel: new THREE.MeshStandardMaterial({ color: '#59606a', metalness: 0.75, roughness: 0.5 }),
       rust: new THREE.MeshStandardMaterial({ color: '#7c3f1d', metalness: 0.6, roughness: 0.75 }),
     }

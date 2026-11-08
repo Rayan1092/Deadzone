@@ -31,12 +31,12 @@ function mats() {
   if (M) return M
   const t = materials()
   M = {
-    rock: new THREE.MeshStandardMaterial({ ...tiledSet(t.concrete, 0.6, 0.6), color: '#b3aca2', roughness: 0.95, flatShading: true }),
-    darkRock: new THREE.MeshStandardMaterial({ ...tiledSet(t.concrete, 0.6, 0.6), color: '#7d766d', roughness: 0.97, flatShading: true }),
+    rock: new THREE.MeshStandardMaterial({ ...tiledSet(t.rubble, 0.6, 0.6), color: '#b3aca2', roughness: 0.95, flatShading: true }),
+    darkRock: new THREE.MeshStandardMaterial({ ...tiledSet(t.rubble, 0.6, 0.6), color: '#7d766d', roughness: 0.97, flatShading: true }),
     brick: new THREE.MeshStandardMaterial({ ...tiledSet(t.brick, 0.5, 0.5), color: '#c9a99a', roughness: 0.92, flatShading: true }),
     tile: new THREE.MeshStandardMaterial({ color: '#8f8a80', roughness: 0.95 }),
     board: new THREE.MeshStandardMaterial({ color: '#cfc9bd', roughness: 0.92 }),
-    slab: new THREE.MeshStandardMaterial({ ...tiledSet(t.concrete, 2, 2), color: '#a39d94', roughness: 0.93 }),
+    slab: new THREE.MeshStandardMaterial({ ...tiledSet(t.rubble, 2, 2), color: '#a39d94', roughness: 0.93 }),
     steel: new THREE.MeshStandardMaterial({ color: '#4f565e', metalness: 0.75, roughness: 0.55 }),
     rust: new THREE.MeshStandardMaterial({ color: '#7c3f1d', metalness: 0.55, roughness: 0.8 }),
     asphalt: new THREE.MeshStandardMaterial({ ...tiledSet(t.asphalt, 1, 1), color: '#6d7177', roughness: 0.95 }),

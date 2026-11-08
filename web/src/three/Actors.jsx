@@ -6,6 +6,7 @@ import { useSim } from '../store'
 import { COLORS, FOG_H, w2t } from './util'
 import { materials, tiledSet } from './textures'
 import Rover, { ROBOT_SCALE } from './Rover'
+import Human from './Human'
 import { LightBeam } from './NightLights'
 import { CommandRelays, RealityLinks, RealityRelays } from './Network'
 import { CommandRoutes, RealityRoutes } from './Routes'
@@ -105,40 +106,6 @@ function lieAngle(id = '') {
   return (h * Math.PI) / 180
 }
 
-// A person lying where they fell: capsule limbs, clothes and skin, one arm flung up by
-// the head. Clothing varies per survivor id. A warm glow pool underneath keeps them
-// readable from across the room (the heat the thermal camera picks up).
-const OUTFITS = [
-  { top: '#2b4a7a', legs: '#2d3340', skin: '#c99a7a', hair: '#2a1d14' },
-  { top: '#7a2b2b', legs: '#3b3f47', skin: '#8d5e43', hair: '#16110d' },
-  { top: '#4f6b3a', legs: '#26303d', skin: '#e0b896', hair: '#6b4a2b' },
-  { top: '#d97706', legs: '#2f3640', skin: '#b07b5a', hair: '#1c1410' },
-]
-const personMats = new Map()
-function outfit(id) {
-  let h = 0
-  for (const ch of id ?? '') h = (h * 31 + ch.charCodeAt(0)) % 997
-  const o = OUTFITS[h % OUTFITS.length]
-  if (!personMats.has(o)) {
-    const m = (color, rough = 0.85) => new THREE.MeshStandardMaterial({ color, roughness: rough })
-    personMats.set(o, { top: m(o.top), legs: m(o.legs), skin: m(o.skin, 0.6), hair: m(o.hair, 0.9), shoe: m('#1a1a1a', 0.6) })
-  }
-  return personMats.get(o)
-}
-
-function Limb({ from, to, r, m }) {
-  const a = new THREE.Vector3(...from)
-  const b = new THREE.Vector3(...to)
-  const mid = a.clone().add(b).multiplyScalar(0.5)
-  const dir = b.clone().sub(a)
-  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize())
-  return (
-    <mesh position={mid} quaternion={q} material={m} castShadow>
-      <capsuleGeometry args={[r, Math.max(0.01, dir.length() - r * 2), 4, 10]} />
-    </mesh>
-  )
-}
-
 // Debris pinning the legs: a broken slab and a few chunks (they are trapped, which is why
 // they need rescuing rather than walking out).
 let pinMats = null
@@ -162,33 +129,15 @@ function Pinned() {
 }
 
 export function PersonFigure({ id }) {
-  const M = outfit(id)
-  const y = 0.1 // limbs rest on the floor
+  // true scale: drawn bigger, their legs and glow reached under robots passing 2 m away
   return (
-    <group rotation={[0, lieAngle(id), 0]} scale={1.35}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.015, 0]}>
-        <circleGeometry args={[0.8, 32]} />
-        <meshBasicMaterial color="#ff5a1f" transparent opacity={0.22} blending={THREE.AdditiveBlending} depthWrite={false} />
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
+        <circleGeometry args={[0.95, 32]} />
+        <meshBasicMaterial color="#ff5a1f" transparent opacity={0.16} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
-      {/* torso and hips */}
-      <Limb from={[0.02, y + 0.02, 0]} to={[0.36, y + 0.03, 0]} r={0.12} m={M.top} />
-      <Limb from={[-0.06, y, 0]} to={[0.06, y + 0.01, 0]} r={0.105} m={M.legs} />
-      {/* head */}
-      <mesh position={[0.56, y + 0.01, 0.02]} material={M.skin} castShadow><sphereGeometry args={[0.085, 18, 14]} /></mesh>
-      <mesh position={[0.6, y + 0.03, 0.02]} scale={[0.9, 0.85, 1]} material={M.hair}><sphereGeometry args={[0.086, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2]} /></mesh>
-      {/* arms: one along the side, one flung up past the head */}
-      <Limb from={[0.34, y + 0.02, 0.15]} to={[0.08, y - 0.02, 0.2]} r={0.042} m={M.top} />
-      <Limb from={[0.08, y - 0.02, 0.2]} to={[-0.12, y - 0.04, 0.17]} r={0.036} m={M.skin} />
-      <Limb from={[0.36, y + 0.02, -0.15]} to={[0.56, y - 0.02, -0.28]} r={0.042} m={M.top} />
-      <Limb from={[0.56, y - 0.02, -0.28]} to={[0.76, y - 0.04, -0.22]} r={0.036} m={M.skin} />
-      {/* legs, one bent */}
-      <Limb from={[-0.06, y, 0.07]} to={[-0.46, y - 0.01, 0.1]} r={0.058} m={M.legs} />
-      <Limb from={[-0.46, y - 0.01, 0.1]} to={[-0.84, y - 0.03, 0.12]} r={0.05} m={M.legs} />
-      <Limb from={[-0.06, y, -0.07]} to={[-0.4, y + 0.12, -0.16]} r={0.058} m={M.legs} />
-      <Limb from={[-0.4, y + 0.12, -0.16]} to={[-0.74, y - 0.03, -0.2]} r={0.05} m={M.legs} />
-      <mesh position={[-0.89, y - 0.02, 0.12]} material={M.shoe}><boxGeometry args={[0.1, 0.08, 0.1]} /></mesh>
-      <mesh position={[-0.79, y - 0.02, -0.2]} material={M.shoe}><boxGeometry args={[0.1, 0.08, 0.1]} /></mesh>
-      <Pinned />
+      <Human id={id} angle={lieAngle(id)} />
+      <group rotation={[0, lieAngle(id), 0]} scale={1.3}><Pinned /></group>
     </group>
   )
 }

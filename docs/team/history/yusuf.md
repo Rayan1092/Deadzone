@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/disaster`: disaster-site pass, new rover model, scheduler redesign (done). `p3/clinic-map`: second building `clinic_02` + `DZ_FLOORPLAN` (PR for Rayan and Aziz to review). #70 open.
+- **Working on:** `p3/hyperreal`: photo-scanned materials and HDRI, honest scout-camera classification, true-scale sculpted survivors, rugged relays, first-glance explainer. Plan update in `docs/PLAN.md` (branch `p3/plan-v4`). Stacked on #70 → `p3/disaster`.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,25 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 08:35 · p3/hyperreal · Photo-scanned world, honest scout-camera AI, true-scale people, rugged relays, explainer
+- **Did (Yusuf's ask: hyper-realistic, scout camera must match the robot, classify every object, realistic people, no run-overs, realistic beacons, judge-friendly UI):**
+  - **Photo-scanned surfaces:** 7 CC0 Poly Haven sets at 1K (color, normal, roughness): damaged concrete floor, concrete wall, red brick, cracked concrete (debris, slabs, ruins), asphalt, rusty metal, painted plaster. Plus a CC0 HDRI sky (industrial sunset) for light and reflections. 14 MB in `web/public/assets/` with `CREDITS.md`. Each texture starts procedural and swaps to the photo when it loads; the HDRI falls back to the light panels. A missing file never breaks the view.
+  - **Scout camera:**
+    - It is a chassis camera now: it always looks where the robot is heading. Before, it swung to the survivor even when the robot faced away.
+    - Every warm object in view (survivors and decoys) gets a box. Within the 5 m thermal range it shows the classifier's score for that object's real FLIR crop (`/crops/manifest.json`, the same crops and model output the robot uses): "PERSON 99.9% onboard AI" or "NOT A PERSON 0.3% rejected". Farther away: "WARM · 6 m · come closer to classify". Hidden behind walls or rubble: no box.
+    - Cold objects (walls, furniture, debris) are never scored: they never reach the classifier, and inventing scores for them would be fake.
+  - **Survivors:** sculpted at true scale (1.72 m): lathe torso (hips, waist, chest, shoulders), shaped head with nose, ears and hair, tapered limbs with joints, hands, shoes, dusty woven clothes, one arm up and one knee bent, pinned under a slab.
+    - The "run over" look was drawing scale: people were 1.35× (legs and glow reached under robots passing 2 m away). Robots also keep 0.5 m off confirmed survivors (previous entry).
+    - Thermal view still shows the real FLIR crop.
+  - **Relays and beacons:** a yellow hard case with ribs, latches and handle, an antenna mast with two whips and a blinking green LED. The phone relay is a phone in a rubber case on a stand. Destroyed relays are the same case, crushed.
+  - **First glance:**
+    - A "How to read this screen" card opens once per session (three lines: robots search where radio can't reach; amber = command hasn't heard it yet; onboard AI checks warm things and reports hop relay to relay). It closes itself after 14 s and is linked from the `?` overlay.
+    - Plain pane titles: "Inside the building", "What's really happening", "What the command post knows". Top bar reads "Survivors: 1 found · 1 at command".
+    - The scheduler opens only near overload (≥97%) or on a miss.
+- **Contract changes:** none. Static assets under `/assets/` (served from `web/public`).
+- **Heads-up for others:** Rayan: no CC0 photo-scanned human exists that we can download without an account. If your asset pack can include one (CC0/CC-BY GLB, lying pose), it drops into `Human.jsx`. Your `lab.json` is on main, so L now shows curves and examples.
+- **Next:** multi-story shell, more scanned props.
 
 ### 2026-11-08 08:20 · p3/hyperreal · Robots keep 0.5 m off confirmed survivors (Rayan's robot code, please review)
 - **Did:** with Yusuf's OK, a small change in **Rayan's `server/deadzone/robot/robot.py`**: a new `_drive_trav()` used for frontier, go-to and path-blocked planning removes a 0.5 m disk around every survivor the robot has confirmed, so a motion plan never crosses a person. Rescue routes keep `_trav()` (they have to reach the survivor), and the robot's own cell stays open.

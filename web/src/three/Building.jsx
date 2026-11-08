@@ -239,11 +239,11 @@ function RoomFloor({ room }) {
 
 // Polished concrete slab under everything, 4 m saw-cut panels.
 function Slab({ W, H }) {
-  const surf = useMemo(() => tiledSet(materials().floor, W / 4, H / 4), [W, H])
+  const surf = useMemo(() => tiledSet(materials().floor, W / 2.5, H / 2.5), [W, H])
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={w2t(W / 2, H / 2, 0)} receiveShadow>
       <planeGeometry args={[W, H]} />
-      <meshStandardMaterial {...surf} color="#c4c8cc" roughness={0.62} metalness={0.05} normalScale={[0.7, 0.7]} />
+      <meshStandardMaterial {...surf} color="#e2e2e0" roughness={0.9} metalness={0} normalScale={[0.9, 0.9]} />
     </mesh>
   )
 }
