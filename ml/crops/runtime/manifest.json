@@ -1,0 +1,98 @@
+{
+ "threshold": 0.6,
+ "layer": "features[8]",
+ "size_px": 192,
+ "note": "Grad-CAM for the person class. Paths are relative to /crops.",
+ "crops": [
+  {
+   "id": "D1",
+   "file": "neg_0001.png",
+   "heatmap": "heatmaps/neg_0001.png",
+   "heatmap_alpha": "heatmaps/neg_0001_alpha.png",
+   "label": "not person",
+   "conf": 0.0,
+   "predicted": "not person",
+   "role": "decoy",
+   "object": "radiator",
+   "pos": [
+    15.0,
+    28.0
+   ]
+  },
+  {
+   "id": "D2",
+   "file": "neg_0002.png",
+   "heatmap": "heatmaps/neg_0002.png",
+   "heatmap_alpha": "heatmaps/neg_0002_alpha.png",
+   "label": "not person",
+   "conf": 0.0,
+   "predicted": "not person",
+   "role": "decoy",
+   "object": "engine",
+   "pos": [
+    37.0,
+    12.0
+   ]
+  },
+  {
+   "id": "D3",
+   "file": "neg_0003.png",
+   "heatmap": "heatmaps/neg_0003.png",
+   "heatmap_alpha": "heatmaps/neg_0003_alpha.png",
+   "label": "not person",
+   "conf": 0.003,
+   "predicted": "not person",
+   "role": "decoy",
+   "object": "coffee machine",
+   "pos": [
+    22.0,
+    28.0
+   ]
+  },
+  {
+   "id": "S1",
+   "file": "pos_0001.png",
+   "heatmap": "heatmaps/pos_0001.png",
+   "heatmap_alpha": "heatmaps/pos_0001_alpha.png",
+   "label": "person",
+   "conf": 1.0,
+   "predicted": "person",
+   "role": "survivor",
+   "object": null,
+   "pos": [
+    36.0,
+    27.0
+   ]
+  },
+  {
+   "id": "S2",
+   "file": "pos_0002.png",
+   "heatmap": "heatmaps/pos_0002.png",
+   "heatmap_alpha": "heatmaps/pos_0002_alpha.png",
+   "label": "person",
+   "conf": 0.889,
+   "predicted": "person",
+   "role": "survivor",
+   "object": null,
+   "pos": [
+    29.0,
+    4.0
+   ]
+  },
+  {
+   "id": "S3",
+   "file": "pos_0003.png",
+   "heatmap": "heatmaps/pos_0003.png",
+   "heatmap_alpha": "heatmaps/pos_0003_alpha.png",
+   "label": "person",
+   "conf": 0.999,
+   "predicted": "person",
+   "role": "survivor",
+   "object": null,
+   "pos": [
+    5.0,
+    26.0
+   ]
+  }
+ ]
+}
