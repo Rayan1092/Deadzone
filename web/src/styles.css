@@ -40,10 +40,7 @@ button:hover { border-color: var(--teal); }
 .conn { padding: 3px 8px; border-radius: 999px; font-size: 11px; }
 .conn.ok { background: rgba(34,197,94,.15); color: var(--green); }
 .conn.bad { background: rgba(239,68,68,.15); color: var(--red); }
-/* server down: a loud chip and visibly dead controls (the clicks would go nowhere) */
-.conn.bad { font-size: 13px; font-weight: 600; padding: 4px 12px; border: 1px solid var(--red); animation: conn-pulse 1.6s ease-in-out infinite; }
-@keyframes conn-pulse { 50% { background: rgba(239,68,68,.32); } }
-@media (prefers-reduced-motion: reduce) { .conn.bad { animation: none; } }
+/* server down: visibly dead controls (the clicks would go nowhere) */
 .topbar button:disabled { opacity: .4; cursor: not-allowed; }
 
 .split { grid-area: split; position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); min-height: 0; }
@@ -648,11 +645,7 @@ button:hover { border-color: var(--teal); }
 .side-peek, .time-peek { display: none; }
 .app.judge .side-peek { display: block; position: fixed; z-index: 29; top: 52px; right: 0; bottom: 0; width: 14px; }
 .app.judge .time-peek { display: block; position: fixed; z-index: 29; left: 0; right: 0; bottom: 0; height: 12px; }
-.app.judge .topbar > :not(.brand):not(.incident):not(.baseline-chip) { opacity: 0; transition: opacity .2s ease; }
-.app.judge .topbar:hover > :not(.brand):not(.incident):not(.baseline-chip),
-.app.judge .topbar:focus-within > :not(.brand):not(.incident):not(.baseline-chip) { opacity: 1; }
-/* server down: the Operator view shows the top bar so the disconnected chip is seen without hovering */
-.app.judge .topbar.offline > :not(.brand):not(.incident):not(.baseline-chip) { opacity: 1; }
+
 .app.judge .pane-legend { opacity: 0; transition: opacity .2s ease; }
 .app.judge .pane:hover .pane-legend { opacity: 1; }
 /* collapsed (not just transparent) so the title pill is only as wide as its title */
@@ -703,3 +696,56 @@ button:hover { border-color: var(--teal); }
 .tl-util-bar b { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: #e6edf3; }
 .tl-util-bound { font-size: 10px; }
 .tl-gantt + .tl-axis, .tl-body > .tl-axis { margin: 0 0 0 124px; }
+
+/* ---------------------------------------------------------------- top bar (deployment pass)
+   The one piece of chrome with presence: frosted night glass, a thin light edge, restrained glow.
+   Readable at 1080p from 5 m: 14-16 px labels, a 24 px clock. */
+.topbar { position: relative; z-index: 6; gap: 14px; padding: 0 12px 0 18px;
+  background: linear-gradient(180deg, rgba(22,28,36,.72), rgba(12,16,22,.62));
+  backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 10px 30px rgba(0,0,0,.35); }
+.topbar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(45,212,191,.45) 30%, rgba(96,165,250,.35) 70%, transparent); }
+.topbar .brand { font-size: 15px; letter-spacing: .22em; text-shadow: 0 0 14px rgba(45,212,191,.45); }
+.topbar .incident { font-size: 16px; font-weight: 600; color: #e6edf3; max-width: 26ch; }
+.tb-robots { display: flex; gap: 8px; margin-left: 6px; }
+.tb-robot { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 10px; border-radius: 999px; font-size: 14px;
+  color: #e6edf3; background: color-mix(in srgb, var(--c) 10%, rgba(255,255,255,.04)); border: 1px solid color-mix(in srgb, var(--c) 55%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--c) 18%, transparent); cursor: pointer; }
+.tb-robot i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+.tb-robot b { font-weight: 600; }
+.tb-robot span { font-size: 12px; color: rgba(230,237,243,.75); }
+.tb-robot.weak span { color: #fcd34d; }
+.tb-robot.lost { border-color: rgba(239,68,68,.6); box-shadow: 0 0 12px rgba(239,68,68,.22); }
+.tb-robot.lost span { color: #fca5a5; font-weight: 600; }
+.tb-robot.off { opacity: .6; box-shadow: none; }
+.tb-robot.on { background: color-mix(in srgb, var(--c) 24%, rgba(255,255,255,.05)); }
+.tb-clock { display: flex; align-items: baseline; gap: 10px; margin: 0 auto; padding: 0 14px; }
+.tb-clock span { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: rgba(230,237,243,.6); font-weight: 600; }
+.tb-clock b { font-size: 26px; font-weight: 600; color: #fbbf24; text-shadow: 0 0 16px rgba(251,191,36,.35); font-variant-numeric: tabular-nums; }
+.topbar .controls.tb-secondary { margin-left: 0; gap: 6px; font-size: 13px; }
+.tb-btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 10px; font-size: 14px; font-weight: 600;
+  color: #e6edf3; background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04)); border: 1px solid rgba(255,255,255,.14);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12); }
+.tb-btn:hover:not(:disabled) { border-color: rgba(45,212,191,.55); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 0 14px rgba(45,212,191,.2); }
+.tb-btn.on { border-color: rgba(96,165,250,.6); background: rgba(96,165,250,.16); }
+.tb-btn svg, .tb-icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tb-conn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: rgba(134,239,172,.9); }
+.tb-conn i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px rgba(34,197,94,.7); }
+.tb-conn.bad { color: #fca5a5; }
+.tb-conn.bad i { background: var(--red); box-shadow: 0 0 8px rgba(239,68,68,.8); animation: eye-wait 1s ease-in-out infinite; }
+/* server down: a loud pill, not just a red dot */
+.tb-conn.bad { padding: 5px 12px; border-radius: 999px; border: 1px solid rgba(239,68,68,.7); background: rgba(239,68,68,.16); font-size: 13px; }
+.tb-icon { display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 10px; color: rgba(230,237,243,.8);
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); }
+.tb-icon.on { color: #99f6e4; border-color: rgba(45,212,191,.5); background: rgba(45,212,191,.12); }
+/* Operator lock: a clear state, not a footnote */
+.topbar .lock-chip { height: 32px; font-size: 13px; font-weight: 600; padding: 0 6px 0 12px; border: 1px solid rgba(245,158,11,.55); background: rgba(245,158,11,.12); color: #fde68a; }
+.topbar .lock-chip.open { border-color: rgba(45,212,191,.55); background: rgba(45,212,191,.12); color: #99f6e4; }
+/* run controls: a frosted row that drops from under the bar while it is hovered or focused (both views) */
+.topbar > .controls.tb-secondary { position: absolute; top: 100%; right: 150px; margin: 0; padding: 8px 10px; border-radius: 0 0 12px 12px;
+  background: rgba(14,18,24,.86); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,.08); border-top: 0; box-shadow: 0 14px 30px rgba(0,0,0,.45);
+  opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity .18s ease, transform .18s ease; }
+.topbar:hover > .controls.tb-secondary, .topbar:focus-within > .controls.tb-secondary { opacity: 1; transform: none; pointer-events: auto; }
