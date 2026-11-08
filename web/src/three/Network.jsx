@@ -12,6 +12,39 @@ const OFF = '#4b5563'
 // Reality knows power state and queue; Command only knows an announced position.
 // Calm by default: the halo only pulses while the relay is carrying bundles, and only
 // relay phones (the audience's own devices) or switched-off relays get a label.
+// A rugged field relay: a yellow hard case (ribs, latches, carry handle) with a folding
+// antenna mast, two whips and a status LED that blinks while it is on. A phone relay is the
+// audience's phone in a rubber case on a small stand. Same model crushed when destroyed.
+let caseMats = null
+function relayMats() {
+  caseMats ??= {
+    shell: new THREE.MeshStandardMaterial({ color: '#d29a14', roughness: 0.55, metalness: 0.05 }),
+    shellDim: new THREE.MeshStandardMaterial({ color: '#7a6332', roughness: 0.7 }),
+    dark: new THREE.MeshStandardMaterial({ color: '#1c1f23', roughness: 0.6, metalness: 0.2 }),
+    metal: new THREE.MeshStandardMaterial({ color: '#b9c0c8', metalness: 0.9, roughness: 0.3 }),
+    rubber: new THREE.MeshStandardMaterial({ color: '#111315', roughness: 0.85 }),
+    screen: new THREE.MeshStandardMaterial({ color: '#0b1220', emissive: '#1d4ed8', emissiveIntensity: 0.6, roughness: 0.2 }),
+    crushed: new THREE.MeshStandardMaterial({ color: '#5a4a2a', roughness: 0.9 }),
+  }
+  return caseMats
+}
+
+function RelayCase({ m, shell }) {
+  return (
+    <group>
+      <mesh material={shell} position={[0, 0.11, 0]} castShadow receiveShadow><boxGeometry args={[0.42, 0.2, 0.3]} /></mesh>
+      {[-0.13, 0, 0.13].map((x) => <mesh key={x} material={shell} position={[x, 0.11, 0]}><boxGeometry args={[0.03, 0.205, 0.31]} /></mesh>)}
+      <mesh material={m.dark} position={[0, 0.215, 0]}><boxGeometry args={[0.43, 0.012, 0.31]} /></mesh>
+      {[-0.12, 0.12].map((x) => <mesh key={x} material={m.dark} position={[x, 0.17, 0.155]}><boxGeometry args={[0.05, 0.035, 0.012]} /></mesh>)}
+      <mesh material={m.dark} position={[0, 0.24, 0]} rotation={[0, 0, Math.PI / 2]}><torusGeometry args={[0.035, 0.008, 6, 12, Math.PI]} /></mesh>
+      <mesh material={m.metal} position={[-0.14, 0.42, -0.08]}><cylinderGeometry args={[0.012, 0.016, 0.42, 8]} /></mesh>
+      {[-1, 1].map((s) => (
+        <mesh key={s} material={m.rubber} position={[-0.14 + s * 0.05, 0.72, -0.08]} rotation={[0, 0, s * 0.12]}><cylinderGeometry args={[0.005, 0.008, 0.26, 6]} /></mesh>
+      ))}
+    </group>
+  )
+}
+
 function RelayNode({ pos, label, on = true, phone = false, known = true, busy = false, destroyed = false }) {
   const halo = useRef()
   const phase = useRef(Math.random())
@@ -21,20 +54,20 @@ function RelayNode({ pos, label, on = true, phone = false, known = true, busy = 
     halo.current.scale.setScalar(1 + k * 2.5)
     halo.current.material.opacity = 0.45 * (1 - k)
   })
-  const lamp = !known ? '#6b7280' : on ? COLORS.teal : OFF
+  const lamp = !known ? '#6b7280' : on ? '#22c55e' : OFF
   const top = phone ? 0.5 : 0.62
+  const m = relayMats()
+  const led = useRef()
+  useFrame(({ clock }) => {
+    if (led.current) led.current.emissiveIntensity = known && on ? (Math.sin((clock.elapsedTime + phase.current * 3) * 6) > 0.6 ? 3 : 0.3) : 0
+  })
   if (destroyed) {
     // crushed by the aftershock: knocked flat, antenna snapped, no lamp
     return (
       <group position={w2t(pos[0], pos[1], 0)}>
-        <mesh position={[0.05, 0.12, 0]} rotation={[0.2, 0.4, Math.PI / 2 - 0.15]}>
-          <cylinderGeometry args={[0.18, 0.22, 0.14, 16]} />
-          <meshStandardMaterial color="#4a3a22" roughness={0.9} />
-        </mesh>
-        <mesh position={[0.3, 0.03, 0.1]} rotation={[0, 0.7, Math.PI / 2]}>
-          <cylinderGeometry args={[0.015, 0.015, 0.3, 6]} />
-          <meshStandardMaterial color="#374151" />
-        </mesh>
+        <group rotation={[0.25, 0.5, Math.PI / 2 - 0.2]} position={[0.1, 0.16, 0]} scale={[1, 0.6, 1]}>
+          <RelayCase m={m} shell={m.crushed} />
+        </group>
         {label && (
           <Html position={[0, 0.7, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
             <div className="tag relay off"><b>{label}</b></div>
@@ -44,27 +77,20 @@ function RelayNode({ pos, label, on = true, phone = false, known = true, busy = 
     )
   }
   return (
-    <group position={w2t(pos[0], pos[1], 0)}>
+    <group position={w2t(pos[0], pos[1], 0)} scale={1.4 /* readable next to the drawn robots */}>
       {phone ? (
-        <mesh position={[0, 0.22, 0]} castShadow>
-          <boxGeometry args={[0.22, 0.42, 0.05]} />
-          <meshStandardMaterial color="#e5e7eb" roughness={0.4} />
-        </mesh>
-      ) : (
-        <>
-          <mesh position={[0, 0.07, 0]} castShadow>
-            <cylinderGeometry args={[0.18, 0.22, 0.14, 16]} />
-            <meshStandardMaterial color={known ? '#b7791f' : '#6b5b3e'} roughness={0.7} />
-          </mesh>
-          <mesh position={[0, 0.35, 0]}>
-            <cylinderGeometry args={[0.015, 0.015, 0.45, 6]} />
-            <meshStandardMaterial color="#6b7280" />
-          </mesh>
-        </>
-      )}
-      <mesh position={[0, top, 0]}>
-        <sphereGeometry args={[0.07, 12, 12]} />
-        <meshStandardMaterial color={lamp} emissive={lamp} emissiveIntensity={known && on ? 1.6 : 0} />
+        <group>
+          <mesh material={m.dark} position={[0, 0.05, 0]}><cylinderGeometry args={[0.1, 0.12, 0.04, 16]} /></mesh>
+          <mesh material={m.metal} position={[0, 0.14, 0]} rotation={[0.25, 0, 0]}><boxGeometry args={[0.02, 0.16, 0.02]} /></mesh>
+          <group position={[0, 0.32, 0.02]} rotation={[-0.3, 0, 0]}>
+            <mesh material={m.rubber} castShadow><boxGeometry args={[0.2, 0.38, 0.03]} /></mesh>
+            <mesh material={m.screen} position={[0, 0, 0.016]}><boxGeometry args={[0.17, 0.34, 0.002]} /></mesh>
+          </group>
+        </group>
+      ) : <RelayCase m={m} shell={known ? m.shell : m.shellDim} />}
+      <mesh position={phone ? [0, 0.53, -0.04] : [0.15, 0.235, 0.1]}>
+        <sphereGeometry args={[phone ? 0.02 : 0.022, 10, 10]} />
+        <meshStandardMaterial ref={led} color={lamp} emissive={lamp} emissiveIntensity={1} toneMapped={false} />
       </mesh>
       {known && on && busy && (
         <mesh ref={halo} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>

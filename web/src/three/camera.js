@@ -8,15 +8,31 @@ export const shared = {
   pos: new THREE.Vector3(19.5, 50, 16),
   target: new THREE.Vector3(19.5, 0, -15),
   home: null,  // fitted overview { pos, target } for the 0 key
+  map: null,   // floorplan id the overview was fitted for
   src: null,   // pane the user is dragging
   rev: 0,      // bumps whenever pos/target change
 }
 
 // Pull the overview camera back along its viewing direction until the whole
 // building (plus the CMD antenna west of it) fits the pane, whatever its shape.
-const VIEW_W = 48 // m, x from -4.5 to 43.5 (the command truck is west of the wall)
-const VIEW_D = 32 // m, y from -1 to 31
+const VIEW_DIR = new THREE.Vector3(0, 50, 31).normalize() // default overview angle
 export function fitOverview(camera, aspect) {
+  // frame the building plus the command post (and its truck) outside it, whatever the map
+  let VIEW_W = 48
+  let VIEW_D = 32
+  const fp = useSim.getState().floorplan
+  if (fp) {
+    const [W, H] = fp.size
+    const [cx, cy] = fp.command_post.pos
+    const x0 = Math.min(-0.5, cx - 3.5)
+    const x1 = Math.max(W + 0.5, cx + 3.5)
+    const y0 = Math.min(-1, cy - 3.5)
+    const y1 = Math.max(H + 1, cy + 3.5)
+    VIEW_W = x1 - x0 + 2
+    VIEW_D = y1 - y0
+    shared.target.set((x0 + x1) / 2, 0, -(y0 + y1) / 2)
+    shared.pos.copy(shared.target).addScaledVector(VIEW_DIR, 60)
+  }
   const dir = shared.pos.clone().sub(shared.target).normalize()
   const elevation = Math.asin(dir.y)
   const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)

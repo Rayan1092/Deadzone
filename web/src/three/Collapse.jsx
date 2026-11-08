@@ -98,14 +98,14 @@ function mats() {
     frame: new THREE.MeshStandardMaterial({ color: '#2b3036', metalness: 0.6, roughness: 0.45 }),
     glass: new THREE.MeshStandardMaterial({ color: '#16222c', metalness: 0.9, roughness: 0.06, transparent: true, opacity: 0.55 }),
     shard: new THREE.MeshStandardMaterial({ color: '#9fb4c0', metalness: 0.8, roughness: 0.1, transparent: true, opacity: 0.7, side: THREE.DoubleSide }),
-    rock: new THREE.MeshStandardMaterial({ ...tiledSet(t.concrete, 0.6, 0.6), color: '#b0a89d', roughness: 0.95, flatShading: true }),
+    rock: new THREE.MeshStandardMaterial({ ...tiledSet(t.rubble, 0.6, 0.6), color: '#b0a89d', roughness: 0.95, flatShading: true }),
     crack: new THREE.MeshStandardMaterial({ map: t.cracks, transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 }),
     rebar: new THREE.MeshStandardMaterial({ color: '#7c3f1d', metalness: 0.6, roughness: 0.75 }),
     steel: new THREE.MeshStandardMaterial({ color: '#5b626b', metalness: 0.75, roughness: 0.5 }),
     cable: new THREE.MeshStandardMaterial({ color: '#111315', roughness: 0.6 }),
     lamp: new THREE.MeshStandardMaterial({ color: '#f1f5f9', emissive: '#e0f2fe', emissiveIntensity: 1.6, toneMapped: false }),
     lampOff: new THREE.MeshStandardMaterial({ color: '#cbd5e1', roughness: 0.4 }),
-    slab: new THREE.MeshStandardMaterial({ ...tiledSet(t.concrete, 3, 3), color: '#a8a39b', roughness: 0.92 }),
+    slab: new THREE.MeshStandardMaterial({ ...tiledSet(t.rubble, 3, 3), color: '#a8a39b', roughness: 0.92 }),
     slabUnder: new THREE.MeshStandardMaterial({ color: '#77736d', roughness: 0.95 }),
   }
   return shared
