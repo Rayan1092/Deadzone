@@ -70,7 +70,9 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    ```
    **Don't set `DZ_VOICE`, `DZ_CONTROL_LEASES` or `DZ_EXPLORATION_V2` for the main run.** With control leases on, the top bar shows a **presenter lock**: **B** and **U** stay locked (with a hint) until you press **Unlock**, which takes every robot for the big screen (phones then see them locked; R, F, O and A are not affected). **Lock** releases the robots so phones can take them (Q&A). Unlock fails, naming the holder, while a phone holds a robot. Leases off: no lock, B and U as before. With `DZ_EXPLORATION_V2=1` the robots explore differently and every beat in the beat sheet moves (S3 found at 23.8 s instead of 14.4, S2 found at 106 s instead of 246). `DZ_SENSOR_VIEW=1` is safe: it only adds camera frames to the Reality pane.
 6. **Before the phone test, Rayan starts the tunnel manually** in a second
-   PowerShell terminal from the repo root: `scripts/tunnel.ps1`. Install the tool
+   PowerShell terminal from the repo root:
+   `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tunnel.ps1`
+   (the execution policy applies only to that process). Install the tool
    first if missing: `winget install Cloudflare.cloudflared`, then open a fresh
    terminal and confirm `cloudflared --version`. The script runs
    `cloudflared tunnel --url http://localhost:8000` and prints **HTTPS URL** and
