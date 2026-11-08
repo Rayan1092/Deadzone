@@ -1,0 +1,63 @@
+{
+  "setup": {
+    "seed": 7,
+    "robots": 3,
+    "sim_seconds": 250.0,
+    "input_hz": 30,
+    "modeled_wall_seconds": 83.3,
+    "detector": "model",
+    "plan": "P-1 rejected, allow ZNE dark, dispatch",
+    "director": "R/F/O at 150/165/175 s",
+    "initial_forced_frame": true,
+    "counts": "screen UTF-8 JSON bytes; no WS/TLS overhead, hello or plan_state"
+  },
+  "profiles": {
+    "legacy": {
+      "bytes": {
+        "tick": 20969694,
+        "maps": 25700469,
+        "event": 237622
+      },
+      "total_bytes": 46907785,
+      "frames": {
+        "tick": 2500,
+        "maps": 501,
+        "event": 1546
+      },
+      "max_lidar_points_per_robot": 36,
+      "lossless_grid_checks": 0
+    },
+    "optimized_base64": {
+      "bytes": {
+        "tick": 9642520,
+        "maps": 16175854,
+        "event": 237499
+      },
+      "total_bytes": 26055873,
+      "frames": {
+        "tick": 1250,
+        "maps": 315,
+        "event": 1546
+      },
+      "max_lidar_points_per_robot": 24,
+      "lossless_grid_checks": 0,
+      "reduction_pct": 44.45
+    },
+    "optimized_compact": {
+      "bytes": {
+        "tick": 9642520,
+        "maps": 680805,
+        "event": 237499
+      },
+      "total_bytes": 10560824,
+      "frames": {
+        "tick": 1250,
+        "maps": 315,
+        "event": 1546
+      },
+      "max_lidar_points_per_robot": 24,
+      "lossless_grid_checks": 630,
+      "reduction_pct": 77.49
+    }
+  }
+}

@@ -41,6 +41,7 @@ from .robot.robot import resume_command
 from .robot.perception import CROP_DIR, get_detector
 from .sim import DT, ROBOT_DEFS, Sim
 from .network.dtn import make_bundle
+from .network.stream import StreamState, compact_message, stream_profile, thin_tick
 from .scenarios import ResetScenario, prepare_scenario, scenario_catalog
 
 MAPS_EVERY = 5
@@ -74,6 +75,8 @@ class Hub:
         self.relay_power_requests = {}
         self.next_phone_id = 1
         self.seq = 0
+        self.stream = StreamState(enabled=os.environ.get("DZ_STREAM_OPTIMIZE") == "1")
+        self.compact_clients = set()
         self.plan_lock = asyncio.Lock()  # survives reset: old publications finish first
         self.lease_lock = asyncio.Lock()
         self.leases = LeaseTable(self.sim.robots)
@@ -81,6 +84,7 @@ class Hub:
         self._init_plans()
 
     def _init_plans(self):
+        self.stream.reset()
         self.plan_epoch = secrets.token_hex(16)
         checker = SafetyChecker(self.sim.prior, self.sim.robot_specs, self.sim.energy_time_scale)
         self.plans = PlanManager(self.sim, checker)
@@ -95,13 +99,39 @@ class Hub:
 
     async def send_all(self, clients, msg):
         dead = []
+        compact = None
         for ws in list(clients):
             try:
-                await ws.send_text(msg)
+                wire = msg
+                if ws in self.compact_clients:
+                    if compact is None:
+                        compact = compact_message(msg)
+                    wire = compact
+                await ws.send_text(wire)
             except Exception:
                 dead.append(ws)
         for ws in dead:
             clients.discard(ws)
+            self.compact_clients.discard(ws)
+
+    async def send_one(self, ws, msg):
+        await ws.send_text(compact_message(msg) if ws in self.compact_clients else msg)
+
+    async def accept_socket(self, ws, compact=False):
+        await ws.accept()
+        if compact and not self.stream.enabled:
+            await ws.close(code=1008, reason="Compact stream is disabled")
+            return False
+        if compact:
+            self.compact_clients.add(ws)
+        return True
+
+    def screen_snapshot(self):
+        snapshot = self.sim.snapshot()
+        return thin_tick(snapshot) if self.stream.enabled else snapshot
+
+    def screen_maps(self):
+        return self.stream.maps(self.sim.maps())
 
     def leases_enabled(self):
         return os.environ.get("DZ_CONTROL_LEASES") == "1" or os.environ.get("DZ_VOICE") == "1"
@@ -272,6 +302,7 @@ class Hub:
 
     def hello(self, ws=None):
         return self.envelope("hello", self.sim.hello() | self.control_state()
+                             | ({"stream": stream_profile()} if self.stream.enabled else {})
                              | {"scenario": {"id": self.scenario_id, "timeline": self.timeline_enabled}}
                              | detector_status() | {"leases": self.lease_state(), "voice":{"enabled":os.environ.get("DZ_VOICE") == "1"}}
                              | self.controller_hello(ws))
@@ -293,6 +324,7 @@ class Hub:
                 "relay_id": self.relay_clients.get(client) if role == "relay" else None,
                 "leases": self.lease_state(),
                 "voice": {"enabled":os.environ.get("DZ_VOICE") == "1"},
+                **({"stream": stream_profile()} if self.stream.enabled else {}),
                 **detector_status()}
 
     def attach_relay(self, client):
@@ -318,13 +350,14 @@ class Hub:
         for ws, (client, role) in list(self.phone_sessions.items()):
             if role == "relay":
                 try:
-                    await ws.send_text(self.envelope("relay_state", self.relay_state(client)))
+                    await self.send_one(ws, self.envelope("relay_state", self.relay_state(client)))
                 except (RuntimeError, WebSocketDisconnect):
                     await self.disconnect_phone(ws, notify=False)
 
     async def disconnect_phone(self, ws, notify=True):
         session = self.phone_sessions.pop(ws, None)
         self.phones.discard(ws)
+        self.compact_clients.discard(ws)
         await self.disconnect_controller(ws)
         if session is not None:
             client, role = session
@@ -336,7 +369,7 @@ class Hub:
 
     async def publish_paused_relay_view(self):
         if not self.running:
-            await self.send_all(self.screens, self.envelope("tick", self.sim.snapshot()))
+            await self.send_all(self.screens, self.envelope("tick", self.screen_snapshot()))
 
     async def plan_state(self, state):
         message = self.envelope("plan_state", state)
@@ -430,10 +463,12 @@ class Hub:
             raise PlanError("unsupported_message", f"Unsupported phone message: {kind}", 422)
 
     async def broadcast_tick(self, force_maps=False):
-        snap = self.sim.snapshot()
-        await self.send_all(self.screens, self.envelope("tick", snap))
+        if self.stream.tick_due(force_maps):
+            await self.send_all(self.screens, self.envelope("tick", self.screen_snapshot()))
         if force_maps or self.sim.tick_n % MAPS_EVERY == 0:
-            await self.send_all(self.screens, self.envelope("maps", self.sim.maps()))
+            maps = self.screen_maps()
+            if self.stream.maps_due(maps, force_maps):
+                await self.send_all(self.screens, self.envelope("maps", maps))
             await self.send_all(self.phones, self.envelope("cmd_view", self.phone_view()))
             await self.relay_states()
         for ev in self.sim.drain_events():
@@ -467,11 +502,11 @@ class Hub:
                 if role == "relay":
                     self.attach_relay(client)
             await self.send_all(self.screens, self.hello())
-            await self.send_all(self.screens, self.envelope("maps", self.sim.maps()))
+            await self.send_all(self.screens, self.envelope("maps", self.screen_maps()))
             await self.send_all(self.screens, self.envelope("plan_state", None))
             for ws, (client, role) in list(self.phone_sessions.items()):
                 try:
-                    await ws.send_text(self.envelope("hello", self.phone_hello(client, role) | self.controller_hello(ws)))
+                    await self.send_one(ws, self.envelope("hello", self.phone_hello(client, role) | self.controller_hello(ws)))
                 except (RuntimeError, WebSocketDisconnect):
                     await self.disconnect_phone(ws, notify=False)
             await self.broadcast_tick(force_maps=True)
@@ -821,15 +856,16 @@ async def control(body: dict, request: Request):
 
 
 @app.websocket("/ws/screen")
-async def ws_screen(ws: WebSocket):
-    await ws.accept()
+async def ws_screen(ws: WebSocket, compact: bool = False):
+    if not await hub.accept_socket(ws, compact):
+        return
     hub.screens.add(ws)
     hub.register_controller(ws, "screen")
     try:
-        await ws.send_text(hub.hello(ws))
-        await ws.send_text(hub.envelope("maps", hub.sim.maps()))
-        await ws.send_text(hub.envelope("tick", hub.sim.snapshot()))
-        await ws.send_text(hub.envelope("plan_state", hub.plans.current()))
+        await hub.send_one(ws, hub.hello(ws))
+        await hub.send_one(ws, hub.envelope("maps", hub.screen_maps()))
+        await hub.send_one(ws, hub.envelope("tick", hub.screen_snapshot()))
+        await hub.send_one(ws, hub.envelope("plan_state", hub.plans.current()))
         while True:
             try:
                 msg = json.loads(await ws.receive_text())
@@ -846,20 +882,22 @@ async def ws_screen(ws: WebSocket):
                     data = {"code": error.code, "msg": str(error)}
                 elif isinstance(error, ValidationError):
                     data["issues"] = validation_issues(error)
-                await ws.send_text(hub.envelope("error", data))
+                await hub.send_one(ws, hub.envelope("error", data))
     except (WebSocketDisconnect, RuntimeError, json.JSONDecodeError):
         pass
     finally:
         hub.screens.discard(ws)
+        hub.compact_clients.discard(ws)
         await hub.disconnect_controller(ws)
 
 
 @app.websocket("/ws/phone")
 async def ws_phone(ws: WebSocket,
                    client: str | None = Query(default=None, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.-]+$"),
-                   role: Literal["planner", "relay", "spectator"] = "planner"):
+                   role: Literal["planner", "relay", "spectator"] = "planner", compact: bool = False):
     """Phone planning session; only prior geometry and delivered Command data."""
-    await ws.accept()
+    if not await hub.accept_socket(ws, compact):
+        return
     if client is None:
         client = f"phone-{hub.next_phone_id}"
         hub.next_phone_id += 1
@@ -870,10 +908,10 @@ async def ws_phone(ws: WebSocket,
     try:
         if role == "relay":
             hub.attach_relay(client)
-        await ws.send_text(hub.envelope("hello", hub.phone_hello(client, role) | hub.controller_hello(ws)))
-        await ws.send_text(hub.envelope("cmd_view", hub.phone_view()))
+        await hub.send_one(ws, hub.envelope("hello", hub.phone_hello(client, role) | hub.controller_hello(ws)))
+        await hub.send_one(ws, hub.envelope("cmd_view", hub.phone_view()))
         if role == "relay":
-            await ws.send_text(hub.envelope("relay_state", hub.relay_state(client)))
+            await hub.send_one(ws, hub.envelope("relay_state", hub.relay_state(client)))
             await hub.publish_paused_relay_view()
         while True:
             try:
@@ -887,9 +925,9 @@ async def ws_phone(ws: WebSocket,
                     data = {"code": error.code, "msg": str(error)}
                 else:
                     data = {"code": "invalid_json", "msg": "Message must be valid JSON"}
-                await ws.send_text(hub.envelope("error", data))
+                await hub.send_one(ws, hub.envelope("error", data))
     except PlanError as error:
-        await ws.send_text(hub.envelope("error", {"code": error.code, "msg": str(error)}))
+        await hub.send_one(ws, hub.envelope("error", {"code": error.code, "msg": str(error)}))
         await ws.close(code=1008)
     except WebSocketDisconnect:
         pass
