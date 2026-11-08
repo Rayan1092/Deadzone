@@ -1,6 +1,7 @@
 """Validated phone plans and dispatch through the existing DTN transport."""
 import json
 import math
+import os
 from copy import deepcopy
 from typing import Annotated, Literal
 
@@ -120,6 +121,7 @@ class PlanManager:
     """One shared draft, saved by ID. Published IDs are immutable and idempotent."""
     def __init__(self, sim, checker):
         self.sim, self.checker = sim, checker
+        self.global_no_go = os.environ.get("DZ_GLOBAL_NO_GO") == "1"
         self.saved = {}
         self.current_id = None
         self.dispatched = set()
@@ -157,7 +159,8 @@ class PlanManager:
             return result
         plan = self.get(plan_id)
         outgoing = []
-        for rid in sorted({z.robot for z in plan.zones}):
+        recipients = self.sim.robot_specs if self.global_no_go else {z.robot for z in plan.zones}
+        for rid in sorted(recipients):
             payload = plan.model_dump(mode="json")
             payload["zones"] = [z.model_dump(mode="json") for z in sorted(plan.zones, key=lambda z: (z.priority, z.id))
                                 if z.robot == rid]

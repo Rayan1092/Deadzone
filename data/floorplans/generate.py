@@ -608,6 +608,7 @@ def generate(seed, size=None, plan_id=None, name=None, location=None):
             if name:
                 data["name"] = name
             data["default_plan"] = plan_location(location or f"generated/{data['id']}")
+            data["expected_survivors"] = len(data["survivors"])   # the briefing's count, a prior for the belief map
             data["validation"] = {"ok": True, "checks": [
                 "everything reachable from the entrance with 1-cell wall inflation",
                 "survivors and decoys out of hazards and debris", "no hazard over a door",
@@ -671,6 +672,7 @@ def variant_of(base, seed):
         data["generator"] = {"kind": "variant", "base": base_id, "seed": seed, "attempt": attempt, "version": VERSION,
                              "people": len(chosen)}
         data["default_plan"] = plan_location(f"variants/{data['id']}")
+        data["expected_survivors"] = len(data["survivors"])
         if not [p for p in validate(data) if p not in inherited]:
             data["validation"] = {"ok": True, "checks": [
                 "same walls, rooms, hazards, debris, entry and command post as the base building",

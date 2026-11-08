@@ -841,6 +841,7 @@
   }
  ],
  "default_plan": "data/plans/generated/gen_3.plan.json",
+ "expected_survivors": 3,
  "validation": {
   "ok": true,
   "checks": [
