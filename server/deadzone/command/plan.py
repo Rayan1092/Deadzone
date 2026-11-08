@@ -121,7 +121,9 @@ class PlanManager:
     """One shared draft, saved by ID. Published IDs are immutable and idempotent."""
     def __init__(self, sim, checker):
         self.sim, self.checker = sim, checker
-        self.global_no_go = os.environ.get("DZ_GLOBAL_NO_GO") == "1"
+        # Default on (Rayan, with Aziz's files authorized): a phone no-go reaches every deployed robot and
+        # a robot inside a new no-go is routed out; DZ_GLOBAL_NO_GO=0 restores the legacy behaviour.
+        self.global_no_go = os.environ.get("DZ_GLOBAL_NO_GO", "1") != "0"
         self.saved = {}
         self.current_id = None
         self.dispatched = set()

@@ -12,6 +12,12 @@
 - stats_card.png       : numbers from ml/results/metrics.json                            [stats]
 - training_curve.png   : loss and accuracy per epoch from ml/results/train_history.json
                          (written by ml/train.py --history); skipped while the curve is empty [curve]
+- calibration.png      : reliability diagram replotted from ml/results/calibration.json
+                         (ml/calibration.py scores the sets)                                  [calibration]
+- benchmark_v2.png, benchmark_published.png : replotted from their saved JSON
+                         (ml/benchmark_v2.py --replot, ml/benchmark_published.py --replot)     [benchmark]
+- gradcam_strip.png    : the six demo crops (S1-S3, D1-D3) with their Grad-CAM, verdict and score
+                         from ml/crops/runtime/manifest.json (ml/gradcam.py)                   [gradcam]
 """
 import argparse
 import json
@@ -27,7 +33,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch  # noqa: E402
 from PIL import Image  # noqa: E402
 
-SECTIONS = ("confusion", "crops", "stats", "curve")
+SECTIONS = ("confusion", "crops", "stats", "curve", "calibration", "benchmark", "gradcam")
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("repo", nargs="?", help="repo root (default: this file's parent's parent)")
 parser.add_argument("--only", nargs="+", choices=SECTIONS, default=list(SECTIONS), metavar="SECTION",
@@ -292,7 +298,65 @@ def training_curve():
     plt.close(fig)
 
 
-BUILD = {"confusion": confusion, "crops": crops_and_pipeline, "stats": stats_card, "curve": training_curve}
+# ---------------------------------------------------------------- calibration (replot from JSON)
+def calibration():
+    import calibration as cal
+    path = ML / "results" / "calibration.json"
+    if not path.exists():
+        print("calibration.png skipped: run py ml/calibration.py first")
+        return
+    cal.chart(json.loads(path.read_text(encoding="utf-8")), OUT / "calibration.png")
+
+
+# ---------------------------------------------------------------- benchmark charts (replot from JSON)
+def benchmarks():
+    import subprocess
+    for script, data in (("benchmark_v2.py", "benchmark_v2.json"), ("benchmark_published.py", "benchmark_published.json")):
+        if not (OUT / data).exists():
+            print(f"{data} missing: run py ml/{script} first")
+            continue
+        subprocess.run([sys.executable, str(ML / script), "--replot", "--out", str(OUT)], check=True)
+
+
+# ---------------------------------------------------------------- Grad-CAM strip of the six demo crops
+def gradcam_strip():
+    """Top row: the real thermal crop the robot judges; bottom row: the same crop with the model's
+    Grad-CAM (where it looked). One column per demo survivor and decoy, verdict and score as the
+    model gives them."""
+    runtime = ML / "crops" / "runtime"
+    m = json.loads((runtime / "manifest.json").read_text(encoding="utf-8"))
+    crops = [c for c in m["crops"] if c.get("id")]
+    crops.sort(key=lambda c: (c["id"][0] != "S", c["id"]))
+    fig, axes = plt.subplots(2, len(crops), figsize=(2.2 * len(crops), 5.4), facecolor=BG)
+    for col, c in enumerate(crops):
+        person = c["label"] == "person"
+        top, bottom = axes[0][col], axes[1][col]
+        top.imshow(Image.open(runtime / c["file"]).convert("L"), cmap="inferno")
+        bottom.imshow(Image.open(runtime / c["heatmap"]).convert("RGB"))
+        verdict = "person" if c["predicted"] == "person" else "not a person"
+        top.set_title(f"{c['id']}  {verdict}  {c['conf'] * 100:.1f}%" if not person else f"{c['id']}  {verdict}  {c['conf'] * 100:.0f}%",
+                      color=GREEN if c["predicted"] == "person" else RED, fontsize=10.5, fontweight="bold")
+        shows = c.get("shows") or c.get("object") or ""
+        if shows:
+            import textwrap
+            bottom.set_xlabel("\n".join(textwrap.wrap(str(shows), 26)[:2]), color=MUTED, fontsize=8.5)
+    for ax in axes.flat:
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for sp in ax.spines.values():
+            sp.set_color(GRID)
+    fig.text(0.012, 0.72, "thermal crop", color=FG, rotation=90, fontsize=11, va="center")
+    fig.text(0.012, 0.30, "where the AI looked", color=FG, rotation=90, fontsize=11, va="center")
+    fig.suptitle("The six demo hot spots as the onboard model sees them", color=FG, fontsize=13, x=0.02, ha="left")
+    fig.text(0.02, 0.012, "Real thermal camera images, Teledyne FLIR dataset (held out)  ·  Grad-CAM on the person class  ·  "
+             f"threshold {m.get('threshold', 0.6)}", color=MUTED, fontsize=9, ha="left")
+    fig.subplots_adjust(left=0.05, right=0.99, top=0.88, bottom=0.13, wspace=0.08, hspace=0.22)
+    fig.savefig(OUT / "gradcam_strip.png", dpi=150, facecolor=BG)
+    plt.close(fig)
+
+
+BUILD = {"confusion": confusion, "crops": crops_and_pipeline, "stats": stats_card, "curve": training_curve,
+         "calibration": calibration, "benchmark": benchmarks, "gradcam": gradcam_strip}
 for name in SECTIONS:
     if name in args.only:
         BUILD[name]()
