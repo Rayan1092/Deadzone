@@ -134,10 +134,11 @@ function Curve({ curve, keys, title, fmt }) {
 
 function Live({ crops }) {
   const events = useSim((s) => s.events)
-  const last = events.find((e) => e.kind === 'survivor_found' || e.kind === 'hotspot_rejected')
+  const last = events.find((e) => e.kind === 'survivor_found' || e.kind === 'hotspot_rejected' || e.kind === 'hotspot_unsure')
   const [heat, setHeat] = useState(true)
   if (!last) return <div className="lab-live empty muted">Waiting for a robot to judge a hot spot…</div>
   const person = last.kind === 'survivor_found'
+  const unsure = last.kind === 'hotspot_unsure'
   const entry = cropEntry(crops, last.crop)
   // transparent overlay first, so the toggle shows the crop with and without it
   const heatmap = entry?.heatmap_alpha ?? last.heatmap
@@ -149,9 +150,16 @@ function Live({ crops }) {
       </div>
       <div className="lab-live-text">
         <span className="muted small">Just judged onboard · {last.robot} · T+{fmtClock(last.time ?? 0)}</span>
+        {entry?.shows && <span className="det-shows">{entry.shows}</span>}
         <span className="det-caption">{cropCaption(crops, entry)}</span>
-        <b className={person ? 'yes' : 'no'}>{person ? 'Person' : 'Not a person'} · {pct(last.conf ?? (person ? 1 : 0), last.conf > 0 && last.conf < 0.01 ? 1 : 0)}</b>
-        <span className="muted small">{person ? `Survivor ${last.survivor}${entry?.pose ? ` · ${entry.pose}` : ''}` : `Hot spot ${last.id}${entry?.object ? ` (${entry.object})` : ''}, rejected`}</span>
+        <b className={person ? 'yes' : unsure ? 'unsure' : 'no'}>
+          {unsure ? 'Unsure' : person ? 'Person' : 'Not a person'} · {pct(last.conf ?? (person ? 1 : 0), last.conf > 0 && last.conf < 0.01 ? 1 : 0)}
+        </b>
+        <span className="muted small">
+          {unsure ? `Hot spot ${last.id}: moving closer for a second look`
+            : person ? `Survivor ${last.survivor}` : `Hot spot ${last.id}${entry?.object ? ` (${entry.object})` : ''}, rejected`}
+          {last.looked_closer && last.conf_far != null ? ` · unsure ${pct(last.conf_far, 0)} from afar, judged again up close` : ''}
+        </span>
         {heatmap && (
           <label className="lab-toggle">
             <input type="checkbox" checked={heat} onChange={(e) => setHeat(e.target.checked)} />
