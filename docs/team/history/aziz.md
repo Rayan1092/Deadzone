@@ -4,12 +4,17 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** `p2/exploration-progress`: user-authorized robot logic improvements, code complete and validated; publishing separate PR. Synced main `68dcfd2`: Rayan scenario generator + route cap, review/demo notes, and our voice #72 now merged.
-- **Contract:** `DZ_EXPLORATION_V2=1` opts into room-entry/camera-coverage exploration. Default stays legacy until testing-laptop dry run; no wire/schema changes. Local map and delivered peer telemetry only; no truth/survivor-coordinate access. Operator commands reset committed goals; radio/battery/fault protections still preempt exploration.
-- **Works:** camera coverage drives viewpoints, one weighted search replaces repeated goal searches, stable commitment and corner-safe waypoint following reduce backtracking. Separate paused trained-model preview: http://127.0.0.1:8022 (flag on); existing phone tunnel untouched.
-- **Need from others:** Rayan: review robot changes under explicit user routing request and opt-in dry run. Yusuf: voice #72 is now on main; PTT/lease UI and presenter grant still needed. B/U still require ownership with leases enabled (Rayan A2); leave voice/leases off for fixed demo until UI acceptance. Provider keys/dry run remain Rayan's, none added/used here. Scenario startup selector/timeline remains a separate follow-up, not part of routing.
+- **Working on:** `p2/sensor-camera`, stacked on routing PR #77. User explicitly requests actual robot-facing camera and further route review; authorizes focused robot/web edits. Estimate 30-45 min; no ML/map/other-history edits. Main `68dcfd2` current; reviewed Yusuf unmerged hyperreal/plan-v4 camera changes rather than merging his visual stack.
+- **Contract BEFORE code:** startup opt-in `DZ_SENSOR_VIEW=1`. Screen-only `hello.sensor_view={enabled:true,range_m:5,fov_rad:2.0943951023931953,height_m:0.4}`; `tick.reality.robots[].camera={t,pose:[x,y,yaw],hits:[{id,pos,crop,verdict:"person"|"rejected",conf:number|null,source:"model"|"sim"}]}` from actual `io.thermal()` plus the actual onboard detector. Empty hits clears boxes. No camera field in robot bundles, Command, phone or Gemini. Default wire payload stays unchanged. Renderer uses frame pose, 120-degree horizontal lens, no independent auto-aim, no manifest-derived guesses; label simulated reconstruction/crop evidence honestly. Flag off keeps existing view until dry run.
+- **Heads-up:** Yusuf's unmerged hyperreal already removes auto-aim; his boxes still infer results from truth positions + manifest/range. New opt-in sensor component and helper will be small/independent for him to integrate. Route PR #77 remains open/default off; inspecting additional route safety without changing demo timing.
 
 ## Log
+
+### 2026-11-07 PT - p2/sensor-camera - Reserve actual sensor-frame camera contract
+- **Did:** audited current and Yusuf's unmerged camera: independent detection pan, lens/range mismatch, and metadata-based inferred classifications. User explicitly asked for robot/web fixes; ownership exception is task-scoped.
+- **Contract changes:** additive Reality-only camera/config fields and `DZ_SENSOR_VIEW=1` exactly as in Now, posted before code. No new phone/Command/DTN access, no video claim or rendered-frame model input.
+- **Heads-up for others:** Yusuf: dedicated sensor component will avoid touching your unmerged visual assets/models. Rayan: actual IO observations only, no truth reads in robot code; demo default remains unchanged.
+- **Next:** implement/test range/FOV/occlusion/fallback/reset/privacy and visual camera alignment; review additional route safety.
 
 ### 2026-11-07 PT - p2/exploration-progress - Robots enter rooms and keep route progress
 - **Did:** camera-view coverage replaces mapped-only search completion under the preposted flag; committed reachable goals, arrival sweeps, delivered-peer coverage and safe permanent waypoint lookahead reduce repeated travel. New plans/commands preempt old goals. Fixed false STUCK after intentional turns; real stalls still fault. User explicitly authorized robot-owned code. Pulled main `68dcfd2`, including Rayan generator/route cap and voice #72; no owner web/ML/map edits.
