@@ -22,6 +22,7 @@ export const usePhone = create((set) => ({
   leases: null,      // server lease table { enabled, ttl_s, robots: [{ robot, controller, expires_at }] }
   token: null,       // this phone's controller token (planner role, leases on); new on every connect
   commands: {},      // robot -> my latest command { cmd_id, action, zone, status, say, at }
+  refusal: null,     // the server refused a plan: { msg, code, at }, a red banner until tapped
   time: 0,
   set,
 }))
