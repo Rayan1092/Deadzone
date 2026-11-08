@@ -728,6 +728,39 @@ def check_plan(path, plan):
     return manager.check(plan["plan_id"])
 
 
+EXPORTER = REPO / "web" / "scripts" / "export-obstacles.mjs"
+
+
+def export_obstacles(path):
+    """Yusuf's furniture exporter: writes the building's solid furniture footprints into its
+    `obstacles` list (and a `wood` material), the same layout the big screen draws, so
+    DZ_OBSTACLES=1 makes the picture and the physics agree. Needs node; skipped with a note when
+    node or the exporter is missing (the building is still valid without obstacles)."""
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if node is None or not EXPORTER.is_file():
+        print(f"obstacles not exported ({'node not found' if node is None else 'exporter missing'}); "
+              f"run: cd web && node scripts/export-obstacles.mjs {path}")
+        return False
+    result = subprocess.run([node, str(EXPORTER), str(Path(path).resolve())], cwd=str(EXPORTER.parent.parent),
+                            capture_output=True, text=True, timeout=120)
+    if result.returncode != 0:
+        print("obstacles exporter failed:", (result.stderr or result.stdout).strip()[:400])
+        return False
+    n = len(json.loads(Path(path).read_text(encoding="utf-8")).get("obstacles", []))
+    print(f"obstacles exported: {n} furniture footprints (web/scripts/export-obstacles.mjs)")
+    return True
+
+
+def strip_export(data):
+    """The building without the exporter's additions (`obstacles`, the `wood` material), for
+    comparing a file on disk with a fresh generate()."""
+    d = {k: v for k, v in data.items() if k != "obstacles"}
+    d["materials"] = {k: v for k, v in data.get("materials", {}).items() if k != "wood"}
+    return d
+
+
 def validate_rooms_only(data):
     fp = FloorPlan(data)
     reach = reachable(fp)
@@ -830,6 +863,7 @@ def main():
     plan_path.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(data, indent=1), encoding="utf-8")
     plan_path.write_text(json.dumps(plan, indent=1), encoding="utf-8")
+    export_obstacles(out)
     if args.png:
         preview(data, args.png, plan)
     if args.variant_of:

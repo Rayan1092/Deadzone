@@ -48,6 +48,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    # $env:DZ_VOICE=1      # voice commands: robot side and Aziz's /api/voice are on main; the push-to-talk UI isn't yet, and leases block B/U (below)
    $env:DZ_SENSOR_VIEW=1  # safe: Aziz's Reality-only robot camera frames (#82) for Yusuf's renderer; the demo guard stays green with it on
    # DZ_EXPLORATION_V2    # must stay unset (0) for the main run: Aziz's opt-in exploration policy (#77) moves every beat below
+   # DZ_OBSTACLES         # must stay unset (0) for the main run: solid furniture (#119) makes the safety checker reject P-1 and moves the dark moment to 205 s (rayan.md 17:00)
    ```
    **Don't set `DZ_VOICE`, `DZ_CONTROL_LEASES` or `DZ_EXPLORATION_V2` for the main run.** With control leases on, **B** and **U** from the big screen need robot leases it doesn't hold, so they fail with a toast (R, F, O and A are not affected). With `DZ_EXPLORATION_V2=1` the robots explore differently and every beat in the beat sheet moves (S3 found at 23.8 s instead of 14.4, S2 found at 106 s instead of 246). `DZ_SENSOR_VIEW=1` is safe: it only adds camera frames to the Reality pane.
 5. Open `http://localhost:8000` on the big screen. Phones join with **Q** (QR) on the same Wi-Fi, or on the phone hotspot. Phone microphones need https: use Aziz's tunnel (`scripts/demo_tunnel.py`, see its docs) if voice or the mic is part of the run.
