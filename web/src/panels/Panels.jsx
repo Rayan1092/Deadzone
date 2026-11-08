@@ -15,13 +15,14 @@ import { heldByOthers } from '../net/leaseState'
 import { missingPeople, missingText } from '../three/beliefRamp'
 import { ping, setSound, soundOn } from '../audio'
 
+// Every line in sentence case, in the words the screen itself uses (no flags, no script words).
 export const KEYS = [
-  ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
-  ['R', 'rubble ahead of the followed robot (R1 on the overview)'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
-  ['U', 'resume after safe stop'], ['A', 'aftershock at a random spot (server needs DZ_AFTERSHOCK=1)'], ['⇧A', 'strong aftershock: three areas, two relays'], ['N', 'new random building (Q&A)'], ['⇧N', 'back to the main building'], ['B', 'baseline: robots without Deadzone (with control leases on: Unlock first)'], ['L', 'Model Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
-  ['M', 'one view / split view'], ['C', 'one view: swap the Command post inset and the main view · split view: top-down on the command post'], ['Y', 'belief map: where survivors may still be'], ['E', 'Operator view / Engineering view (sidebar, scheduler, legends)'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save the mission recording (open with ?record)'],
-  ['J', 'Model test: a held-out sample (Q&A)'], ['I', 'under the hood (Q&A)'], ['?replay', 'mission replay: plays a saved mission recording, no server'],
-  ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
+  ['Space', 'Start / pause'], ['1–9', 'Follow that robot (or click its card)'], ['0', 'Overview'],
+  ['R', 'Drop rubble ahead of the followed robot (robot 1 on the overview)'], ['F', 'Wheel overcurrent on the followed robot'], ['O', 'Perception overload on the followed robot'],
+  ['U', 'Resume the followed robot after a safe stop'], ['A', 'Aftershock at a random spot (when aftershocks are turned on for this run)'], ['⇧A', 'Strong aftershock: three areas, two relays'], ['N', 'New random building'], ['⇧N', 'Back to the main building'], ['B', 'Baseline: robots without Deadzone (press Unlock first when the Operator lock is shown)'], ['L', 'Model Lab: how the detector was trained'], ['K', 'Night operations lighting'], ['D', 'Auto camera (director)'], ['V', "Robot's camera"], ['G', 'Briefing'], ['T', 'Truth overlay'],
+  ['M', 'One view / split view'], ['C', 'One view: swap the command post inset and the main view · Split view: top-down on the command post'], ['Y', 'Belief map: where survivors may still be'], ['E', 'Operator view / Engineering view (sidebar, scheduler, legends)'], ['X', 'Sound cues on / off'], ['P', 'Performance mode'], ['Q', 'Join on phone (QR code)'], ['S', 'Save the mission recording (when this page is recording)'],
+  ['J', 'Model test: guess before the AI on a held-out thermal image'], ['I', 'Under the hood: live system counters'],
+  ['+ / −', 'Speed'], ['⌫', 'Reset'], ['?', 'This list'],
 ]
 
 function toggleView() {
@@ -66,6 +67,7 @@ export function RescueStatus() {
 function PresenterLock() {
   const leases = useSim((s) => s.leases)
   const p = useSim((s) => s.presenter)
+  const connected = useSim((s) => s.connected)
   if (!leases?.enabled) return null
   const others = heldByOthers(leases, p)
   return (
@@ -74,8 +76,8 @@ function PresenterLock() {
       {p.held ? 'Console has control · field units locked out' : 'Operator lock'}
       {others.length > 0 && <small>{others.map((r) => `${r.robot}: ${unitName(r.controller.name)}`).join(' · ')}</small>}
       {!REPLAY && (
-        <button disabled={p.pending} onClick={p.held ? lock : unlock}
-                title={p.held ? 'Release the robots so field units can take them' : 'Take every robot for this console (B and U need it)'}>
+        <button disabled={p.pending || !connected} onClick={p.held ? lock : unlock}
+                title={p.held ? 'Release the robots so field units can take them' : 'Take every robot for this console (needed for baseline mode and for resuming a stopped robot)'}>
           {p.pending ? '…' : p.held ? 'Lock' : 'Unlock'}
         </button>
       )}
@@ -94,14 +96,15 @@ export function TopBar() {
   const view = useSim((s) => s.view)
   const mode = useSim((s) => s.mode)
   const night = useSim((s) => s.night)
+  const offline = !connected && !REPLAY
   return (
-    <header className="topbar">
+    <header className={`topbar${offline ? ' offline' : ''}`}>
       <div className="brand">DEADZONE</div>
       <div className="incident">{fp ? fp.name : 'Waiting for sim'}</div>
       {/* the run clock lives in the Rescue Status strip ("since collapse"); one clock on screen */}
-      {detector && (
+      {detector && !offline && (
         <span className={`detector-chip ${detector.mode}`} title={detector.reason ?? ''}>
-          Detector: {detector.mode === 'model' ? 'AI model' : 'sim fallback'}
+          Detector: {detector.mode === 'model' ? 'AI model' : 'simulated sensor (no AI model)'}
         </span>
       )}
       <ReplayChip />
@@ -112,19 +115,25 @@ export function TopBar() {
         <span className="baseline-chip" title="Press B to switch Deadzone back on">Baseline · without Deadzone</span>
       )}
       <div className="controls">
-        <button onClick={() => control(running ? 'pause' : 'start')}>{running ? 'Pause' : 'Start'}</button>
-        <button onClick={() => control('speed', speed / 2)}>-</button>
+        {/* with the server gone these do nothing, so they are disabled rather than silently ignored */}
+        <button disabled={offline} onClick={() => control(running ? 'pause' : 'start')}>{running ? 'Pause' : 'Start'}</button>
+        <button disabled={offline} title="Slower (−)" aria-label="Slower" onClick={() => control('speed', speed / 2)}>−</button>
         <span className="mono">{speed}x</span>
-        <button onClick={() => control('speed', speed * 2)}>+</button>
-        <button onClick={() => control('reset')}>Reset</button>
+        <button disabled={offline} title="Faster (+)" aria-label="Faster" onClick={() => control('speed', speed * 2)}>+</button>
+        <button disabled={offline} onClick={() => control('reset')}>Reset</button>
         <button className="view-btn" title="Switch layout (M)" onClick={toggleView}>
           {view === 'gap' ? 'One view' : 'Split view'}
         </button>
         {!REPLAY && <JoinButton />}
         <button className="icon-btn" title="Keys (?)" onClick={() => set({ helpOpen: true })}>?</button>
         <button title="Model test on a held-out thermal sample (J)" onClick={() => set({ judgeOpen: true, hoodOpen: false, labOpen: false })}>J · Model test</button>
-        <button title="Live diagnostic counters (I)" onClick={() => set({ hoodOpen: true, judgeOpen: false, labOpen: false })}>I · Counters</button>
-        {!REPLAY && <span className={connected ? 'conn ok' : 'conn bad'}>{connected ? 'live' : 'offline'}</span>}
+        <button title="Live system counters (I)" onClick={() => set({ hoodOpen: true, judgeOpen: false, labOpen: false })}>I · Under the hood</button>
+        {!REPLAY && (
+          <span className={connected ? 'conn ok' : 'conn bad'} role="status"
+                title={connected ? 'Connected to the simulator' : 'The simulator server is not answering; this screen reconnects by itself'}>
+            {connected ? 'Live' : 'Server disconnected · reconnecting…'}
+          </span>
+        )}
       </div>
     </header>
   )
@@ -308,7 +317,7 @@ async function nextScenario(home) {
     if (!res.ok) throw new Error(String(res.status))
     cat = await res.json()
   } catch {
-    note('New scenario needs the latest server (GET /api/scenarios)')
+    note('This server cannot switch buildings')
     return
   }
   const ids = (cat.floorplans ?? []).map((f) => f.id)

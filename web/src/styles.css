@@ -40,6 +40,11 @@ button:hover { border-color: var(--teal); }
 .conn { padding: 3px 8px; border-radius: 999px; font-size: 11px; }
 .conn.ok { background: rgba(34,197,94,.15); color: var(--green); }
 .conn.bad { background: rgba(239,68,68,.15); color: var(--red); }
+/* server down: a loud chip and visibly dead controls (the clicks would go nowhere) */
+.conn.bad { font-size: 13px; font-weight: 600; padding: 4px 12px; border: 1px solid var(--red); animation: conn-pulse 1.6s ease-in-out infinite; }
+@keyframes conn-pulse { 50% { background: rgba(239,68,68,.32); } }
+@media (prefers-reduced-motion: reduce) { .conn.bad { animation: none; } }
+.topbar button:disabled { opacity: .4; cursor: not-allowed; }
 
 .split { grid-area: split; position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); min-height: 0; }
 .pane { position: relative; background: var(--bg); min-height: 0; }
@@ -646,6 +651,8 @@ button:hover { border-color: var(--teal); }
 .app.judge .topbar > :not(.brand):not(.incident):not(.baseline-chip) { opacity: 0; transition: opacity .2s ease; }
 .app.judge .topbar:hover > :not(.brand):not(.incident):not(.baseline-chip),
 .app.judge .topbar:focus-within > :not(.brand):not(.incident):not(.baseline-chip) { opacity: 1; }
+/* server down: the Operator view shows the top bar so the disconnected chip is seen without hovering */
+.app.judge .topbar.offline > :not(.brand):not(.incident):not(.baseline-chip) { opacity: 1; }
 .app.judge .pane-legend { opacity: 0; transition: opacity .2s ease; }
 .app.judge .pane:hover .pane-legend { opacity: 1; }
 /* collapsed (not just transparent) so the title pill is only as wide as its title */

@@ -145,7 +145,7 @@ function Live({ crops }) {
   return (
     <div className="lab-live">
       <div className="lab-crop">
-        {last.crop ? <img src={`/crops/${last.crop}`} alt="Thermal crop the robot classified" /> : <div className="crop-ph">thermal</div>}
+        {last.crop ? <img src={`/crops/${last.crop}`} alt="Thermal image the robot classified" /> : <div className="crop-ph">thermal</div>}
         {heat && heatmap && <img className="lab-heat" src={`/crops/${heatmap}`} alt="Grad-CAM: where the model looked" />}
       </div>
       <div className="lab-live-text">
@@ -192,12 +192,12 @@ function Examples({ lab, crops }) {
   if (!list.length) return null
   return (
     <section className="lab-examples">
-      <h4>Thermal crops in this building</h4>
+      <h4>Thermal images in this building</h4>
       <div className="lab-grid">
         {list.map((c) => (
           <figure key={c.file}>
-            <img src={`/crops/${c.file}`} alt={`${c.label} crop`} loading="lazy" />
-            <figcaption><b>{c.id} · {c.object ?? c.label}</b>model: {c.predicted ?? c.label} {pct(c.conf, c.conf > 0 && c.conf < 0.01 ? 1 : 0)}</figcaption>
+            <img src={`/crops/${c.file}`} alt={`${c.label} thermal image`} loading="lazy" />
+            <figcaption><b>{c.id} · {c.object ?? c.label}</b>Model: {c.predicted ?? c.label} {pct(c.conf, c.conf > 0 && c.conf < 0.01 ? 1 : 0)}</figcaption>
           </figure>
         ))}
       </div>
@@ -220,7 +220,7 @@ export default function AILab() {
           <div>
             <b>Model Lab</b>
             <span className="muted">
-              Onboard person detector{model ? ` · ${model}` : ''} · classifies thermal crops on the robot, no signal needed
+              Onboard person detector{model ? ` · ${model}` : ''} · classifies thermal images on the robot, no signal needed
             </span>
           </div>
           <button className="report-close" aria-label="Close Model Lab" onClick={() => set({ labOpen: false })}>×</button>

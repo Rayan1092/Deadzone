@@ -120,11 +120,11 @@ export default function Timeline() {
         <button className="tl-title" onClick={toggle} aria-expanded={open} title={pinned ? 'Collapse the scheduler' : 'Keep the scheduler open'}>
           <b>Scheduler</b><i className={`tl-caret${open ? ' up' : ''}`} />
         </button>
-        {!robots.length && <span className="muted">Waiting for robot telemetry</span>}
+        {!robots.length && <span className="muted">Waiting for robots</span>}
         {robots.map((r) => <Mini key={r.id} r={r} missed={!!missOf(r)} />)}
-        <span className={`tl-status${worst ? ' bad' : ''}`}>
-          <i />{worst ? `${worst.id}: ${TASK_INFO[missOf(worst)]?.label ?? missOf(worst)} missed a deadline` : robots.length ? 'All deadlines met' : ''}
-        </span>
+        {robots.length > 0 && <span className={`tl-status${worst ? ' bad' : ''}`}>
+          <i />{worst ? `${worst.id}: ${TASK_INFO[missOf(worst)]?.label ?? missOf(worst)} missed a deadline` : 'All deadlines met'}
+        </span>}
       </div>
       {open && (
         <div className="tl-body">
