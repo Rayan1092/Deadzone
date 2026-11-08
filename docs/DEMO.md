@@ -51,10 +51,10 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 4. Start the server **paused**. Leave `DZ_AUTOSTART` unset.
    ```powershell
    cd server
-   $env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=1.5; $env:DZ_OBSTACLES=1; $env:DZ_SMART_RUBBLE=1
+   $env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=1.5; $env:DZ_OBSTACLES=1; $env:DZ_ROBOT_COLLISIONS=1; $env:DZ_SMART_RUBBLE=1
    python -m uvicorn deadzone.app:app --host 0.0.0.0 --port 8000
    ```
-   `DZ_OBSTACLES=1` is **required** for the main run (the demo guard runs with it on). Without it the beat sheet below is wrong: S1 is found at 129.0 s instead of 102.7. `DZ_SMART_RUBBLE=1` makes the R key a no-trap drop for Q&A. The secondary collapse at 2:28 (sim 162.5) is a scenario event in `collapse_01.json` and runs with no flag; leave `DZ_SCENARIO_EVENTS` unset.
+   `DZ_OBSTACLES=1` and `DZ_ROBOT_COLLISIONS=1` are **required** for the main run (the demo guard runs with both on). Without `DZ_OBSTACLES` the beat sheet below is wrong: S1 is found at 129.0 s instead of 102.7. Without `DZ_ROBOT_COLLISIONS` the robots can drive through each other and S2 lands at 3:06 (sim 219.4) instead of 3:04.8. `DZ_SMART_RUBBLE=1` makes the R key a no-trap drop for Q&A. The secondary collapse at 2:28 (sim 162.5) is a scenario event in `collapse_01.json` and runs with no flag; leave `DZ_SCENARIO_EVENTS` unset.
 5. The server log must say `survivor detector: trained model, threshold 0.60`. If it says `sim sensor fallback (...)`, fix torch before going on stage. The top-bar detector chip shows the same thing.
    Optional features are off unless their flag is set before starting the server (only turn on what passed a dry run):
    ```powershell
@@ -102,7 +102,7 @@ REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http:
 
 ## Beat sheet
 
-Space is pressed at **0:40**. Times after it come from the demo guard's headless seed-7 run (`server/tests/test_demo_guard.py`: P-1 rejected, fixed, dispatched; `DZ_OBSTACLES=1`, `DZ_SMART_RUBBLE=1`; the scenario event in `collapse_01.json`, a collapse near R1 at 162.5; F / O at sim 177.5 / 187.5). Clock = 0:40 + sim seconds / 1.5. They are exact until the first director key is pressed. Re-check them at every rehearsal and update this table and the guard together if they drift.
+Space is pressed at **0:40**. Times after it come from the demo guard's headless seed-7 run (`server/tests/test_demo_guard.py`: P-1 rejected, fixed, dispatched; `DZ_OBSTACLES=1`, `DZ_ROBOT_COLLISIONS=1`, `DZ_SMART_RUBBLE=1`; the scenario event in `collapse_01.json`, a collapse on S1's route at 162.5; F / O at sim 177.5 / 187.5). Clock = 0:40 + sim seconds / 1.5. They are exact until the first director key is pressed. Re-check them at every rehearsal and update this table and the guard together if they drift.
 
 | Clock | After Space (sim s) | On screen | Who | What to say |
 |---|---|---|---|---|
@@ -119,10 +119,10 @@ Space is pressed at **0:40**. Times after it come from the demo guard's headless
 | 1:59 | +1:19 (118.5) | R2 reconnects. Map, **S1 and its 49.7 m rescue route burst onto Command**, 16 s after detection | Rayan | "Store and forward: nothing lost, just late. Responders now have the way in." |
 | 2:02 | | Press **0**, then **G**: the Gemini briefing appears after about 6 s and is read aloud | Yusuf | While it generates: "Gemini writes this briefing only from what reached the antenna, never from the robots' own view." |
 | 2:26 | +1:46 (159) | Press **1**: follow R1, now in the corridor below the break room, on S1's rescue route | Rayan | |
-| 2:28 | +1:48.3 (162.5) | **Nothing to press.** The building's scripted **secondary collapse** (scenario event in `collapse_01.json`) drops rubble ahead of R1 **on S1's rescue route** (event `rubble_fall`, cause `collapse`). R1 goes **REPLANNING** and drives around; R2, 4 m away, sees the rubble and reroutes S1 at once (sim 162.8): Command's S1 route **redraws around it, 52.1 m** (replaced, not doubled) | Rayan | Narrate it: "A secondary collapse, right on the way in. Robot 1 sees it, stops and replans. Robot 2 saw it too and just sent responders a new route around it." |
+| 2:28 | +1:48.3 (162.5) | **Nothing to press.** The building's scripted **secondary collapse** (scenario event in `collapse_01.json`) drops rubble ahead of R1 **on S1's rescue route** (event `rubble_fall`, cause `collapse`). R1 sees it and goes **REPLANNING** a second later (sim 164.0) and drives around; R2, 3 m away, sees the rubble and reroutes S1 at once (sim 162.8): Command's S1 route **redraws around it, 52.1 m** (replaced, not doubled) | Rayan | Narrate it: "A secondary collapse, right on the way in. Robot 1 sees it, stops and replans. Robot 2 saw it too and just sent responders a new route around it." |
 | 2:38 | +1:58.3 (177.5) | Press **3** then **F**: R3 gets an **OVERCURRENT** fault, backs up 0.5 m and replans | Rayan | "A wheel jams. Fault protection stops it, backs off and tries another way." |
 | 2:45 | +2:05 (187.5) | Press **1** then **O**: the scheduler strip shows **perception missing deadlines** (red) for 3 s, while **safety still runs at 0 and 50 ms** | Rayan | "Rate monotonic scheduling: when the AI overloads the CPU, perception misses deadlines, but the safety task always runs on time." |
-| 3:06 | +2:26.3 (219.4) | Press **0**. R2 finds **S2** while linked, with its 39.1 m route: all three survivors are on Command | Rayan | "Third survivor, this time with signal, so it's on Command instantly. Three for three." |
+| 3:04.8 | +2:24.8 (217.2) | Press **0**. R2 finds **S2** while linked, with its 39.1 m route: all three survivors are on Command | Rayan | "Third survivor, this time with signal, so it's on Command instantly. Three for three." |
 | 3:10 | | | Rayan | "The robots are autonomous, and AI detects survivors. Collapsed buildings, mines, wildfires, tunnels." |
 
 That ends at about 3:25, with 35 s of slack before 4:00.
@@ -179,7 +179,7 @@ The safety check needs the command post to have heard each robot once. Startup a
 | "Can you do a different building?" | **N** (Yusuf): reset into another registered building; **Shift+N** comes back to the main one. Pick-a-seed: `py data/floorplans/generate.py --seed <judge's number>` writes `data/floorplans/generated/gen_<number>.json` (validated: everything reachable, a steel dead zone, 3 survivors, 3 decoys, a disaster script), then reset into `generated/gen_<number>` (`{action:"reset", value:{floorplan:"generated/gen_<number>", timeline:true}}`) | Timelines need `DZ_SCENARIO_TIMELINE=1` (and `DZ_AFTERSHOCK=1`, every script has one aftershock). Robots start without a plan; to give them one, `POST /api/plan` with `data/plans/generated/gen_<number>.plan.json` and dispatch `P-gen_<number>`, until Aziz preloads it |
 | "How big can it go?" | **`showcase_01`**: 80 x 60 m, 36 rooms, two steel dead zones (storage cage and vault), 4 survivors, 4 decoys, a **three-area earthquake** at 184 s (warehouse), 194 s (cross hall) and 246 s (far hall), 2 relays crushed. Reset into `showcase_01` with `timeline: true` | **Show the earthquake and the pick-a-seed, not a dead-zone find:** with 3 robots the dead-zone survivors take over 5 minutes of sim time. What does land early: the hall survivor at ~44 s with the "AI unsure 58%, moving closer" card, then "Person 100%". Plan: `data/plans/showcase_01.plan.json` as above (`P-showcase_01`). Big maps run slower (about 6x real time headless on the dev laptop) |
 | "Same building, new survivors?" | **N** prefers the five validated variants of the demo building (`variants/collapse_01_v1..v5`): same walls, S1 still deep in the steel cage, the other people and decoys moved; the NEW SCENARIO banner names it | S3 and D3 in every variant use the "unsure from a distance" crops, so the look-closer card shows up here too. Never during the main run |
-| "Are there more survivors?" | No: all three are on Command by 3:06 (S2 at sim 219.4). After that the robots finish mapping and return home on battery; nothing else is scripted | Only if R / F / O landed on time; otherwise S2 lands between sim 216 and 233 |
+| "Are there more survivors?" | No: all three are on Command by 3:04.8 (S2 at sim 217.2). After that the robots finish mapping and return home on battery; nothing else is scripted | Only if R / F / O landed on time; otherwise S2 lands between sim 216 and 233 |
 | "Can I talk to a robot?" | Voice command | Not yet: robot side and Aziz's `/api/voice` are on main; Yusuf's push-to-talk UI is not |
 
 ## Judge questions (one answer each)

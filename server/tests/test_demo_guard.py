@@ -3,9 +3,10 @@
 Seed 7, 3 robots, solid furniture on (DZ_OBSTACLES=1, the main-run setting since the
 2026-11-08 20:30 re-baseline), plan P-1 (rejected: R2's north-east zone is a dead zone) then
 fixed to lost_link_ok and dispatched after the startup tick, exactly like the phone beat.
-The reroute beat is not a key press: collapse_01.json's scenario event (`events`: collapse near
-R1 at 162.5 s) drops rubble 1.5 m ahead of R1 (rubble_fall, cause "collapse"), when R1 is on S1's
-rescue corridor and R2 is 4 m away. Director presses at the DEMO.md times: F (overcurrent on R3)
+Robot collisions on (DZ_ROBOT_COLLISIONS=1, main run since 2026-11-08 23:50). The reroute beat
+is not a key press: collapse_01.json's scenario event (`events`: collapse at [25.31, 15.65], on
+S1's rescue route by the break-room door, at 162.5 s; rubble_fall, cause "collapse") lands 3.3 m
+ahead of R1 with R2 3 m away. Director presses at the DEMO.md times: F (overcurrent on R3)
 at 177.5 s, O (perception overload on R1) at 187.5 s.
 
 If you change robot, network or floor plan behavior and a beat moves, this fails on purpose.
@@ -35,12 +36,12 @@ BEATS = {
     "S1_found": 102.7,      # R2, dark, beacon next to the survivor
     "S1_reported": 118.5,   # S1 + rescue route reach Command
     "S1_rerouted": 162.8,   # R2 sees the collapse rubble on S1's rescue route and resends it
-    "S2_found": 219.4,      # the finale, only with F/O on time
+    "S2_found": 217.2,      # the finale, only with F/O on time (219.4 before robot collisions)
 }
 COLLAPSE_AT = 162.5     # collapse_01.json scenario event: collapse near R1
 DIRECTOR = {177.5: ("overcurrent", "R3"), 187.5: ("overload", "R1")}
 END = 230.0
-FLAGS = {"DZ_OBSTACLES": "1", "DZ_SMART_RUBBLE": "1"}   # the main run's environment (docs/DEMO.md pre-flight step 4)
+FLAGS = {"DZ_OBSTACLES": "1", "DZ_SMART_RUBBLE": "1", "DZ_ROBOT_COLLISIONS": "1"}   # the main run's environment (docs/DEMO.md pre-flight step 4)
 
 ZW = [[0, 17], [20, 17], [20, 30], [0, 30]]
 ZB = [[20, 17], [32, 17], [32, 30], [20, 30]]
@@ -159,7 +160,8 @@ def test_director_beats(run):
     assert [(t, e.get("cause"), e.get("robot")) for t, e in falls] == [(round(COLLAPSE_AT + 0.1, 1), "collapse", "R1")], \
         f"exactly one scripted collapse ahead of R1, nothing pressed: {falls}"
     t = next((t for t, e in log if t >= COLLAPSE_AT and e["kind"] == "replan" and e["robot"] == "R1"), None)
-    assert t is not None and t <= COLLAPSE_AT + 1.0, f"collapse: R1 replan at {t}"
+    # the rubble is pinned 3.3 m ahead of R1 (path check 3 m): R1 replans at 164.0 with collisions on
+    assert t is not None and t <= COLLAPSE_AT + 2.0, f"collapse: R1 replan at {t}"
     t, e = first(log, lambda e: e["kind"] == "fault" and e["robot"] == "R3")
     assert t is not None and 177.5 <= t <= 178.5 and e["fault"] == "OVERCURRENT", f"F key: {t} {e}"
     misses = [t for t, e in log if e["kind"] == "deadline_miss" and e["robot"] == "R1"]
