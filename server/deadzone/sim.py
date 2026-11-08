@@ -2,6 +2,7 @@
 import base64
 import json
 import math
+import os
 import random
 import re
 from pathlib import Path
@@ -125,7 +126,7 @@ class Sim:
         self.time = 0.0
         self.tick_n = 0
         self.links = LinkGraph()
-        self.network = DTNNetwork()
+        self.network = DTNNetwork(fec_enabled=os.environ.get("DZ_FEC") == "1", seed=self.seed)
         self.network.register("CMD")
         self.relays = {}
         self.relay_revisions = {}
@@ -205,6 +206,8 @@ class Sim:
         return x, y
 
     def move_relay(self, rid, pos):
+        if self.relays[rid].get("destroyed"):
+            raise ValueError("Destroyed relay cannot be moved")
         x, y = self._relay_position(pos)
         self.relays[rid]["pos"] = [x, y]
         self._relay_telemetry(rid)
@@ -228,6 +231,8 @@ class Sim:
     def set_relay_power(self, rid, on):
         """Power changes break links without deleting the relay's stored bundles."""
         relay = self.relays[rid]
+        if on and relay.get("destroyed"):
+            raise ValueError("Destroyed relay cannot be powered on")
         if relay["on"] == bool(on):
             return
         relay["on"] = bool(on)
@@ -325,6 +330,11 @@ class Sim:
             robots.append(r.telemetry(link))
         found = [rec for r in self.robots.values() for rec in r.found.values()]
         links = self.links.as_list()
+        for link in links:
+            edge = tuple(sorted((link["a"], link["b"])))
+            link.update(self.network.link_stats.get(edge, {"corrupted_bytes": 0, "corrected_bytes": 0,
+                                                         "fec_failed_blocks": 0}))
+            link["fec"] = bool(self.network.fec_enabled and link["up"] and -88 <= self.links.link_rssi(*edge) <= -80)
         relays = [dict(relay, queue=len(self.network.queues[rid])) for rid, relay in self.relays.items()]
         reality = {"robots": robots, "relays": relays, "links": links, "survivors_found": found}
         stats = {"robots": len(self.robots), "relays": len(relays),
@@ -352,6 +362,43 @@ class Sim:
         return ev
 
     # ------------------------------------------------------------------ director
+    def aftershock(self, at=None, relay=None):
+        """Apply one validated truth-only collapse; robots react through normal IO."""
+        if relay is not None and (relay not in self.relays or self.relays[relay].get("destroyed")):
+            raise ValueError("Unknown or already destroyed relay")
+        if relay is None:
+            relay = next((rid for rid, r in self.relays.items() if r["on"] and not r["phone"]), None)
+        if at is None:
+            at = self.relays[relay]["pos"] if relay else (min(22, self.fp.W - self.fp.cell), self.fp.H / 2)
+        x, y = map(float, at)
+        if not (math.isfinite(x) and math.isfinite(y) and 0 <= x < self.fp.W and 0 <= y < self.fp.H):
+            raise ValueError("Aftershock must be inside the building")
+        # Validate first, then mutate geometry/custody together without awaiting.
+        x0, x1 = max(0, x - 1), min(self.fp.W, x + 1)
+        y0, y1 = max(0, y - 1), min(self.fp.H, y + 1)
+        poly = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+        rubble = {"id": f"ASR{len(self.fp.data.get('rubble', [])) + 1}", "poly": poly,
+                  "height": 1.5, "dynamic": True}
+        wall = {"id": f"ASW{len(self.fp.data.get('dynamic_walls', [])) + 1}",
+                "a": [max(0, x - 1.5), y1], "b": [min(self.fp.W, x + 1.5), y1],
+                "material": "concrete", "dynamic": True}
+        self.fp.add_rubble(poly)
+        self.fp.data.setdefault("rubble", []).append(rubble)
+        self.fp.add_wall(wall)
+        lost = 0
+        if relay:
+            node = self.relays[relay]
+            node.update(on=False, destroyed=True)
+            lost = self.network.destroy(relay)
+            self.events.append({"kind": "relay_destroyed", "id": relay, "pos": list(node["pos"]),
+                                "lost_bundles": lost})
+        self.events.append({"kind": "rubble_fall", "poly": poly})
+        event = {"kind": "aftershock", "at": [x, y], "rubble": [rubble], "walls": [wall],
+                 "destroyed_relay": relay, "lost_bundles": lost}
+        self.events.append(event)
+        self._update_links()
+        return event
+
     def drop_rubble(self, at, size=1.4):
         x, y = at
         s = size / 2

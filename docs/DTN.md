@@ -112,6 +112,31 @@ The existing robot-to-command visual line does not draw the full relay path yet.
 
 ## Verification
 
+### Opt-in Reed-Solomon (`DZ_FEC=1`)
+
+Weak up links from -80 through -88 dBm now encode the actual serialized payload
+with RS(255,223), 32 parity bytes per block and a CRC32. Numpy map arrays retain
+their dtype/shape in the wire format. The receiver delivers the decoded object,
+never the sender's original payload. Parity and CRC bytes consume the same shared
+link budget as other bytes. Decode/CRC failure does not acknowledge custody; the
+sender retries a fresh attempt. Broken links discard partial coded frames.
+
+Corruption uses a separate seed-7/network-seed RNG, independent of robot policy:
+byte error probability rises linearly from 0.4% at -80 to 2.5% at -88 dBm.
+Decode success is checked by the real `reedsolo` codec plus CRC. This is a byte-error
+simulation, not a physical radio implementation. No coding/noise runs by default,
+so Version 1 timings remain reproducible while the feature awaits a dry run.
+
+`tick.reality.links[]` keeps the existing fields and adds integer per-tick counters
+`corrupted_bytes`, `corrected_bytes`, `fec_failed_blocks`. They reset each transport
+tick and are reported when complete coded attempts are decoded (including failed
+attempts), not while partial frames are in flight. `fec` is true only for enabled
+weak up links. Idle/disabled links report zeros. Pure Command/phones/Gemini never
+receive live repair counters. Yusuf owns repair animation on the Reality link lines.
+
+Install updated `server/requirements.txt`; `reedsolo==1.7.0` is required when enabled.
+Testing-laptop dry run remains pending. Keep the switch off for Version 1 recording.
+
 Run `python -m pytest -q` from `server/`. Tests cover the original single-robot
 story, three-robot reset repeatability, one-hop-per-tick custody, interrupted large
 transfers, duplicate replays, disconnected TTL expiry, shared-link bandwidth,

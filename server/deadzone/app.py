@@ -25,7 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
-from .command.controls import FaultRequest, RelayPlace, RelayPower, director_adapter
+from .command.controls import AskQuestion, FaultRequest, RelayPlace, RelayPower, director_adapter
 from .command.reports import command_report
 from .command.safety import SafetyChecker
 from .robot.robot import resume_command
@@ -101,6 +101,8 @@ class Hub:
                 raise PlanError("relay_limit", "Reset the simulation before adding more phone relays", 409)
             self.relay_clients[client] = self.sim.add_relay(self.sim.prior.entry, owner=client, phone=True)
         rid = self.relay_clients[client]
+        if self.sim.relays[rid].get("destroyed"):
+            raise PlanError("relay_destroyed", "This relay was destroyed; reset to restore it", 409)
         self.sim.set_relay_power(rid, self.relay_power_requests.setdefault(client, True))
         return rid
 
@@ -168,6 +170,8 @@ class Hub:
             rid = self.relay_clients[client]
             if kind == "relay_power":
                 power = RelayPower.model_validate(data)
+                if power.on and self.sim.relays[rid].get("destroyed"):
+                    raise PlanError("relay_destroyed", "Destroyed relay cannot be powered on", 409)
                 self.relay_power_requests[client] = power.on
                 self.sim.set_relay_power(rid, power.on)
             else:
@@ -236,7 +240,16 @@ class Hub:
                 raise PlanError("invalid_director", "Director value must use do, not type", 422)
             request = director_adapter.validate_python({
                 "type": value.get("do"), **{k: v for k, v in value.items() if k != "do"}})
-            if request.type in ("overload", "resume"):
+            if request.type == "aftershock":
+                if os.environ.get("DZ_AFTERSHOCK") != "1":
+                    raise PlanError("feature_disabled", "Enable DZ_AFTERSHOCK=1 for an aftershock dry run", 409)
+                try:
+                    self.sim.aftershock(request.at, request.relay)
+                except ValueError as error:
+                    raise PlanError("invalid_aftershock", str(error), 422) from None
+                await self.send_all(self.screens, self.hello())
+                await self.broadcast_tick(force_maps=True)
+            elif request.type in ("overload", "resume"):
                 if request.robot not in self.sim.robots:
                     raise PlanError("robot_not_found", f"Unknown robot: {request.robot}", 404)
                 if request.type == "overload":
@@ -380,6 +393,15 @@ def join(request: Request):
         parts = parts._replace(netloc=f"{address}:{port or (443 if parts.scheme == 'https' else 80)}")
     url = urlunsplit((parts.scheme, parts.netloc, parts.path.rstrip("/") + "/phone", "", ""))
     return {"url": url}
+
+
+@app.post("/api/ask")
+async def ask(question: AskQuestion):
+    post = hub.sim.post
+    result = await command_report(post, hub.sim.time, question=question.question)
+    if post is not hub.sim.post:
+        raise PlanError("report_reset", "Simulation reset during answer; ask again", 409)
+    return result  # private HTTP reply; no screen-wide report broadcast
 
 
 @app.post("/api/control")
