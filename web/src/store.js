@@ -94,13 +94,20 @@ export const useSim = create((set) => ({
 
 // What the detector judged, as a card. Reality cards come straight from the robot's
 // event; the Command card only appears once the survivor report is delivered.
+// A doubtful score from afar (Rayan's look-closer, 0.35 to 0.75) holds its card while the robot
+// drives in (up to 20 s); the decision card then replaces it, showing far -> close.
+const UNSURE_CARD_MS = 22000
 function detectionCard(ev, repeat, tick) {
   const base = { eid: ev.eid, at: Date.now(), robot: ev.robot ?? ev.by }
+  const closer = { confFar: ev.conf_far, closer: ev.looked_closer }
+  if (ev.kind === 'hotspot_unsure') {
+    return { ...base, side: 'reality', verdict: 'unsure', crop: ev.crop, conf: ev.conf, subject: ev.id, say: ev.say, ttl: UNSURE_CARD_MS }
+  }
   if (ev.kind === 'survivor_found' && !repeat) {
-    return { ...base, side: 'reality', verdict: 'person', crop: ev.crop, conf: ev.conf, subject: ev.survivor, linked: ev.linked }
+    return { ...base, side: 'reality', verdict: 'person', crop: ev.crop, conf: ev.conf, subject: ev.survivor, linked: ev.linked, ...closer }
   }
   if (ev.kind === 'hotspot_rejected') {
-    return { ...base, side: 'reality', verdict: 'rejected', crop: ev.crop, conf: ev.conf, subject: ev.id }
+    return { ...base, side: 'reality', verdict: 'rejected', crop: ev.crop, conf: ev.conf, subject: ev.id, ...closer }
   }
   if (ev.kind === 'survivor_reported') {
     const rec = tick?.command.survivors.find((r) => r.id === ev.survivor)
@@ -202,16 +209,28 @@ export function handleMessage(msg) {
       // is still playing is not interrupted.
       const firstReject = ev.kind === 'hotspot_rejected' &&
         !s.events.some((e) => e.kind === 'hotspot_rejected' && e.id === ev.id)
-      if ((ev.kind === 'survivor_found' && !repeat) || firstReject) {
-        const busy = s.eyeFocus && performance.now() - s.eyeFocus.born < FOCUS_HOLD_MS
+      // a doubtful hot spot is shown too (the robot drives closer); its decision then takes over
+      // the camera even while the unsure shot is still playing
+      // (every robot re-checks a doubtful hot spot itself: only the first doubt is shown, and
+      // the decision of the robot being shown always completes its shot)
+      const subject = ev.survivor ?? ev.id
+      const unsure = ev.kind === 'hotspot_unsure' && !s.events.some((e) => e.kind === 'hotspot_unsure' && e.id === ev.id)
+      const follows = (ev.kind === 'survivor_found' || ev.kind === 'hotspot_rejected') &&
+        s.eyeFocus?.kind === 'unsure' && s.eyeFocus.subject === subject && s.eyeFocus.robot === ev.robot
+      if ((ev.kind === 'survivor_found' && !repeat) || firstReject || unsure || follows) {
+        const busy = s.eyeFocus && performance.now() - s.eyeFocus.born < FOCUS_HOLD_MS && !follows
         if (!busy) {
-          s.set({ eyeRobot: ev.robot, eyeFocus: { kind: ev.kind === 'survivor_found' ? 'person' : 'decoy',
-            subject: ev.survivor ?? ev.id, robot: ev.robot, pos: ev.pos, conf: ev.conf, linked: ev.linked,
-            born: performance.now() } })
+          s.set({ eyeRobot: ev.robot, eyeFocus: { kind: unsure ? 'unsure' : ev.kind === 'survivor_found' ? 'person' : 'decoy',
+            subject, robot: ev.robot, pos: ev.pos, conf: ev.conf, linked: ev.linked,
+            confFar: ev.conf_far, closer: ev.looked_closer, born: performance.now() } })
         }
       }
       const card = detectionCard(ev, repeat, s.tick)
-      if (card) s.set({ detections: [...s.detections, card].slice(-6) })
+      if (card) {
+        const kept = card.verdict === 'unsure' ? s.detections
+          : s.detections.filter((c) => !(c.verdict === 'unsure' && c.subject === card.subject))
+        s.set({ detections: [...kept, card].slice(-6) })
+      }
       s.set({ events: events.slice(0, 40),
               ...(TOAST_KINDS.has(ev.kind) && !repeat ? { toasts: [...s.toasts, { ...ev, at: Date.now() }].slice(-8) } : {}) })
       break

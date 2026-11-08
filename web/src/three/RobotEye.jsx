@@ -143,6 +143,10 @@ function Robots({ robotId, thermal }) {
 // behind a wall or rubble = not boxed. The classifier scores crops, it doesn't localize:
 // the box is the object's known extent projected through this camera.
 const THERMAL_RANGE = 5   // m, matches the sim's thermal camera
+// Rayan's look-closer: a score in [0.35, 0.75) from afar is unsure when a close-up crop
+// (<crop>_close.png) exists; within 2 m the close-up is what gets judged
+const UNSURE = [0.35, 0.75]
+const CLOSE_LOOK_M = 2
 const MAX_BOXES = 6
 
 // 2D segment intersection, for line of sight against walls and rubble edges.
@@ -170,8 +174,8 @@ function ClassifyBoxes({ robotId, thermal, boxes }) {
     const score = Object.fromEntries((m?.crops ?? []).map((c) => [c.file, c.conf]))
     const threshold = m?.threshold ?? 0.6
     return [...(fp.survivors ?? []), ...(fp.decoys ?? [])].map((o) => ({
-      ...o, conf: score[o.thermal], person: score[o.thermal] != null ? score[o.thermal] >= threshold : null,
-      lying: !o.label,
+      ...o, conf: score[o.thermal], threshold, lying: !o.label,
+      closeConf: o.thermal ? score[o.thermal.replace(/\.png$/, '_close.png')] : undefined,
     }))
   }, [fp, m])
   useFrame(() => {
@@ -201,7 +205,11 @@ function ClassifyBoxes({ robotId, thermal, boxes }) {
         const top = ((1 - clamp(z1)) / 2) * size.height
         const bottom = ((1 - clamp(z0)) / 2) * size.height
         const judged = dist <= THERMAL_RANGE && o.conf != null
-        const kind = !judged ? 'warm' : o.person ? 'person' : 'decoy'
+        const close = o.closeConf != null && dist <= CLOSE_LOOK_M
+        const conf = close ? o.closeConf : o.conf
+        const unsure = judged && !close && o.closeConf != null && conf >= UNSURE[0] && conf < UNSURE[1]
+        const person = conf >= o.threshold
+        const kind = !judged ? 'warm' : unsure ? 'unsure' : person ? 'person' : 'decoy'
         el.className = `eye-box ${kind}`
         el.style.display = ''
         el.style.transform = `translate(${left}px, ${top}px)`
@@ -209,8 +217,9 @@ function ClassifyBoxes({ robotId, thermal, boxes }) {
         el.style.height = `${Math.max(20, bottom - top)}px`
         const label = el.firstChild
         const text = !judged ? `WARM · ${dist.toFixed(0)} m · come closer to classify`
-          : `${o.person ? 'PERSON' : 'NOT A PERSON'} ${pct(o.conf)}`
-        const sub = judged ? (o.person ? 'onboard AI' : 'onboard AI · rejected') : ''
+          : unsure ? `UNSURE ${pct(conf)}` : `${person ? 'PERSON' : 'NOT A PERSON'} ${pct(conf)}`
+        const sub = !judged ? '' : unsure ? 'onboard AI · moving closer'
+          : `onboard AI${close ? ' · up close' : ''}${person ? '' : ' · rejected'}`
         if (label.dataset.t !== text + sub) {
           label.dataset.t = text + sub
           label.innerHTML = sub ? `${text}<small>${sub}</small>` : text
@@ -226,9 +235,21 @@ const pct = (c) => `${(c * 100).toFixed(c > 0 && c < 0.01 ? 1 : 0)}%`
 
 // What the robot does next, ticked off only by real events (never assumed).
 function steps(f, events) {
+  if (f.kind === 'unsure') {
+    return [
+      { done: true, text: 'Hot spot found on the thermal camera' },
+      { done: true, text: `Onboard classifier unsure (${pct(f.conf ?? 0)})` },
+      { done: false, text: 'Driving closer for a second look…' },
+    ]
+  }
+  // decided after a close look: say where the doubt was and what the close-up said
+  const second = f.confFar != null
+    ? [{ done: true, text: f.closer ? `Unsure from afar (${pct(f.confFar)}) · judged again up close` : `Unsure from afar (${pct(f.confFar)}) · could not get close` }]
+    : []
   if (f.kind === 'decoy') {
     return [
       { done: true, text: 'Hot spot found on the thermal camera' },
+      ...second,
       { done: true, text: `Onboard classifier: not a person (${pct(f.conf ?? 0)})` },
       { done: true, text: 'Rejected · keeps exploring' },
     ]
@@ -238,6 +259,7 @@ function steps(f, events) {
   const beacon = events.find((e) => e.kind === 'relay_dropped' && e.beacon_for === f.subject)
   const reported = events.find((e) => e.kind === 'survivor_reported' && mine(e))
   const out = [
+    ...second,
     { done: true, text: `Person detected · ${pct(f.conf ?? 1)} (onboard classifier)` },
     { done: true, text: `Location marked · ${f.pos[0].toFixed(1)}, ${f.pos[1].toFixed(1)} m` },
     { done: !!route, text: route ? `Rescue route planned · ${Math.round(route.length_m)} m` : 'Planning rescue route…' },
@@ -262,7 +284,7 @@ function FocusPanel({ robotId }) {
   return (
     <>
       {live && (
-        <ol className={`eye-steps ${person ? 'person' : 'decoy'}`}>
+        <ol className={`eye-steps ${person ? 'person' : f.kind === 'unsure' ? 'unsure' : 'decoy'}`}>
           {steps(f, events).map((st, i) => (
             <li key={i} className={st.done ? 'done' : 'wait'}><i />{st.text}</li>
           ))}
