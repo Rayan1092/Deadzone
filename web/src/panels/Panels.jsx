@@ -75,6 +75,11 @@ function PresenterLock() {
   )
 }
 
+function TruthStatus() {
+  const on = useSim((s) => s.showTruth)
+  return on ? <span className="truth-chip" role="status" title="Press T to hide">Truth markers on</span> : null
+}
+
 // Small inline icons for the top bar (stroke = currentColor)
 const Icon = {
   phone: <svg viewBox="0 0 24 24" aria-hidden><rect x="7" y="2.5" width="10" height="19" rx="2.2" /><path d="M11 18.5h2" /></svg>,
@@ -141,6 +146,7 @@ export function TopBar() {
         <span className="baseline-chip" title="Press B to switch Deadzone back on">Baseline · without Deadzone</span>
       )}
       <div className="tb-robots">{robots.map((r) => <RobotChip key={r.id} r={r} />)}</div>
+      <TruthStatus />
       <MissionClock />
       <PresenterLock />
       <ReplayChip />
@@ -401,6 +407,10 @@ export function useKeyboard() {
       if (key === 'd') { if (s.director) overview(); s.set({ director: !s.director, shot: null }) }
       if (key === 'h') s.set({ helpOpen: !s.helpOpen })
       if (key === 'v' && target) s.set({ eyeRobot: s.eyeRobot === target.id ? null : target.id })
+      if (key === 't' && !e.repeat) {
+        s.set({ showTruth: !s.showTruth })
+        note(s.showTruth ? 'Truth markers off' : 'Truth markers on: Reality only')
+      }
       if (key === 'p') setPerf(!s.perf)
       if (key === 'k' && !e.repeat) {
         setNight(!s.night)

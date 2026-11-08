@@ -75,6 +75,7 @@ export const useSim = create((set) => ({
   time: 0,
   tick: null,          // { reality, command, stats }
   maps: { reality: null, command: null, version: 0, commandVersion: 0, belief: null, beliefCommand: null, missing: null, beliefVersion: 0 }, // commandVersion: only when Command's map changed
+  showTruth: false,   // T: truth markers on Reality only; never Command or phones.
   coverageOn: false,   // W: predicted radio coverage on the Command side (off by default)
   beliefOn: (() => { try { return localStorage.getItem('dz-belief') === '1' } catch { return false } })(), // Y: belief heat layer
   events: [],          // newest first, capped

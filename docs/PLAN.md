@@ -983,3 +983,10 @@ The core story (explore, lose signal, find survivor, report later) survives ever
 | Signal never drops in the demo or drops everywhere | Coverage test at 5:00 PM, tune `n` and wall losses only |
 | Gemini quota or timeout on stage | 10 s timeout, canned briefing generated from the same tool data |
 | Live demo crashes | Replay mode, then the backup video |
+
+### Reality truth markers (T)
+
+T toggles observer-only truth markers, off by default: unfound survivors in red
+and warm decoys in amber on Reality (including the Reality part of one view).
+A visible top-bar status and H help list the toggle. Command, its inset, phone
+views, robot sensing and simulation state are unchanged. No wire changes.

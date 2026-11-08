@@ -6,7 +6,8 @@ test('help: four groups of plain sentences, nothing internal', () => {
   assert.deepEqual(KEY_GROUPS.map((g) => g.title), ['Run', 'View', 'Scenario', 'Model & network'])
   const keys = KEY_GROUPS.flatMap((g) => g.keys)
   const names = keys.map(([k]) => k)
-  for (const gone of ['?', 'S', 'T', 'E', '?replay']) assert.ok(!names.includes(gone), `${gone} is gone`)
+  for (const gone of ['?', 'S', 'E', '?replay']) assert.ok(!names.includes(gone), `${gone} is gone`)
+  assert.ok(keys.some(([k, line]) => k === 'T' && /Reality only/.test(line)))
   assert.equal(new Set(names).size, names.length)
   for (const [k, line] of keys) {
     assert.match(line, /^[A-Z0-9].*[.)]$/, `${k}: a sentence`)
