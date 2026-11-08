@@ -105,10 +105,32 @@ cd server
 python -m pytest -q
 ```
 
-## Data and resources
+## AI tools
 
-- **Teledyne FLIR ADAS v2 thermal dataset**: street-scene thermal images with person boxes; training data and the held-out test set (1,200 images), the judge test pool and the decoy images.
-- **SDT, Synthetic Depth & Thermal dataset** ([Zenodo 4124309](https://zenodo.org/records/4124309)), licensed **CC BY 4.0** (the record also says non-commercial research use): we use only its real indoor test split, FLIR Lepton 3.5 frames of people lying, sitting and standing plus empty rooms. 80% is used for training, 20% is held out; the sim's three survivors come from the held-out part.
+We used AI coding assistants to build this, and we're saying so because MLH asks (and because it's true): **Claude Code** (Anthropic) and **OpenAI Codex** wrote and edited code alongside us, each teammate driving one session on their own laptop. The design, the demo story, what gets built and what gets cut were ours; the assistants worked inside the rules in `CLAUDE.md` and `docs/team/INSTRUCTIONS.md` (ownership per folder, tests before every PR, a history entry with every commit). The survivor detector is a model we trained ourselves (see below); Gemini only writes the command-post briefing from data the command post already has, and never drives a robot.
+
+## Resources and licenses
+
+**Datasets**
+
+- **Teledyne FLIR ADAS v2 thermal dataset**: street-scene thermal images with person boxes; training data, the held-out test set (1,200 images), the judge test pool and the decoy images. Used under Teledyne's free dataset terms; nothing from it is committed to this repo.
+- **SDT, Synthetic Depth & Thermal dataset** ([Zenodo 4124309](https://zenodo.org/records/4124309)), **CC BY 4.0** (the record also says non-commercial research use): we use only its real indoor split, FLIR Lepton 3.5 frames of people lying, sitting and standing plus empty rooms. 80% trains, 20% is held out; the sim's three survivors come from the held-out part. Nothing from it is committed either.
+
+**Published numbers we lean on**
+
+- Rappaport, *Wireless Communications: Principles and Practice*, 2nd ed., Table 4.3: partition losses (our 1 dB per furniture piece).
+- Stone, W. C. (1997), *Electromagnetic Signal Attenuation in Construction Materials*, NISTIR 6055: wall losses at 2.4 GHz for the published-values benchmark.
+- ITU-R Recommendation P.1238: indoor path-loss exponents at 2.4 GHz, same benchmark.
+- Liu & Layland (1973): the rate-monotonic bound the robot scheduler is checked against.
+
+**3D assets**: Poly Haven and Poly Pizza, all CC0; the full list is in `assets-pack/CREDITS.md` and `web/public/assets/CREDITS.md`.
+
+**Code we depend on** (one line each, licenses as published by the projects)
+
+- Python (`server/requirements.txt`): fastapi (MIT), uvicorn (BSD-3-Clause), numpy (BSD-3-Clause), pytest (MIT), httpx (BSD-3-Clause), python-dotenv (BSD-3-Clause), reedsolo (public domain). For training and slides (`ml/`): torch (BSD-3-Clause, with bundled components under their own terms), torchvision (BSD-3-Clause), Pillow (MIT-CMU), matplotlib (PSF-based matplotlib license), trimesh (MIT).
+- JavaScript (`web/package.json`): react and react-dom (MIT), three (MIT), @react-three/fiber, @react-three/drei and @react-three/postprocessing (MIT), zustand (MIT), d3-delaunay (ISC), qrcode.react (ISC), vite and @vitejs/plugin-react (MIT).
+
+Every number we say on stage, with the file it comes from, is in `docs/FACTS.md`.
 
 ## Team
 
