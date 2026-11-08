@@ -1,209 +1,97 @@
 # Deadzone
 
-Rescue robots that keep searching when the signal dies. Built at UB Hacking 2026.
+Rescue robots that keep searching when radio cannot reach them. Built at UB Hacking 2026.
 
-## What it is
+Deadzone is a laptop simulation of a rescue fleet inside a collapsed building. Robots map rooms, check thermal images for people, drop relays and hold reports through radio outages. When a route to the command post returns, the reports arrive there.
 
-When a building collapses, concrete and steel kill the radio. Most rescue robots just stop when they lose their link, and the people outside go blind.
+The big screen shows the difference between **Reality**, the simulated world, and **Command**, which only knows what the radio has delivered. Phones let responders plan searches, view the last received camera image and control robots.
 
-Our robots don't stop. They explore on their own, drop radio relays as they go, and keep searching in dead zones. When they find someone, they hold the report and bring it back the moment they get signal again. An AI model running on each robot checks every warm spot so a radiator never shows up as a person.
+![Deadzone showing the collapsed building and the command post's received map](docs/assets/deadzone.jpg)
 
-It's all simulated, so you only need a laptop. The big screen shows two views of the same building side by side:
+*A three-robot run in Performance mode: Reality on the left, received Command reports on the right.*
 
-- **Reality**: where the robots really are and what they really found.
-- **Command post**: only what has actually reached the antenna over the radio. No cheating, a test fails if this side ever knows something early.
+## Run in two commands
 
-The gap between those two views is the whole point.
+Install **64-bit Python 3.11+**, **Node.js 20+** and Git, then clone this repository. From its root:
 
-## A typical mission
-
-1. An operator scans a QR code and plans the search on their phone. They send Robot 2 into the north-east corner, where there's a steel storage cage. The safety checker rejects it: "that zone is a radio dead zone". They tap "Allow it to go dark" and send it.
-2. Three robots drive in, map the building with lidar, and drop relays as the signal gets weak.
-3. Robot 2 enters the steel cage and loses signal. The command post still shows it as a grey ghost at its last known spot.
-4. Robot 2 finds a survivor in the dark. Its AI model says "person, 100%". Only the Reality side knows. It drops a beacon next to the survivor and plans the safest route in from the entrance.
-5. It heads back to signal. 16 seconds later the map, the survivor and the 50 m rescue route all pop up on the command post at once.
-6. A secondary collapse drops rubble on that rescue route. The robots see it, replan, and the route on the command post redraws around it. A jammed wheel and an overloaded processor follow: fault protection backs the robot off, and its safety task never misses a deadline.
-
-Same seed every time, so the story happens on cue. The full script with timings is in [`docs/DEMO.md`](docs/DEMO.md).
-
-## How it works
-
-- **Robots** (`server/deadzone/robot/`): lidar mapping, frontier exploration, A\* paths, relay drop rule, lost-link behaviour, a rate monotonic task scheduler, fault protection, and rescue routes. Robot code can only touch the world through its sensors and radio. It never reads the sim's truth.
-- **Network** (`server/deadzone/network/`): a radio model where every wall costs signal (metal costs the most), plus store and forward with custody, so a message is never lost, just late.
-- **Command post** (`server/deadzone/command/`): only changes when a message actually arrives. It also runs the safety checker for phone plans.
-- **AI survivor detector** (`ml/`): MobileNetV3-Small trained on real thermal images (FLIR street scenes plus SDT indoor scenes). 96.7% accuracy, 97.3% precision, 96.0% recall on 1,200 FLIR images it never trained on. Adding the indoor images raised accuracy on held-out people lying and sitting from 83.9% to 99.6%. The model is 6 MB and runs on the robot, so it works with no signal.
-- **Big screen and phones** (`web/`): React and three.js. Phones are just a web page, so there's nothing to install.
-
-## Run it
-
-You need Python 3.11+ and Node 20+. On Windows use `py` where we write `python`.
-
-Server:
-
-```
-cd server
-python -m pip install -r requirements.txt
-python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-python -m pip install pillow
+```sh
+python scripts/setup.py
+python scripts/run.py
 ```
 
-The torch line is optional. Without it the robots use a simple sim sensor instead of the AI model, and the decoys are turned off.
+On Windows, use `py` instead of `python` if that is your Python launcher. Setup creates `.venv`, installs the server and CPU PyTorch, loads the included detector, and builds the web app with `npm ci`. It needs internet access for dependencies. Run reuses the project Python; no activation is needed. Repeat setup after pulling dependency or web changes.
 
-Build the web app once, then the server hosts everything on port 8000:
+Open **http://localhost:8000**. The mission starts paused; press **Space** to begin. Use **H** for current controls. The server binds `0.0.0.0:8000` so phones can join. Stop it with **Ctrl+C**; choose another port with `python scripts/run.py --port 8001`.
 
-```
+No API keys are needed for the local simulation or trained detector. `python scripts/setup.py --check` verifies an existing installation without installing anything. For a rehearsed three-robot run, use the flags and preflight checks in [the demo runbook](docs/DEMO.md).
+
+## Settings
+
+Optional configuration belongs in **server/.env**. Copy [server/.env.example](server/.env.example), uncomment only what you need, and restart. The example documents every supported setting; its only active entries are empty API-key slots. Real `.env` files are ignored by Git and read only by the server. Keep keys out of frontend code and screenshots.
+
+| Setting | Purpose | Default |
+|---|---|---|
+| `DZ_ROBOTS` | Fleet size | 1; reference demo uses 3 |
+| `DZ_SEED` | Repeatable run | 7 |
+| `DZ_SPEED` | Simulation speed | 2 |
+| `DZ_FLOORPLAN` | Building | `collapse_01` |
+| `DZ_AI_LAB=1` | Enable Model Lab | Off |
+| `DZ_PHONE_FRAMES=1` | Share the scout camera with linked phones | Off |
+| `DZ_CONTROL_LEASES=1` | Enable robot control locks | Off |
+| `DZ_VOICE=1` | Additional robot instructions and optional speech | Off |
+| `DZ_GEMINI=1` | Optional briefing and questions with `GEMINI_API_KEY` | Off |
+
+Other opt-in features stay off unless selected. The building's scripted events and global no-go handling are on by default. Environment variables override `.env`. The full reference-demo profile is in [DEMO.md](docs/DEMO.md); copying every optional flag into the environment will fail its strict preflight.
+
+## Join from a phone
+
+Click **Phone** in the top bar or press **Q**, then scan the join code. **Phones must be on the same Wi-Fi, or use the tunnel.** The LAN join link uses the laptop's network address, never localhost. Guest-network isolation may require a hotspot or tunnel even when the laptop's LAN check passes.
+
+On Windows, start [scripts/tunnel.ps1](scripts/tunnel.ps1) manually after starting the server if you need HTTPS access. Open its printed HTTPS origin on the big screen and its `/phone` URL on the phone. Preflight never starts a tunnel or applies firewall changes.
+
+- **Control a robot:** pick a scout to see its latest delivered report and camera image. Take control before sending instructions when control locks are enabled. Dark robots keep the last image and contact age; sending an instruction does not mean the robot has received it.
+- **Plan the search:** draw search areas and no-go areas, choose robot assignments, run the safety check, then **Send plan**. Delete the last region and use **Clear plan**, or use **Clear all**, to tell every robot the exclusion is gone.
+- **Extend radio coverage:** join as a relay and place it on the map. Relay power and position changes are confirmed by the server.
+- **Ask about the search:** answers use received Command reports. If optional Gemini service is unavailable, the phone labels its local summary.
+
+## Model Lab
+
+Enable `DZ_AI_LAB=1` before startup and press **L**. Model Lab shows training examples, held-out results, confusion matrices and the evidence behind the local person detector. **J** opens Model test: make a guess on a held-out thermal image, then compare it with the recorded model result.
+
+The detector is trained locally on thermal-image datasets and runs on CPU without a radio link. Navigation uses frontier exploration and A*; it is separate from the person classifier. The scene is simulated, and the classifier judges the real thermal-image samples assigned to its hot spots. Metrics and their source files are listed in [FACTS.md](docs/FACTS.md); training code is in [ml/train.py](ml/train.py).
+
+## Mission recording and replay
+
+Open **http://localhost:8000/?record**, run the mission, then click the **REC** chip to save a compressed mission recording. The old S shortcut is no longer used.
+
+Open **http://localhost:8000/?replay** and choose or drop the saved file. Replay uses recorded messages rather than recomputing the mission. Space pauses and Backspace restarts playback. Keep an asset server available if you want the thermal images to load.
+
+## Buildings and mission controls
+
+The reference scenario is **Riverside Block C, post-earthquake**: offices, a warehouse, a steel radio dead zone and a scripted secondary collapse. **N** loads another building; **Shift+N** returns to the reference scenario. Harborview Logistics Center and generated buildings provide larger search layouts. Names, descriptions and event labels travel with each building.
+
+**M** switches between one view and split view. **C** swaps the Command inset in one view or frames the command post in split view. Robot chips and number keys follow scouts; **V** opens the scout camera. **H** is the source of truth for controls. [PLAN.md](docs/PLAN.md) documents the formats and algorithms, and [DEMO.md](docs/DEMO.md) contains the timed reference run.
+
+## Development and checks
+
+Setup uses the repository virtual environment. For backend tests, activate `.venv`, then run `cd server` and `python -m pytest -q`. For the web:
+
+```sh
 cd web
-npm install
+npm test
 npm run build
 ```
 
-Start it (PowerShell):
+`npm run dev` serves the web app on port 5173 and proxies the backend on 8000. The launch helpers use argument arrays, preserve runtime settings, and never read or print API-key values. `scripts/preflight.ps1` and `scripts/preflight.sh` check the demo laptop, real detector, flags, ports, tools and LAN access before a rehearsal.
 
-```
-cd server
-$env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=2
-python -m deadzone
-```
+## License and resources
 
-On macOS or Linux: `DZ_ROBOTS=3 DZ_SEED=7 DZ_SPEED=2 python -m deadzone`.
+Original Deadzone source code is available under the [MIT license](LICENSE). Third-party datasets, image derivatives and assets retain their original terms and provenance. Runtime thermal-image provenance is recorded in [the crop manifest](ml/crops/runtime/manifest.json) and [decoy manifest](ml/crops/decoys/manifest.json); these sample images are included, while the full training datasets are not. See [asset credits](assets-pack/CREDITS.md) and [web asset credits](web/public/assets/CREDITS.md) for models and textures.
 
-The default launcher binds `0.0.0.0:8000` (all IPv4 interfaces); `--port` and `--reload` are supported.
+## Team and AI tools
 
-Open http://localhost:8000. Press **Q** for the phone QR code, which uses the laptop's LAN IP instead of localhost. **Phones must be on the same Wi-Fi, or use the tunnel** (`scripts/tunnel.ps1`, started manually; see [DEMO.md](docs/DEMO.md)). Open the tunnel's HTTPS origin on the screen to share its phone URL. Preflight checks HTTP access through the LAN IP; if it fails, it prints the Windows Firewall command to allow inbound TCP 8000. Guest Wi-Fi/client isolation may still require a hotspot or tunnel.
+- **Rayan Diya:** robot autonomy and the person detector.
+- **Aziz:** simulation, radio network and command post.
+- **Yusuf Nusrat:** big screen, phone app and 3D.
 
-For web development, run `npm run dev` in `web/` and open http://localhost:5173.
-
-The keys, the phone and every optional feature are described in [Using the simulator](#using-the-simulator) below.
-
-### Settings
-
-- `DZ_ROBOTS`: number of robots (default 1, the demo uses 3)
-- `DZ_SEED`: random seed (default 7)
-- `DZ_SPEED`: sim speed (default 2)
-- `DZ_AUTOSTART=1`: start right away instead of paused
-- `DETECTOR=sim`: skip the AI model and use the sim sensor
-- `DZ_PUBLIC_URL`: the address phones should use, if the QR code points to the wrong one
-
-### Tests
-
-```
-cd server
-python -m pytest -q
-```
-
-## Using the simulator
-
-Deadzone is a test bench for one question: what should a team of search robots do when the building cuts their radio? Everything below runs on one laptop; phones join as field units over Wi-Fi.
-
-### What you are looking at
-
-Two views of the same mission. **Reality** is the simulated world: where the robots really are, every survivor and heat source (press **T** to show the hidden ones). The **Command post** is only what has reached the antenna over the simulated radio: delivered maps, last reported robot positions (a grey ghost when a robot is out of contact), reported survivors and rescue routes. A test fails if the Command post ever learns something before the radio delivered it. **M** switches between one view (Reality with the Command post inset) and side by side; **C** swaps the inset and the main view.
-
-### Buildings, variants and scenarios
-
-| Building | What it is | How to load it |
-|---|---|---|
-| **Riverside Block C, post-earthquake** | the reference building: 40 x 30 m offices, break room and warehouse, a steel storage cage that kills the radio, 3 survivors, 3 warm decoys (a radiator among them), a gas hazard, and a scripted secondary collapse at 162.5 s | the default (`collapse_01`) |
-| **Riverside Block C, variants 1 to 5** | the same walls with the people and decoys moved (one survivor always deep in the steel cage) | **N** loads another building (these five first); **Shift+N** returns to the default (`variants/collapse_01_v1` ...) |
-| **Harborview Logistics Center, post-earthquake** | 80 x 60 m, 36 rooms, two steel dead zones, 4 survivors, 4 decoys, a three-area earthquake | reset into `showcase_01` (below) |
-| **Building 1234, post-earthquake** (any seed) | `python data/floorplans/generate.py --seed 1234` writes `data/floorplans/generated/gen_1234.json`: a random collapsed building, validated (everything reachable, a steel dead zone, survivors, decoys, a disaster script), plus a default search plan in `data/plans/` | reset into `generated/gen_1234` |
-
-Every building carries a name and a one-line description (what the screen shows), a short descriptor for each survivor ("Crouched low in the steel storage cage") used in captions, and a label on every scripted event for the banner. `GET /api/scenarios` lists every building the server knows. To switch, send the control `{action: "reset", value: {floorplan: "<id>", timeline: true}}`. The same seed and building always give the same run, step for step, so you can change one thing and compare.
-
-**Scenario events.** A building can script its own disasters in an `events` list, run at the same sim time on every run: `collapse` (rubble at a point or just ahead of a robot), `aftershock` (rubble, a fallen wall section, a destroyed relay) and `radio_fail` (a relay's radio dies and its stored messages are lost). Riverside Block C has one, labelled "Secondary collapse on the rescue corridor": `{"t": 162.5, "type": "collapse", "near": "R1", "at": [25.31, 15.65]}`, rubble on the first survivor's rescue route. The schema is in `docs/PLAN.md` ("Scenario events"). Generated buildings also carry a longer disaster `timeline`, played when the server runs with `DZ_SCENARIO_TIMELINE=1`.
-
-### The phone as a field unit
-
-Press **Q** for a join code. Any phone on the same network opens a web page; nothing to install.
-
-- **Plan the search:** draw search zones on the map, assign a robot and a priority to each, mark what the zone needs (stairs, climbing rubble), and draw no-go areas. "Dark for up to" sets how long a robot may stay out of radio contact.
-- **Run safety check:** the command post checks every zone against what it actually knows (not the true building): battery reserve for there and back, robot capability, reachability, no-go overlap, and whether the zone is predicted to be a radio dead zone. A dead-zone zone is refused until you allow that robot to go dark. Then **Dispatch**: the plan itself travels over the simulated radio, so a robot out of contact gets it late.
-- **Robot cards:** tap one for its delivered camera image and controls (explore, return home, move to a point). With control leases on (`DZ_CONTROL_LEASES=1`), **Take control** / **Release** hand a robot between phones and the big screen; the big screen shows an **Operator lock** while it holds the fleet.
-- **Be a relay:** the phone becomes a radio relay and carries robot data to the command post.
-- **Ask:** questions about the search, answered by Gemini from Command post data only (`DZ_GEMINI=1`).
-
-### Keys on the big screen
-
-| Key | What it does |
-| --- | --- |
-| Space / Backspace | start or pause / reset (paused) |
-| + / - | sim speed |
-| 1, 2, 3 / 0 | follow a robot (or click its card) / overview |
-| M / C | one view or side by side / swap the Command post inset and the main view |
-| E | Operator view (map first) / Engineering view (scheduler, legends, every panel) |
-| V | the followed robot's camera, with a thermal toggle |
-| T | show hidden survivors and decoys on Reality |
-| Y | belief map: where survivors may still be |
-| R | rubble on the followed robot's path (with `DZ_SMART_RUBBLE=1` it never seals anyone in) |
-| F / O | jam a wheel / overload the robot's processor (the safety task keeps its deadlines) |
-| U | resume a robot from safe stop (sent over the radio) |
-| A / Shift+A | aftershock / strong three-area aftershock (`DZ_AFTERSHOCK=1`) |
-| B | baseline: every robot behaves like a conventional one that stops when its link drops |
-| N / Shift+N | a new building / back to the default |
-| G | spoken situation briefing from Command post data (`DZ_GEMINI=1`) |
-| L / J | Model Lab / one held-out thermal sample: guess, then see the model's answer |
-| K / D | night lighting / automatic camera |
-| X / P | sound cues / performance mode (set before a run) |
-| Q / S / ? | phone join code / save the mission recording / this list |
-
-### Model Lab
-
-Press **L** (server started with `DZ_AI_LAB=1`): training examples, the training curve, the confusion matrix and held-out metrics, and the last thermal crop a robot classified with its Grad-CAM heat map ("where the model looked"). Every number shown is reproducible from a file in `ml/results/`; `docs/FACTS.md` lists each one with its source. The detector also exports to ONNX (`py ml/export_onnx.py`) for embedded boards.
-
-### Mission recording and replay
-
-Open `http://localhost:8000/?record`, run the mission, press **S**: the browser saves a gzipped recording of everything both views showed. Open `/?replay` and drop the file in to watch it again without the simulator (Space pauses, Backspace restarts); the detection images load only while a server is running.
-
-### Optional features
-
-All off unless set before starting the server.
-
-| Setting | What it adds |
-|---|---|
-| `DZ_OBSTACLES=1` | solid furniture: blocks robots and lidar, 1 dB radio loss per piece |
-| `DZ_ROBOT_COLLISIONS=1` | robots are solid to each other |
-| `DZ_SMART_RUBBLE=1` | R never traps a robot |
-| `DZ_AFTERSHOCK=1` | keys A and Shift+A |
-| `DZ_SCENARIO_TIMELINE=1` | generated buildings play their disaster timeline |
-| `DZ_SEARCH_BAYES=1` | robots steer toward where survivors are most likely, not just the nearest unexplored area |
-| `DZ_HEAT_SOURCES=1` | typed heat sources (generators, pipes, server racks...) the detector must reject |
-| `DZ_SENSOR_VIEW=1` | rendered robot camera frames on Reality |
-| `DZ_AI_LAB=1` | Model Lab (key L) |
-| `DZ_GEMINI=1` | briefings and phone questions through Gemini (`GEMINI_API_KEY` in `server/.env`) |
-| `DZ_CONTROL_LEASES=1` | one controller per robot; the big screen's Operator lock |
-| `DZ_SCENARIO_EVENTS=0` | switch a building's scripted events off |
-
-## AI tools
-
-We used AI coding assistants to build this, and we're saying so because MLH asks (and because it's true): **Claude Code** (Anthropic) and **OpenAI Codex** wrote and edited code alongside us, each teammate driving one session on their own laptop. The design, the demo story, what gets built and what gets cut were ours; the assistants worked inside the rules in `CLAUDE.md` and `docs/team/INSTRUCTIONS.md` (ownership per folder, tests before every PR, a history entry with every commit). The survivor detector is a model we trained ourselves (see below); Gemini only writes the command-post briefing from data the command post already has, and never drives a robot.
-
-## Resources and licenses
-
-**Datasets**
-
-- **Teledyne FLIR ADAS v2 thermal dataset**: street-scene thermal images with person boxes; training data, the held-out test set (1,200 images), the Model test's held-out set and the decoy images. Used under Teledyne's free dataset terms; nothing from it is committed to this repo.
-- **SDT, Synthetic Depth & Thermal dataset** ([Zenodo 4124309](https://zenodo.org/records/4124309)), **CC BY 4.0** (the record also says non-commercial research use): we use only its real indoor split, FLIR Lepton 3.5 frames of people lying, sitting and standing plus empty rooms. 80% trains, 20% is held out; the sim's three survivors come from the held-out part. Nothing from it is committed either.
-
-**Published numbers we lean on**
-
-- Rappaport, *Wireless Communications: Principles and Practice*, 2nd ed., Table 4.3: partition losses (our 1 dB per furniture piece).
-- Stone, W. C. (1997), *Electromagnetic Signal Attenuation in Construction Materials*, NISTIR 6055: wall losses at 2.4 GHz for the published-values benchmark.
-- ITU-R Recommendation P.1238: indoor path-loss exponents at 2.4 GHz, same benchmark.
-- Liu & Layland (1973): the rate-monotonic bound the robot scheduler is checked against.
-
-**3D assets**: Poly Haven and Poly Pizza, all CC0; the full list is in `assets-pack/CREDITS.md` and `web/public/assets/CREDITS.md`.
-
-**Code we depend on** (one line each, licenses as published by the projects)
-
-- Python (`server/requirements.txt`): fastapi (MIT), uvicorn (BSD-3-Clause), numpy (BSD-3-Clause), pytest (MIT), httpx (BSD-3-Clause), python-dotenv (BSD-3-Clause), reedsolo (public domain). For training and slides (`ml/`): torch (BSD-3-Clause, with bundled components under their own terms), torchvision (BSD-3-Clause), Pillow (MIT-CMU), matplotlib (PSF-based matplotlib license), trimesh (MIT).
-- JavaScript (`web/package.json`): react and react-dom (MIT), three (MIT), @react-three/fiber, @react-three/drei and @react-three/postprocessing (MIT), zustand (MIT), d3-delaunay (ISC), qrcode.react (ISC), vite and @vitejs/plugin-react (MIT).
-
-Every number we say on stage, with the file it comes from, is in `docs/FACTS.md`.
-
-## Team
-
-- **Rayan Diya**: robots and the AI detector
-- **Aziz**: sim, radio network and command post
-- **Yusuf Nusrat**: big screen, phone app and 3D
-
-More docs: [`docs/PLAN.md`](docs/PLAN.md) (the build plan), [`docs/DEMO.md`](docs/DEMO.md) (demo runbook), [`docs/DEVPOST.md`](docs/DEVPOST.md) (write-up draft).
+We used **Claude Code** and **OpenAI Codex** to write, edit and test code under human direction. The team chose the design, experiments and demo. The person detector was trained for this project; optional Gemini services summarize received reports or interpret requested instructions, while robot navigation and safety checks run locally. Development ownership, tests and handoff rules are recorded in [the team instructions](docs/team/INSTRUCTIONS.md).

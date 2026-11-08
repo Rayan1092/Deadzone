@@ -21,7 +21,7 @@ Zones in the demo plan. R2 is the robot that goes dark on purpose:
 | **R2** | **ZNE** | **north-east incl. the steel cage, x 32–40, y 17–30** | **lost_link_ok** |
 | R3 | ZB | break room, x 20–32, y 17–30 | relay |
 
-P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that rejection is the phone beat. The phone's one-tap fix "Allow ZNE to go dark" switches it to `lost_link_ok` (same plan id), and then it passes. All timings below were measured with exactly that plan.
+P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that rejection is the phone beat. The phone's one-tap fix "Allow signal loss here and check again" switches it to `lost_link_ok` (same plan id), and then it passes. All timings below were measured with exactly that plan.
 
 ## Pre-flight checks (T-30 min)
 
@@ -91,9 +91,9 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    the same Wi-Fi/hotspot. **Phones must be on the same Wi-Fi, or use the tunnel.**
    A LAN-IP preflight pass cannot detect guest-network/client isolation; use a
    hotspot or the tunnel if another device still cannot connect. `?nointro` keeps the first-visit explainer off the scene;
-   the **?** overlay can still show it.
+   the **H** help popup can still open it.
 8. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
-9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped mission recording, and keep the file on the demo laptop.
+9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, click the **REC** chip to save the gzipped mission recording, and keep the file on the demo laptop.
 10. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
 
 ## Director keys (big screen)
@@ -108,10 +108,10 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | F | wheel overcurrent on the **followed** robot (R1 if none) | live |
 | G | **Gemini briefing** from Command data only (`source: "gemini"`, about **6 s** to generate, then read aloud; Voice on/off toggle). Press it ~6 s before you want to talk over it | live with `DZ_GEMINI=1` (dry run passed) |
 | Q / Esc | QR join overlay on / off (Esc also closes the briefing) | live |
-| T | faint truth survivors and decoys on Reality only | live |
+| H | keyboard help popup, with a link to reopen the intro | live |
 | V | robot's-eye camera of the followed robot (with a Thermal toggle). It also opens by itself on a detection, with the AI box and the robot's steps | live |
 | P | performance mode (no shadows, fewer lidar rays). **Set it before the demo, never during:** toggling recompiles every material and freezes the screen for several seconds (rayan-ml's profile) | set before |
-| S | save the mission recording (only when the page was opened with `?record`) | live |
+| REC chip | save the mission recording when opened with `?record` | click the chip; S is no longer bound |
 | O | perception overload on the **followed** robot: deadline misses for 3 s | live |
 | U | resume the followed robot from SAFE_STOP (also the "Send resume command" button on its card). Travels over the radio, so it needs a route to CMD | live |
 | B | baseline toggle: every robot switches to "without Deadzone" (stops when its link drops, no relays) and back. Red "Baseline" chip while on. Q&A only, never during the beat sheet | live |
@@ -119,9 +119,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | L | Model Lab overlay: training examples, training curve, confusion matrix, held-out metrics, and the crop a robot just classified with its Grad-CAM | needs `DZ_AI_LAB=1` |
 | J | Model test: a random held-out thermal sample; guess person or not, then see the model's recorded answer. Q&A only | needs the held-out export |
 | M | one view (Reality with the Command post inset, bottom right) / split view | live |
-| C | one view only: swap the Command post inset and the main view (the reveal) | live |
-| E | Operator view (map first, panels on hover; the default) / Engineering view (every panel) | live |
-| K | night operations lighting (headlights, flood light, strobes) | live, off by default; dry run first |
+| C | one view: swap the Command post inset and the main view; split view: frame the command post | live |
 | D | auto-director camera (cuts to dark robots, finds, the reveal, aftershocks). Any drag, wheel or 0–9 hands the camera back for 20 s | live, off by default; good for a hands-free video |
 
 REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/fault -ContentType application/json -Body '{"type":"overcurrent","robot":"R3"}'`, G `Invoke-RestMethod http://127.0.0.1:8000/api/report` (check `source` says `gemini`).
@@ -133,8 +131,8 @@ Space is pressed at **0:40**. Times after it come from the demo guard's headless
 | Clock | After Space (sim s) | On screen | Who | What to say |
 |---|---|---|---|---|
 | 0:00 | paused | Building, robots at the door, empty Command side | Rayan | "In a collapse the radio dies first. Today's rescue robots stop when the signal stops. Ours keep searching." |
-| 0:15 | paused | Q: judges scan the QR and see **P-1** on the phone. A judge taps **Run safety check**: the card rejects it, *"Zone ZNE predicts a dead zone; use a relay chain or lost_link_ok"*, and ZNE pulses red | Yusuf | "The safety checker only uses what the command post knows. It predicts the steel cage is a radio dead zone, so it blocks the plan until we say that zone may go dark." |
-| 0:30 | paused | Judge taps **Allow ZNE to go dark**, runs the check again (pass), taps **Dispatch** | Yusuf | "Robot 2 is now allowed to lose signal in the north-east for up to 60 seconds." |
+| 0:15 | paused | Q: judges scan the QR and see the preloaded search plan on the phone. A judge taps **Run safety check**: the card rejects it, *"Search area 2 may lose radio contact. Add a relay route or allow signal loss for a limited time."*, and the north-east search area pulses red | Yusuf | "The safety checker only uses what the command post knows. It predicts the steel cage is a radio dead zone, so it blocks the plan until we say that zone may go dark." |
+| 0:30 | paused | Judge taps **Allow signal loss here and check again**, runs the check again (pass), taps **Send plan** | Yusuf | "Robot 2 is now allowed to lose signal in the north-east for up to 60 seconds." |
 | 0:40 | 0 | **Space.** Robots enter. Each takes its zone (`plan_applied`) | Aziz | "Every message, even this plan, travels over the simulated radio." |
 | 0:49 | +0:09.4 (14.1) | R1 finds **S3** in Office A while linked. It appears on both sides at once, with its **rescue route** from the entrance (14.2 m) | Aziz | "With signal, the report is instant, and the robot sends responders the safest route in." |
 | 1:19 | +0:38.6 (57.9) | R1's camera sees the **radiator** (D1). The detector rejects it | Rayan | "That's a radiator. Our model, trained on real FLIR thermal images, says it's not a person, so no false alarm." |
