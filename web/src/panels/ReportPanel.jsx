@@ -9,7 +9,7 @@ export async function requestReport() {
   s.set({ report: { loading: true } })
   try {
     const res = await fetch('/api/report')
-    if (!res.ok) throw new Error(`report failed (${res.status})`)
+    if (!res.ok) throw new Error("The briefing isn't available right now. Try again in a moment.")
     useSim.getState().set({ report: await res.json() }) // also arrives as a `report` message
   } catch (err) {
     useSim.getState().set({ report: { error: err.message } })
@@ -63,8 +63,8 @@ export default function ReportPanel() {
       <div className="report-head">
         <b>{gemini ? 'Gemini briefing' : 'Command briefing'}</b>
         <span className="muted small">
-          {report.loading ? 'Generating…' : report.error ? 'Unavailable'
-            : `${gemini ? 'Gemini' : 'Local summary'} · Command data only · T+${fmtClock(report.generated_at ?? 0)}`}
+          {report.loading ? 'Writing…' : report.error ? 'Not available'
+            : `${gemini ? 'Written by Gemini' : 'Local summary'} · command post data only · at ${fmtClock(report.generated_at ?? 0)}`}
         </span>
         <button className={`report-voice${voiceOn ? ' on' : ''}`} aria-pressed={voiceOn} onClick={toggleVoice}
                 title="Read the briefing aloud">{voiceOn ? 'Voice on' : 'Voice off'}</button>

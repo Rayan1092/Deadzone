@@ -204,8 +204,8 @@ function PaneStats() {
   const delivered = useSim((s) => s.tick?.stats.delivered ?? 0)
   const waiting = useSim((s) => s.tick?.stats.in_flight ?? 0)
   return (
-    <span className="pane-stats mono" title="Bundles delivered to the command post · still in transit">
-      {delivered.toLocaleString()} delivered · {waiting} in transit
+    <span className="pane-stats mono" title="Reports delivered to the command post · still on the way">
+      {delivered.toLocaleString()} delivered · {waiting} on the way
     </span>
   )
 }

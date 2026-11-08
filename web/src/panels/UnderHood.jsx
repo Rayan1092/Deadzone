@@ -2,17 +2,17 @@ import { useSim } from '../store'
 import DataPanel from './DataPanel'
 
 const GROUPS = [
-  ['Store and forward', [['Held in custody', 'in_flight'], ['Delivered to Command', 'delivered'],
-    ['Hops per Command delivery', 'hops_per_delivery'], ['Custody transfers', 'hop_transfers'],
+  ['Store and forward', [['Held on the way', 'in_flight'], ['Delivered to the command post', 'delivered'],
+    ['Hops per delivery', 'hops_per_delivery'], ['Hand-offs between radios', 'hop_transfers'],
     ['Queued bytes', 'queued_bytes'], ['Simulated bytes transmitted', 'bytes_transmitted']]],
   ['Link repair', [['Bytes corrupted', 'corrupted_bytes'], ['Bytes repaired by Reed-Solomon', 'corrected_bytes'],
-    ['Error-correction blocks that failed', 'fec_failed_blocks'], ['Bundles lost with relays', 'bundles_destroyed']]],
+    ['Error-correction blocks that failed', 'fec_failed_blocks'], ['Reports lost with relays', 'bundles_destroyed']]],
   ['Onboard work', [['Lidar scans', 'lidar_scans'], ['Thermal scans', 'thermal_scans'],
     ['Detector calls', 'detector_calls'], ['Rejected hot spots', 'hotspots_rejected'],
     ['Rescue routes computed', 'rescue_routes_computed'], ['Replans', 'replans']]],
   ['Deadlines and disasters', [['Deadlines met', 'scheduler_deadlines_met'], ['Deadline misses', 'deadline_misses'],
     ['Safety deadline misses', 'safety_deadline_misses'], ['Collapse areas applied', 'aftershock_areas'],
-    ['Timeline events played', 'timeline_events_played'], ['Timeline events failed', 'timeline_events_failed']]],
+    ['Scenario events played', 'timeline_events_played'], ['Scenario events that could not run', 'timeline_events_failed']]],
 ]
 
 export default function UnderHood() {

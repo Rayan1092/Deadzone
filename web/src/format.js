@@ -1,3 +1,4 @@
+import { TASK_INFO } from './panels/scheduler.js'
 // Labels and formatting shared by the big screen and the phone.
 
 export const STATE_LABEL = {
@@ -52,9 +53,9 @@ export function describeEvent(e) {
   switch (e.kind) {
     case 'survivor_found': return `${e.robot} found ${e.survivor}, confirmed by onboard AI${e.looked_closer ? ' after a closer look' : ''}${e.linked ? '' : ' (no link, holding the report)'}`
     case 'hotspot_unsure': return `${e.robot}: ${e.say ?? 'AI unsure, moving closer'} (hot spot ${e.id})`
-    case 'survivor_reported': return `${e.survivor} reached the command post (${e.delay_s}s after detection)`
-    case 'link_lost': return `${e.robot} lost link, keeps exploring`
-    case 'link_restored': return e.dark_s ? `${e.robot} back online after ${Math.round(e.dark_s)}s dark` : `${e.robot} link restored`
+    case 'survivor_reported': return `${e.survivor} reached the command post, ${e.delay_s} s after it was found`
+    case 'link_lost': return `${e.robot} lost its link and keeps exploring`
+    case 'link_restored': return e.dark_s ? `${e.robot} is back in contact after ${Math.round(e.dark_s)} s` : `${e.robot} is back in contact`
     case 'replan': return `${e.robot} replanned${e.reason ? `: ${REPLAN_REASON[e.reason] ?? e.reason}` : ''}`
     case 'fault': return `${e.robot} fault: ${FAULT_LABEL[e.fault] ?? e.fault}`
     case 'relay_dropped': // owner is a robot id, a relay phone's client label, or null
@@ -68,27 +69,29 @@ export function describeEvent(e) {
       : `Route for rescuers to ${e.survivor} · ${Math.round(e.length_m)} m, avoids no-go zones${e.beacon ? `, radio beacon ${e.beacon}` : ''}`
     case 'rescue_route_blocked': return `Rescuers' route to ${e.survivor} is blocked, no safe path right now`
     case 'rescue_route_reported': return `${e.updated ? 'Updated route' : 'Route'} to ${e.survivor} reached the command post · ${Math.round(e.length_m)} m`
-    case 'deadline_miss': return `${e.robot} missed a ${e.task} deadline`
+    case 'deadline_miss': return `${e.robot}'s ${TASK_INFO[e.task]?.label ?? e.task} task missed its deadline`
     case 'rubble_fall': return e.cause === 'collapse' ? `Secondary collapse: rubble across ${e.robot ?? 'a robot'}'s path`
       : e.cause === 'key' ? `Rubble dropped ahead of ${e.robot ?? 'the robot'}` : 'Rubble fell'
     case 'mode_changed': return e.mode === 'baseline'
       ? 'Baseline mode: without Deadzone, robots stop and wait when they lose the link'
       : 'Deadzone on: robots keep exploring in the dark'
     case 'aftershock': return `Aftershock: ceiling collapsed${e.destroyed_relay ? `, relay ${e.destroyed_relay} crushed` : ''}`
-    case 'relay_destroyed': return `Relay ${e.id} ${e.cause === 'radio_fail' ? 'lost its radio' : 'destroyed'}${e.lost_bundles ? `, ${e.lost_bundles} bundles lost with it` : ''}`
-    case 'radio_fail': return `Relay ${e.relay}'s radio failed${e.lost_bundles ? ` · ${e.lost_bundles} bundles lost` : ''}`
-    case 'control_error': return e.code === 'feature_disabled' ? 'Aftershock is off: start the server with DZ_AFTERSHOCK=1' : e.msg
+    case 'relay_destroyed': return `Relay ${e.id} ${e.cause === 'radio_fail' ? 'lost its radio' : 'was destroyed'}${e.lost_bundles ? `, ${e.lost_bundles} reports lost with it` : ''}`
+    case 'radio_fail': return `Relay ${e.relay}'s radio failed${e.lost_bundles ? `, ${e.lost_bundles} reports lost` : ''}`
+    case 'control_error': return e.code === 'feature_disabled'
+      ? (/aftershock/i.test(e.msg ?? '') ? "Aftershocks aren't switched on for this run." : "That isn't switched on for this run.")
+      : plainText(e.msg)
     case 'note': return e.msg
-    case 'robot_shutdown': return `${e.robot} back at command, ${(e.found ?? []).length} survivor${(e.found ?? []).length === 1 ? '' : 's'} found, powered down`
+    case 'robot_shutdown': return `${e.robot} is back at the command post and powered down (${(e.found ?? []).length} survivor${(e.found ?? []).length === 1 ? '' : 's'} found)`
     case 'robot_contact': return `${e.a} and ${e.b} bumped into each other and stopped`
     case 'command_received': return `${e.robot} got the ${String(e.cmd).replace(/_/g, ' ')} command: ${e.say}`
-    case 'command_ack_reported': return `${e.robot}'s answer reached command: ${e.status} ${String(e.cmd).replace(/_/g, ' ')}${e.delay_s != null ? ` (${e.delay_s}s)` : ''}`
-    case 'plan_dispatched': return `Plan ${e.plan_id} dispatched to the robots`
+    case 'command_ack_reported': return `${e.robot}'s answer reached the command post: ${String(e.cmd).replace(/_/g, ' ')} ${e.status}${e.delay_s != null ? ` (${e.delay_s} s)` : ''}`
+    case 'plan_dispatched': return `Plan ${e.plan_id} sent to the robots`
     case 'plan_applied': return `${e.robot} is following ${e.plan_id}${e.zones?.length ? ` (${e.zones.join(', ')})` : ''}`
-    case 'resumed': return `${e.robot} resumed after safe stop`
-    case 'fault_injected': return `Director: ${e.type} injected on ${e.robot}`
-    case 'safety_reject': return `Plan ${e.plan_id} rejected: ${e.violations?.[0]?.msg ?? 'safety check failed'}`
-    default: return e.kind
+    case 'resumed': return `${e.robot} resumed after a safety stop`
+    case 'fault_injected': return `${e.type === 'overload' ? 'Computer overload' : e.type === 'overcurrent' ? 'Wheel jam' : 'Fault'} on ${e.robot}`
+    case 'safety_reject': return `Plan ${e.plan_id} rejected: ${plainText(e.violations?.[0]?.msg) || 'the safety check failed'}`
+    default: return String(e.kind ?? '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
   }
 }
 
@@ -136,11 +139,11 @@ export function rubbleBanner(ev, aimed, scenario = false) {
   if (ev?.kind !== 'rubble_fall') return null
   const robot = ev.robot ?? aimed ?? null
   if (ev.cause === 'collapse') {
-    return { title: 'SECONDARY COLLAPSE', sub: `${SCENARIO_TAG} · ${robot ? `${robot} blocked` : 'a robot is blocked'}`, tone: 'alert', size: 'major' }
+    return { title: 'Secondary collapse', sub: `${SCENARIO_TAG} · ${robot ? `${robot} blocked` : 'a robot is blocked'}`, tone: 'alert', size: 'major' }
   }
   // the floor plan's timeline dropping rubble (no cause): named as the scenario's doing
-  if (!ev.cause) return scenario ? { title: 'RUBBLE', sub: `${SCENARIO_TAG} · part of the ceiling came down`, tone: 'warn', size: 'minor', ms: 3500 } : null
-  return { title: 'RUBBLE', sub: robot ? `Dropped ahead of ${robot}` : 'Dropped ahead of the robot', tone: 'warn', size: 'minor', ms: 3500 }
+  if (!ev.cause) return scenario ? { title: 'Rubble', sub: `${SCENARIO_TAG} · part of the ceiling came down`, tone: 'warn', size: 'minor', ms: 3500 } : null
+  return { title: 'Rubble', sub: robot ? `Dropped ahead of ${robot}` : 'Dropped ahead of the robot', tone: 'warn', size: 'minor', ms: 3500 }
 }
 
 export function polyCenter(poly) {
@@ -192,8 +195,8 @@ export function isScenarioEvent(ev, { timeline = false, pressedRecently = false,
 }
 export const SCENARIO_TAG = 'Scenario event'
 export function radioFailBanner(ev, label) {
-  const lost = ev.lost_bundles ? ` · ${ev.lost_bundles} bundle${ev.lost_bundles === 1 ? '' : 's'} lost` : ''
-  return { title: 'RADIO FAILURE', sub: `${SCENARIO_TAG} · ${label || `relay ${ev.relay} lost its radio`}${lost}`, tone: 'alert' }
+  const lost = ev.lost_bundles ? ` · ${ev.lost_bundles} report${ev.lost_bundles === 1 ? '' : 's'} lost` : ''
+  return { title: 'Radio failure', sub: `${SCENARIO_TAG} · ${label || `relay ${ev.relay} lost its radio`}${lost}`, tone: 'alert' }
 }
 
 // ------------------------------------------------------------------ plan captions
@@ -234,4 +237,17 @@ export function robotTag(r, cmd, time) {
   }
   const age = cmd?.last_seen != null ? ` · ${Math.max(0, Math.floor(time - cmd.last_seen))} s` : ''
   return { text: `${r.id} · NO LINK${age}`, dark: true }
+}
+
+// Server wording shown on screen (safety reasons, refusals) in operator words: no internal names.
+export function plainText(s) {
+  if (!s) return ''
+  return String(s)
+    .replace(/\blost_link_ok\b/g, 'allowed to go dark')
+    .replace(/\bCMD\b/g, 'the command post')
+    .replace(/\s*\(?(start|run|restart) (the )?server with DZ_[A-Z_]+=\d\)?\.?/gi, '')
+    .replace(/\bDZ_[A-Z_]+(=\d)?\b/g, '')
+    .replace(/_/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
 }
