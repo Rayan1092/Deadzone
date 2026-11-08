@@ -87,21 +87,31 @@ def test_tombstone_survives_concurrent_edit_and_explicit_undelete_preserves_edit
 
 def test_invalid_concurrent_candidate_converges_and_blocks_old_plan_dispatch(session):
     client, hub = session
-    deletes = [op("a", "zone:Z1", "deleted", True), op("b", "zone:Z2", "deleted", True)]
+    # Deleting every zone is a valid "clear" since no-go-only plans are accepted (Rayan's P0,
+    # 2026-11-08), so the invalid candidate here is a zone moved outside the building.
+    edits = [op("a", "zone:Z1", "deleted", True), op("b", "zone:Z2", "poly", [[50, 14], [60, 14], [60, 16], [50, 16]])]
     results = []
-    for order in (deletes, list(reversed(deletes))):
+    for order in (edits, list(reversed(edits))):
         epoch = seed(client)
         for change in order:
             response = merge(client, epoch, [change])
             assert response.status_code == 200
         result = response.json()
-        assert not result["valid"] and result["issues"] and result["plan"]["zones"] == []
+        assert not result["valid"] and result["issues"] and [z["id"] for z in result["plan"]["zones"]] == ["Z2"]
         assert client.post("/api/dispatch", json={"plan_id": "CO-1"}).json()["detail"]["code"] == "plan_conflict"
         assert not hub.sim.network.queues["CMD"]
         results.append((result["plan"], result["ops"]))
     assert results[0] == results[1]
-    fixed = merge(client, epoch, [op("a", "zone:Z1", "deleted", False, 2)]).json()
+    fixed = merge(client, epoch, [op("a", "zone:Z2", "poly", [[7, 14], [9, 14], [9, 16], [7, 16]], 2)]).json()
     assert fixed["valid"] and len(fixed["plan"]["zones"]) == 1
+
+
+def test_deleting_every_zone_is_a_valid_clear(session):
+    """No zones left is a no-go-only (or empty) plan: valid, and dispatchable to every robot."""
+    client, hub = session
+    epoch = seed(client)
+    result = merge(client, epoch, [op("a", "zone:Z1", "deleted", True), op("b", "zone:Z2", "deleted", True)]).json()
+    assert result["valid"] and result["plan"]["zones"] == [] and not result["issues"]
 
 
 def test_clock_reuse_different_value_is_atomic_error(session):

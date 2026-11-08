@@ -1,7 +1,8 @@
 """Robot onboard software. Everything here only sees the world through `io`.
 
 States: DEPLOYING, EXPLORING, LOST_LINK_EXPLORING, RETURNING_TO_SIGNAL,
-RETURNING_HOME, REPLANNING, FAULT, DONE, plus WAITING_FOR_LINK in baseline mode.
+RETURNING_HOME, REPLANNING, FAULT, DONE, WAITING (a plan's no-go leaves nothing reachable: hold
+until it is edited), plus WAITING_FOR_LINK in baseline mode.
 
 Modes: "deadzone" (default, the real thing) and "baseline" ("without Deadzone": a robot that
 stops and waits when its link drops and carries no relays, like a tethered or teleoperated
@@ -101,7 +102,13 @@ HAZARD_COST = 3.0          # ... costs this much extra per cell
 # Final contract (telemetry): `state` is one of STATES, `fault` is None or one of FAULTS.
 STATES = ("DEPLOYING", "EXPLORING", "LOST_LINK_EXPLORING", "RETURNING_TO_SIGNAL",
           "RETURNING_HOME", "REPLANNING", "FAULT", "DONE", "WAITING_FOR_LINK",
-          "GOING_TO_POINT", "HOLDING", "SHUTDOWN")
+          "GOING_TO_POINT", "HOLDING", "SHUTDOWN", "WAITING")
+# WAITING: a plan's no-go areas leave this robot no reachable frontier (frontiers exist without
+# them), so it holds where it stands, keeps mapping and reporting, and retries every REPLAN_PERIOD;
+# it resumes on its own as soon as a plan edit opens a way. Telemetry says
+# `plan_state: "no reachable area, holding"` while in it (None otherwise). Never driven through,
+# never refused by the safety checker.
+WAITING_PLAN_STATE = "no reachable area, holding"
 # SHUTDOWN: back at the command post (DONE, including after LOW_BATTERY) with the outbox empty for
 # SHUTDOWN_AFTER_S, the robot powers down: scheduler stopped (tasks empty), lidar, camera and
 # headlights off (`lights: false` in telemetry), battery drain stops, the radio sends one final
@@ -390,6 +397,7 @@ class Robot:
         if "lost_link_budget_s" in plan:
             self.lost_budget = float(plan["lost_link_budget_s"])
         self.path = []                       # replan under the new plan right away
+        self.last_plan_t = -99.0             # (also from WAITING: a plan edit is retried on the next step)
         if self.explorer is not None:
             self.explorer.reset_goal()
         self.events.append({"kind": "plan_applied", "robot": self.id, "plan_id": plan.get("plan_id"),
@@ -1082,7 +1090,25 @@ class Robot:
                 if self._escape_blocked_cell():         # a no-go drawn over us: walk out, then plan
                     return
                 if not self._plan_frontier():
+                    if self._walled_in_by_no_go():
+                        self._hold_for_plan()
+                        return
                     self._set_state("RETURNING_HOME")   # nothing left to explore
+                    if not self._plan_to(self.entry):
+                        self._start_replan("no_route")
+            return
+
+        if s == "WAITING":
+            # hold; retry whenever a plan arrives (last_plan_t reset) or every REPLAN_PERIOD
+            self.path = []
+            if self.t - self.last_plan_t > REPLAN_PERIOD:
+                if self._escape_blocked_cell():
+                    return
+                if self._plan_frontier():
+                    self._set_state("EXPLORING")
+                    self.events.append({"kind": "robot_resumed", "robot": self.id, "reason": "no_go_edited"})
+                elif not self._walled_in_by_no_go():
+                    self._set_state("RETURNING_HOME")   # the map really is finished
                     if not self._plan_to(self.entry):
                         self._start_replan("no_route")
             return
@@ -1170,6 +1196,9 @@ class Robot:
         if state in ("EXPLORING", "LOST_LINK_EXPLORING"):
             if self._plan_frontier():
                 return True, state
+            if self._walled_in_by_no_go():
+                self._hold_for_plan()              # a no-go walls us in: hold, never drive home through it
+                return True, "WAITING"
             if self._plan_to(self.entry):
                 return True, "RETURNING_HOME"      # nothing reachable left to explore
             return False, state
@@ -1243,6 +1272,22 @@ class Robot:
         self.escaping = True
         self.events.append({"kind": "replan", "robot": self.id, "reason": "walk_out"})
         return True
+
+    def _walled_in_by_no_go(self):
+        """True when the plan's no-go areas are what leaves us no frontier: without them (hazards
+        known at deploy still excluded) a frontier is reachable from where we stand."""
+        if np.array_equal(self.nogo, self.base_nogo):
+            return False
+        trav = planning.traversable(self.map.grid, self.base_nogo)
+        clusters, _, _ = planning.frontier_clusters(self.map.grid, trav, self._cell(*self.pose[:2]), self.blacklist)
+        return bool(clusters)
+
+    def _hold_for_plan(self):
+        self.path, self.target = [], None
+        self._set_state("WAITING")
+        self.last_telemetry_t = -99.0            # tell Command at once
+        self.events.append({"kind": "robot_waiting", "robot": self.id, "reason": "no_reachable_area",
+                            "plan_id": self.plan.get("plan_id") if self.plan else None})
 
     def _plan_to_signal(self):
         """A* back to the newest breadcrumb we can still reach (older ones if rubble cut us off).
@@ -1502,6 +1547,7 @@ class Robot:
             "link": link,
             "relays_left": self.relays_left,
             "plan_id": self.plan.get("plan_id") if self.plan else None,
+            "plan_state": WAITING_PLAN_STATE if self.state == "WAITING" else None,
             "zone": (self._active_zone() or {}).get("id"),
             "target": self.target,
             "path": [[round(px, 2), round(py, 2)] for px, py in self.path[:60]],

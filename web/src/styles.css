@@ -583,3 +583,4 @@ button:hover { border-color: var(--teal); }
 /* collapsed (not just transparent) so the title pill is only as wide as its title */
 .app.judge .pane-stats, .app.judge .pane-title .muted { display: none; }
 .app.judge .pane:hover .pane-stats, .app.judge .pane:hover .pane-title .muted { display: inline; }
+.lg-packet { width: 8px; height: 8px; border-radius: 50%; background: #5eead4; box-shadow: 0 0 6px #5eead4; display: inline-block; }

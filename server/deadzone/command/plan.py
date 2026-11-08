@@ -85,7 +85,9 @@ class NoGo(Region):
 class SearchPlan(Model):
     plan_id: Identifier
     author: Identifier
-    zones: list[Zone] = Field(min_length=1, max_length=32)
+    # No zones is allowed: a no-go-only plan (or an empty one that clears the exclusions) keeps the
+    # robots' current zone assignments and only changes the exclusions (Rayan's P0, 2026-11-08).
+    zones: list[Zone] = Field(max_length=32)
     no_go: list[NoGo] = Field(default_factory=list, max_length=32)
     lost_link_budget_s: Number = Field(default=60.0, ge=0, le=900)
 
@@ -127,6 +129,11 @@ class PlanManager:
         self.saved = {}
         self.current_id = None
         self.dispatched = set()
+        # Current zone assignments: per robot, the zones of the last dispatched plan that had any, and
+        # that plan's lost-link budget. A plan without zones (no-go only, or empty = clear the
+        # exclusions) is sent to every deployed robot with these, so assignments never change by it.
+        self.assignments = {}
+        self.assigned_budget = None
 
     def current(self):
         return deepcopy(self.saved.get(self.current_id))
@@ -148,9 +155,9 @@ class PlanManager:
         return PlanDraft.model_validate(self.saved[plan_id])
 
     def check(self, plan_id):
+        """A plan without zones only changes the exclusions: nothing to route, so it is accepted
+        (robots that a no-go walls in hold in WAITING instead of being refused)."""
         plan = self.get(plan_id)
-        if not plan.zones:
-            raise PlanError("empty_plan", "Add a search zone before checking or dispatching", 422)
         return self.checker.check(plan, self.sim.post, self.sim.time)
 
     def dispatch(self, plan_id):
@@ -161,11 +168,19 @@ class PlanManager:
             return result
         plan = self.get(plan_id)
         outgoing = []
-        recipients = self.sim.robot_specs if self.global_no_go else {z.robot for z in plan.zones}
+        if plan.zones:
+            self.assignments = {rid: [z.model_dump(mode="json") for z in sorted(plan.zones, key=lambda z: (z.priority, z.id))
+                                      if z.robot == rid] for rid in self.sim.robot_specs}
+            self.assigned_budget = plan.lost_link_budget_s
+        recipients = self.sim.robot_specs if (self.global_no_go or not plan.zones) else {z.robot for z in plan.zones}
         for rid in sorted(recipients):
             payload = plan.model_dump(mode="json")
-            payload["zones"] = [z.model_dump(mode="json") for z in sorted(plan.zones, key=lambda z: (z.priority, z.id))
-                                if z.robot == rid]
+            if plan.zones:
+                payload["zones"] = [z for z in self.assignments.get(rid, [])]
+            else:   # no-go only: every robot keeps its current zones and budget, only the exclusions change
+                payload["zones"] = list(self.assignments.get(rid, []))
+                if self.assigned_budget is not None:
+                    payload["lost_link_budget_s"] = self.assigned_budget
             size = len(json.dumps(payload, separators=(",", ":")).encode()) + 64
             outgoing.append(make_bundle("CMD", rid, "plan", payload, self.sim.time, size))
         self.sim.network.queues["CMD"].extend(outgoing)
