@@ -50,8 +50,10 @@ Everything runs on a fixed seed, so the story happens on cue. Between cues the r
 ## The ML
 
 - **Data:** person boxes from the FLIR ADAS thermal dataset. 96 × 96 crops. Positives are people at least 20 px tall. Negatives are half object-centered (cars, bikes, buses) and half random background. 3,000 per class for training, 600 per class held out for testing.
+- **Indoor data:** street footage has almost no one lying or sitting, so we added real indoor thermal frames from the SDT dataset (FLIR Lepton 3.5, CC BY 4.0): people lying, sitting and standing, plus empty rooms. The last 20% of every recording is held out.
 - **Model:** MobileNetV3-Small pretrained on ImageNet, last layer swapped for person / not person, 5 epochs. The model file is 6 MB, small enough to run on the robot.
-- **Results on 1,200 held-out images (threshold 0.6):** 96.2% accuracy, 96.3% precision, 96.0% recall. Confusion matrix: 576 people found, 24 missed, 578 backgrounds rejected, 22 false alarms.
+- **Results on 1,200 held-out images (threshold 0.6):** 96.7% accuracy, 97.3% precision, 96.0% recall. Confusion matrix: 576 people found, 24 missed, 584 backgrounds rejected, 16 false alarms.
+- **Indoor result:** on 2,273 held-out indoor frames, accuracy on people lying and sitting went from 83.9% (street data only) to 99.6% after adding the indoor data; the street-image score went up too, from 96.2% to 96.7%.
 - **In the sim:** every hot spot the thermal camera sees gets cropped and scored on the robot. The survivors and decoys in the building use held-out crops, so the radiator, engine and coffee machine get rejected by the real model, not by a rule. If PyTorch isn't installed the robots fall back to a simple sim sensor and the decoys turn off, so a missing library can never put a radiator on screen as a person.
 
 ## Does it actually help? (in simulation)
