@@ -48,9 +48,10 @@ export function connectScreen() {
   return () => { closed = true; clearTimeout(timer); sock?.close() }
 }
 
-export function control(action, value) {
+// `extra` sits next to action in data (Rayan's rubble control: {action: 'rubble', robot: 'R2'})
+export function control(action, value, extra = {}) {
   if (REPLAY) return replayControl(action, value)
   // with control leases on, B and U carry this socket's token (server checks the presenter's leases)
   const token = controllerToken()
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'control', data: { action, value, ...(token ? { controller_token: token } : {}) } }))
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'control', data: { action, value, ...extra, ...(token ? { controller_token: token } : {}) } }))
 }
