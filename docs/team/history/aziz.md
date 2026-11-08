@@ -5,9 +5,9 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 ## Now
 
 - **Working on:** p2/lan-access, LAN reliability PR first; phone-only empty-plan clear PR next (cross-area authorized by Rayan, web/src/phone/ only).
-- **Works on main:** A #108, B #126, camera #115, compact stream #137, preflight #143/D2 #161, RSSI #146, phone frames F #152, heat sources G #156 plus Rayan's data #173. F/E/G are complete. Latest base 39f25bc.
-- **In flight (not merged):** default `cd server; python -m deadzone` binds 0.0.0.0:8000; routed IPv4 join URLs replace local-only hosts; preflight checks LAN HTTP and prints the inbound-8000 firewall command on failure. Public tunnel URLs preserved. Full backend 731 passed / 1 skipped; demo guard green.
-- **Blocked on / need from others:** none. Existing :8000 service stays running. LAN check cannot prove phone access through guest-Wi-Fi isolation; same Wi-Fi/hotspot or manual tunnel needed. Web has no npm test script; Windows rename.test.js bug remains upstream.
+- **Works on main:** A #108, B #126, camera #115, compact stream #137, preflight #143/D2 #161, RSSI #146, phone frames F #152, heat sources G #156 plus Rayan's data #173. F/E/G are complete. Base 39f25bc, merged current main 6c60e13 (decoy pool/scheduler/Windows test fixes).
+- **In flight (not merged):** default `cd server; python -m deadzone` binds 0.0.0.0:8000; routed IPv4 join URLs replace local-only hosts; preflight checks LAN HTTP and prints the inbound-8000 firewall command on failure. Public tunnel URLs preserved. Combined backend 734 passed / 1 skipped; demo guard green.
+- **Blocked on / need from others:** none. Existing :8000 service stays running. LAN check cannot prove phone access through guest-Wi-Fi isolation; same Wi-Fi/hotspot or manual tunnel needed. Web has no npm test script; upstream Windows rename.test.js fix is now merged (84 frontend tests pass).
 - **Promises to others:** one PR/merge per item, immediate main merge before PR, backend suite/demo guard. No protected source/real .env changes. Next phone PR explicitly limited to web/src/phone/ by user; overrides usual history edit outside that directory.
 
 ## Log
@@ -17,7 +17,8 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 - **Contract changes:** no WebSocket shape change. GET /api/join remains {url}; local-only hosts become LAN IPv4 or 503; public/tunnel origin retained. PLAN updated. No simulation/flag change; requested LAN default is unconditional.
 - **Validation:** 74 focused regressions pass. Actual owned paused server on 8012 ran 10 s: detector=model and LAN HTTP both true on 10.84.29.47, child/port cleaned. Existing 8000 LAN health true, service untouched. Full backend 731 passed / 1 skipped (164.97 s), seed-7 demo guard green.
 - **Heads-up for others:** local LAN health does not prove access past firewall/client isolation. Next phone edit only in web/src/phone/ per user; no outside history/package/test edits in that PR. No tunnel started/firewall changed.
-- **Next:** full backend/demo guard, immediate main merge, LAN PR/merge; then phone clear-plan PR.
+- **Upstream sync:** merged main 6c60e13 (#174 scheduler, #175 Windows/path-fixture fixes, #176 decoy pool). Rayan crop names may now include decoys/<file>; no LAN contract conflict. 84 frontend tests green; combined backend 734 passed / 1 skipped (164.09 s), demo guard green.
+- **Next:** combined backend/demo guard, immediate main merge, LAN PR/merge; then phone clear-plan PR.
 
 ### 2026-11-08 PT - p2/preflight-d2 - Preserve operator wording in final main merge
 - **Did:** immediate pre-PR sync merged main 34425e1 (#160 Yusuf's UI/doc rename). Resolved DEMO only: kept Operator lock/Console/Field unit language, Mission recording, new key rows, and D2's tunnel-before-phone steps. No backend/scripts changed upstream after the 699-test full pass.
