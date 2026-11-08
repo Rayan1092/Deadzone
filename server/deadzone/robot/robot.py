@@ -13,7 +13,7 @@ import re
 
 import numpy as np
 
-from ..floorplan import FREE, UNKNOWN
+from ..floorplan import FREE, OCC, UNKNOWN
 from ..geometry import points_in_poly, wrap_angle
 from ..network.dtn import PRIO, make_bundle
 from . import planning
@@ -57,6 +57,7 @@ PATH_CHECK_SKIP_M = 0.4    # ignore the robot's own footprint (it may sit in a w
 REPLAN_PAUSE_S = 0.6       # stop briefly in REPLANNING so the replan is visible and the map settles
 REPLAN_COOLDOWN_S = 5.0    # repeat obstacles this soon after a replan are replanned silently
 TRAPPED_AFTER_S = 10.0     # no route for this long raises a TRAPPED fault to the command post
+ESCAPE_M = 6.0             # walk at most this far out of a no-go area drawn over the robot
 ROUTE_CHECK_PERIOD = 2.0   # s between "is the rescue route I sent still open on my map?" checks
 COLLAPSE_MARGINS_CELLS = (4, 2)  # rescue routes stay 1 m (else 0.5 m) clear of fresh collapse
 ROUTE_MAX_POINTS = 60      # Command's RescueRoute cap (Aziz, PR #28)
@@ -192,6 +193,7 @@ class Robot:
         self.map = OccupancyMap(w, h, cell)
         self.nogo = nogo if nogo is not None else np.zeros((h, w), dtype=bool)
         self.base_nogo = self.nogo.copy()   # hazards known at deploy; plan no-go areas add to it
+        self.escaping = False     # walking out of a cell plans may not start from (no-go drawn over us)
         self.zones = []                     # this robot's dispatched zones, highest priority first
         self.battery = Battery()
         self.state = "DEPLOYING"
@@ -271,6 +273,10 @@ class Robot:
                          if os.environ.get("DZ_EXPLORATION_V2") == "1" else None)
         self.sensor_view = os.environ.get("DZ_SENSOR_VIEW") == "1"
         self.camera_frame = None
+        # DZ_CAMERA_TELEMETRY=1: the same camera observations ride inside the telemetry bundle
+        # (`camera: {t, hits}`), so Command and the phone see them once the bundle is delivered
+        self.camera_telemetry = os.environ.get("DZ_CAMERA_TELEMETRY") == "1"
+        self.camera_hits = []
 
     # ------------------------------------------------------------------ mode toggle
     def set_mode(self, mode):
@@ -597,20 +603,23 @@ class Robot:
     def _perceive(self, io):
         # every hot spot goes through the trained detector (sim sensor fallback if no model)
         hits = io.thermal()
+        all_hits = hits                                   # everything in the camera cone, for the camera views
         hits, finals = self._triage_unsure(hits)
         kept = filter_hits(hits) + [h for h, conf in finals if conf >= get_detector().threshold]
         hits = hits + [h for h, _ in finals]
         kept_ids = {h["id"] for h in kept}
-        if self.sensor_view:
+        if self.sensor_view or self.camera_telemetry:
             detector = get_detector()
             observations = []
-            for hit in hits:
+            for hit in all_hits:
                 score = detector.score(hit.get("crop"))
+                verdict = "unsure" if hit["id"] in self.unsure else ("person" if hit["id"] in kept_ids else "rejected")
                 observations.append({
-                    "id": hit["id"], "pos": list(hit["pos"]), "crop": hit.get("crop"),
-                    "verdict": "person" if hit["id"] in kept_ids else "rejected",
-                    "conf": score, "source": "model" if score is not None else "sim"})
-            self.camera_frame = {"t": self.t, "pose": list(self.pose), "hits": observations}
+                    "id": hit["id"], "pos": [round(hit["pos"][0], 2), round(hit["pos"][1], 2)], "crop": hit.get("crop"),
+                    "verdict": verdict, "conf": score, "source": "model" if score is not None else "sim"})
+            if self.sensor_view:
+                self.camera_frame = {"t": self.t, "pose": list(self.pose), "hits": observations}
+            self.camera_hits = observations
         for h in hits:
             if h["id"] in kept_ids or h["id"] in self.rejected or h["id"] in self.found:
                 continue                  # (a person confirmed from close up still scores low from afar)
@@ -994,6 +1003,16 @@ class Robot:
         dark_for = self.t - self.last_link_t
         s = self.state
 
+        if self.escaping:
+            # keep walking out until plans may start from where we stand (no obstacle check: the
+            # way out crosses the very cells the check would flag)
+            mx, my = self._cell(*self.pose[:2])
+            out = self._drive_trav()
+            if self.path and not (0 <= mx < out.shape[1] and 0 <= my < out.shape[0] and out[my, mx]):
+                return
+            self.escaping = False
+            self.path = []
+
         if s == "DEPLOYING":
             if self.t - self.state_since > 1.0 + DEPLOY_STAGGER_S * self.rank:
                 self._set_state("EXPLORING")
@@ -1042,6 +1061,8 @@ class Robot:
             if self._look_closer():                     # approaching an unsure hot spot
                 return
             if not self.path or self.t - self.last_plan_t > REPLAN_PERIOD:
+                if self._escape_blocked_cell():         # a no-go drawn over us: walk out, then plan
+                    return
                 if not self._plan_frontier():
                     self._set_state("RETURNING_HOME")   # nothing left to explore
                     if not self._plan_to(self.entry):
@@ -1146,6 +1167,8 @@ class Robot:
         if self.replan_fail_since is not None and self.t - self.last_plan_t < REPLAN_PERIOD:
             return   # throttle retries while no route exists
         ok, resume = self._plan_for(self.resume_state or "EXPLORING")
+        if not ok and self._escape_blocked_cell():
+            ok, resume = True, self.resume_state or "EXPLORING"
         if ok:
             self.last_replan_done_t = self.t
             self.replan_fail_since = None
@@ -1157,6 +1180,51 @@ class Robot:
             self.replan_fail_since = self.t
         elif self.t - self.replan_fail_since >= TRAPPED_AFTER_S and self.fault != "TRAPPED":
             self._raise_fault("TRAPPED")
+
+    def _escape_blocked_cell(self):
+        """Standing where motion plans may not start (a no-go area drawn over us by a new plan, or a
+        cell our map now calls blocked), A* has no start and the robot would sit in REPLANNING for
+        good. Walk out first: breadth-first over cells that are not occupied on our own map (no-go
+        allowed on the way out) to the nearest cell where plans may start, within ESCAPE_M; that
+        short path is followed before anything else. Returns True when a way out was set."""
+        trav = self._drive_trav()
+        sx, sy = self._cell(*self.pose[:2])
+        h, w = trav.shape
+        if not (0 <= sx < w and 0 <= sy < h) or trav[sy, sx]:
+            return False
+        if planning.nearest_traversable(trav, (sx, sy)) is not None:
+            return False                              # grazing an edge: the planners start nearby as usual
+        passable = self.map.grid != OCC
+        limit = int(ESCAPE_M / self.cell)
+        parent = {(sx, sy): None}
+        queue = [(sx, sy)]
+        goal = None
+        while queue and goal is None:
+            x, y = queue.pop(0)
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if not (0 <= nx < w and 0 <= ny < h) or (nx, ny) in parent or not passable[ny, nx]:
+                    continue
+                if abs(nx - sx) > limit or abs(ny - sy) > limit:
+                    continue
+                parent[(nx, ny)] = (x, y)
+                if trav[ny, nx]:
+                    goal = (nx, ny)
+                    break
+                queue.append((nx, ny))
+        if goal is None:
+            return False
+        cells = []
+        while goal is not None:
+            cells.append(goal)
+            goal = parent[goal]
+        cells.reverse()
+        self.path = [((cx + 0.5) * self.cell, (cy + 0.5) * self.cell) for cx, cy in cells[1:]] or \
+                    [((cells[0][0] + 0.5) * self.cell, (cells[0][1] + 0.5) * self.cell)]
+        self.target = list(self.path[-1])
+        self.last_plan_t = self.t
+        self.escaping = True
+        self.events.append({"kind": "replan", "robot": self.id, "reason": "walk_out"})
+        return True
 
     def _plan_to_signal(self):
         """A* back to the newest breadcrumb we can still reach (older ones if rubble cut us off).
@@ -1348,7 +1416,7 @@ class Robot:
         if self.t - self.last_telemetry_t < TELEMETRY_PERIOD:
             return
         self.last_telemetry_t = self.t
-        self.outbox.append(make_bundle(self.id, "CMD", "telemetry", {
+        payload = {
             "id": self.id,
             "pose": [round(v, 2) for v in self.pose],
             "state": self.state,
@@ -1356,7 +1424,14 @@ class Robot:
             "found": list(self.found),
             "target": [round(v, 2) for v in self.target] if self.target else None,
             "relays": [list(p) for p in self.my_relays],
-        }, self.t, 120))
+        }
+        size = 120
+        if self.camera_telemetry:                         # contract B: what the camera sees, for the phone
+            payload["camera"] = {"t": round(self.t, 1), "hits": [
+                {"id": h["id"], "pos": h["pos"], "verdict": h["verdict"], "conf": h["conf"], "crop": h["crop"]}
+                for h in self.camera_hits]}
+            size += 40 * len(self.camera_hits)
+        self.outbox.append(make_bundle(self.id, "CMD", "telemetry", payload, self.t, size))
         ix, iy, vals = self.map.take_patch()
         if len(vals):
             self.outbox.append(make_bundle(self.id, "CMD", "map_patch",
