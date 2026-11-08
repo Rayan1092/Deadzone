@@ -549,3 +549,12 @@ button:hover { border-color: var(--teal); }
   .hood-grid { grid-template-columns: 1fr; }
   .judge-test img { height: 210px; }
 }
+/* presenter lock (control leases on) */
+.lock-chip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; border-radius: 999px; font-size: 12px;
+  border: 1px solid rgba(245,158,11,.5); background: rgba(245,158,11,.12); color: #fde68a; white-space: nowrap; }
+.lock-chip i { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; }
+.lock-chip.open { border-color: rgba(45,212,191,.5); background: rgba(45,212,191,.12); color: #99f6e4; }
+.lock-chip.open i { background: #2dd4bf; }
+.lock-chip small { color: rgba(230,237,243,.7); font-size: 11px; }
+.lock-chip button { padding: 2px 10px; font-size: 12px; border-radius: 999px; }
+.lease-holder { font-size: 11px; color: #fde68a; margin: 2px 0; }
