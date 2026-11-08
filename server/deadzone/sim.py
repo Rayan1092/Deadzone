@@ -2,6 +2,7 @@
 import base64
 import json
 import math
+import os
 import random
 import re
 from pathlib import Path
@@ -125,7 +126,7 @@ class Sim:
         self.time = 0.0
         self.tick_n = 0
         self.links = LinkGraph()
-        self.network = DTNNetwork()
+        self.network = DTNNetwork(fec_enabled=os.environ.get("DZ_FEC") == "1", seed=self.seed)
         self.network.register("CMD")
         self.relays = {}
         self.relay_revisions = {}
@@ -329,6 +330,11 @@ class Sim:
             robots.append(r.telemetry(link))
         found = [rec for r in self.robots.values() for rec in r.found.values()]
         links = self.links.as_list()
+        for link in links:
+            edge = tuple(sorted((link["a"], link["b"])))
+            link.update(self.network.link_stats.get(edge, {"corrupted_bytes": 0, "corrected_bytes": 0,
+                                                         "fec_failed_blocks": 0}))
+            link["fec"] = bool(self.network.fec_enabled and link["up"] and -88 <= self.links.link_rssi(*edge) <= -80)
         relays = [dict(relay, queue=len(self.network.queues[rid])) for rid, relay in self.relays.items()]
         reality = {"robots": robots, "relays": relays, "links": links, "survivors_found": found}
         stats = {"robots": len(self.robots), "relays": len(relays),

@@ -103,7 +103,7 @@ class LinkGraph:
         for (a, b), r in self.rssi.items():
             if r > min_rssi or self.up.get((a, b)):
                 out.append({"a": a, "b": b, "rssi": round(r, 1), "up": self.up.get((a, b), False),
-                            "fec": bool(self.up.get((a, b)) and r < -80)})
+                            "fec": False})  # transport snapshot supplies actual coding state
         return out
 
 
