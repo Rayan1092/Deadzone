@@ -1,14 +1,10 @@
 # Deadzone
 
-Rescue robots that keep searching when radio cannot reach them. Built at UB Hacking 2026.
+Deadzone is a laptop simulation of rescue robots that keep searching a collapsed building after the radio cuts out. The robots map rooms, check thermal images for people with an onboard detector, drop radio relays and hold their reports through outages until a route to the command post returns. The big screen shows **Reality**, the simulated world, beside **Command**, which only knows what the radio has delivered, and responders plan searches and steer robots from their phones. Built at UB Hacking 2026.
 
-Deadzone is a laptop simulation of a rescue fleet inside a collapsed building. Robots map rooms, check thermal images for people, drop relays and hold reports through radio outages. When a route to the command post returns, the reports arrive there.
+![The opening shot from the street: the command post truck and tent in front of Riverside Block C](docs/screenshots/street-opening.jpg)
 
-The big screen shows the difference between **Reality**, the simulated world, and **Command**, which only knows what the radio has delivered. Phones let responders plan searches, view the last received camera image and control robots.
-
-![Deadzone showing the collapsed building and the command post's received map](docs/assets/deadzone.jpg)
-
-*A three-robot run in Performance mode: Reality on the left, received Command reports on the right.*
+*The opening shot from the street. Press Space to dive into the building and start the mission.*
 
 ## Run in two commands
 
