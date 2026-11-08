@@ -108,3 +108,20 @@ export function latestRoutes(list) {
 
 // Every AI image on screen says what it is (Rayan's trust rule).
 export const AI_CAPTION = 'Real thermal camera image, Teledyne FLIR dataset: the same input a thermal camera on a rescue robot produces.'
+
+// Command post inset: a robot with no report for this long is drawn dark with a counter.
+export const CONTACT_STALE_S = 3
+
+// "12 s", then "1 min 05 s" (sim seconds since the robot's last delivered report)
+export function lastContact(age) {
+  const s = Math.max(0, Math.floor(age))
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`
+}
+
+// A survivor report counts as just delivered (pulse) when it reached the command post within
+// the last few sim seconds; one already known when the page loads does not pulse.
+export const FRESH_DELIVERY_S = 6
+export function freshDelivery(survivor, now) {
+  const t = survivor?.reported_t
+  return typeof t === 'number' && now - t <= FRESH_DELIVERY_S
+}

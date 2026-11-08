@@ -18,7 +18,7 @@ import RobotEye from './RobotEye'
 import CommandInset from './CommandInset'
 import NightLights from './NightLights'
 
-const GAP_COLUMN_PX = 330 // Command inset (300) + margins
+export const INSET_FRAC = 0.46 // one view: the Command post inset's share of the pane width (styles.css .cmd-inset)
 
 // Late-afternoon sun from the south-west so every wall throws a readable shadow, a cool
 // sky fill, and image-based light from a few soft panels (no HDR download) so metal,
@@ -124,9 +124,11 @@ function SyncedControls({ id }) {
   const applying = useRef(false)
   const goal = useRef(new THREE.Vector3()).current
 
-  // One view keeps a right-hand column free for the Command inset and AI cards: frame
-  // the building in the rest and shift the projection so it sits centered there.
-  const reserve = id === 'gap' ? GAP_COLUMN_PX : 0
+  // One view keeps the right side free for the Command post inset (bottom right) and the AI
+  // cards above it: frame the building in the rest and shift the projection so it sits
+  // centered there. Swapped (C), this view is the small one and uses its whole box.
+  const swapped = useSim((s) => s.insetSwap)
+  const reserve = id === 'gap' && !swapped && size.width ? Math.round(size.width * INSET_FRAC) + 24 : 0
   useEffect(() => {
     if (!size.width || !size.height) return
     if (reserve) camera.setViewOffset(size.width, size.height, reserve / 2, 0, size.width, size.height)
@@ -274,13 +276,14 @@ function DebugExpose({ which }) {
 }
 
 export default function Pane({ which, title, subtitle }) {
+  const swapped = useSim((s) => which === 'gap' && s.insetSwap)
   const showTruth = useSim((s) => s.showTruth)
   const follow = useSim((s) => s.follow)
   const perf = useSim((s) => s.perf)
   const night = useSim((s) => s.night)
   const traffic = useSim((s) => s.traffic)
   return (
-    <div className={`pane pane-${which}`}>
+    <div className={`pane pane-${which}${swapped ? ' swapped' : ''}`}>
       <div className="pane-title">
         <span className={`dot ${which}`} />
         <b>{title}</b>
@@ -310,7 +313,9 @@ export default function Pane({ which, title, subtitle }) {
       )}
       <DetectionCards side={which} sides={which === 'gap' ? ['command', 'reality'] : undefined} />
       {which !== 'command' && <RobotEye />}
-      {which === 'gap' && <CommandInset />}
+      {which === 'gap' && <CommandInset big={swapped} />}
+      <div className="pane-view">
+      {swapped && <div className="view-head"><span className="dot reality" /><b>Inside the building</b><span>· what's really happening</span></div>}
       <Canvas shadows={!perf} dpr={perf ? 1 : [1, 1.5]} camera={{ fov: 42, near: 0.1, far: 300 }} frameloop={which === 'command' ? 'demand' : 'always'}
               gl={{ toneMapping: THREE.AgXToneMapping, toneMappingExposure: 1.1 }}>
         <color attach="background" args={[night ? '#08090b' : COLORS.bg]} />
@@ -344,6 +349,7 @@ export default function Pane({ which, title, subtitle }) {
         <SyncedControls id={which} />
         {!perf && <Grading which={which} night={night} />}
       </Canvas>
+      </div>
     </div>
   )
 }
