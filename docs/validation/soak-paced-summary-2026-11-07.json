@@ -1,0 +1,24 @@
+{
+  "ok": false,
+  "seed": 7,
+  "robots": 3,
+  "detector": "model",
+  "target_speed": 10,
+  "simulated_s": 1201.0,
+  "wall_s": 156.92,
+  "actual_speed": 7.654,
+  "rss_mb": 353.58,
+  "peak_rss_mb": 353.58,
+  "rss_growth_after_warmup_mb": 9.62,
+  "memory_limit_mb": 500,
+  "growth_limit_mb": 25,
+  "min_actual_speed": 9.5,
+  "survivors_reported": [
+    "S1",
+    "S2",
+    "S3"
+  ],
+  "bundles_delivered": 4351,
+  "tick": 12011,
+  "error": null
+}
