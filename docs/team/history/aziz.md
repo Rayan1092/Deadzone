@@ -4,14 +4,19 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** p2/tunnel-performance, one PR due 1:30 Eastern; user-testing instance is live on :8000 plus a verified HTTP/2 tunnel, Vite remains local :5173.
-- **Works on main:** deployment phone #186, public text/audit #191, public release #199; LAN #178. All previously assigned audit items fixed. Main c0f6f9a includes Yusuf's no-go and manual phone command fixes (#204/#205).
-- **In flight (not merged):** HTTP gzip >=1000 bytes, immutable hashed production assets, compact screen maps on by default (explicit 0 opts out), per-socket lite profile and automatic public HTTPS web selection. Production serving/runbook and protocol docs updated. No simulation/planner/safety edits.
-- **Validation:** web 105 tests/build pass; targeted serving/delta/lite 25 tests pass; full backend 841 passed / 1 skipped (338.79 s), demo guard green; one upstream TestClient deprecation warning. Before/after 60 s tunnel measurements and cold/warm browser paint samples recorded under docs/validation; full-profile screenshots inspected and map/lidar equivalence tests pass.
-- **Measurements:** before 380423 WS frame bytes/s; after full 173103, lite 80457. Lite 600 versus full 1200 ticks/60 s, 0 versus 36 lidar points. Cold FCP median 2284 -> 2006 ms; warm 238 -> 898 ms (slow HTML outlier; JS/CSS transfer 0 in both warm runs). No exaggerated instant-load claim.
-- **Blocked on / need from others:** none. Deadline 1:30 Eastern. Merge main immediately before PR; no .env or protected source in this change.
+- **Working on:** p2/public-tunnel-origin follow-up: public hello/QR consistency and tunnel-first startup. Deadline extension requested because the preceding performance PR is already merged and a full suite takes over 5 minutes.
+- **Works on main:** performance #207 merged at 1:23 Eastern (841 backend / 1 skipped, 105 web/build); deployment #186/#191/#199 and LAN #178. Latest main also includes Rayan's README #208.
+- **In flight (not merged):** shared validated phone URL helper; configured-only public_url/phone_url in both hello messages; exact PowerShell assignment from tunnel.ps1; DEMO order tunnel -> set server-terminal origin -> start server.
+- **Validation:** targeted public URL / script checks and full backend in progress. Existing live user-test server and tunnel remain on merged #207; private .env untouched.
+- **Blocked on / need from others:** permission to merge this follow-up after 1:30 Eastern if tests run beyond it. Do not treat silence as approval.
 
 ## Log
+
+### 2026-11-08 PT - p2/public-tunnel-origin - Advertise one configured public origin everywhere
+- **Did:** factored the existing /api/join URL validation/LAN fallback into a shared helper; both screen and phone hello advertise the configured public origin and /phone link. The Q/QR endpoint uses the same helper. tunnel.ps1 prints an exact copyable $env:DZ_PUBLIC_URL assignment and DEMO explicitly starts tunnel, sets that variable in the server terminal, then starts server. Setting it in the tunnel terminal cannot update an already-running backend.
+- **Contract changes:** when DZ_PUBLIC_URL is configured and valid, hello.data adds public_url and phone_url on screen/phone sockets. With it unset these fields are absent, preserving old hello shape. Invalid settings remain a 503 at /api/join and are never advertised. REST {url} shape and LAN fallback unchanged.
+- **Validation:** configured screen/phone hello equals /api/join; no advertisement for missing/invalid/credential-bearing origins; script double checks exact printed assignment. Targeted suite 101 passed; full backend pending. No private keys or protected sources changed.
+- **Next:** full suite and main sync, one follow-up PR. Merge after 1:30 only if user extends that deadline.
 
 ### 2026-11-08 PT - p2/tunnel-performance - Production HTTP and remote viewer streams
 - **Did:** confirmed the backend already serves web/dist (baseline was not Vite); added GZipMiddleware minimum_size=1000, immutable one-year caching only on hashed production assets, revalidated HTML, default-on lossless screen deltas with legacy opt-out. Public HTTPS pages auto-select a per-socket lite stream; localhost/private LAN keep full detail. DEMO tells operators to build before starting, keep the laptop local and use the tunnel for phones/viewers.

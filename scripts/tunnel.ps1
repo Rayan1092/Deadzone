@@ -1,4 +1,4 @@
-# Rayan runs this manually after starting the server. Ctrl+C stops this tunnel.
+# Start the tunnel first, copy its assignment to the server terminal, then start the server.
 $ErrorActionPreference = 'Stop'
 $tunnelCommand = Get-Command cloudflared -ErrorAction SilentlyContinue
 if (-not $tunnelCommand) {
@@ -20,6 +20,8 @@ try {
             $tunnelOrigin = $Matches[1].ToLowerInvariant()
             Write-Output "HTTPS URL: $tunnelOrigin"
             Write-Output "Phone URL: $tunnelOrigin/phone"
+            Write-Output 'In the SERVER terminal, run this exact line before starting the server:'
+            Write-Output ('$env:DZ_PUBLIC_URL = "' + $tunnelOrigin + '"')
             Write-Output 'Keep this terminal open. Ctrl+C stops the tunnel.'
         }
     }

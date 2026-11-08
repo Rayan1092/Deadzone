@@ -54,6 +54,10 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    The production server serves `web/dist` at `/`; never point the tunnel at
    the Vite dev server on 5173. Hashed JS/CSS cache for one year; HTML revalidates.
    Compact screen maps are on by default (`DZ_COMPACT_STREAM=0` opts out).
+   **Tunnel startup order: start the tunnel (step 6), set `DZ_PUBLIC_URL` in the
+   server terminal using the exact line it prints, then start the server below.**
+   The tunnel may show a temporary origin error until the server starts. For a
+   LAN-only run, leave `DZ_PUBLIC_URL` unset.
    Start the server **paused**. Leave `DZ_AUTOSTART` unset. The default launcher
    binds `0.0.0.0:8000` so phones can connect.
    ```powershell
@@ -77,7 +81,8 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    # DZ_ZONE_PRIORITY     # must stay unset for the main run: robots head straight for their zones and the story runs earlier (R2 dark 48.7 s, S1 found 59.5, S2 193.2; rayan.md 00:55)
    ```
    **Don't set `DZ_VOICE`, `DZ_CONTROL_LEASES` or `DZ_EXPLORATION_V2` for the main run.** With control leases on, the top bar shows the **Operator lock**: **B** and **U** stay locked (with a hint) until you press **Unlock**, which takes every robot for this console ("Console has control"; field units then see the robots locked; R, F, O and A are not affected). **Lock** releases the robots so field units (phones) can take them (Q&A). Unlock fails, naming the holder, while a field unit holds a robot. Leases off: no lock, B and U as before. With `DZ_EXPLORATION_V2=1` the robots explore differently and every beat in the beat sheet moves (S3 found at 23.8 s instead of 14.4, S2 found at 106 s instead of 246). `DZ_SENSOR_VIEW=1` is safe: it only adds camera frames to the Reality pane.
-6. **Before the phone test, Rayan starts the tunnel manually** in a second
+6. **Before the phone test, Rayan starts the tunnel manually** (before starting
+   the server in step 4) in a second
    PowerShell terminal from the repo root:
    `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tunnel.ps1`
    (the execution policy applies only to that process). Install the tool
@@ -85,7 +90,10 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    terminal and confirm `cloudflared --version`. The script runs
    `cloudflared tunnel --url http://localhost:8000` and prints **HTTPS URL** and
    **Phone URL** (`/phone`). Leave that terminal open; **Ctrl+C** stops the tunnel.
-   It uses the already-running server and does not start/reset it. The URL changes
+   It also prints the exact `$env:DZ_PUBLIC_URL = "https://..."` assignment.
+   Copy it into the **server terminal**, then start the server; setting it only
+   in the tunnel terminal does not change another process's environment.
+   It forwards to port 8000 and does not start/reset the server. The URL changes
    on each run. No tunnel is started by preflight or installation.
 7. **Test the phone:** keep the laptop big screen local at `http://localhost:8000/?nointro`.
    Use the tunnel's HTTPS **Phone URL** on phones away from the LAN, and the
