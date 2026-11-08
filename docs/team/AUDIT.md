@@ -28,13 +28,14 @@ Owners: `web/src/three/` = Yusuf, `web/src/panels/` = rayan-ml (testing laptop),
 | 18 | `server/deadzone/app.py:885,888` | "Set DZ_PUBLIC_URL to ...": shown when the join link fails (Join overlay, `panels/JoinPanel.jsx:16` displays `detail` as is) | Aziz | open |
 | 19 | `server/deadzone/app.py:200` | "Presenter credential required": "presenter" (the screen says Operator lock / console) | Aziz | open |
 | 20 | `server/deadzone/command/leases.py:90,126` | "{robot} is controlled by {name}": `name` is the raw client label (e.g. "judge-phone", "Presenter"); the screen maps labels to "Field unit N" / "Console", this message does not | Aziz | open |
+| 41 | `web/src/panels/AILab.jsx:243` | Model Lab without results: "Test results not served: start the server with DZ_AI_LAB=1.": flag name (missed in the first pass) | rayan-ml | fixed (rayan-ml/audit-panels) |
 
 ## Wording, grammar, consistency
 
 | # | Where | Problem | Owner | Status |
 |---|---|---|---|---|
 | 21 | `web/src/panels/Panels.jsx:19-25` | Help list mixes lowercase entries ("start / pause", "overview") with capitalised ones ("Model Lab: ...", "Operator view / Engineering view ..."); pick one (sentence case) | rayan-ml | fixed (rayan-ml/audit-panels) |
-| 22 | `web/src/panels/Panels.jsx:19` | "1–3 follow robot": the handler follows robots 1-9 (generated buildings can have more) | rayan-ml | fixed (rayan-ml/audit-panels) |
+| 22 | `web/src/panels/Panels.jsx:19` (now `keys.js`) | "1–3 follow robot": the handler follows robots 1-9 (generated buildings can have more) | rayan-ml | fixed (rayan-ml/audit-panels) |
 | 23 | `web/src/panels/Panels.jsx:22` | "Q phone join QR" vs the top-bar button "Join on phone" and the overlay title "Join on phone": same thing, two names | rayan-ml | fixed (rayan-ml/audit-panels) |
 | 24 | `web/src/panels/Panels.jsx:126` / `UnderHood.jsx:24` | Top-bar button "I · Counters" opens a panel titled "Under the hood"; help says "under the hood" | rayan-ml | fixed (rayan-ml/audit-panels) |
 | 25 | `web/src/panels/Panels.jsx:127` | Connection chip "live" / "offline" in lowercase, every other chip is sentence case ("Night ops", "Detector: AI model") | rayan-ml | fixed (rayan-ml/audit-panels) |

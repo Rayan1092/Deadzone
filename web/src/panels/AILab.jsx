@@ -240,7 +240,7 @@ export default function AILab() {
                 {m.confusion && <Confusion c={m.confusion} />}
               </>
             ) : (
-              <p className="muted small">{loaded ? 'Test results not served: start the server with DZ_AI_LAB=1.' : 'Loading…'}</p>
+              <p className="muted small">{loaded ? 'Test results are not available on this run.' : 'Loading…'}</p>
             )}
             {!curve && lab && (
               <p className="muted small lab-note">Training curve pending{lab.curve_note ? `: ${lab.curve_note}` : ''}</p>

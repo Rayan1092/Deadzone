@@ -233,25 +233,6 @@ function Survivor({ pos, label, born, id, burst = false, tone = 'alert', hold = 
   )
 }
 
-// Ground truth the robots have not found yet (T key): survivors in red, thermal
-// decoys in amber. Reality pane only, never Command. Drawn just above the fog layer.
-function TruthMarker({ pos, id, sub = 'not found yet', color = COLORS.red, decoy = false }) {
-  const ring = useRef()
-  useFrame(({ clock }) => {
-    if (ring.current) ring.current.material.opacity = 0.35 + 0.2 * Math.sin(clock.elapsedTime * 2)
-  })
-  return (
-    <group position={w2t(pos[0], pos[1], 0)}>
-      <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, FOG_H + 0.03, 0]} renderOrder={3}>
-        <ringGeometry args={[0.35, 0.42, 32]} />
-        <meshBasicMaterial color={color} transparent side={THREE.DoubleSide} depthWrite={false} />
-      </mesh>
-      <Html position={[0, FOG_H + 0.6, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
-        <div className={`tag ghost truth${decoy ? ' decoy' : ''}`}><b>{id}</b><span>{sub}</span></div>
-      </Html>
-    </group>
-  )
-}
 
 function rng(seed) {
   let s = (seed % 2147483647) || 1
@@ -386,7 +367,6 @@ function useBirths(ids) {
 export function RealityActors({ gap = false }) {
   const tick = useSim((s) => s.tick)
   const fp = useSim((s) => s.floorplan)
-  const showTruth = useSim((s) => s.showTruth)
   const survivors_found = firstFinds(tick?.reality.survivors_found ?? [])
   const births = useBirths(survivors_found.map((s) => s.id))
   const reportedIds = (tick?.command.survivors ?? []).map((s) => s.id)
@@ -410,7 +390,6 @@ export function RealityActors({ gap = false }) {
     return null // dark: the label says NO LINK
   }
   const { robots } = tick.reality
-  const found = new Set(survivors_found.map((s) => s.id))
   const foundBy = new Map(survivors_found.map((s) => [s.id, s]))
   const cmdById = Object.fromEntries(tick.command.robots.map((c) => [c.id, c]))
   const simTime = useSim.getState().time // updates with every tick, like this component
@@ -442,12 +421,6 @@ export function RealityActors({ gap = false }) {
             : { label: `${s.id} · not reported yet`, tone: 'pending', hold: true }
         return <RealitySurvivor key={s.id} id={s.id} pos={s.pos} pose={survivorPose(s, manifest)} tag={tag} />
       })}
-      {showTruth && (fp.survivors ?? []).filter((s) => !found.has(s.id)).map((s) => (
-        <TruthMarker key={s.id} pos={s.pos} id={s.id} />
-      ))}
-      {showTruth && decoyLayout(fp).map((d) => (
-        <TruthMarker key={d.id} pos={d.pos} id={d.id} sub={`${d.label} · decoy`} color={COLORS.amber} decoy />
-      ))}
     </group>
   )
 }

@@ -11,7 +11,7 @@ export function ReplayChip() {
   const replay = useSim((s) => s.replay)
   if (RECORDING) {
     return (
-      <button className="rec-chip" title="Save the recording (S)" onClick={saveRecording}>
+      <button className="rec-chip" title="Save the mission recording" onClick={saveRecording}>
         <i />REC {fmtClock((recorder?.ms ?? 0) / 1000)} · {mb(recorder?.bytes ?? 0)}
       </button>
     )

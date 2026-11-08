@@ -239,7 +239,7 @@ const PULSE_MS = 900
 function commandSignature(s) {
   const c = s.tick?.command
   return [c ? c.robots.map((r) => r.last_seen).join(',') : '', c?.survivors.length, c?.routes?.length, c?.relays.length, c?.faults?.length,
-    s.maps.commandVersion, shared.rev, s.floorplan, s.night, s.follow, s.showTruth, s.beliefOn].join('|')
+    s.maps.commandVersion, shared.rev, s.floorplan, s.night, s.follow, s.beliefOn].join('|')
 }
 function CommandRedraw() {
   const invalidate = useThree((s) => s.invalidate)
@@ -278,7 +278,6 @@ function DebugExpose({ which }) {
 
 export default function Pane({ which, title, subtitle }) {
   const swapped = useSim((s) => which === 'gap' && s.insetSwap)
-  const showTruth = useSim((s) => s.showTruth)
   const follow = useSim((s) => s.follow)
   const perf = useSim((s) => s.perf)
   const night = useSim((s) => s.night)
@@ -290,7 +289,6 @@ export default function Pane({ which, title, subtitle }) {
         <b>{title}</b>
         <span className="muted">{subtitle}</span>
         {which === 'command' && <PaneStats />}
-        {which !== 'command' && showTruth && <span className="truth-chip">Truth overlay · T</span>}
         {follow && <span className="follow-chip">{which === 'command' ? `${follow} last report` : `Following ${follow}`} · 0</span>}
       </div>
       {which === 'gap' && (
