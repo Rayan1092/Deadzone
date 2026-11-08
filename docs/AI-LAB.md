@@ -21,6 +21,14 @@ establish that they are training examples. Benchmark numbers retain their
 simulation labels. Live survivor crops/Grad-CAM keep the existing `/crops` contract
 and delivered-only Command boundary.
 
+Contract clarification for the new AI-eye plan: current robot detection events
+contain `heatmap` (the pre-blended image), not `heatmap_alpha`. The alpha path is
+available in `/crops/manifest.json` for the Reality/AI Lab panel. Command panels
+must wait for a delivered survivor and must not use manifest truth positions or
+labels to reveal unknown objects. `/ai-lab/results/lab.json` and nested
+`/ai-lab/results/lab/*.png` will work when Rayan adds those exports; absent files
+remain 404, and an absent curve must remain absent in the UI.
+
 Both roots allow GET/HEAD of PNG, JPEG, WebP, SVG and JSON files, with normal media
 types and cache revalidation. No directory listing is provided. Disabled, missing,
 hidden, unsupported and escaping paths return 404. Enabled mutation requests

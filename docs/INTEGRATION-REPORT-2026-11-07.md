@@ -18,7 +18,7 @@ testing-laptop acceptance.
 | Quiet preload | `/api/plan?check=false` saves/broadcasts without safety rejection; judge's explicit check still rejects unsafe P-1 | Final demo rehearsal |
 | Baseline toggle | REST and screen WS accept both action/value and action/mode; all robots switch through set_mode; conflicting aliases reject atomically | Yusuf key/chip and WAITING_FOR_LINK label |
 | Plan publication ordering | One Hub lifetime lock orders draft writes, CRDT, checks, dispatch and reset through publication; reset cannot resurrect old drafts | PR #58 merged |
-| AI Lab assets | New gated read-only `/ai-lab/results/*` and `/ai-lab/slides/*`; JSON/images only; exports served byte-for-byte | Implementation PR; Rayan training curve/examples/manifest exports; Yusuf L overlay |
+| AI Lab assets | New gated read-only `/ai-lab/results/*` and `/ai-lab/slides/*`; JSON/images only; exports served byte-for-byte | [PR #60](https://github.com/Rayan1092/Deadzone/pull/60); Rayan training curve/examples/manifest exports; Yusuf L overlay |
 
 Feature flags: `DZ_GEMINI`, `DZ_AFTERSHOCK`, `DZ_FEC`, `DZ_CRDT`,
 `DZ_RESCUE_ORDER`, `DZ_AI_LAB`, each enabled only by value `1`. Baseline control is
@@ -37,6 +37,12 @@ an explicit operator action. Nothing enables these features automatically.
   visual only. AI Lab and judge-picked scenario generation are newly planned.
   Rayan owns generator validation and route recompute. Planner optimization is
   explicitly deferred by Rayan. No robot/ML/web source was edited by Aziz.
+- Final fetch also found Yusuf's unmerged `p3/ai-eye` commit `74aee55`: **plan only,
+  no runtime code**. He prioritizes route replacement/B-key baseline, honest
+  robot-eye object boxes and Ask/spoken G, then L overlay/visuals. His requested
+  `lab.json` and nested example PNG paths fit the asset API without a backend
+  schema change. One clarification posted: current events carry `heatmap`;
+  `heatmap_alpha` is in the crop manifest, not a detection-event field.
 
 Some history `Now` sections still describe already-merged work as in flight; the
 status above follows commits, actual code and checks rather than those old labels.
@@ -94,3 +100,7 @@ Earlier long-run evidence, not rerun for static asset serving:
 Contracts and details: [AI Lab](AI-LAB.md), [co-planning](CO-PLANNING.md),
 [aftershock](AFTERSHOCK.md), [network/FEC](DTN.md), [rescue order](RESCUE-ORDER.md),
 [mode/soak](SOAK-AND-MODE.md), and [team handoff](team/history/aziz.md).
+
+Local preview left running at `http://127.0.0.1:8017`: paused, seed 7, three robots,
+2x, trained detector, quiet P-1 preload and all optional flags off. This loopback
+preview is for this laptop; it does not establish venue-Wi-Fi phone connectivity.
