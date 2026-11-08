@@ -60,6 +60,7 @@ SURVIVOR_CLEAR_M = 0.5     # never drive over a person: motion plans keep this f
 PATH_CHECK_SKIP_M = 0.4    # ignore the robot's own footprint (it may sit in a wall's inflation)
 REPLAN_PAUSE_S = 0.6       # stop briefly in REPLANNING so the replan is visible and the map settles
 REPLAN_COOLDOWN_S = 5.0    # repeat obstacles this soon after a replan are replanned silently
+PEER_MARK_S = 8.0          # a motion fault this soon after a peer blocked us counts as a peer block
 TRAPPED_AFTER_S = 10.0     # no route for this long raises a TRAPPED fault to the command post
 ESCAPE_M = 6.0             # walk at most this far out of a no-go area drawn over the robot
 BELIEF_PERIOD_S = 0.5      # the survivor belief takes one camera look per perception period
@@ -224,6 +225,8 @@ class Robot:
         self.zone_priority = os.environ.get("DZ_ZONE_PRIORITY") == "1"
         self.heading_zone = None   # zone id we are driving to under DZ_ZONE_PRIORITY
         self.excluded_skipped = False   # went home with frontiers left only inside plan no-go areas
+        self.peer_block_t = -99.0       # last time odometry said another robot blocked us
+        self.peer_marks = {}            # (ix, iy) -> (value before, time marked): peers never persist
         self.belief_t = -99.0
         self.zones = []                     # this robot's dispatched zones, highest priority first
         self.battery = Battery()
@@ -1004,7 +1007,13 @@ class Robot:
             if self.cmd_v > 0.2 and moved < 0.05 and self.state not in ("DEPLOYING", "DONE", "FAULT"):
                 self._enter_fault("STUCK")
                 return
-        if odo.get("blocked"):
+        if odo.get("blocked_by"):
+            # another robot's body is in the way (DZ_ROBOT_COLLISIONS): avoid it like an obstacle,
+            # but only for PEER_MARK_S. It moves on; a permanent wall would seal the doorway on our
+            # map for good (tester's trace: R3 in Office A's door, R1 TRAPPED at 37.4 s)
+            self.peer_block_t = self.t
+            self._block_ahead(peer=True)
+        elif odo.get("blocked"):
             self._block_ahead()
 
     def inject_overcurrent(self, seconds=1.0):
@@ -1054,17 +1063,33 @@ class Robot:
         backed = math.dist(self.pose[:2], self.reverse_from[:2])
         if backed < REVERSE_M and self.t - self.reverse_t < REVERSE_TIMEOUT_S:
             return
-        self._block_ahead(self.reverse_from)
+        self._block_ahead(self.reverse_from, peer=self.t - self.peer_block_t < PEER_MARK_S)
         self.state = self.fault_resume or "EXPLORING"   # resume target for the replan
         self._start_replan(self.fault.lower())
 
-    def _block_ahead(self, pose=None):
+    def _block_ahead(self, pose=None, peer=False):
         x, y, th = pose if pose is not None else self.pose
         for d in (0.35, 0.6):
             ix = int((x + math.cos(th) * d) // self.cell)
             iy = int((y + math.sin(th) * d) // self.cell)
             if 0 <= ix < self.map.w and 0 <= iy < self.map.h:
+                if peer:
+                    before = self.peer_marks.get((ix, iy), (int(self.map.grid[iy, ix]), 0.0))[0]
+                    self.peer_marks[(ix, iy)] = (before, self.t)
+                else:
+                    self.peer_marks.pop((ix, iy), None)   # a real obstacle: keep it
                 self.map.mark_occupied(ix, iy)
+
+    def _forget_peer_marks(self):
+        """Give back what the map had under other robots' bodies. Called when no route exists:
+        a robot that blocked us once must never wall us in for good. True if anything changed."""
+        changed = False
+        for (ix, iy), (before, _) in self.peer_marks.items():
+            if self.map.grid[iy, ix] == OCC and before != OCC:
+                self.map._set(np.array([ix]), np.array([iy]), before)
+                changed = True
+        self.peer_marks = {}
+        return changed
 
     # ------------------------------------------------------------------ behavior FSM
     def _set_state(self, s):
@@ -1148,7 +1173,8 @@ class Robot:
             if not self.path or self.t - self.last_plan_t > REPLAN_PERIOD:
                 if self._escape_blocked_cell():         # a no-go drawn over us: walk out, then plan
                     return
-                if not self._plan_frontier():
+                if not self._plan_frontier() and not (self.peer_marks and self._forget_peer_marks()
+                                                      and self._plan_frontier()):
                     if self._no_frontier_outcome() == "hold":
                         self._hold_for_plan()
                         return
@@ -1280,6 +1306,8 @@ class Robot:
         if self.replan_fail_since is not None and self.t - self.last_plan_t < REPLAN_PERIOD:
             return   # throttle retries while no route exists
         ok, resume = self._plan_for(self.resume_state or "EXPLORING")
+        if not ok and self.peer_marks and self._forget_peer_marks():
+            ok, resume = self._plan_for(self.resume_state or "EXPLORING")   # a peer, not a wall
         if not ok and self._escape_blocked_cell():
             ok, resume = True, self.resume_state or "EXPLORING"
         if ok:
