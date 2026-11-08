@@ -5,6 +5,7 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 ## Now
 
 - **Role:** Aziz = backend/network/simulation/Command APIs, serving and integration tests. Yusuf = web/camera/phone UX; Rayan = robot policy/ML/maps. No new owner-source implementation in this audit.
+- **Working on:** `p2/demo-refresh`: refresh stale venue tunnel/backend (10-15 min), then short G briefing. Startup CLI contract before code: add `--no-leases` for the fixed demo, preserving existing launcher defaults; reject `--voice --no-leases` because voice requires leases. No API/message changes. Use current main runtime, AI Lab on, G/Ask enabled for Rayan/user use without making provider calls here; optional experiment flags remain off.
 - **Audit basis:** pulled main `d2cfbde`, including PLAN.md's V2/voice/leases/9:50 PM sections and newest team histories. #81 owner artifacts and #82 actual sensor backend are now MERGED. #83 asset pack is also merged; README asks Yusuf to copy selected files into web/public/assets, so no speculative backend mount is needed unless he requests one.
 
 ### Backend implemented on main (acceptance tracked separately)
@@ -26,6 +27,12 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 - **Validation baseline:** last backend suite 404 passed / 1 opt-in soak skipped; web build 737 modules passed. `server/` and `web/` source trees are unchanged from that tested integration; this checklist audit adds no runtime changes. Keep DEMO guard green, feature gates and testing-laptop dry runs; 7:30 AM freeze still applies.
 
 ## Log
+
+### 2026-11-07 PT - p2/demo-refresh - Reserve fixed-demo launcher profile before service refresh
+- **Did:** user authorized continuing the checklist; synced d2cfbde and latest team asks. Starting stale demo deployment, estimate 10-15 min. No owner UI/policy edits.
+- **Contract changes:** CLI-only --no-leases opts out of the old launcher's hardcoded lease setting for the fixed demo; incompatible with --voice. Existing CLI defaults remain. No endpoint or wire changes.
+- **Heads-up for others:** refreshed Quick Tunnel gets a new URL; existing phone mic success is recorded, new-origin phone acceptance remains manual. Real provider source checks stay with Rayan; no key added/read by agent.
+- **Next:** add the opt-out, rebuild current Yusuf frontend unchanged, refresh our owned demo processes and verify HTTPS/API/WSS/AI Lab/quiet preload.
 
 ### 2026-11-07 PT - p2/checklist-audit - Refresh Aziz checklist from latest plan, code and live service probes
 - **Did:** read current plan/team asks, pulled d2cfbde, distinguished implemented backend from UI/device/deployment acceptance. Recorded #81/#82 merged and new Rayan asset pack. Read-only port 8020 probe exposed an old running backend (no voice audio/TTS schema; AI Lab 404); no services, keys or feature flags changed.
