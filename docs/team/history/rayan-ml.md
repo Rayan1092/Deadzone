@@ -3,9 +3,9 @@
 Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on the testing laptop edits this file. Rayan's robot session writes `history/rayan.md`.
 
 ## Now
-- **Working on:** `rayan-ml/judge-test` (PR open, merging after tests): judge pool export for Aziz's J overlay. Next: `rayan-ml/benchmark-v2` (radio sensitivity sweep, results ready).
-- **Works on main:** trained survivor detector + `perception.filter_hits()` with sim fallback (PR #14), runtime crops, robot hookup and decoys (PR #17), Grad-CAM heatmaps (PR #49), AI Lab export (PR #68), logged retrain (PR #71), real-scene crops + detector fine-tuned on indoor thermal people, FLIR 96.7% / indoor 99.6% (PR #95).
-- **In flight (not merged):** `rayan-ml/judge-test`: `ml/results/judge_pool/` (40 held-out images + manifest).
+- **Working on:** `rayan-ml/benchmark-v2` (PR open, merging after tests). Then test-station duty and whatever Rayan queues.
+- **Works on main:** trained survivor detector + `perception.filter_hits()` with sim fallback (PR #14), runtime crops, robot hookup and decoys (PR #17), Grad-CAM heatmaps (PR #49), AI Lab export (PR #68), logged retrain (PR #71), judge pool `ml/results/judge_pool/` (PR #96), real-scene crops + detector fine-tuned on indoor thermal people, FLIR 96.7% / indoor 99.6% (PR #95).
+- **In flight (not merged):** `rayan-ml/benchmark-v2`: `ml/benchmark_v2.py`, `docs/assets/benchmark_v2.{md,png,json}`.
 - **Blocked on / need from others:** nothing.
 - **Promises to others:**
   - `filter_hits(hits)` keeps the `io.thermal()` hit shape `{id,pos,crop,conf}`. Kept hits get `conf` = model P(person) and `detector:"model"`; rejected hits are dropped.
@@ -15,6 +15,12 @@ Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on
   - Judge pool manifest format below (judge-test entry), readable by Aziz's `readJudgePool`.
 
 ## Log
+
+### 2026-11-08 13:20 · rayan-ml/benchmark-v2 · Radio sensitivity sweep: the Deadzone advantage holds everywhere (in simulation)
+- **Did:** `py ml/benchmark_v2.py` (660 headless runs, 57 min on 13 workers): Deadzone vs baseline with **random rubble per seed** (3 to 6 one-metre piles, never sealing a door) and the radio model swept one knob at a time (wall losses 0.7x / 1x / 1.3x, path exponent 2.2 / 2.6 / 3.0, link thresholds -4 / 0 / +4 dB) plus easy and hard corners; collapse_01 with 30 seeds per setting, gen_1..3 at default and hard radio with 10 seeds. The radio is patched only inside each worker (`propagation`, `safety` constants, floor plan wall losses); robot code keeps its own assumptions. **Result: Deadzone reports more survivors than the baseline in all 15 settings, and fewer in 0 of 330 paired runs.** collapse_01: Deadzone 87-88 of 90 (97-98%) in every setting vs baseline 29-68 of 90 (32% hard radio to 76% easy radio); Command map 89% vs 33-75%; Deadzone adapts with 2.7 to 5.2 relays per run. Generated buildings: Deadzone 90-97% vs baseline 10-63%. `--replot` redraws from the saved JSON. Ran before PR #95 swapped crops and model; both detectors accept every survivor crop and reject every decoy, so sim outcomes are the same. The original `benchmark.md` (20 seeds, no rubble) is unchanged.
+- **Contract changes:** none (new files `docs/assets/benchmark_v2.{md,png,json}`).
+- **Heads-up for others:** slide-ready chart `docs/assets/benchmark_v2.png`, labelled in simulation. Judge answer to "what if your radio model is wrong?": "We swept it: wall losses plus or minus 30%, path exponent 2.2 to 3.0, thresholds plus or minus 4 dB, random rubble, three generated buildings. Deadzone reported more survivors in every setting, 97% vs 32 to 76%."
+- **Next:** test-station duty; anything Rayan queues.
 
 ### 2026-11-08 13:05 · rayan-ml/judge-test · Judge pool export for the J overlay
 - **Did:** `py ml/make_judge_pool.py` writes `ml/results/judge_pool/`: 40 held-out FLIR ADAS v2 val images (20 person, 20 not person, 288 px), scored by the shipped model (the PR #95 detector). Never trained on; none of them, and no crop from their frames, are in the AI Lab examples or the sim's crops (exclusions from `ml/real_crops.json`). Crops from one video are at least 150 frames apart (no near-duplicates). Not-person images are centred on labelled objects (cars, signs), never random background that could hold an unlabelled person. 2 + 2 model mistakes kept on purpose: the model is right on **36 of 40** here (96.7% on all 1,200 held-out images; the manifest's `note` says so). Poses set by eye in `ml/judge_pool_poses.json`. Validated with Aziz's own `readJudgePool` (web/src/panels/judgePool.js on main): 40 items accepted, URLs, labels and scores correct. Overlay not built here (Aziz's #90 has it).
