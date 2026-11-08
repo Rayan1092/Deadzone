@@ -1,0 +1,192 @@
+{
+ "caption": "Real FLIR thermal frame, same input as the AI",
+ "rules": "person: exactly one person, tight to the body, no road / vehicle / crosswalk, a pose plausible for a trapped person; decoy and not-person: a warm object filling the frame, never a whole car on a street. All frames held out from training; picked and checked by eye from contact sheets (ml/real_crops.py cands).",
+ "survivors": [
+  {
+   "key": "sdt/image_t_1830.png#104,153,431,480",
+   "pose": "crouching",
+   "shows": "person crouched low on a floor, indoor overhead view",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "sdt/image_t_1910.png#59,82,456,480",
+   "pose": "bent",
+   "shows": "person kneeling, bent over, indoor overhead view",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "sdt/image_t_3620.png#63,0,543,480",
+   "pose": "sitting",
+   "shows": "person slumped in a chair, indoor overhead view",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  }
+ ],
+ "decoys": [
+  {
+   "key": "video_thermal_test/data/video-ePoikf5LyTTfqchga-frame-000707-GXdT2g9hBZaTf3Pks.jpg#468,275,528,335",
+   "pose": null,
+   "shows": "hot slatted panel on a vehicle (stand-in for a radiator)",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "video_thermal_test/data/video-ePoikf5LyTTfqchga-frame-000617-GTN9AuR6myAx99oMy.jpg#533,319,600,386",
+   "pose": null,
+   "shows": "hot truck machinery and fuel tanks (stand-in for an engine)",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "images_thermal_val/data/video-AP7PvpujjZZGLnsJt-frame-002477-ZnhHGtXJbJcMn9TJ5.jpg#429,125,548,244",
+   "pose": null,
+   "shows": "boxy panel with two round dials (stand-in for a coffee machine)",
+   "dataset": "FLIR ADAS v2 held-out split"
+  }
+ ],
+ "lab_pos": [
+  {
+   "key": "sdt/image_t_1600.png#0,0,480,480",
+   "pose": "lying",
+   "shows": "person lying on a floor",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "sdt/image_t_1760.png#17,0,497,480",
+   "pose": "lying",
+   "shows": "person lying on a floor, seen from the side",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "sdt/image_t_1800.png#31,83,427,480",
+   "pose": "lying",
+   "shows": "person curled up on a floor",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "sdt/image_t_1870.png#80,121,438,480",
+   "pose": "crouching",
+   "shows": "person crouched on hands and knees",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "sdt/image_t_1930.png#109,106,482,480",
+   "pose": "crouching",
+   "shows": "person crouched on a floor",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "sdt/image_t_1980.png#0,0,480,480",
+   "pose": "lying",
+   "shows": "person lying curled on a floor",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "sdt/image_t_3640.png#6,0,486,480",
+   "pose": "sitting",
+   "shows": "person sitting in a chair",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "sdt/image_t_3770.png#0,62,417,480",
+   "pose": "sitting",
+   "shows": "person sitting, leaning forward",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "sdt/image_t_3810.png#159,84,345,270",
+   "pose": "sitting",
+   "shows": "person sitting, mostly hidden by the chair back",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "sdt/image_t_1690.png#8,52,436,480",
+   "pose": "lying",
+   "shows": "person lying on a floor",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "sdt/image_t_3880.png#0,15,464,480",
+   "pose": "sitting",
+   "shows": "person sitting in a chair",
+   "dataset": "SDT real test set (FLIR Lepton 3.5, indoor), Zenodo 4124309, held out from training"
+  },
+  {
+   "key": "images_thermal_val/data/video-k5bTJAiyEgHismN7Y-frame-001445-TpMQX8R8MNG3G4EuJ.jpg#195,260,259,324",
+   "pose": "sitting",
+   "shows": "person reclining, outdoor street camera",
+   "dataset": "FLIR ADAS v2 held-out split"
+  }
+ ],
+ "lab_neg": [
+  {
+   "key": "images_thermal_val/data/video-kBvcuDMtYv2Z4kmXi-frame-010771-69BtT4stoFCxPawT9.jpg#503,222,613,332",
+   "pose": null,
+   "shows": "truck front grille",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "images_thermal_val/data/video-kBvcuDMtYv2Z4kmXi-frame-010899-6fLXzgCBsCrzMGMYv.jpg#516,262,610,356",
+   "pose": null,
+   "shows": "panel on a bus body",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "images_thermal_val/data/video-mKfYgxHA8ZZmXvw56-frame-009145-a7SGrYKQDBYcf5e3T.jpg#51,320,118,387",
+   "pose": null,
+   "shows": "vehicle vent panel",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "images_thermal_val/data/video-mKfYgxHA8ZZmXvw56-frame-009735-YGJ6HLjPbmGo9DGfG.jpg#555,269,633,347",
+   "pose": null,
+   "shows": "vehicle body panel",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "images_thermal_val/data/video-k5bTJAiyEgHismN7Y-frame-001156-ijBMji7sTe7PKD3xo.jpg#391,194,455,258",
+   "pose": null,
+   "shows": "rear panel of a bus",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "video_thermal_test/data/video-ePoikf5LyTTfqchga-frame-000739-4rd3EQbqkLyEDTLHW.jpg#537,215,631,309",
+   "pose": null,
+   "shows": "hot slatted panel",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "images_thermal_val/data/video-57kWWRyeqqHs3Byei-frame-005702-J22hP4z3Zxu8YKRBo.jpg#517,240,609,332",
+   "pose": null,
+   "shows": "wheel arch close-up",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "images_thermal_val/data/video-57kWWRyeqqHs3Byei-frame-001435-vW9v3aLnr7A8wJBEa.jpg#222,259,302,339",
+   "pose": null,
+   "shows": "vehicle side panel",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "images_thermal_val/data/video-k5bTJAiyEgHismN7Y-frame-008670-jgwD6Ea4Se3p8fAvi.jpg#42,251,128,337",
+   "pose": null,
+   "shows": "wheel hub close-up",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "video_thermal_test/data/video-ePoikf5LyTTfqchga-frame-000619-Kx8pBRgNf9nD2pEkB.jpg#537,316,601,380",
+   "pose": null,
+   "shows": "truck machinery",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "images_thermal_val/data/video-57kWWRyeqqHs3Byei-frame-004111-xGFTemtQnKmT99Mkd.jpg#193,258,257,322",
+   "pose": null,
+   "shows": "hot wheel hub close-up",
+   "dataset": "FLIR ADAS v2 held-out split"
+  },
+  {
+   "key": "images_thermal_val/data/video-Qk8msXvMopoYNDdco-frame-005270-ti3cEoSCYHZXrEwKr.jpg#480,285,567,372",
+   "pose": null,
+   "shows": "lower vehicle body panel",
+   "dataset": "FLIR ADAS v2 held-out split"
+  }
+ ]
+}

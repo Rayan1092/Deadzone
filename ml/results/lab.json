@@ -3,17 +3,40 @@
   "name": "MobileNetV3-Small",
   "input_px": 96,
   "params": 1519906,
-  "onboard_ms": 4.7,
+  "onboard_ms": 4.9,
   "size_mb": 6.2,
   "threshold": 0.6,
-  "trained_on": "FLIR ADAS v2 thermal, person vs not-person 96 px crops"
+  "trained_on": "FLIR ADAS v2 thermal street crops + SDT real indoor thermal crops (people lying, sitting, standing), 96 px"
  },
  "metrics": {
-  "accuracy": 0.9617,
-  "precision": 0.9632,
+  "accuracy": 0.9667,
+  "precision": 0.973,
   "recall": 0.96,
-  "f1": 0.9616,
+  "f1": 0.9664,
   "n_test": 1200
+ },
+ "metrics_indoor": {
+  "accuracy": 0.9956,
+  "precision": 1.0,
+  "recall": 0.9917,
+  "n_test": 2273,
+  "confusion": {
+   "labels": [
+    "person",
+    "not person"
+   ],
+   "matrix": [
+    [
+     1190,
+     10
+    ],
+    [
+     0,
+     1073
+    ]
+   ]
+  },
+  "data": "SDT real indoor thermal frames (FLIR Lepton 3.5): people lying, sitting, standing, plus empty floor; the held-out 20% of every recording block"
  },
  "confusion": {
   "labels": [
@@ -26,46 +49,46 @@
     24
    ],
    [
-    22,
-    578
+    16,
+    584
    ]
   ]
  },
  "curve": [
   {
    "epoch": 1,
-   "train_loss": 0.3901,
-   "val_loss": 0.6683,
-   "train_acc": 0.7974,
-   "val_acc": 0.815
+   "train_loss": 0.2004,
+   "val_loss": 0.1564,
+   "train_acc": 0.9041,
+   "val_acc": 0.9511
   },
   {
    "epoch": 2,
-   "train_loss": 0.1309,
-   "val_loss": 0.247,
-   "train_acc": 0.9465,
-   "val_acc": 0.9183
+   "train_loss": 0.0541,
+   "val_loss": 0.0565,
+   "train_acc": 0.9799,
+   "val_acc": 0.9769
   },
   {
    "epoch": 3,
-   "train_loss": 0.0819,
-   "val_loss": 0.1524,
-   "train_acc": 0.9689,
-   "val_acc": 0.945
+   "train_loss": 0.034,
+   "val_loss": 0.0431,
+   "train_acc": 0.9864,
+   "val_acc": 0.9783
   },
   {
    "epoch": 4,
-   "train_loss": 0.0641,
-   "val_loss": 0.1,
-   "train_acc": 0.9754,
-   "val_acc": 0.965
+   "train_loss": 0.0246,
+   "val_loss": 0.0371,
+   "train_acc": 0.99,
+   "val_acc": 0.9851
   },
   {
    "epoch": 5,
-   "train_loss": 0.0522,
-   "val_loss": 0.087,
-   "train_acc": 0.9787,
-   "val_acc": 0.9683
+   "train_loss": 0.0174,
+   "val_loss": 0.0338,
+   "train_acc": 0.9934,
+   "val_acc": 0.9864
   }
  ],
  "curve_note": "Curve of the shipped model (logged retrain, promoted because it scored equal or better).",
@@ -74,145 +97,217 @@
    "file": "lab/pos_01.png",
    "label": "person",
    "predicted": "person",
-   "conf": 0.992
+   "conf": 1.0,
+   "pose": "lying",
+   "shows": "person lying on a floor",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/pos_02.png",
    "label": "person",
-   "predicted": "person",
-   "conf": 0.996
+   "predicted": "not person",
+   "conf": 0.316,
+   "pose": "lying",
+   "shows": "person lying on a floor, seen from the side",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/pos_03.png",
    "label": "person",
    "predicted": "person",
-   "conf": 0.998
+   "conf": 1.0,
+   "pose": "lying",
+   "shows": "person curled up on a floor",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/pos_04.png",
    "label": "person",
    "predicted": "person",
-   "conf": 0.996
+   "conf": 1.0,
+   "pose": "crouching",
+   "shows": "person crouched on hands and knees",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/pos_05.png",
    "label": "person",
    "predicted": "person",
-   "conf": 0.821
+   "conf": 1.0,
+   "pose": "crouching",
+   "shows": "person crouched on a floor",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/pos_06.png",
    "label": "person",
    "predicted": "person",
-   "conf": 1.0
+   "conf": 1.0,
+   "pose": "lying",
+   "shows": "person lying curled on a floor",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/pos_07.png",
    "label": "person",
    "predicted": "person",
-   "conf": 0.998
+   "conf": 1.0,
+   "pose": "sitting",
+   "shows": "person sitting in a chair",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/pos_08.png",
    "label": "person",
    "predicted": "person",
-   "conf": 0.818
+   "conf": 0.997,
+   "pose": "sitting",
+   "shows": "person sitting, leaning forward",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/pos_09.png",
    "label": "person",
    "predicted": "person",
-   "conf": 1.0
+   "conf": 1.0,
+   "pose": "sitting",
+   "shows": "person sitting, mostly hidden by the chair back",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/pos_10.png",
    "label": "person",
    "predicted": "person",
-   "conf": 0.981
+   "conf": 1.0,
+   "pose": "lying",
+   "shows": "person lying on a floor",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/pos_11.png",
    "label": "person",
    "predicted": "person",
-   "conf": 1.0
+   "conf": 1.0,
+   "pose": "sitting",
+   "shows": "person sitting in a chair",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/pos_12.png",
    "label": "person",
    "predicted": "person",
-   "conf": 0.993
+   "conf": 0.997,
+   "pose": "sitting",
+   "shows": "person reclining, outdoor street camera",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/neg_01.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.0
+   "conf": 0.105,
+   "pose": null,
+   "shows": "truck front grille",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/neg_02.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.002
+   "conf": 0.002,
+   "pose": null,
+   "shows": "panel on a bus body",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/neg_03.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.0
+   "conf": 0.002,
+   "pose": null,
+   "shows": "vehicle vent panel",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/neg_04.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.01
+   "conf": 0.032,
+   "pose": null,
+   "shows": "vehicle body panel",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/neg_05.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.0
+   "conf": 0.157,
+   "pose": null,
+   "shows": "rear panel of a bus",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/neg_06.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.004
+   "conf": 0.085,
+   "pose": null,
+   "shows": "hot slatted panel",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/neg_07.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.0
+   "conf": 0.011,
+   "pose": null,
+   "shows": "wheel arch close-up",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/neg_08.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.177
+   "conf": 0.001,
+   "pose": null,
+   "shows": "vehicle side panel",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/neg_09.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.0
+   "conf": 0.007,
+   "pose": null,
+   "shows": "wheel hub close-up",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/neg_10.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.021
+   "conf": 0.056,
+   "pose": null,
+   "shows": "truck machinery",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/neg_11.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.0
+   "conf": 0.019,
+   "pose": null,
+   "shows": "hot wheel hub close-up",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   },
   {
    "file": "lab/neg_12.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.0
+   "conf": 0.001,
+   "pose": null,
+   "shows": "lower vehicle body panel",
+   "caption": "Real FLIR thermal frame, same input as the AI"
   }
  ],
  "runtime": [
@@ -221,8 +316,11 @@
    "role": "decoy",
    "object": "radiator",
    "label": "not person",
+   "pose": null,
+   "shows": "hot slatted panel on a vehicle (stand-in for a radiator)",
+   "caption": "Real FLIR thermal frame, same input as the AI",
    "predicted": "not person",
-   "conf": 0.0,
+   "conf": 0.002,
    "file": "/crops/neg_0001.png",
    "heatmap": "/crops/heatmaps/neg_0001.png",
    "heatmap_alpha": "/crops/heatmaps/neg_0001_alpha.png"
@@ -232,8 +330,11 @@
    "role": "decoy",
    "object": "engine",
    "label": "not person",
+   "pose": null,
+   "shows": "hot truck machinery and fuel tanks (stand-in for an engine)",
+   "caption": "Real FLIR thermal frame, same input as the AI",
    "predicted": "not person",
-   "conf": 0.0,
+   "conf": 0.038,
    "file": "/crops/neg_0002.png",
    "heatmap": "/crops/heatmaps/neg_0002.png",
    "heatmap_alpha": "/crops/heatmaps/neg_0002_alpha.png"
@@ -243,8 +344,11 @@
    "role": "decoy",
    "object": "coffee machine",
    "label": "not person",
+   "pose": null,
+   "shows": "boxy panel with two round dials (stand-in for a coffee machine)",
+   "caption": "Real FLIR thermal frame, same input as the AI",
    "predicted": "not person",
-   "conf": 0.003,
+   "conf": 0.009,
    "file": "/crops/neg_0003.png",
    "heatmap": "/crops/heatmaps/neg_0003.png",
    "heatmap_alpha": "/crops/heatmaps/neg_0003_alpha.png"
@@ -254,6 +358,9 @@
    "role": "survivor",
    "object": null,
    "label": "person",
+   "pose": "crouching",
+   "shows": "person crouched low on a floor, indoor overhead view",
+   "caption": "Real FLIR thermal frame, same input as the AI",
    "predicted": "person",
    "conf": 1.0,
    "file": "/crops/pos_0001.png",
@@ -265,8 +372,11 @@
    "role": "survivor",
    "object": null,
    "label": "person",
+   "pose": "bent",
+   "shows": "person kneeling, bent over, indoor overhead view",
+   "caption": "Real FLIR thermal frame, same input as the AI",
    "predicted": "person",
-   "conf": 0.889,
+   "conf": 1.0,
    "file": "/crops/pos_0002.png",
    "heatmap": "/crops/heatmaps/pos_0002.png",
    "heatmap_alpha": "/crops/heatmaps/pos_0002_alpha.png"
@@ -276,8 +386,11 @@
    "role": "survivor",
    "object": null,
    "label": "person",
+   "pose": "sitting",
+   "shows": "person slumped in a chair, indoor overhead view",
+   "caption": "Real FLIR thermal frame, same input as the AI",
    "predicted": "person",
-   "conf": 0.999,
+   "conf": 1.0,
    "file": "/crops/pos_0003.png",
    "heatmap": "/crops/heatmaps/pos_0003.png",
    "heatmap_alpha": "/crops/heatmaps/pos_0003_alpha.png"
@@ -292,5 +405,5 @@
   ]
  },
  "paths": "file paths are relative to /ai-lab/results/ (DZ_AI_LAB=1); runtime paths start with /crops/",
- "note": "Examples and metrics are held-out FLIR val images, never used in training."
+ "note": "Examples and metrics are held-out FLIR images (val and video test splits), never used in training. Examples are curated for a collapsed-building search: one person in a sitting, crouching or bent pose, or a warm object filling the frame."
 }
