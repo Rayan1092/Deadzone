@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { useRef } from 'react'
 import { alarm, chime, confirm, ping, rumble } from './audio'
 import { lostFleet, newerTable } from './net/leaseState'
+import { pushTraffic, resetTraffic } from './net/traffic'
 
 // Events worth a toast on the big screen. replan, deadline_miss and deliveries
 // fire too often and stay in the sidebar feed or the timeline.
@@ -91,6 +92,7 @@ export const useSim = create((set) => ({
   mode: null,          // 'deadzone' | 'baseline' | 'mixed' from hello/control (Rayan's baseline mode)
   aftershock: null,    // { at, born, rubble } of the latest aftershock, for the shake, slabs and dust
   banner: null,        // { title, sub, tone, at }: AFTERSHOCK / NEW SCENARIO over the main view
+  traffic: false,      // network traffic events seen (DZ_NETWORK_TRAFFIC): packets and live line widths
   leases: null,        // public control-lease table (DZ_CONTROL_LEASES=1): { enabled, revision, robots: [{ robot, controller }] }
   presenter: { held: false, robots: [], pending: false }, // this screen's own fleet claim (net/presenter.js)
   report: null,        // briefing from /api/report: { text, generated_at, source } | { loading } | { error }
@@ -171,6 +173,7 @@ export function handleMessage(msg) {
               detector: data.detector ? { mode: data.detector, reason: data.detector_reason } : null,
               ...(data.leases ? { leases: data.leases } : {}),
               // a reset frees every lease on the server: the presenter has to Unlock again
+              ...(reset ? (resetTraffic(), {}) : {}),
               ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [], detections: [], routes: {}, aftershock: null, eyeFocus: null,
                             presenter: { held: false, robots: [], pending: false } } : {}) })
       break
@@ -199,6 +202,12 @@ export function handleMessage(msg) {
     case 'event': {
       if (data.kind === 'bundle_delivered' && BIG_DELIVERIES.has(data.bundle_kind)) {
         s.set({ bigDeliveries: s.bigDeliveries + 1 })
+      }
+      // network traffic (DZ_NETWORK_TRAFFIC): several a second, drawn as packets, never in the feed
+      if (data.kind === 'bundle_hop' || data.kind === 'bundle_held') {
+        pushTraffic(data)
+        if (!s.traffic) s.set({ traffic: true })
+        break
       }
       if (SKIP_KINDS.has(data.kind)) break
       // POST /api/plan saves and checks in one request, so its rejection lands right after

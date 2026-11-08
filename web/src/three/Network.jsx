@@ -1,8 +1,9 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
-import Line from './FastLine' // drei's Line relinks its shader on every new points array
 import * as THREE from 'three'
+import Line from './FastLine' // drei's Line relinks its shader on every new points array
+import { drainHops, linkRate } from '../net/traffic'
 import { useSim, useStable } from '../store'
 import { COLORS, MAST_H, w2t } from './util'
 
@@ -146,6 +147,57 @@ function pathHome(start, edges, robots) {
   return out
 }
 
+// --------------------------------------------------------------- packets
+// One dot per actual completed hop (Aziz's bundle_hop), flown from sender to receiver just after
+// the custody acknowledgment, coloured by what it carries. Pooled instances, positions from the
+// nodes' current places; nothing is drawn without traffic events.
+const PACKET_POOL = 96
+const PACKET_MS = 650
+const KIND_COLOR = { survivor: '#ef4444', rescue_route: '#facc15', fault: '#f59e0b', plan: '#60a5fa', command: '#60a5fa', command_ack: '#60a5fa' }
+const packetColor = new THREE.Color()
+const packetPos = new THREE.Vector3()
+function Packets({ at }) {
+  const mesh = useRef()
+  const nodes = useRef(at)
+  nodes.current = at
+  const flying = useRef([])
+  useFrame(() => {
+    const m = mesh.current
+    if (!m) return
+    const now = performance.now()
+    for (const h of drainHops()) {
+      flying.current.push({ ...h, t0: now })
+      if (flying.current.length > PACKET_POOL) flying.current.shift()
+    }
+    flying.current = flying.current.filter((p) => now - p.t0 < PACKET_MS)
+    let i = 0
+    for (const p of flying.current) {
+      const a = nodes.current[p.a]
+      const b = nodes.current[p.b]
+      if (!a || !b) continue
+      const k = (now - p.t0) / PACKET_MS
+      const e = k * k * (3 - 2 * k)
+      packetPos.set(a[0] + (b[0] - a[0]) * e, a[1] + (b[1] - a[1]) * e + Math.sin(Math.PI * e) * 0.35, a[2] + (b[2] - a[2]) * e)
+      PACKET_DUMMY.position.copy(packetPos)
+      PACKET_DUMMY.scale.setScalar(1)
+      PACKET_DUMMY.updateMatrix()
+      m.setMatrixAt(i, PACKET_DUMMY.matrix)
+      m.setColorAt(i, packetColor.set(KIND_COLOR[p.kind] ?? '#5eead4'))
+      i++
+    }
+    m.count = i
+    m.instanceMatrix.needsUpdate = true
+    if (m.instanceColor) m.instanceColor.needsUpdate = true
+  })
+  return (
+    <instancedMesh ref={mesh} args={[undefined, undefined, PACKET_POOL]} frustumCulled={false} renderOrder={5}>
+      <sphereGeometry args={[0.11, 10, 8]} />
+      <meshBasicMaterial toneMapped={false} depthTest={false} transparent opacity={0.95} />
+    </instancedMesh>
+  )
+}
+const PACKET_DUMMY = new THREE.Object3D()
+
 export function RealityLinks() {
   const tick = useSim((s) => s.tick)
   const fp = useSim((s) => s.floorplan)
@@ -167,12 +219,22 @@ export function RealityLinks() {
     const route = r.link.up ? pathHome(r.id, edges, robots) : null
     if (route) home.push({ id: r.id, color: r.color, points: route.map((n) => at[n]) })
   }
+  // with traffic events (DZ_NETWORK_TRAFFIC): thickness from the bytes that actually crossed the
+  // link in the last 3 s, dimmed when nothing did; colour from its state (weak or FEC = amber)
+  const now = performance.now()
   return (
     <group>
-      {up.map((l) => (
-        <Line key={`${l.a}-${l.b}`} points={[at[l.a], at[l.b]]} color={l.fec ? COLORS.amber : '#cbd5e1'}
-              lineWidth={1} transparent opacity={l.fec ? 0.28 : 0.16} />
-      ))}
+      {up.map((l) => {
+        const rate = linkRate(l.a, l.b, now)
+        const weak = l.fec || l.rssi < -80
+        const width = rate == null ? 1 : 1 + Math.min(3.5, Math.log2(1 + rate / 150))
+        const opacity = rate == null ? (weak ? 0.28 : 0.16) : rate > 0 ? (weak ? 0.75 : 0.6) : 0.1
+        return (
+          <Line key={`${l.a}-${l.b}`} points={[at[l.a], at[l.b]]} color={weak ? COLORS.amber : '#cbd5e1'}
+                lineWidth={width} transparent opacity={opacity} />
+        )
+      })}
+      <Packets at={at} />
       {home.map((h) => (
         <Line key={`home-${h.id}`} points={h.points} color={h.color} lineWidth={2.5} transparent opacity={0.9} />
       ))}

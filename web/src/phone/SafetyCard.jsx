@@ -1,5 +1,6 @@
 import { usePhone } from './store'
 import { RULE_LABEL, checkPlan, commit, dispatchPlan, updateZone } from './plan'
+import { hasPlanContent } from './zones'
 
 // Check → (fix) → dispatch. A pass is never stored as approval: dispatch rechecks
 // against the latest delivered Command knowledge and can still be rejected.
@@ -9,23 +10,11 @@ export default function SafetyCard() {
   const checking = usePhone((s) => s.checking)
   const connected = usePhone((s) => s.connected)
   const dispatched = usePhone((s) => s.dispatched)
-  const set = usePhone((s) => s.set)
-  // no-go areas travel to robots inside a dispatched plan, and a plan needs a search zone
-  if (!draft?.zones.length) {
-    if (!draft?.no_go?.length) return null
-    return (
-      <section className="m3-card safety">
-        <b>No-go areas are not sent to robots yet</b>
-        <span className="muted small">They reach the robots inside a dispatched plan, and a plan needs at least one search zone. Add a zone, then check and dispatch: the no-go goes with it.</span>
-        <div className="actions">
-          <button className="filled" onClick={() => set({ mode: 'zone', selected: null })}>Add a search zone</button>
-        </div>
-      </section>
-    )
-  }
+  // a plan with only no-go areas is sent to every robot, which route around them
+  if (!hasPlanContent(draft)) return null
 
   const result = safety?.plan_id === draft.plan_id ? safety : null
-  const robots = [...new Set(draft.zones.map((z) => z.robot))].sort().join(', ')
+  const robots = [...new Set(draft.zones.map((z) => z.robot))].sort().join(', ') || 'every robot'
 
   if (dispatched.includes(draft.plan_id)) {
     return (

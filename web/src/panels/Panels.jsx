@@ -1,7 +1,7 @@
 import { Fragment, useEffect } from 'react'
 import { setLayout, setNight, setPerf, setView, useSim } from '../store'
 import { control } from '../net/socket'
-import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt, latestRoutes } from '../format'
+import { FAULT_LABEL, describeEvent, fmtClock as fmt, latestRoutes, robotStateLabel } from '../format'
 import { JoinButton } from './JoinPanel'
 import { requestReport } from './ReportPanel'
 import { ReplayChip } from './ReplayPanel'
@@ -166,7 +166,7 @@ export function Sidebar() {
             </div>
             {leaseHolder[r.id] && <div className="lease-holder">{leaseHolder[r.id]} has control</div>}
             <div className="state">
-              {STATE_LABEL[r.state] ?? r.state}
+              {robotStateLabel(r)}
               {r.fault && <span className={`fault-pill ${r.fault === 'SAFE_STOP' ? 'stop' : ''}`}>{FAULT_LABEL[r.fault] ?? r.fault}</span>}
             </div>
             {r.fault === 'SAFE_STOP' && (

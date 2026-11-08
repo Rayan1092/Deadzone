@@ -1,6 +1,6 @@
 import { usePhone } from './store'
 import { createDraftSync, postJSON } from './sync'
-import { pickRobot } from './zones'
+import { hasPlanContent, pickRobot, refusalText } from './zones'
 
 // Shared draft editing for planner phones. The server keeps one draft
 // (last write wins) and broadcasts it as plan_state to every phone.
@@ -128,7 +128,7 @@ export async function dispatchPlan() {
 
 async function planAction(path) {
   const initial = usePhone.getState()
-  if (initial.checking || !initial.draft?.zones.length) return
+  if (initial.checking || !hasPlanContent(initial.draft)) return
   initial.set({ checking: true, safety: null })
   const epoch = initial.hello?.plan_epoch
   let draft = null
@@ -140,11 +140,17 @@ async function planAction(path) {
     const s = usePhone.getState()
     if (s.hello?.plan_epoch !== epoch || s.draft !== draft) return
     if (path === '/api/dispatch' && body.ok) {
-      s.set({ dispatched: [...new Set([...s.dispatched, body.plan_id])] })
-    } else s.set({ safety: body })
+      s.set({ dispatched: [...new Set([...s.dispatched, body.plan_id])], refusal: null })
+    } else {
+      s.set({ safety: body })
+      // a dispatch the command post refused stays on screen until it is read (red banner)
+      if (path === '/api/dispatch') s.set({ refusal: { msg: refusalText(path, body), at: Date.now() } })
+    }
   } catch (err) {
     if (usePhone.getState().hello?.plan_epoch === epoch) {
-      usePhone.getState().set({ error: { code: err.code ?? 'plan', msg: err.message, at: Date.now() } })
+      // another phone dispatched this ID first: the shell forks a new plan ID, no banner needed
+      if (err.code === 'plan_dispatched') usePhone.getState().set({ error: { code: err.code, msg: err.message, at: Date.now() } })
+      else usePhone.getState().set({ refusal: { msg: refusalText(path, err), code: err.code, at: Date.now() } })
     }
   } finally {
     if (usePhone.getState().hello?.plan_epoch === epoch) usePhone.getState().set({ checking: false })
