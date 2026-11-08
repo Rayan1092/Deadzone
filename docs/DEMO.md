@@ -44,8 +44,8 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    ```powershell
    $env:DZ_AFTERSHOCK=1   # key A
    $env:DZ_AI_LAB=1       # key L (serves ml/results and docs/assets read-only)
-   $env:DZ_GEMINI=1       # G briefing and phone Ask through Gemini (needs GEMINI_API_KEY in server/.env); without it they use the local summary
-   # $env:DZ_VOICE=1      # voice commands: NOT ready. Robot side is on main; /api/voice is still a placeholder (501) and the push-to-talk UI isn't on main
+   $env:DZ_GEMINI=1       # G briefing and phone Ask through Gemini (GEMINI_API_KEY in server/.env); passed the testing-laptop dry run
+   # $env:DZ_VOICE=1      # voice commands: robot side and Aziz's /api/voice are on main; the push-to-talk UI isn't yet, and leases block B/U (below)
    ```
    **Don't set `DZ_VOICE` or `DZ_CONTROL_LEASES` for the main run:** with control leases on, **B** and **U** from the big screen need robot leases it doesn't hold, so they fail with a toast. R, F, O and A are not affected.
 5. Open `http://localhost:8000` on the big screen. Phones join with **Q** (QR) on the same Wi-Fi, or on the phone hotspot. Phone microphones need https: use Aziz's tunnel (`scripts/demo_tunnel.py`, see its docs) if voice or the mic is part of the run.
@@ -63,7 +63,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | 1–3 / 0 | follow robot 1–3 (or click its card) / back to overview. Command follows the robot's last *reported* pose | live |
 | R | drop rubble 1.5 m ahead of the **followed** robot (R1 if none) | live |
 | F | wheel overcurrent on the **followed** robot (R1 if none) | live |
-| G | briefing panel, read aloud (Voice on/off toggle). "Gemini" with `DZ_GEMINI=1` and a key, else "Local summary · Command data only" | live (Gemini: keyed dry run pending) |
+| G | **Gemini briefing** from Command data only (`source: "gemini"`, about **6 s** to generate, then read aloud; Voice on/off toggle). Press it ~6 s before you want to talk over it | live with `DZ_GEMINI=1` (dry run passed) |
 | Q / Esc | QR join overlay on / off (Esc also closes the briefing) | live |
 | T | faint truth survivors and decoys on Reality only | live |
 | V | robot's-eye camera of the followed robot (with a Thermal toggle). It also opens by itself on a detection, with the AI box and the robot's steps | live |
@@ -77,7 +77,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | K | night operations lighting (headlights, flood light, strobes) | live, off by default; dry run first |
 | D | auto-director camera (cuts to dark robots, finds, the reveal, aftershocks). Any drag, wheel or 0–9 hands the camera back for 20 s | live, off by default; good for a hands-free video |
 
-REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/fault -ContentType application/json -Body '{"type":"overcurrent","robot":"R3"}'`, G `Invoke-RestMethod http://127.0.0.1:8000/api/report`.
+REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/fault -ContentType application/json -Body '{"type":"overcurrent","robot":"R3"}'`, G `Invoke-RestMethod http://127.0.0.1:8000/api/report` (check `source` says `gemini`).
 
 ## Beat sheet
 
@@ -99,16 +99,15 @@ Space is pressed at **0:40**. Times after it come from a headless seed-7 run wit
 | 1:55 | +1:15 (150) | Press **1** then **R**: rubble falls ahead of R1, which goes **REPLANNING** and drives around | Rayan | "Rubble falls. The robot sees it, stops and replans on its own." |
 | 2:02 | +1:22.5 (165) | Press **3** then **F**: R3 gets an **OVERCURRENT** fault, backs up 0.5 m and replans | Rayan | "A wheel jams. Fault protection stops it, backs off and tries another way." |
 | 2:07 | +1:27.5 (175) | Press **1** then **O**: the scheduler strip shows **perception missing deadlines** (red) for 3 s, while **safety still runs at 0 and 50 ms** | Rayan | "Rate monotonic scheduling: when the AI overloads the CPU, perception misses deadlines, but the safety task always runs on time." |
-| 2:08 | +1:28.5 (177.0) | R2 drives past the rubble from **R**: it blocks S1's rescue route, so R2 reroutes it (49.7 → 52.0 m, again at 185.0 → 52.8 m). Command's S1 route **redraws** (replaced, not doubled) | Rayan (optional, if O is done) | "That rubble fell on the way in. The robot saw it and sent responders a new route." |
-| 2:20 | | Press **0**, then **G**: briefing panel appears | Yusuf | "This briefing only uses what reached the antenna." |
-| 2:43 | +2:03 (246.0) | **S2** found by R2 while linked, with its route (bonus, only if R/F/O landed on time) | | |
+| 2:08 | +1:28.5 (177.0) | R2 drives past the rubble from **R**: it blocks S1's rescue route, so R2 reroutes it. Command's S1 route **redraws around the rubble, about 52 m** (replaced, not doubled) | Rayan (optional, if O is done) | "That rubble fell on the way in. The robot saw it and sent responders a new route." |
+| 2:10 | | Press **0**, then **G**: the Gemini briefing appears after about 6 s and is read aloud | Yusuf | While it generates: "Gemini writes this briefing only from what reached the antenna, never from the robots' own view." |
 | 2:45 | | | Rayan | "The robots are autonomous, and AI detects survivors. Collapsed buildings, mines, wildfires, tunnels." |
 
 Rescue routes draw on Reality as soon as a robot computes them (yellow dashed line, beacon ring), and on Command and phones only when the route bundle is delivered. A rerouted route replaces the old one with a short flash (2:08).
 
 R, F, O and U hit the **followed** robot, so check the follow key first.
 
-**Press R, F and O on time** (1:55, 2:02, 2:07). They change what the robots do next, and late or extra presses push the S2 bonus past the 2:45 close. If they slip, skip S2 and close on time.
+**Press R, F and O on time** (1:55, 2:02, 2:07). They change what the robots do next. S2 is no longer in the main script: it lands at 2:44.8 (sim 246.0), right at the close, so only mention it in Q&A.
 
 PowerShell fallbacks use `127.0.0.1`, not `localhost`: on Windows `localhost` tries IPv6 first and hangs about 2 s per call.
 
@@ -140,6 +139,7 @@ The safety check needs the command post to have heard each robot once. Startup a
 | Robot in **SAFE_STOP** (F pressed 3 times on it within 60 s) | Follow it and press **U** (or the "Send resume command" button on its card). It arrives over the radio, so the robot needs a route to CMD. If there's no route, say "the watchdog stopped it, a human has to clear it" and carry on. |
 | Robot **TRAPPED** (rubble sealed a doorway) | It keeps retrying. It can't be cleared live. Carry on, or reset (below). |
 | Story off script (S1 found while linked, wrong plan sent, keys pressed too early) | **Reset:** Backspace (seed 7, paused; the shared plan clears). Preload P-1 again and redo the phone fix, or send and dispatch P-2 with the fallback, then Space. Speed stays where it was; check it reads 2x. |
+| G shows "Local summary · Gemini unavailable" (or nothing after ~10 s) | Gemini timed out or the key/network failed; the local summary is still built only from Command data. Say "the briefing falls back to a local summary when the model isn't reachable" and carry on. Check `server/.env` and the Wi-Fi after the demo |
 | Log says `sim sensor fallback` | Stop. Install CPU torch (pre-flight step 2) and restart the server. Without it there's no AI story (the sensor then emits no decoys, so no false survivors, but no rejection cards either). |
 | Server crashed | Restart it (pre-flight step 3). The browser reconnects by itself. Then reset and dispatch P-2 again. |
 | Phones can't reach the laptop | Move every device to the phone hotspot, or use `cloudflared`. The demo also runs without phones (plan fallback above). |
@@ -153,7 +153,8 @@ The safety check needs the command post to have heard each robot once. Startup a
 | "What if the building shifts again?" | **A** (with `DZ_AFTERSHOCK=1`): collapse, relay crushed, links reroute, robots replan and resend rescue routes they see blocked | Best after the reveal; it changes everything after it |
 | "How was the AI trained?" | **L** (with `DZ_AI_LAB=1`): real FLIR examples, curve, confusion matrix, Grad-CAM "where the AI looked" | The training curve shows once the logged retrain has run on the testing laptop |
 | "Can you do a different building?" | A generated building (`py data/floorplans/generate.py --seed <judge's number> --png out.png`) | Preview image and a headless run today; loading it on the big screen needs Aziz's loader (asked in rayan.md) |
-| "Can I talk to a robot?" | Voice command | Not yet: the robot side is on main; Aziz's voice endpoint and Yusuf's push-to-talk UI are not |
+| "Are there more survivors?" | Keep the run going: R2 finds **S2** while linked at 2:44.8 (sim 246.0), with its route | Only if R / F / O landed on time |
+| "Can I talk to a robot?" | Voice command | Not yet: robot side and Aziz's `/api/voice` are on main; Yusuf's push-to-talk UI is not |
 
 ## Judge questions (one answer each)
 
