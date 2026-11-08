@@ -16,7 +16,25 @@ export const shared = {
 // Pull the overview camera back along its viewing direction until the whole
 // building (plus the CMD antenna west of it) fits the pane, whatever its shape.
 const VIEW_DIR = new THREE.Vector3(0, 50, 31).normalize() // default overview angle
+
+// ?cam=px,py,pz,tx,ty,tz[,fov] (three.js coordinates: y up, z = -north) pins the camera, so
+// before/after screenshots and video takes use the exact same angle.
+const CAM = (() => {
+  try {
+    const v = new URLSearchParams(location.search).get('cam')
+    const n = v ? v.split(',').map(Number) : []
+    return n.length >= 6 && n.every(Number.isFinite) ? n : null
+  } catch { return null }
+})()
+
 export function fitOverview(camera, aspect) {
+  if (CAM) {
+    shared.pos.set(CAM[0], CAM[1], CAM[2])
+    shared.target.set(CAM[3], CAM[4], CAM[5])
+    if (CAM[6]) { camera.fov = CAM[6]; camera.updateProjectionMatrix() }
+    shared.home = { pos: shared.pos.clone(), target: shared.target.clone() }
+    return
+  }
   // frame the building plus the command post (and its truck) outside it, whatever the map
   let VIEW_W = 48
   let VIEW_D = 32

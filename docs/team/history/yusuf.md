@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/hyperreal`: photo-scanned materials and HDRI, honest scout-camera classification, true-scale sculpted survivors, rugged relays, first-glance explainer. Plan update in `docs/PLAN.md` (branch `p3/plan-v4`). Stacked on #70 → `p3/disaster`.
+- **Working on:** `p3/collapse-geometry`: Rayan's "real collapse" list. Step 1 broken walls done; steps 2-4 (ceiling, debris, night atmosphere) being built in parallel worktrees and integrated next; then 5 cinematic camera, 6 robot glTF loader. Before/after shots in `docs/visuals/`.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,23 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 09:40 · p3/collapse-geometry · Step 1 of Rayan's collapse list: every wall broken (fractured meshes)
+- **Did:** `web/src/three/Fracture.jsx`. Every masonry wall is drawn as a fractured slab while standing exactly on the floorplan segment (robots, radio and the demo guard see the same wall):
+  - The wall face is split into convex Voronoi cells (`d3-delaunay`, new npm dep): big panels where the wall is intact, small pieces along the break line, around breaches and window edges.
+  - Cells above a jagged break line (coherent noise plus bites; outer walls keep ~85 %, brick interiors ~68 %, drywall ~55 %; the last 0.45 m at each end stands so door jambs and corners hold), inside breaches and windows, and spalled corners are removed. Cells along the tear shift and tilt a little.
+  - Each cell is a prism with two material groups: the wall face (brick / concrete / plaster photo texture) and the cut faces (fresh broken material, lighter), so torn edges show what the wall is made of.
+  - Bent rebar (instanced tube) sticks out of torn edges and breach rims.
+  - A plaster skin (coarser cells) sits on interior faces and has spalled off in patches, more near the break and at the floor line, exposing brick or concrete underneath. Exterior faces are bare.
+  - About 30 % of long interior walls have a 1.2-2 m section leaning over above a 0.5 m hinge.
+  - Removed pieces lie flat at the foot of the wall (within 0.5 m of the wall line, never within 0.7 m of a segment end, so door openings stay clear).
+  - Everything merges into one mesh per material: about 10 draw calls for all walls. 38 fps in this browser at a close angle (27 before).
+  - Command pane, thermal and blueprint keep intact walls (Command's knowledge is the pre-collapse plan).
+  - `?cam=px,py,pz,tx,ty,tz,fov` pins the camera (three.js coords) for before/after shots and video takes.
+- **Before/after:** `docs/visuals/` (`before-*.jpg` from main at 11:29 PM, `after-1-*.jpg` from this step), same pinned angles; see `docs/visuals/README.md`.
+- **Contract changes:** none. New npm dependency `d3-delaunay` (run `npm install` in `web/`).
+- **Heads-up for others:** Rayan: this is step 1 of your list. Steps 2-4 are in progress in parallel; estimates in my 11:17 PM message to Yusuf: ceiling ~1:20, debris ~2:05, night ~2:45, PRs by ~3:10 AM.
+- **Next:** integrate ceiling, litter and atmosphere modules; step 5 camera; step 6 robot glTF loader.
 
 ### 2026-11-08 08:55 · p3/hyperreal · Rayan's Y1: AI Lab shows `curve_note`; merged main
 - **Did:** AI Lab shows `lab.curve_note` under the training curves, and as the empty state ("Training curve pending: …") when there is no curve, so it's clear the curve comes from the logged retrain (Rayan's review item Y1).
