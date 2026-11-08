@@ -9,6 +9,10 @@ class OccupancyMap:
         self.w, self.h, self.cell = w, h, cell
         self.grid = np.zeros((h, w), dtype=np.uint8)      # UNKNOWN everywhere
         self.dirty = np.zeros((h, w), dtype=bool)         # changed since last map patch
+        # cells lidar saw as free earlier and as an obstacle later: something fell there
+        # (an aftershock, rubble). Occupied cells never turn free again, so this never
+        # fires from normal mapping.
+        self.collapsed = np.zeros((h, w), dtype=bool)
 
     def integrate(self, pose, angles, ranges, hits):
         x, y, _ = pose
@@ -28,7 +32,9 @@ class OccupancyMap:
         hx = np.floor((x + np.cos(angles[hits]) * ranges[hits]) / self.cell).astype(int)
         hy = np.floor((y + np.sin(angles[hits]) * ranges[hits]) / self.cell).astype(int)
         ok = (hx >= 0) & (hy >= 0) & (hx < self.w) & (hy < self.h)
-        self._set(hx[ok], hy[ok], OCC)
+        hx, hy = hx[ok], hy[ok]
+        self.collapsed[hy, hx] |= self.grid[hy, hx] == FREE
+        self._set(hx, hy, OCC)
         # the robot's own footprint is free
         cx, cy = int(x // self.cell), int(y // self.cell)
         if 0 <= cx < self.w and 0 <= cy < self.h and self.grid[cy, cx] == UNKNOWN:

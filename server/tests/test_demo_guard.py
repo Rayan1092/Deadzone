@@ -31,6 +31,7 @@ BEATS = {
     "R2_dark": 119.1,       # R2 enters the steel cage
     "S1_found": 129.0,      # R2, dark, beacon next to the survivor
     "S1_reported": 143.1,   # S1 + rescue route reach Command
+    "S1_rerouted": 177.0,   # R2 sees the R-key rubble on S1's rescue route and resends it
     "S2_found": 246.0,      # bonus, only with R/F/O on time
 }
 DIRECTOR = {150.0: ("rubble", "R1"), 165.0: ("overcurrent", "R3"), 175.0: ("overload", "R1")}
@@ -160,3 +161,19 @@ def test_s2_bonus(run):
 def test_no_decoy_ever_reported(run):
     found = {e["survivor"] for _, e in run["log"] if e["kind"] == "survivor_found"}
     assert found <= {"S1", "S2", "S3"}
+
+
+def test_rescue_routes_in_the_demo(run):
+    """The R-key rubble (150 s) lands on S1's rescue corridor. When R2 passes it, R2 reroutes
+    S1's route and resends it (Command replaces the old one); nothing else is resent."""
+    log = run["log"]
+    routes = [(e["survivor"], e.get("reason")) for _, e in log if e["kind"] == "rescue_route"]
+    assert routes == [("S3", "found"), ("S1", "found"), ("S1", "blocked"), ("S1", "blocked"),
+                      ("S2", "found")], routes
+    t, e = first(log, lambda e: e["kind"] == "rescue_route" and e.get("reason") == "blocked")
+    at("S1_rerouted", t)
+    assert e["robot"] == "R2" and 50 < e["length_m"] < 56
+    tr = next((tt for tt, ee in log if tt >= t and ee["kind"] == "rescue_route_reported"
+               and ee.get("survivor") == "S1"), None)
+    assert tr == t, "R2 is linked, so the rerouted S1 route reaches Command at once"
+    assert not any(e["kind"] == "rescue_route_blocked" for _, e in log)
