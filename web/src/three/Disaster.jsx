@@ -389,11 +389,11 @@ function Plume({ x, y, h, fire }) {
   )
 }
 
-export function DisasterStatic({ fp }) {
+export function DisasterStatic({ fp, outside = true }) {
   return (
     <group>
       <Inside fp={fp} />
-      <Outside fp={fp} />
+      {outside && <Outside fp={fp} />}
     </group>
   )
 }

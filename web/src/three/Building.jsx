@@ -256,7 +256,8 @@ function staticRubble(fp) {
 }
 
 // `props`: furniture and decoy objects (Reality only; the command post's floorplan has none).
-export default function Building({ thermal = false, blueprint = false, props = true }) {
+// `lite`: the robot camera's copy (indoors only: no outside ruins, smoke or airborne dust).
+export default function Building({ thermal = false, blueprint = false, props = true, lite = false }) {
   const fp = useSim((s) => s.floorplan)
   const perf = useSim((s) => s.perf)
   const mode = blueprint ? 'blueprint' : thermal ? 'thermal' : 'plain'
@@ -286,10 +287,10 @@ export default function Building({ thermal = false, blueprint = false, props = t
         {!blueprint && <CommandPost pos={[cx, cy]} entry={fp.entry} cold={thermal} />}
         {damage && <WallDamageLayer walls={fp.walls} damage={damage} />}
         {damage && <CollapseStatic fp={fp} />}
-        {damage && <DisasterStatic fp={fp} />}
+        {damage && <DisasterStatic fp={fp} outside={!lite} />}
       </Baked>
-      {damage && <CollapseLive fp={fp} dust={!perf} />}
-      {damage && !perf && <DisasterLive fp={fp} />}
+      {damage && <CollapseLive fp={fp} dust={!perf && !lite} />}
+      {damage && !perf && !lite && <DisasterLive fp={fp} />}
       {mode === 'plain' && (fp.hazards ?? []).map((hz) => <GasLeak key={hz.id} hazard={hz} />)}
       {blueprint && (
         <mesh position={w2t(cx, cy, 0.5)}>

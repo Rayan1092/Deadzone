@@ -301,7 +301,7 @@ export default function RobotEye() {
           </>
         )}
         {!thermal && <fog attach="fog" args={['#0e1114', 8, 26]} />}
-        <Building thermal={thermal} />
+        <Building thermal={thermal} lite />
         <HotSpots thermal={thermal} />
         <Robots robotId={robotId} thermal={thermal} />
         <EyeCamera robotId={robotId} />

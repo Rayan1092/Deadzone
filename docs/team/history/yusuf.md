@@ -34,6 +34,7 @@ Owns `web/`. Only Yusuf's sessions edit this file.
     - The scheduler opens only near overload (≥97%) or on a miss.
 - **Contract changes:** none. Static assets under `/assets/` (served from `web/public`).
 - **Heads-up for others:** Rayan: no CC0 photo-scanned human exists that we can download without an account. If your asset pack can include one (CC0/CC-BY GLB, lying pose), it drops into `Human.jsx`. Your `lab.json` is on main, so L now shows curves and examples.
+- **Perf:** the robot camera renders a lite copy (indoors only: no outside ruins, smoke or dust). Measured in this browser with the camera open: 18 → about 27 fps; overview without it about 27 fps (gap view plus inset). P mode is the fallback on the testing laptop.
 - **Next:** multi-story shell, more scanned props.
 
 ### 2026-11-08 08:20 · p3/hyperreal · Robots keep 0.5 m off confirmed survivors (Rayan's robot code, please review)
