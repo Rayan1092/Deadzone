@@ -9,6 +9,7 @@ robot). Set at start with DZ_MODE=baseline or live with Robot.set_mode().
 """
 import math
 import os
+import re
 
 import numpy as np
 
@@ -73,6 +74,7 @@ PERCEPTION_OVERLOAD_S = 3.0
 
 # Dispatched plans
 ZONE_PULL_PER_M = 0.7      # before the zone is on our map: score falls with distance to the zone
+VOICE_ZONE_PULL_PER_M = 2.0  # a spoken "explore X" outweighs nearby frontiers (distance costs 1/m)
 ZONE_DONE_KNOWN = 0.8      # stop pulling once this share of the zone's cells is mapped
 
 # Rescue route: safest known route entrance -> survivor for responders. Clearance is the
@@ -83,7 +85,13 @@ HAZARD_COST = 3.0          # ... costs this much extra per cell
 
 # Final contract (telemetry): `state` is one of STATES, `fault` is None or one of FAULTS.
 STATES = ("DEPLOYING", "EXPLORING", "LOST_LINK_EXPLORING", "RETURNING_TO_SIGNAL",
-          "RETURNING_HOME", "REPLANNING", "FAULT", "DONE", "WAITING_FOR_LINK")
+          "RETURNING_HOME", "REPLANNING", "FAULT", "DONE", "WAITING_FOR_LINK",
+          "GOING_TO_POINT", "HOLDING")
+
+# Direct commands (voice / phone) a robot accepts; see rayan.md voice-contract entry
+COMMANDS = ("explore_zone", "go_to", "return_home", "hold", "resume")
+CMD_ID_RE = re.compile(r"[A-Za-z0-9_.-]{1,64}")
+ETA_SPEED = 0.75 * 0.8      # m/s average incl. turns (V_MAX 0.8), for spoken ETAs
 FAULTS = ("OVERCURRENT", "STUCK", "LOW_BATTERY", "TRAPPED", "SAFE_STOP")
 
 # Robot modes. Deadzone is the demo default; baseline is the "without Deadzone" comparison.
@@ -183,6 +191,10 @@ class Robot:
         self.mode = default_mode()
         self.routes = {}             # survivor id -> rescue route we sent (watched for new rubble)
         self.route_check_t = -99.0
+        self.cmds = {}               # cmd_id -> last ack sent (dedupe, repeat answers)
+        self.active_cmd = None       # accepted go_to / return_home / explore_zone in progress
+        self.goto = None             # go_to target (x, y)
+        self._cmd_zone_id = None
 
     # ------------------------------------------------------------------ mode toggle
     def set_mode(self, mode):
@@ -219,7 +231,8 @@ class Robot:
         self._run_scheduler(dt)
         self._check_faults(odo)
         self._behave()
-        v, w = self._reverse() if self.state == "FAULT" else self._follow()
+        self._check_command_done()
+        v, w =self._reverse() if self.state == "FAULT" else self._follow()
         io.drive(v, w)
         self.cmd_v = v
         self.v = odo["v"]
@@ -234,8 +247,10 @@ class Robot:
             p = b.get("payload") or {}
             if b["kind"] == "telemetry":
                 self._learn_peer(b)
+            elif b["kind"] == "command" and p.get("cmd_id") is not None:
+                self._on_command(p)                 # voice / phone command: acked
             elif b["kind"] == "command" and p.get("cmd") == "resume":
-                self._resume_from_safe_stop()
+                self._resume_from_safe_stop()       # legacy SAFE_STOP resume: no ack
             elif b["kind"] == "plan":
                 if self.plan is None or self.plan.get("_t", -1) <= b["created"]:
                     self.plan = dict(p, _t=b["created"])
@@ -290,6 +305,162 @@ class Robot:
         self.events.append({"kind": "resumed", "robot": self.id})
         self.state = self.fault_resume or "EXPLORING"
         self._start_replan("resume")
+
+    # ------------------------------------------------------------------ voice / phone commands
+    def _on_command(self, p):
+        """A direct command from CMD (voice or phone): decide, act, and answer with a priority-1
+        command_ack. The same cmd_id twice gets the same answer again and is not run twice."""
+        cid = p.get("cmd_id")
+        if not isinstance(cid, str) or not CMD_ID_RE.fullmatch(cid):
+            return                                   # can't answer without a valid id
+        if cid in self.cmds:
+            self._send_ack(dict(self.cmds[cid]))     # repeat the answer (e.g. a lost ack)
+            return
+        cmd = p.get("cmd")
+        status, eta, reason, say = self._decide_command(cid, cmd, p)
+        ack = {"cmd_id": cid, "robot": self.id, "cmd": cmd, "status": status,
+               "eta_s": None if eta is None else int(round(eta)), "reason": reason, "say": say,
+               "state": self.state, "t": round(self.t, 1), "issued_t": p.get("issued_t")}
+        self.cmds[cid] = ack
+        self._send_ack(ack)
+        self.events.append({"kind": "command_received", "robot": self.id, "cmd_id": cid, "cmd": cmd,
+                            "status": status, "eta_s": ack["eta_s"], "reason": reason, "say": say})
+        if status == "accepted" and cmd in ("go_to", "return_home", "explore_zone"):
+            self.active_cmd = {"cmd_id": cid, "cmd": cmd, "zone": (p.get("zone") or {}).get("name"),
+                               "zone_id": self._cmd_zone_id}
+            self._check_command_done()               # e.g. return_home while already home
+
+    def _send_ack(self, ack):
+        self.outbox.append(self._bundle("command_ack", ack, 220))
+
+    def _refuse(self, reason, say):
+        return "refused", None, reason, say
+
+    def _decide_command(self, cid, cmd, p):
+        """(status, eta_s, reason, say) for one command, and start doing it if accepted."""
+        self._cmd_zone_id = None
+        if cmd not in COMMANDS:
+            return self._refuse("bad_command", "I don't know that command.")
+        if cmd == "resume":
+            if self.fault == "SAFE_STOP":
+                self._resume_from_safe_stop()
+                return "accepted", None, None, "Safe stop cleared. Resuming the search."
+            if self.state in ("HOLDING", "GOING_TO_POINT", "DONE"):
+                self.goto, self.path = None, []
+                self._set_state("EXPLORING")
+                return "accepted", None, None, "Resuming the search."
+            return "accepted", None, None, "Already searching."
+        if self.fault == "SAFE_STOP":
+            return self._refuse("safe_stop", "I'm in safe stop. Send resume first.")
+        if self.state == "FAULT":
+            return self._refuse("fault", "I'm recovering from a fault. Try again in a few seconds.")
+        if cmd == "hold":
+            self.goto, self.path = None, []
+            self._set_state("HOLDING")
+            return "accepted", None, None, "Holding position."
+        if cmd == "return_home":
+            if math.dist(self.pose[:2], self.entry) < 0.6:
+                self.path = []
+                self._set_state("DONE")
+                return "accepted", 0, None, "I'm already at the entrance."
+            if not self._plan_to(self.entry):
+                return self._refuse("no_route", "I can't find a known route home right now.")
+            self.goto = None
+            self._set_state("RETURNING_HOME")
+            eta = self._path_m() / ETA_SPEED
+            return "accepted", eta, None, f"Heading home, about {int(round(eta))} seconds."
+        if self.low_battery:
+            return self._refuse("low_battery", "My battery is low, I'm heading home.")
+        if cmd == "go_to":
+            target = p.get("target")
+            ok = (isinstance(target, (list, tuple)) and len(target) == 2
+                  and all(isinstance(v, (int, float)) and math.isfinite(v) for v in target))
+            if not ok:
+                return self._refuse("bad_command", "I didn't get a valid point.")
+            x, y = float(target[0]), float(target[1])
+            if not (0 <= x < self.map.w * self.cell and 0 <= y < self.map.h * self.cell):
+                return self._refuse("outside_building", "That point is outside the building.")
+            ix, iy = self._cell(x, y)
+            if self.nogo[iy, ix]:
+                return self._refuse("no_go", "That point is in a no-go area.")
+            saved = list(self.path)
+            if not self._plan_to((x, y)):
+                self.path = saved
+                return self._refuse("no_route", "I don't know a route there yet.")
+            length = self._path_m()
+            need = Battery.pct_to_drive(length + 1.6 * math.dist((x, y), self.entry))
+            if self.battery.pct - need <= RESERVE_PCT:
+                self.path = saved
+                return self._refuse("battery_reserve", "Not enough battery to go there and come back.")
+            self.goto = (x, y)
+            self._set_state("GOING_TO_POINT")
+            eta = length / ETA_SPEED
+            return "accepted", eta, None, f"On my way, about {int(round(eta))} seconds."
+        # explore_zone
+        zone = p.get("zone") or {}
+        poly = zone.get("poly")
+        if not (isinstance(poly, list) and len(poly) >= 3 and all(
+                isinstance(q, (list, tuple)) and len(q) == 2 and all(isinstance(v, (int, float)) for v in q)
+                for q in poly)):
+            return self._refuse("bad_command", "I didn't get a valid area.")
+        h, w = self.nogo.shape
+        xs = (np.arange(w) + 0.5) * self.cell
+        ys = (np.arange(h) + 0.5) * self.cell
+        cx, cy = np.meshgrid(xs, ys)
+        mask = points_in_poly(cx, cy, poly)
+        if not mask.any():
+            return self._refuse("outside_building", "That area is outside the building.")
+        if (mask & ~self.nogo).sum() == 0:
+            return self._refuse("no_go", "That whole area is a no-go zone.")
+        name = zone.get("name") or zone.get("id") or "that area"
+        zid = f"voice:{zone.get('id') or cid}"
+        iy, ix = np.nonzero(mask)
+        center = (float(xs[ix].mean()), float(ys[iy].mean()))
+        self.zones = [z for z in self.zones if not z["id"].startswith("voice:")]
+        self.zones.insert(0, {"id": zid, "priority": 0, "comms": "relay", "mask": mask,
+                              "near": planning.dilate(mask, 2), "center": center})
+        self._cmd_zone_id = zid
+        self.goto, self.path = None, []
+        if self.state in ("HOLDING", "GOING_TO_POINT", "DONE", "RETURNING_HOME"):
+            self._set_state("EXPLORING")
+        if (self.map.grid[mask] != UNKNOWN).mean() >= ZONE_DONE_KNOWN:
+            return "accepted", 0, None, f"{name} is already searched. I'll check it again."
+        saved = list(self.path)
+        eta = (self._path_m() if self._plan_to(center) else 1.6 * math.dist(self.pose[:2], center)) / ETA_SPEED
+        self.path = saved
+        return "accepted", eta, None, f"Heading to {name}, about {int(round(eta))} seconds."
+
+    def _path_m(self):
+        pts = [tuple(self.pose[:2])] + [tuple(q) for q in self.path]
+        return planning.path_length(pts)
+
+    def _check_command_done(self):
+        """Send a `completed` ack when the active command is done."""
+        c = self.active_cmd
+        if c is None:
+            return
+        done, say = False, None
+        if c["cmd"] == "go_to" and self.state == "HOLDING" and self.goto is None:
+            done, say = True, "I'm there."
+        elif c["cmd"] == "return_home" and self.state == "DONE":
+            done, say = True, "I'm back at the entrance."
+        elif c["cmd"] == "explore_zone":
+            z = next((z for z in self.zones if z["id"] == c["zone_id"]), None)
+            if z is None:
+                self.active_cmd = None            # a newer plan replaced the zone
+                return
+            if (self.map.grid[z["mask"]] != UNKNOWN).mean() >= ZONE_DONE_KNOWN:
+                done, say = True, f"Finished searching {c['zone'] or 'that area'}."
+        if not done:
+            return
+        self.active_cmd = None
+        ack = {"cmd_id": c["cmd_id"], "robot": self.id, "cmd": c["cmd"], "status": "completed",
+               "eta_s": None, "reason": None, "say": say, "state": self.state,
+               "t": round(self.t, 1), "issued_t": self.cmds[c["cmd_id"]].get("issued_t")}
+        self.cmds[c["cmd_id"]] = ack
+        self._send_ack(ack)
+        self.events.append({"kind": "command_completed", "robot": self.id, "cmd_id": c["cmd_id"],
+                            "cmd": c["cmd"], "say": say})
 
     def _read_inbox(self):
         """Learn peer targets from telemetry bundles the network delivered to us."""
@@ -695,6 +866,27 @@ class Robot:
                 self._start_replan("no_route")
             return
 
+        if s == "HOLDING":
+            self.path = []                   # stays put; still maps, perceives and reports
+            return
+
+        if s == "GOING_TO_POINT":
+            if self.battery.pct - self._pct_home() <= RESERVE_PCT:
+                self.low_battery = True
+                self._raise_fault("LOW_BATTERY")
+                self.goto = None
+                self._set_state("RETURNING_HOME")
+                if not self._plan_to(self.entry):
+                    self._start_replan("no_route")
+            elif math.dist(self.pose[:2], self.goto) < 0.6:
+                self.path, self.goto = [], None
+                self._set_state("HOLDING")
+            elif self._path_blocked():
+                self._start_replan("obstacle")
+            elif not self.path and not self._plan_to(self.goto):
+                self._start_replan("no_route")
+            return
+
     # ------------------------------------------------------------------ replanning
     def _start_replan(self, reason):
         """Stop, mark REPLANNING, and replan for whatever we were doing.
@@ -726,6 +918,8 @@ class Robot:
             return False, state
         if state == "RETURNING_TO_SIGNAL":
             return self._plan_to_signal(), state
+        if state == "GOING_TO_POINT" and self.goto is not None:
+            return self._plan_to(self.goto), state
         return self._plan_to(self.entry), state
 
     def _replanning(self):
@@ -792,7 +986,8 @@ class Robot:
             if any(math.dist((gx, gy), t) < PEER_TARGET_RADIUS for t in claimed):
                 s -= PEER_TARGET_PENALTY
             if pull is not None:
-                s -= ZONE_PULL_PER_M * math.dist((gx, gy), pull)
+                per_m = VOICE_ZONE_PULL_PER_M if zone["id"].startswith("voice:") else ZONE_PULL_PER_M
+                s -= per_m * math.dist((gx, gy), pull)
             return s
         clusters.sort(key=score, reverse=True)
         for c in clusters[:4]:
