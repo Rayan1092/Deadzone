@@ -544,5 +544,175 @@
    "license": "CC0 1.0",
    "note": "laid on its back along +X (pose by rotation), origin at floor center"
   }
- ]
+ ],
+ "plain": {
+  "note": "uncompressed copies of three texture sets and the decals for loaders without KTX2 (same sources and credits as the KTX2 files); not counted in total_bytes",
+  "layout": "plain/textures/<set>/{diff,nor_gl,rough}.jpg mirrors web/public/assets/textures/<set>/",
+  "total_bytes": 23504747,
+  "files": [
+   {
+    "path": "plain/textures/cracked_concrete_wall/diff.jpg",
+    "bytes": 2666189,
+    "kind": "texture",
+    "set": "cracked_concrete_wall",
+    "map": "color",
+    "format": "jpg",
+    "colorSpace": "srgb",
+    "width": 2048,
+    "height": 2048,
+    "credit": "cracked_concrete_wall"
+   },
+   {
+    "path": "plain/textures/cracked_concrete_wall/nor_gl.jpg",
+    "bytes": 2342650,
+    "kind": "texture",
+    "set": "cracked_concrete_wall",
+    "map": "normal",
+    "format": "jpg",
+    "colorSpace": "linear",
+    "width": 2048,
+    "height": 2048,
+    "credit": "cracked_concrete_wall"
+   },
+   {
+    "path": "plain/textures/cracked_concrete_wall/rough.jpg",
+    "bytes": 1458273,
+    "kind": "texture",
+    "set": "cracked_concrete_wall",
+    "map": "roughness",
+    "format": "jpg",
+    "colorSpace": "linear",
+    "width": 2048,
+    "height": 2048,
+    "credit": "cracked_concrete_wall"
+   },
+   {
+    "path": "plain/textures/cracked_concrete_floor/diff.jpg",
+    "bytes": 2536908,
+    "kind": "texture",
+    "set": "cracked_concrete_floor",
+    "map": "color",
+    "format": "jpg",
+    "colorSpace": "srgb",
+    "width": 2048,
+    "height": 2048,
+    "credit": "cracked_concrete_floor"
+   },
+   {
+    "path": "plain/textures/cracked_concrete_floor/nor_gl.jpg",
+    "bytes": 2836211,
+    "kind": "texture",
+    "set": "cracked_concrete_floor",
+    "map": "normal",
+    "format": "jpg",
+    "colorSpace": "linear",
+    "width": 2048,
+    "height": 2048,
+    "credit": "cracked_concrete_floor"
+   },
+   {
+    "path": "plain/textures/cracked_concrete_floor/rough.jpg",
+    "bytes": 2683642,
+    "kind": "texture",
+    "set": "cracked_concrete_floor",
+    "map": "roughness",
+    "format": "jpg",
+    "colorSpace": "linear",
+    "width": 2048,
+    "height": 2048,
+    "credit": "cracked_concrete_floor"
+   },
+   {
+    "path": "plain/textures/damaged_plaster/diff.jpg",
+    "bytes": 3392885,
+    "kind": "texture",
+    "set": "damaged_plaster",
+    "map": "color",
+    "format": "jpg",
+    "colorSpace": "srgb",
+    "width": 2048,
+    "height": 2048,
+    "credit": "damaged_plaster"
+   },
+   {
+    "path": "plain/textures/damaged_plaster/nor_gl.jpg",
+    "bytes": 3665302,
+    "kind": "texture",
+    "set": "damaged_plaster",
+    "map": "normal",
+    "format": "jpg",
+    "colorSpace": "linear",
+    "width": 2048,
+    "height": 2048,
+    "credit": "damaged_plaster"
+   },
+   {
+    "path": "plain/textures/damaged_plaster/rough.jpg",
+    "bytes": 1639547,
+    "kind": "texture",
+    "set": "damaged_plaster",
+    "map": "roughness",
+    "format": "jpg",
+    "colorSpace": "linear",
+    "width": 2048,
+    "height": 2048,
+    "credit": "damaged_plaster"
+   },
+   {
+    "path": "plain/decals/crack_01.png",
+    "bytes": 18820,
+    "kind": "decal",
+    "format": "png",
+    "colorSpace": "srgb",
+    "alpha": true,
+    "width": 1024,
+    "height": 1024,
+    "credit": "crack_01"
+   },
+   {
+    "path": "plain/decals/crack_02.png",
+    "bytes": 21192,
+    "kind": "decal",
+    "format": "png",
+    "colorSpace": "srgb",
+    "alpha": true,
+    "width": 1024,
+    "height": 1024,
+    "credit": "crack_02"
+   },
+   {
+    "path": "plain/decals/crack_03.png",
+    "bytes": 21571,
+    "kind": "decal",
+    "format": "png",
+    "colorSpace": "srgb",
+    "alpha": true,
+    "width": 1024,
+    "height": 1024,
+    "credit": "crack_03"
+   },
+   {
+    "path": "plain/decals/stain_water_01.png",
+    "bytes": 105252,
+    "kind": "decal",
+    "format": "png",
+    "colorSpace": "srgb",
+    "alpha": true,
+    "width": 1024,
+    "height": 1024,
+    "credit": "stain_water_01"
+   },
+   {
+    "path": "plain/decals/stain_soot_01.png",
+    "bytes": 116305,
+    "kind": "decal",
+    "format": "png",
+    "colorSpace": "srgb",
+    "alpha": true,
+    "width": 1024,
+    "height": 1024,
+    "credit": "stain_soot_01"
+   }
+  ]
+ }
 }
