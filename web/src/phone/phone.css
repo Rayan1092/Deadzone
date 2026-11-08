@@ -232,6 +232,7 @@
 .cam-nosignal { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   background: rgba(5,7,10,.55); color: #fca5a5; font-size: 12px; letter-spacing: .04em; }
 .cam-nosignal b { font-size: 18px; letter-spacing: .14em; }
+.cam-nosignal.off { color: #cbd5e1; }
 .cam-frame { width: 100%; height: 100%; }
 .cam-cone { fill: rgba(251,146,60,.14); stroke: rgba(251,146,60,.5); stroke-width: .6; }
 .cam-robot { fill: var(--teal); }

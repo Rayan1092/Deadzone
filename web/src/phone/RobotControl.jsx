@@ -151,15 +151,23 @@ export function RobotCamera({ meta, report }) {
   const survivors = usePhone((s) => s.view?.survivors ?? NONE)
   const time = usePhone((s) => s.time)
   const f = lastFrame(report, survivors, meta.id)
+  // a powered-down robot (Rayan's SHUTDOWN) sent its last bundle on purpose: not a lost signal
+  const off = report?.state === 'SHUTDOWN'
   const dark = isDark(report)
   const age = f ? Math.max(0, Math.round(time - f.t)) : null
   return (
-    <div className={`robot-cam${dark ? ' dark' : ''}`}>
+    <div className={`robot-cam${dark || off ? ' dark' : ''}`}>
       <div className="cam-view">
         {f?.kind === 'frame' && report?.pose && <FrameView frame={f.frame} pose={report.pose} />}
         {f?.kind === 'crop' && <CropImage crop={f.crop.crop} />}
         {!f && <div className="cam-empty">No camera image delivered yet</div>}
-        {dark && (
+        {off && (
+          <div className="cam-nosignal off">
+            <b>POWERED DOWN</b>
+            <span>back at command, camera off</span>
+          </div>
+        )}
+        {dark && !off && (
           <div className="cam-nosignal">
             <b>NO SIGNAL</b>
             <span>{f ? `last frame ${age} s ago` : report ? `last report ${Math.round(report.stale_s)} s ago` : 'no report yet'}</span>
