@@ -1,0 +1,1281 @@
+{
+ "threshold": 0.6,
+ "n": 74,
+ "false_alarms": 3,
+ "false_alarm_rate": 0.0405,
+ "per_type": {
+  "dog": {
+   "n": 2,
+   "false_alarms": 0,
+   "false_alarm_rate": 0.0,
+   "max_p_person": 0.121,
+   "mean_p_person": 0.074,
+   "real": true,
+   "classes": [
+    "dog"
+   ],
+   "caption": "dog, real FLIR thermal frame"
+  },
+  "sunlit": {
+   "n": 12,
+   "false_alarms": 0,
+   "false_alarm_rate": 0.0,
+   "max_p_person": 0.005,
+   "mean_p_person": 0.002,
+   "real": true,
+   "classes": [
+    "unlabelled bright patch"
+   ],
+   "caption": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)"
+  },
+  "generator": {
+   "n": 12,
+   "false_alarms": 2,
+   "false_alarm_rate": 0.167,
+   "max_p_person": 0.82,
+   "mean_p_person": 0.251,
+   "real": false,
+   "classes": [
+    "truck",
+    "other vehicle"
+   ],
+   "caption": "running truck engine and machinery (stand-in for a generator)"
+  },
+  "space_heater": {
+   "n": 12,
+   "false_alarms": 0,
+   "false_alarm_rate": 0.0,
+   "max_p_person": 0.562,
+   "mean_p_person": 0.13,
+   "real": false,
+   "classes": [
+    "car"
+   ],
+   "caption": "warm car front (stand-in for a space heater)"
+  },
+  "hot_pipe": {
+   "n": 12,
+   "false_alarms": 0,
+   "false_alarm_rate": 0.0,
+   "max_p_person": 0.127,
+   "mean_p_person": 0.026,
+   "real": false,
+   "classes": [
+    "light"
+   ],
+   "caption": "lamp post or light housing (stand-in for a hot pipe)"
+  },
+  "server_rack": {
+   "n": 12,
+   "false_alarms": 0,
+   "false_alarm_rate": 0.0,
+   "max_p_person": 0.175,
+   "mean_p_person": 0.024,
+   "real": false,
+   "classes": [
+    "bus"
+   ],
+   "caption": "boxy warm bus panel (stand-in for a server rack)"
+  },
+  "laptop": {
+   "n": 12,
+   "false_alarms": 1,
+   "false_alarm_rate": 0.083,
+   "max_p_person": 0.993,
+   "mean_p_person": 0.164,
+   "real": false,
+   "classes": [
+    "sign"
+   ],
+   "caption": "small warm panel (stand-in for a laptop)"
+  }
+ },
+ "source": "Teledyne FLIR ADAS v2 thermal, images_thermal_val + video_thermal_test (never trained on); frames used by the runtime crops, unsure pairs and the held-out test set excluded",
+ "note": "dog and sunlit are real counterparts; the other five are stand-ins (warmest crops of the closest labelled class), named as such in each caption",
+ "crops": [
+  {
+   "file": "dog_01.png",
+   "type": "dog",
+   "real": true,
+   "shows": "dog, real FLIR thermal frame",
+   "split": "video_thermal_test",
+   "frame": "video-ZAtDSNuZZjkZFvMAo-frame-000158-SCzsbKJ8zx6PEPioe.jpg",
+   "box_xyxy": [
+    572,
+    197,
+    601,
+    226
+   ],
+   "p_person": 0.027,
+   "verdict": "not a person"
+  },
+  {
+   "file": "dog_02.png",
+   "type": "dog",
+   "real": true,
+   "shows": "dog, real FLIR thermal frame",
+   "split": "video_thermal_test",
+   "frame": "video-ZAtDSNuZZjkZFvMAo-frame-000159-ToPgFwiJYGmbDoghS.jpg",
+   "box_xyxy": [
+    574,
+    197,
+    603,
+    226
+   ],
+   "p_person": 0.121,
+   "verdict": "not a person"
+  },
+  {
+   "file": "sunlit_01.png",
+   "type": "sunlit",
+   "real": true,
+   "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+   "split": "images_thermal_val",
+   "frame": "video-WcRvuoSJHRxDoTmaT-frame-000000-b8FEwyW7kF8uKzds6.jpg",
+   "box_xyxy": [
+    0,
+    360,
+    120,
+    480
+   ],
+   "p_person": 0.005,
+   "verdict": "not a person"
+  },
+  {
+   "file": "sunlit_02.png",
+   "type": "sunlit",
+   "real": true,
+   "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+   "split": "images_thermal_val",
+   "frame": "video-nMfT5vK8MfEEjQ44W-frame-009303-Rs3ruAjftkJg4yKLX.jpg",
+   "box_xyxy": [
+    0,
+    360,
+    120,
+    480
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "sunlit_03.png",
+   "type": "sunlit",
+   "real": true,
+   "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+   "split": "video_thermal_test",
+   "frame": "video-ePoikf5LyTTfqchga-frame-000827-nuKvirJY9uNJ4yxR2.jpg",
+   "box_xyxy": [
+    480,
+    360,
+    600,
+    480
+   ],
+   "p_person": 0.002,
+   "verdict": "not a person"
+  },
+  {
+   "file": "sunlit_04.png",
+   "type": "sunlit",
+   "real": true,
+   "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+   "split": "images_thermal_val",
+   "frame": "video-M3RnGhMTucGPeqziZ-frame-009000-5iJ959rmJTHn4qGK6.jpg",
+   "box_xyxy": [
+    480,
+    360,
+    600,
+    480
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "sunlit_05.png",
+   "type": "sunlit",
+   "real": true,
+   "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+   "split": "images_thermal_val",
+   "frame": "video-zp8ed5vPKfAJ2fKWh-frame-001713-hqH64gxaCdgFcWyen.jpg",
+   "box_xyxy": [
+    480,
+    360,
+    600,
+    480
+   ],
+   "p_person": 0.002,
+   "verdict": "not a person"
+  },
+  {
+   "file": "sunlit_06.png",
+   "type": "sunlit",
+   "real": true,
+   "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+   "split": "images_thermal_val",
+   "frame": "video-Qk8msXvMopoYNDdco-frame-000880-Ti6Dph58YsC75eRdZ.jpg",
+   "box_xyxy": [
+    420,
+    360,
+    540,
+    480
+   ],
+   "p_person": 0.002,
+   "verdict": "not a person"
+  },
+  {
+   "file": "sunlit_07.png",
+   "type": "sunlit",
+   "real": true,
+   "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+   "split": "images_thermal_val",
+   "frame": "video-YQpCvGJxowy9uhkCw-frame-000300-sagc8nrergJyngmnZ.jpg",
+   "box_xyxy": [
+    480,
+    360,
+    600,
+    480
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "sunlit_08.png",
+   "type": "sunlit",
+   "real": true,
+   "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+   "split": "images_thermal_val",
+   "frame": "video-AP7PvpujjZZGLnsJt-frame-000900-pnsh6z5bGEJbbjghv.jpg",
+   "box_xyxy": [
+    0,
+    300,
+    120,
+    420
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "sunlit_09.png",
+   "type": "sunlit",
+   "real": true,
+   "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+   "split": "images_thermal_val",
+   "frame": "video-zNdAaaFeDJs27cYb7-frame-000900-9H7F2tJyJhCwDQERL.jpg",
+   "box_xyxy": [
+    0,
+    360,
+    120,
+    480
+   ],
+   "p_person": 0.005,
+   "verdict": "not a person"
+  },
+  {
+   "file": "sunlit_10.png",
+   "type": "sunlit",
+   "real": true,
+   "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+   "split": "images_thermal_val",
+   "frame": "video-mKfYgxHA8ZZmXvw56-frame-002065-fkKNMv4Mhqw8n9Ksr.jpg",
+   "box_xyxy": [
+    480,
+    300,
+    600,
+    420
+   ],
+   "p_person": 0.001,
+   "verdict": "not a person"
+  },
+  {
+   "file": "sunlit_11.png",
+   "type": "sunlit",
+   "real": true,
+   "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+   "split": "images_thermal_val",
+   "frame": "video-JhYLiFCieHQHaY8o7-frame-002447-qy9kbdfeDpohfosei.jpg",
+   "box_xyxy": [
+    0,
+    360,
+    120,
+    480
+   ],
+   "p_person": 0.001,
+   "verdict": "not a person"
+  },
+  {
+   "file": "sunlit_12.png",
+   "type": "sunlit",
+   "real": true,
+   "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+   "split": "images_thermal_val",
+   "frame": "video-qymmXK6iWMStjBiLf-frame-001538-ndGuZxgg8YaKNYGid.jpg",
+   "box_xyxy": [
+    480,
+    360,
+    600,
+    480
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "generator_01.png",
+   "type": "generator",
+   "real": false,
+   "shows": "running truck engine and machinery (stand-in for a generator)",
+   "split": "video_thermal_test",
+   "frame": "video-ePoikf5LyTTfqchga-frame-000791-5GFjqYxqPJ93vhbxS.jpg",
+   "box_xyxy": [
+    544,
+    302,
+    640,
+    398
+   ],
+   "p_person": 0.381,
+   "verdict": "not a person"
+  },
+  {
+   "file": "generator_02.png",
+   "type": "generator",
+   "real": false,
+   "shows": "running truck engine and machinery (stand-in for a generator)",
+   "split": "images_thermal_val",
+   "frame": "video-k5bTJAiyEgHismN7Y-frame-008381-bZfvQtoLdbzkawA6w.jpg",
+   "box_xyxy": [
+    392,
+    162,
+    475,
+    245
+   ],
+   "p_person": 0.373,
+   "verdict": "not a person"
+  },
+  {
+   "file": "generator_03.png",
+   "type": "generator",
+   "real": false,
+   "shows": "running truck engine and machinery (stand-in for a generator)",
+   "split": "video_thermal_test",
+   "frame": "video-t3f7QC8hZr6zYXpEZ-frame-000533-8JuxvkjyNztgcQpCd.jpg",
+   "box_xyxy": [
+    0,
+    140,
+    87,
+    227
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "generator_04.png",
+   "type": "generator",
+   "real": false,
+   "shows": "running truck engine and machinery (stand-in for a generator)",
+   "split": "images_thermal_val",
+   "frame": "video-57kWWRyeqqHs3Byei-frame-002786-quKGtHKvqyFpDwmMR.jpg",
+   "box_xyxy": [
+    0,
+    4,
+    495,
+    499
+   ],
+   "p_person": 0.141,
+   "verdict": "not a person"
+  },
+  {
+   "file": "generator_05.png",
+   "type": "generator",
+   "real": false,
+   "shows": "running truck engine and machinery (stand-in for a generator)",
+   "split": "images_thermal_val",
+   "frame": "video-kBvcuDMtYv2Z4kmXi-frame-008868-CoQxFTHLAgNDDAMMu.jpg",
+   "box_xyxy": [
+    115,
+    238,
+    204,
+    327
+   ],
+   "p_person": 0.177,
+   "verdict": "not a person"
+  },
+  {
+   "file": "generator_06.png",
+   "type": "generator",
+   "real": false,
+   "shows": "running truck engine and machinery (stand-in for a generator)",
+   "split": "images_thermal_val",
+   "frame": "video-nMfT5vK8MfEEjQ44W-frame-005246-zzFJiquX7KESAi3r4.jpg",
+   "box_xyxy": [
+    0,
+    128,
+    171,
+    299
+   ],
+   "p_person": 0.103,
+   "verdict": "not a person"
+  },
+  {
+   "file": "generator_07.png",
+   "type": "generator",
+   "real": false,
+   "shows": "running truck engine and machinery (stand-in for a generator)",
+   "split": "images_thermal_val",
+   "frame": "video-M3RnGhMTucGPeqziZ-frame-006450-Ly2BnSWXSiRS67Kfe.jpg",
+   "box_xyxy": [
+    0,
+    9,
+    503,
+    512
+   ],
+   "p_person": 0.022,
+   "verdict": "not a person"
+  },
+  {
+   "file": "generator_08.png",
+   "type": "generator",
+   "real": false,
+   "shows": "running truck engine and machinery (stand-in for a generator)",
+   "split": "images_thermal_val",
+   "frame": "video-zp8ed5vPKfAJ2fKWh-frame-005677-HBpaCrH9gkEWeNZGt.jpg",
+   "box_xyxy": [
+    365,
+    190,
+    452,
+    277
+   ],
+   "p_person": 0.05,
+   "verdict": "not a person"
+  },
+  {
+   "file": "generator_09.png",
+   "type": "generator",
+   "real": false,
+   "shows": "running truck engine and machinery (stand-in for a generator)",
+   "split": "images_thermal_val",
+   "frame": "video-YQpCvGJxowy9uhkCw-frame-003150-igm9gCTj2fhLvmGrH.jpg",
+   "box_xyxy": [
+    0,
+    151,
+    149,
+    300
+   ],
+   "p_person": 0.228,
+   "verdict": "not a person"
+  },
+  {
+   "file": "generator_10.png",
+   "type": "generator",
+   "real": false,
+   "shows": "running truck engine and machinery (stand-in for a generator)",
+   "split": "video_thermal_test",
+   "frame": "video-ePoikf5LyTTfqchga-frame-000789-oHwdKQaPWhiruiBgq.jpg",
+   "box_xyxy": [
+    542,
+    299,
+    640,
+    397
+   ],
+   "p_person": 0.82,
+   "verdict": "person"
+  },
+  {
+   "file": "generator_11.png",
+   "type": "generator",
+   "real": false,
+   "shows": "running truck engine and machinery (stand-in for a generator)",
+   "split": "video_thermal_test",
+   "frame": "video-t3f7QC8hZr6zYXpEZ-frame-000534-PB4vGvxj9YMsNQMpe.jpg",
+   "box_xyxy": [
+    0,
+    142,
+    83,
+    225
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "generator_12.png",
+   "type": "generator",
+   "real": false,
+   "shows": "running truck engine and machinery (stand-in for a generator)",
+   "split": "images_thermal_val",
+   "frame": "video-zp8ed5vPKfAJ2fKWh-frame-006374-q9vpgzzv7dPWnjHFi.jpg",
+   "box_xyxy": [
+    517,
+    179,
+    640,
+    302
+   ],
+   "p_person": 0.72,
+   "verdict": "person"
+  },
+  {
+   "file": "space_heater_01.png",
+   "type": "space_heater",
+   "real": false,
+   "shows": "warm car front (stand-in for a space heater)",
+   "split": "images_thermal_val",
+   "frame": "video-57kWWRyeqqHs3Byei-frame-003494-QkBmGGNuyFsa3Jomy.jpg",
+   "box_xyxy": [
+    445,
+    272,
+    640,
+    467
+   ],
+   "p_person": 0.085,
+   "verdict": "not a person"
+  },
+  {
+   "file": "space_heater_02.png",
+   "type": "space_heater",
+   "real": false,
+   "shows": "warm car front (stand-in for a space heater)",
+   "split": "images_thermal_val",
+   "frame": "video-kBvcuDMtYv2Z4kmXi-frame-012516-XfkWNXkzwuT4aH3AL.jpg",
+   "box_xyxy": [
+    15,
+    246,
+    129,
+    360
+   ],
+   "p_person": 0.002,
+   "verdict": "not a person"
+  },
+  {
+   "file": "space_heater_03.png",
+   "type": "space_heater",
+   "real": false,
+   "shows": "warm car front (stand-in for a space heater)",
+   "split": "images_thermal_val",
+   "frame": "video-k5bTJAiyEgHismN7Y-frame-008670-jgwD6Ea4Se3p8fAvi.jpg",
+   "box_xyxy": [
+    0,
+    150,
+    232,
+    382
+   ],
+   "p_person": 0.031,
+   "verdict": "not a person"
+  },
+  {
+   "file": "space_heater_04.png",
+   "type": "space_heater",
+   "real": false,
+   "shows": "warm car front (stand-in for a space heater)",
+   "split": "video_thermal_test",
+   "frame": "video-ZAtDSNuZZjkZFvMAo-frame-000033-CdSsCcebsqkA6Mpet.jpg",
+   "box_xyxy": [
+    496,
+    266,
+    640,
+    410
+   ],
+   "p_person": 0.33,
+   "verdict": "not a person"
+  },
+  {
+   "file": "space_heater_05.png",
+   "type": "space_heater",
+   "real": false,
+   "shows": "warm car front (stand-in for a space heater)",
+   "split": "images_thermal_val",
+   "frame": "video-M3RnGhMTucGPeqziZ-frame-012600-jvaCizWmETXb7avqf.jpg",
+   "box_xyxy": [
+    0,
+    183,
+    122,
+    305
+   ],
+   "p_person": 0.032,
+   "verdict": "not a person"
+  },
+  {
+   "file": "space_heater_06.png",
+   "type": "space_heater",
+   "real": false,
+   "shows": "warm car front (stand-in for a space heater)",
+   "split": "images_thermal_val",
+   "frame": "video-AP7PvpujjZZGLnsJt-frame-005265-dmhfQSSWxH4MAwwGg.jpg",
+   "box_xyxy": [
+    204,
+    192,
+    335,
+    323
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "space_heater_07.png",
+   "type": "space_heater",
+   "real": false,
+   "shows": "warm car front (stand-in for a space heater)",
+   "split": "video_thermal_test",
+   "frame": "video-SCiKdG3MqZfiE292B-frame-006556-nRWeuXRKtZYgBX7oJ.jpg",
+   "box_xyxy": [
+    0,
+    175,
+    176,
+    351
+   ],
+   "p_person": 0.521,
+   "verdict": "not a person"
+  },
+  {
+   "file": "space_heater_08.png",
+   "type": "space_heater",
+   "real": false,
+   "shows": "warm car front (stand-in for a space heater)",
+   "split": "images_thermal_val",
+   "frame": "video-u4wQrdwdNJzdq7pXY-frame-001853-dZ2Pi95vKR94fvBLo.jpg",
+   "box_xyxy": [
+    22,
+    220,
+    120,
+    318
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "space_heater_09.png",
+   "type": "space_heater",
+   "real": false,
+   "shows": "warm car front (stand-in for a space heater)",
+   "split": "images_thermal_val",
+   "frame": "video-mKfYgxHA8ZZmXvw56-frame-009735-YGJ6HLjPbmGo9DGfG.jpg",
+   "box_xyxy": [
+    432,
+    180,
+    640,
+    388
+   ],
+   "p_person": 0.001,
+   "verdict": "not a person"
+  },
+  {
+   "file": "space_heater_10.png",
+   "type": "space_heater",
+   "real": false,
+   "shows": "warm car front (stand-in for a space heater)",
+   "split": "images_thermal_val",
+   "frame": "video-Qk8msXvMopoYNDdco-frame-004380-MiuHxH4RGHbkjGKkP.jpg",
+   "box_xyxy": [
+    68,
+    194,
+    177,
+    303
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "space_heater_11.png",
+   "type": "space_heater",
+   "real": false,
+   "shows": "warm car front (stand-in for a space heater)",
+   "split": "video_thermal_test",
+   "frame": "video-t3f7QC8hZr6zYXpEZ-frame-000267-Pnfk7bqPH7rKusAej.jpg",
+   "box_xyxy": [
+    444,
+    210,
+    640,
+    406
+   ],
+   "p_person": 0.562,
+   "verdict": "not a person"
+  },
+  {
+   "file": "space_heater_12.png",
+   "type": "space_heater",
+   "real": false,
+   "shows": "warm car front (stand-in for a space heater)",
+   "split": "video_thermal_test",
+   "frame": "video-ePoikf5LyTTfqchga-frame-000577-vuZ2mGrpNhCZtPuyG.jpg",
+   "box_xyxy": [
+    139,
+    274,
+    262,
+    397
+   ],
+   "p_person": 0.001,
+   "verdict": "not a person"
+  },
+  {
+   "file": "hot_pipe_01.png",
+   "type": "hot_pipe",
+   "real": false,
+   "shows": "lamp post or light housing (stand-in for a hot pipe)",
+   "split": "images_thermal_val",
+   "frame": "video-k5bTJAiyEgHismN7Y-frame-005491-LA2MzafhtTE5ZTpcq.jpg",
+   "box_xyxy": [
+    514,
+    140,
+    553,
+    179
+   ],
+   "p_person": 0.012,
+   "verdict": "not a person"
+  },
+  {
+   "file": "hot_pipe_02.png",
+   "type": "hot_pipe",
+   "real": false,
+   "shows": "lamp post or light housing (stand-in for a hot pipe)",
+   "split": "images_thermal_val",
+   "frame": "video-kBvcuDMtYv2Z4kmXi-frame-005278-Geio8TELMnR755FR4.jpg",
+   "box_xyxy": [
+    111,
+    198,
+    150,
+    237
+   ],
+   "p_person": 0.004,
+   "verdict": "not a person"
+  },
+  {
+   "file": "hot_pipe_03.png",
+   "type": "hot_pipe",
+   "real": false,
+   "shows": "lamp post or light housing (stand-in for a hot pipe)",
+   "split": "images_thermal_val",
+   "frame": "video-mKfYgxHA8ZZmXvw56-frame-001180-iC4C8i36adDiJuDYt.jpg",
+   "box_xyxy": [
+    0,
+    75,
+    104,
+    179
+   ],
+   "p_person": 0.127,
+   "verdict": "not a person"
+  },
+  {
+   "file": "hot_pipe_04.png",
+   "type": "hot_pipe",
+   "real": false,
+   "shows": "lamp post or light housing (stand-in for a hot pipe)",
+   "split": "video_thermal_test",
+   "frame": "video-SCiKdG3MqZfiE292B-frame-006475-fz95h3HddFLmSEv2Z.jpg",
+   "box_xyxy": [
+    0,
+    111,
+    36,
+    147
+   ],
+   "p_person": 0.081,
+   "verdict": "not a person"
+  },
+  {
+   "file": "hot_pipe_05.png",
+   "type": "hot_pipe",
+   "real": false,
+   "shows": "lamp post or light housing (stand-in for a hot pipe)",
+   "split": "video_thermal_test",
+   "frame": "video-ZAtDSNuZZjkZFvMAo-frame-000294-LXBmgPeDxirfnf9i2.jpg",
+   "box_xyxy": [
+    224,
+    0,
+    272,
+    48
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "hot_pipe_06.png",
+   "type": "hot_pipe",
+   "real": false,
+   "shows": "lamp post or light housing (stand-in for a hot pipe)",
+   "split": "images_thermal_val",
+   "frame": "video-zp8ed5vPKfAJ2fKWh-frame-000445-PfCi6mQugdaHKpwSL.jpg",
+   "box_xyxy": [
+    154,
+    190,
+    202,
+    238
+   ],
+   "p_person": 0.002,
+   "verdict": "not a person"
+  },
+  {
+   "file": "hot_pipe_07.png",
+   "type": "hot_pipe",
+   "real": false,
+   "shows": "lamp post or light housing (stand-in for a hot pipe)",
+   "split": "images_thermal_val",
+   "frame": "video-qymmXK6iWMStjBiLf-frame-002925-fF66uimCWKFBwBoDN.jpg",
+   "box_xyxy": [
+    32,
+    142,
+    72,
+    182
+   ],
+   "p_person": 0.002,
+   "verdict": "not a person"
+  },
+  {
+   "file": "hot_pipe_08.png",
+   "type": "hot_pipe",
+   "real": false,
+   "shows": "lamp post or light housing (stand-in for a hot pipe)",
+   "split": "images_thermal_val",
+   "frame": "video-AP7PvpujjZZGLnsJt-frame-003453-o3zvh7DKgLwNxY4SS.jpg",
+   "box_xyxy": [
+    540,
+    116,
+    582,
+    158
+   ],
+   "p_person": 0.015,
+   "verdict": "not a person"
+  },
+  {
+   "file": "hot_pipe_09.png",
+   "type": "hot_pipe",
+   "real": false,
+   "shows": "lamp post or light housing (stand-in for a hot pipe)",
+   "split": "images_thermal_val",
+   "frame": "video-M3RnGhMTucGPeqziZ-frame-008850-EqCdBtzct9tXdgfxX.jpg",
+   "box_xyxy": [
+    482,
+    136,
+    521,
+    175
+   ],
+   "p_person": 0.003,
+   "verdict": "not a person"
+  },
+  {
+   "file": "hot_pipe_10.png",
+   "type": "hot_pipe",
+   "real": false,
+   "shows": "lamp post or light housing (stand-in for a hot pipe)",
+   "split": "images_thermal_val",
+   "frame": "video-Qk8msXvMopoYNDdco-frame-006140-kWe6ppHmzoBcB49Nu.jpg",
+   "box_xyxy": [
+    440,
+    116,
+    476,
+    152
+   ],
+   "p_person": 0.06,
+   "verdict": "not a person"
+  },
+  {
+   "file": "hot_pipe_11.png",
+   "type": "hot_pipe",
+   "real": false,
+   "shows": "lamp post or light housing (stand-in for a hot pipe)",
+   "split": "images_thermal_val",
+   "frame": "video-WcRvuoSJHRxDoTmaT-frame-002700-aRXaf7pPuNtY244pk.jpg",
+   "box_xyxy": [
+    76,
+    114,
+    126,
+    164
+   ],
+   "p_person": 0.004,
+   "verdict": "not a person"
+  },
+  {
+   "file": "hot_pipe_12.png",
+   "type": "hot_pipe",
+   "real": false,
+   "shows": "lamp post or light housing (stand-in for a hot pipe)",
+   "split": "images_thermal_val",
+   "frame": "video-JhYLiFCieHQHaY8o7-frame-002360-Lrc6epJ2rmixCMNX4.jpg",
+   "box_xyxy": [
+    16,
+    48,
+    73,
+    105
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "server_rack_01.png",
+   "type": "server_rack",
+   "real": false,
+   "shows": "boxy warm bus panel (stand-in for a server rack)",
+   "split": "images_thermal_val",
+   "frame": "video-AP7PvpujjZZGLnsJt-frame-002447-QtvdNABvwoHtM3R53.jpg",
+   "box_xyxy": [
+    300,
+    157,
+    441,
+    298
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "server_rack_02.png",
+   "type": "server_rack",
+   "real": false,
+   "shows": "boxy warm bus panel (stand-in for a server rack)",
+   "split": "images_thermal_val",
+   "frame": "video-kBvcuDMtYv2Z4kmXi-frame-010132-TgEs5dMANZzxnYEKg.jpg",
+   "box_xyxy": [
+    330,
+    232,
+    422,
+    324
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "server_rack_03.png",
+   "type": "server_rack",
+   "real": false,
+   "shows": "boxy warm bus panel (stand-in for a server rack)",
+   "split": "images_thermal_val",
+   "frame": "video-k5bTJAiyEgHismN7Y-frame-001156-ijBMji7sTe7PKD3xo.jpg",
+   "box_xyxy": [
+    339,
+    117,
+    515,
+    293
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "server_rack_04.png",
+   "type": "server_rack",
+   "real": false,
+   "shows": "boxy warm bus panel (stand-in for a server rack)",
+   "split": "images_thermal_val",
+   "frame": "video-zp8ed5vPKfAJ2fKWh-frame-002058-QvkzTHx4GKWTvk5kn.jpg",
+   "box_xyxy": [
+    0,
+    192,
+    100,
+    292
+   ],
+   "p_person": 0.175,
+   "verdict": "not a person"
+  },
+  {
+   "file": "server_rack_05.png",
+   "type": "server_rack",
+   "real": false,
+   "shows": "boxy warm bus panel (stand-in for a server rack)",
+   "split": "images_thermal_val",
+   "frame": "video-YQpCvGJxowy9uhkCw-frame-003150-igm9gCTj2fhLvmGrH.jpg",
+   "box_xyxy": [
+    240,
+    150,
+    385,
+    295
+   ],
+   "p_person": 0.008,
+   "verdict": "not a person"
+  },
+  {
+   "file": "server_rack_06.png",
+   "type": "server_rack",
+   "real": false,
+   "shows": "boxy warm bus panel (stand-in for a server rack)",
+   "split": "images_thermal_val",
+   "frame": "video-Qk8msXvMopoYNDdco-frame-000420-SQyMtLEZL8AYDyf2o.jpg",
+   "box_xyxy": [
+    340,
+    98,
+    640,
+    398
+   ],
+   "p_person": 0.017,
+   "verdict": "not a person"
+  },
+  {
+   "file": "server_rack_07.png",
+   "type": "server_rack",
+   "real": false,
+   "shows": "boxy warm bus panel (stand-in for a server rack)",
+   "split": "images_thermal_val",
+   "frame": "video-AP7PvpujjZZGLnsJt-frame-002462-2xWAQb5uZaPJo2qpD.jpg",
+   "box_xyxy": [
+    302,
+    118,
+    502,
+    318
+   ],
+   "p_person": 0.001,
+   "verdict": "not a person"
+  },
+  {
+   "file": "server_rack_08.png",
+   "type": "server_rack",
+   "real": false,
+   "shows": "boxy warm bus panel (stand-in for a server rack)",
+   "split": "images_thermal_val",
+   "frame": "video-k5bTJAiyEgHismN7Y-frame-008381-bZfvQtoLdbzkawA6w.jpg",
+   "box_xyxy": [
+    454,
+    123,
+    580,
+    249
+   ],
+   "p_person": 0.015,
+   "verdict": "not a person"
+  },
+  {
+   "file": "server_rack_09.png",
+   "type": "server_rack",
+   "real": false,
+   "shows": "boxy warm bus panel (stand-in for a server rack)",
+   "split": "images_thermal_val",
+   "frame": "video-kBvcuDMtYv2Z4kmXi-frame-010230-uwWwWyiFFAoGiLE3Q.jpg",
+   "box_xyxy": [
+    326,
+    114,
+    640,
+    428
+   ],
+   "p_person": 0.002,
+   "verdict": "not a person"
+  },
+  {
+   "file": "server_rack_10.png",
+   "type": "server_rack",
+   "real": false,
+   "shows": "boxy warm bus panel (stand-in for a server rack)",
+   "split": "images_thermal_val",
+   "frame": "video-zp8ed5vPKfAJ2fKWh-frame-005956-8koo4zGP5768t5L6C.jpg",
+   "box_xyxy": [
+    298,
+    178,
+    396,
+    276
+   ],
+   "p_person": 0.004,
+   "verdict": "not a person"
+  },
+  {
+   "file": "server_rack_11.png",
+   "type": "server_rack",
+   "real": false,
+   "shows": "boxy warm bus panel (stand-in for a server rack)",
+   "split": "images_thermal_val",
+   "frame": "video-Qk8msXvMopoYNDdco-frame-000465-ujLP5CBWECuqC67t3.jpg",
+   "box_xyxy": [
+    10,
+    65,
+    335,
+    390
+   ],
+   "p_person": 0.009,
+   "verdict": "not a person"
+  },
+  {
+   "file": "server_rack_12.png",
+   "type": "server_rack",
+   "real": false,
+   "shows": "boxy warm bus panel (stand-in for a server rack)",
+   "split": "images_thermal_val",
+   "frame": "video-YQpCvGJxowy9uhkCw-frame-005550-5caoJqWQyZvDz7QxK.jpg",
+   "box_xyxy": [
+    26,
+    148,
+    192,
+    314
+   ],
+   "p_person": 0.06,
+   "verdict": "not a person"
+  },
+  {
+   "file": "laptop_01.png",
+   "type": "laptop",
+   "real": false,
+   "shows": "small warm panel (stand-in for a laptop)",
+   "split": "images_thermal_val",
+   "frame": "video-57kWWRyeqqHs3Byei-frame-007847-NmdzGZjBNAzsmzcWE.jpg",
+   "box_xyxy": [
+    416,
+    113,
+    452,
+    149
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "laptop_02.png",
+   "type": "laptop",
+   "real": false,
+   "shows": "small warm panel (stand-in for a laptop)",
+   "split": "images_thermal_val",
+   "frame": "video-AP7PvpujjZZGLnsJt-frame-005265-dmhfQSSWxH4MAwwGg.jpg",
+   "box_xyxy": [
+    438,
+    167,
+    482,
+    211
+   ],
+   "p_person": 0.065,
+   "verdict": "not a person"
+  },
+  {
+   "file": "laptop_03.png",
+   "type": "laptop",
+   "real": false,
+   "shows": "small warm panel (stand-in for a laptop)",
+   "split": "images_thermal_val",
+   "frame": "video-u4wQrdwdNJzdq7pXY-frame-001350-yXd7ohe5pP9zWLMeo.jpg",
+   "box_xyxy": [
+    521,
+    181,
+    557,
+    217
+   ],
+   "p_person": 0.005,
+   "verdict": "not a person"
+  },
+  {
+   "file": "laptop_04.png",
+   "type": "laptop",
+   "real": false,
+   "shows": "small warm panel (stand-in for a laptop)",
+   "split": "images_thermal_val",
+   "frame": "video-k5bTJAiyEgHismN7Y-frame-009826-qfZoWdPxC3Mh7szZL.jpg",
+   "box_xyxy": [
+    536,
+    86,
+    585,
+    135
+   ],
+   "p_person": 0.004,
+   "verdict": "not a person"
+  },
+  {
+   "file": "laptop_05.png",
+   "type": "laptop",
+   "real": false,
+   "shows": "small warm panel (stand-in for a laptop)",
+   "split": "images_thermal_val",
+   "frame": "video-mKfYgxHA8ZZmXvw56-frame-008850-CaeArLM8ff4AFP47p.jpg",
+   "box_xyxy": [
+    110,
+    219,
+    167,
+    276
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "laptop_06.png",
+   "type": "laptop",
+   "real": false,
+   "shows": "small warm panel (stand-in for a laptop)",
+   "split": "images_thermal_val",
+   "frame": "video-zp8ed5vPKfAJ2fKWh-frame-000535-3Eo87BocCSz5S3NeG.jpg",
+   "box_xyxy": [
+    150,
+    210,
+    186,
+    246
+   ],
+   "p_person": 0.993,
+   "verdict": "person"
+  },
+  {
+   "file": "laptop_07.png",
+   "type": "laptop",
+   "real": false,
+   "shows": "small warm panel (stand-in for a laptop)",
+   "split": "video_thermal_test",
+   "frame": "video-SCiKdG3MqZfiE292B-frame-006493-GCtxuEB83tjfyfxwQ.jpg",
+   "box_xyxy": [
+    0,
+    108,
+    36,
+    144
+   ],
+   "p_person": 0.005,
+   "verdict": "not a person"
+  },
+  {
+   "file": "laptop_08.png",
+   "type": "laptop",
+   "real": false,
+   "shows": "small warm panel (stand-in for a laptop)",
+   "split": "video_thermal_test",
+   "frame": "video-ZAtDSNuZZjkZFvMAo-frame-001459-2TRvgpiAintgkTFTu.jpg",
+   "box_xyxy": [
+    104,
+    196,
+    148,
+    240
+   ],
+   "p_person": 0.235,
+   "verdict": "not a person"
+  },
+  {
+   "file": "laptop_09.png",
+   "type": "laptop",
+   "real": false,
+   "shows": "small warm panel (stand-in for a laptop)",
+   "split": "images_thermal_val",
+   "frame": "video-Qk8msXvMopoYNDdco-frame-000880-Ti6Dph58YsC75eRdZ.jpg",
+   "box_xyxy": [
+    71,
+    170,
+    107,
+    206
+   ],
+   "p_person": 0.0,
+   "verdict": "not a person"
+  },
+  {
+   "file": "laptop_10.png",
+   "type": "laptop",
+   "real": false,
+   "shows": "small warm panel (stand-in for a laptop)",
+   "split": "images_thermal_val",
+   "frame": "video-kBvcuDMtYv2Z4kmXi-frame-013386-xQnGtAjeLrxQHhHEg.jpg",
+   "box_xyxy": [
+    32,
+    242,
+    72,
+    282
+   ],
+   "p_person": 0.531,
+   "verdict": "not a person"
+  },
+  {
+   "file": "laptop_11.png",
+   "type": "laptop",
+   "real": false,
+   "shows": "small warm panel (stand-in for a laptop)",
+   "split": "images_thermal_val",
+   "frame": "video-nMfT5vK8MfEEjQ44W-frame-007153-HKobYcrK2CyMmwMXj.jpg",
+   "box_xyxy": [
+    444,
+    144,
+    493,
+    193
+   ],
+   "p_person": 0.128,
+   "verdict": "not a person"
+  },
+  {
+   "file": "laptop_12.png",
+   "type": "laptop",
+   "real": false,
+   "shows": "small warm panel (stand-in for a laptop)",
+   "split": "images_thermal_val",
+   "frame": "video-M3RnGhMTucGPeqziZ-frame-003000-zJM5Ni6xW9ebYqsND.jpg",
+   "box_xyxy": [
+    508,
+    208,
+    549,
+    249
+   ],
+   "p_person": 0.002,
+   "verdict": "not a person"
+  }
+ ]
+}
