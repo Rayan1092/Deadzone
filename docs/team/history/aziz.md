@@ -12,6 +12,12 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Log
 
+### 2026-11-08 PT - p2/global-no-go - Integrate belief main before no-go merge
+- **Did:** #118 opened with 535 backend passed/1 skipped; main advanced with Rayan's display-only belief PR #117 during creation. Integrated main 123c32d without editing his robot/data source; combined backend/guard rerun before merge.
+- **Contract changes:** none in this merge. Read Rayan's new belief-map wiring reservation; it is a separate future backend task, not silently added to the current five-item batch. Traffic compression will preserve optional future belief grid keys.
+- **Heads-up for others:** no claim that belief grids are already served by Sim.maps. Global no-go stays default off. Rayan's physical escape and Yusuf's phone UI remain included and unchanged.
+- **Next:** finish combined validation/merge #118, then the final traffic/stream PR.
+
 ### 2026-11-08 PT - p2/global-no-go - Fix the traced global exclusion dispatch and route start
 - **Did:** implemented both backend break points in rayan-ml 15:10: send the shared exclusions to every statically deployed robot through DTN, and estimate an exit from a newly excluded delivered start before route planning. Clearing exclusions reaches unassigned robots too. No masks, poses or acknowledgments are injected directly into robot state.
 - **Contract changes:** DZ_GLOBAL_NO_GO=1 at construction, default off, reserved before code. Existing plan/API/result shapes remain unchanged. Zones are still required for dispatch; each robot's payload may have zero zones. Escape remains bounded, never crosses known occupied/static-hazard cells, never relaxes destination/home, and its distance counts in battery reserve.
