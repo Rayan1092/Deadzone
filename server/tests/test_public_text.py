@@ -117,3 +117,14 @@ def test_rest_refusals_validation_join_and_acks_do_not_expose_internal_names(ses
     public = json.loads(hub.envelope("cmd_view", {"command_acks": [ack]}))["data"]["command_acks"][0]
     assert public["say"] == "Scout 1 finished searching " + hub.public_text.rooms["S2"] + "."
     assert public["cmd_id"] == ack["cmd_id"] and ack["say"] == "R1 finished searching S2."
+
+
+def test_real_telemetry_counters_reach_public_tick_totals(session):
+    _, hub = session
+    for _ in range(20):
+        hub.sim.tick()
+    reports = [r.telemetry(None)["counters"] for r in hub.sim.robots.values()]
+    public = json.loads(hub.envelope("tick", hub.screen_snapshot()))["data"]
+    assert public["stats"]["scheduler_deadlines_met"] == sum(r["deadlines_met"] for r in reports) > 0
+    assert public["stats"]["detector_calls"] == sum(r["detector_calls"] for r in reports)
+    assert public["stats"]["detector_rejections"] == sum(r["detector_rejections"] for r in reports)
