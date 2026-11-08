@@ -116,9 +116,44 @@ def port_free(port):
             probe.close()
 
 
+def stop_process(process, *, windows=None):
+    windows = os.name == "nt" if windows is None else windows
+    tree_stopped = True
+    if process.poll() is None and windows:
+        # Windows .venv/python.exe may redirect to a second interpreter process.
+        # Stop the owned tree BEFORE terminating the launcher and losing its children.
+        try:
+            result = subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            tree_stopped = result.returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            tree_stopped = False
+    if process.poll() is None:
+        process.terminate()
+    try:
+        process.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=3)
+    return tree_stopped
+
+
+def listener_gone(port, timeout=3):
+    deadline = time.monotonic() + timeout
+    while True:
+        with socket.socket() as probe:
+            probe.settimeout(.15)
+            if probe.connect_ex(("127.0.0.1", port)) != 0:
+                return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(.05)
+
+
 def server_probe(root, python, environ, *, port=8000, seconds=10):
     """Own only this paused probe child, and always stop it, even on Ctrl+C."""
-    process = None
+    process, success, cleaned = None, False, True
     try:
         from websockets.sync.client import connect
         child_env = dict(environ, DZ_AUTOSTART="0")
@@ -142,17 +177,13 @@ def server_probe(root, python, environ, *, port=8000, seconds=10):
                 except (OSError, TimeoutError):
                     pass
             time.sleep(min(.1, max(0, deadline - time.monotonic())))
-        return observed and process.poll() is None
+        success = observed and process.poll() is None
     except Exception:
         return False  # never print server output, credentials, payloads or exception text
     finally:
-        if process is not None and process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=3)
+        if process is not None:
+            cleaned = stop_process(process) and listener_gone(port)
+    return success and cleaned
 
 
 def run_checks(root=ROOT, *, activation="failed", environ=None):

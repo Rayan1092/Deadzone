@@ -117,6 +117,7 @@ def test_busy_tcp_port_is_detected_without_disturbing_its_owner():
         listener.bind(("127.0.0.1", 0))
         listener.listen()
         assert not preflight.port_free(listener.getsockname()[1])
+        assert not preflight.listener_gone(listener.getsockname()[1], timeout=.01)
         assert listener.fileno() >= 0
 
 
@@ -132,8 +133,9 @@ def test_cpu_worker_failure_and_timeout_do_not_print_subprocess_output(monkeypat
     assert captured.out == captured.err == ""
 
 
-@pytest.mark.parametrize("mode,expected", [("sim", False), ("model", True)])
-def test_model_probe_requires_model_hello_and_always_stops_its_own_child(monkeypatch, mode, expected):
+@pytest.mark.parametrize("mode,listener_closed,expected", [("sim", True, False), ("model", True, True),
+                                                         ("model", False, False)])
+def test_model_probe_requires_model_hello_and_always_stops_its_own_child(monkeypatch, mode, listener_closed, expected):
     from websockets.sync import client
     class Child:
         def __init__(self): self.stopped = False
@@ -151,9 +153,32 @@ def test_model_probe_requires_model_hello_and_always_stops_its_own_child(monkeyp
         def recv(self, **kwargs): return '{"t":"hello","data":{"detector":"' + mode + '","reason":"secret"}}'
     monkeypatch.setattr(preflight.subprocess, "Popen", start)
     monkeypatch.setattr(client, "connect", lambda *args, **kwargs: Socket())
+    monkeypatch.setattr(preflight, "stop_process", lambda owned: owned.terminate() or True)
+    monkeypatch.setattr(preflight, "listener_gone", lambda port: listener_closed)
     assert preflight.server_probe(ROOT, sys.executable, {"DZ_AUTOSTART": "1"}, seconds=.05) is expected
     assert child.stopped and seen["env"]["DZ_AUTOSTART"] == "0"
     assert seen["stdout"] == subprocess.DEVNULL and seen["stderr"] == subprocess.DEVNULL
+
+
+@pytest.mark.parametrize("kill_succeeds", [True, False])
+def test_windows_cleanup_targets_only_its_owned_tree_and_detects_failure(monkeypatch, kill_succeeds):
+    class Child:
+        pid = 123456789
+        stopped = False
+        def poll(self): return 0 if self.stopped else None
+        def terminate(self): self.stopped = True
+        def wait(self, timeout): return 0
+    child, commands = Child(), []
+    def taskkill(args, **kwargs):
+        commands.append(args)
+        assert kwargs["stdout"] == kwargs["stderr"] == subprocess.DEVNULL
+        if kill_succeeds:
+            child.stopped = True
+        return SimpleNamespace(returncode=0 if kill_succeeds else 1)
+    monkeypatch.setattr(preflight.subprocess, "run", taskkill)
+    assert preflight.stop_process(child, windows=True) is kill_succeeds
+    assert child.stopped
+    assert commands == [["taskkill", "/PID", str(child.pid), "/T", "/F"]]
 
 
 def test_env_files_and_backups_are_ignored_but_the_blank_example_is_shareable():
