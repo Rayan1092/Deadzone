@@ -1,0 +1,10 @@
+{
+  "scenario": "3 robots, seed 7, fixed demo plan, first 250 simulated seconds, trained detector",
+  "profile_wall_s": 47.58,
+  "note": "cProfile overhead included; cumulative timings overlap and must not be added",
+  "robot_step_cumulative_s": 41.472,
+  "frontier_clusters_cumulative_s": 23.121,
+  "astar_cumulative_s": 7.04,
+  "dtn_step_cumulative_s": 1.429,
+  "owner_followup": "Rayan robot/planning.py frontier search; no robot planner edited by Aziz"
+}

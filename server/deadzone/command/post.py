@@ -1,11 +1,14 @@
 """What the command post knows. Updated ONLY by bundles delivered through the network."""
 from copy import deepcopy
 from collections import deque
+import logging
 
 import numpy as np
 from pydantic import ValidationError
 
 from .rescue import RescueRoute
+
+log = logging.getLogger(__name__)
 
 
 class CommandPost:
@@ -37,9 +40,11 @@ class CommandPost:
             try:
                 route = RescueRoute.model_validate(b["payload"])
             except ValidationError:
+                log.warning("Rejected rescue_route bundle %s: invalid payload", b["bid"])
                 return False
             if route.by != b["src"] or any(
                     not (0 <= x <= self.size[0] and 0 <= y <= self.size[1]) for x, y in route.path):
+                log.warning("Rejected rescue_route bundle %s: source or coordinates invalid", b["bid"])
                 return False
         self._seen[b["bid"]] = b["created"] + b["ttl"]
         self.delivered += 1

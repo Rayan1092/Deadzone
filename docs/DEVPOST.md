@@ -39,7 +39,7 @@ Everything runs on a fixed seed, so the story happens on cue. Between cues the r
 
 **Robots.** Each robot only sees the world through its sensors (lidar, thermal camera, odometry) and its radio. It builds its own occupancy grid from lidar, picks frontiers to explore, and drives with A\*. Robots share their targets with each other so they don't all search the same room. Each robot carries 2 relays and drops one when its best upstream link falls between -81 and -76 dBm, at least 4 m from any other relay. That's before the link actually breaks. When a robot goes dark it keeps exploring for up to 60 s, or goes back to its last good spot as soon as it finds someone. Onboard there's a rate monotonic scheduler with 6 tasks (safety, motion, comms, mapping, perception, battery) at 1 ms resolution. Utilization is 0.377, under the 0.735 Liu and Layland bound. The fault protection handles wheel overcurrent, getting stuck, low battery and being trapped, and goes into safe stop after 3 faults in a minute.
 
-**Radio and network.** Signal strength uses a multi-wall path loss model. Every wall the signal crosses costs a fixed amount by material: drywall 4 dB, brick 10, concrete 16, metal 22. Links come up above -82 dBm and drop below -88, so they don't flicker. Messages are delay-tolerant bundles with per-hop custody: a node only deletes a bundle after the next node confirms it stored it, so nothing gets lost when a link dies mid-transfer. Survivor reports go first, then faults and routes, then telemetry, then map updates. Robots never forward for each other. Only relays and phones do.
+**Radio and network.** Signal strength uses a multi-wall path loss model. Every wall the signal crosses costs a fixed amount by material: drywall 4 dB, brick 10, concrete 16, metal 22 (values we picked for the model, not measurements). Links come up above -82 dBm and drop below -88, so they don't flicker. Messages are delay-tolerant bundles with per-hop custody: a node only deletes a bundle after the next node confirms it stored it, so nothing gets lost when a link dies mid-transfer. Survivor reports go first, then faults and routes, then telemetry, then map updates. Robots never forward for each other. Only relays and phones do.
 
 **Command post.** The command view only changes when a bundle actually arrives. We have a test that fails if it ever knows a survivor or a map cell before the bundle carrying it was delivered. The safety checker only uses what the command post knows. It predicts dead zones, battery reserve and reachability, and rejects unsafe plans with a clear reason.
 
@@ -53,6 +53,14 @@ Everything runs on a fixed seed, so the story happens on cue. Between cues the r
 - **Model:** MobileNetV3-Small pretrained on ImageNet, last layer swapped for person / not person, 5 epochs. The model file is 6 MB, small enough to run on the robot.
 - **Results on 1,200 held-out images (threshold 0.6):** 96.2% accuracy, 96.3% precision, 96.0% recall. Confusion matrix: 576 people found, 24 missed, 578 backgrounds rejected, 22 false alarms.
 - **In the sim:** every hot spot the thermal camera sees gets cropped and scored on the robot. The survivors and decoys in the building use held-out crops, so the radiator, engine and coffee machine get rejected by the real model, not by a rule. If PyTorch isn't installed the robots fall back to a simple sim sensor and the decoys turn off, so a missing library can never put a radiator on screen as a person.
+
+## Does it actually help? (in simulation)
+
+We added a "without Deadzone" baseline: the same robots with the same mapping and planning, but each one stops and waits as soon as its link drops and carries no relays, like a tethered or teleoperated robot. Then we ran both versions in our simulator on 20 random survivor layouts (3 robots, 6 minutes of sim time each).
+
+**In simulation**, Deadzone got 60 of 60 survivors to the command post and the baseline got 39 of 60. The command post had 90% of the building mapped with Deadzone and 70% with the baseline. On our demo layout the baseline never finds the survivor in the steel cage.
+
+These are simulation results, not real-world ones. The radio model's wall losses and link thresholds are values we chose, not measurements, so this shows the idea works in our model, not how much it would help in a real collapse. The script and the full table are in the repo (`ml/benchmark.py`, `docs/assets/benchmark.md`).
 
 ## Challenges we ran into
 
