@@ -152,7 +152,7 @@ class Sim:
         self.relay_revisions = {}
         self.overcurrent_until = {}
         self.inboxes = {}  # delivered robot commands, consumed by future robot IO
-        self.post = CommandPost(self.fp)
+        self.post = CommandPost(self.prior)
         self.events = []
         self.robots, self.bodies, self.ios = {}, {}, {}
         ex, ey = self.fp.entry
@@ -455,6 +455,7 @@ class Sim:
             "w": self.fp.w, "h": self.fp.h, "cell": self.fp.cell,
             "reality": base64.b64encode(self.reality_map().tobytes()).decode(),
             "command": base64.b64encode(cmd.tobytes()).decode(),
+            **self.post.coverage(),
         }
 
     def hello(self):
