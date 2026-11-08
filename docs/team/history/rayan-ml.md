@@ -3,9 +3,9 @@
 Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on the testing laptop edits this file. Rayan's robot session writes `history/rayan.md`.
 
 ## Now
-- **Working on:** big-screen performance profile (posted below, For Yusuf and Aziz). Next: radio-vs-published benchmark PR (study finished).
-- **Works on main:** trained survivor detector + `perception.filter_hits()` with sim fallback (PR #14), runtime crops, robot hookup and decoys (PR #17), Grad-CAM heatmaps (PR #49), AI Lab export (PR #68), logged retrain (PR #71), judge pool `ml/results/judge_pool/` (PR #96), benchmark v2 radio sweep (PR #97), fused Grad-CAM + 96.7% docs (PR #100), confidence calibration (PR #103), phone bug diagnosis (PR #107), real-scene crops + detector fine-tuned on indoor thermal people, FLIR 96.7% / indoor 99.6% (PR #95).
-- **In flight (not merged):** `rayan-ml/radio-published` (benchmark at published 2.4 GHz values).
+- **Working on:** `rayan-ml/radio-published` (PR open, merging after tests). Then test-station duty and whatever Rayan queues.
+- **Works on main:** trained survivor detector + `perception.filter_hits()` with sim fallback (PR #14), runtime crops, robot hookup and decoys (PR #17), Grad-CAM heatmaps (PR #49), AI Lab export (PR #68), logged retrain (PR #71), judge pool `ml/results/judge_pool/` (PR #96), benchmark v2 radio sweep (PR #97), fused Grad-CAM + 96.7% docs (PR #100), confidence calibration (PR #103), phone bug diagnosis (PR #107), big-screen performance profile (PR #110), real-scene crops + detector fine-tuned on indoor thermal people, FLIR 96.7% / indoor 99.6% (PR #95).
+- **In flight (not merged):** `rayan-ml/radio-published`: `ml/benchmark_published.py`, `docs/assets/benchmark_published.{md,png,json}`, `chart()` footer/title options in `ml/benchmark_v2.py`.
 - **Blocked on / need from others:** **Aziz:** phone plan fixes 1.1 and 1.2 (phone-diagnosis entry); screen payload items 4a-4b (perf-profile entry). **Yusuf:** phone fixes 1.4, 2.1, 2.2; big-screen items 1-3, 4c, 5 (perf-profile entry); 3D survivor poses + `shows` captions (gradcam-poses entry). **Rayan (robot session):** phone fix 1.3, escape from a no-go.
 - **Promises to others:**
   - `filter_hits(hits)` keeps the `io.thermal()` hit shape `{id,pos,crop,conf}`. Kept hits get `conf` = model P(person) and `detector:"model"`; rejected hits are dropped.
@@ -15,6 +15,12 @@ Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on
   - Judge pool manifest format below (judge-test entry), readable by Aziz's `readJudgePool`.
 
 ## Log
+
+### 2026-11-08 16:40 · rayan-ml/radio-published · Benchmark at published 2.4 GHz radio values: the advantage holds (in simulation)
+- **Did:** `py ml/benchmark_published.py` (300 headless runs, 24 min) reruns benchmark v2 with published radio values instead of ours, benchmark only; server radio code untouched (values patched inside each worker). Wall losses from NIST (Stone 1997, NISTIR 6055, measured at 2.437 GHz): drywall 2 dB (2 panels x ~1 dB), brick 6, concrete 29 (203 mm), rubble 15 (as 102 mm concrete). Path exponent from ITU-R P.1238 at 2.4 GHz: 3.0 office, 2.8 residential. No published 2.4 GHz measurement of a steel cage found (door / partition figures range 6-10 to 20-30 dB), so metal is bracketed at 10, 20 and 30 dB. Link thresholds unchanged. **Result: Deadzone reports more survivors than the baseline in all 9 settings and buildings, and fewer in 0 of 150 paired runs.** collapse_01: Deadzone 98% (88 of 90) at every metal value vs baseline 40-43%; Command map 89% vs 41-42%; Deadzone uses 2.6 to 5.0 relays per run as metal gets harder. Generated buildings: Deadzone 90-97% vs baseline 17-43%. Chart `docs/assets/benchmark_published.png` (in simulation, sources in the footer), table and sources in `benchmark_published.md`.
+- **Contract changes:** none. `ml/benchmark_v2.py` `chart()` gains optional `title` / `footer` arguments (defaults unchanged) and shorter axis labels.
+- **Heads-up for others:** **For Aziz, calibrated values, your call:** materials `{"drywall": 2, "brick": 6, "concrete": 29, "metal": 20, "rubble": 15}` (metal is the least certain; 10 to 30 dB all keep the result) and `PATH_EXP = 3.0`. Nothing changes in the server unless you decide to; the demo guard was measured with the current values, so changing them moves the DEMO.md beats and needs a dry run first. Judge answer: "We reran it with published wall losses and the ITU indoor model: Deadzone still reported 98% of survivors vs about 40% for a robot that stops when the link drops."
+- **Next:** test-station duty; anything Rayan queues.
 
 ### 2026-11-08 16:10 · rayan-ml/perf-profile · Big-screen performance profile (diagnosis only, no fixes)
 
