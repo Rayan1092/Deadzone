@@ -66,7 +66,10 @@ class RobotIO:
 
     def lidar(self):
         b = self.sim.bodies[self.rid]
-        return raycast(self.sim.fp.occ, self.sim.fp.cell, (b["x"], b["y"], b["th"]))
+        result = raycast(self.sim.fp.occ, self.sim.fp.cell, (b["x"], b["y"], b["th"]))
+        self.sim.counters["lidar_scans"] += 1
+        self.sim.counters["lidar_rays"] += len(result[0])
+        return result
 
     def odometry(self):
         b = self.sim.bodies[self.rid]
@@ -80,6 +83,7 @@ class RobotIO:
         return wheel_current(b["cmd_v"], b["blocked"])
 
     def drive(self, v, w):
+        self.sim.counters["drive_calls"] += 1
         b = self.sim.bodies[self.rid]
         b["cmd_v"], b["cmd_w"] = v, w
 
@@ -91,6 +95,7 @@ class RobotIO:
 
     def thermal(self):
         """Thermal hot spots in the forward camera cone; classification belongs to the robot."""
+        self.sim.counters["thermal_scans"] += 1
         b = self.sim.bodies[self.rid]
         out = []
         spots = list(self.sim.fp.data.get("survivors", []))
@@ -106,6 +111,7 @@ class RobotIO:
                 continue
             if self.sim.line_of_sight((b["x"], b["y"]), (sx, sy)):
                 out.append({"id": s["id"], "pos": (sx, sy), "crop": s.get("thermal"), "conf": 0.99})
+        self.sim.counters["thermal_hits"] += len(out)
         return out
 
 
@@ -126,6 +132,13 @@ class Sim:
         self.energy_time_scale = BATTERY_TIME_SCALE
         self.time = 0.0
         self.tick_n = 0
+        self.geometry_revision = 0
+        self.timeline = None
+        self.pending_aftershocks = []
+        self.counters = {"aftershock_areas": 0, "survivor_detections": 0, "hotspots_rejected": 0,
+                         "rescue_routes_computed": 0, "replans": 0, "faults_raised": 0,
+                         "lidar_scans": 0, "lidar_rays": 0, "thermal_scans": 0, "thermal_hits": 0,
+                         "drive_calls": 0}
         self.links = LinkGraph()
         self.network = DTNNetwork(fec_enabled=os.environ.get("DZ_FEC") == "1", seed=self.seed)
         self.network.register("CMD")
@@ -266,11 +279,22 @@ class Sim:
         dt = DT
         self.time = round(self.time + dt, 3)
         self.tick_n += 1
+        if self.timeline is not None:
+            self.timeline.apply_due(self)
+        due = [item for item in self.pending_aftershocks if item["t"] <= self.time + 1e-6]
+        self.pending_aftershocks = [item for item in self.pending_aftershocks if item not in due]
+        for item in due:
+            self.aftershock(item["at"], destroy_relay=False)
         fresh = {}
         for rid, robot in self.robots.items():
             n0 = len(robot.outbox)
             robot.step(dt, self.ios[rid])
             fresh[rid] = robot.outbox[n0:]   # step only appends, so these are this tick's bundles
+            for event in robot.events:
+                key = {"survivor_found": "survivor_detections", "hotspot_rejected": "hotspots_rejected",
+                       "rescue_route": "rescue_routes_computed", "replan": "replans", "fault": "faults_raised"}.get(event["kind"])
+                if key:
+                    self.counters[key] += 1
             self.events.extend(robot.events)
             robot.events.clear()
         for b in self.bodies.values():
@@ -346,6 +370,18 @@ class Sim:
         stats = {"robots": len(self.robots), "relays": len(relays),
                  "links_up": sum(1 for l in links if l["up"]),
                  "delivered": self.post.delivered, "in_flight": sum(map(len, self.network.queues.values()))}
+        stats.update(self.counters)
+        stats.update(self.network.counters)
+        stats.update(ticks=self.tick_n, sim_s=self.time,
+                     relays_destroyed=sum(bool(r.get("destroyed")) for r in self.relays.values()),
+                     survivors_reported=len(self.post.survivors), rescue_routes_delivered=len(self.post.routes),
+                     deadline_misses=sum(sum(r.scheduler.misses.values()) for r in self.robots.values()),
+                     safety_deadline_misses=sum(r.scheduler.misses["safety"] for r in self.robots.values()),
+                     exploration_searches=sum(r.explorer.searches for r in self.robots.values() if r.explorer is not None),
+                     queued_bytes=sum(b["size"] for queue in self.network.queues.values() for b in queue),
+                     timeline_events_played=self.timeline.played if self.timeline else 0,
+                     timeline_events_failed=self.timeline.failed if self.timeline else 0,
+                     timeline_events_total=len(self.timeline.events) if self.timeline else 0)
         return {"reality": reality, "command": self.post.view(self.time), "stats": stats}
 
     def maps(self):
@@ -369,11 +405,43 @@ class Sim:
         return ev
 
     # ------------------------------------------------------------------ director
-    def aftershock(self, at=None, relay=None):
+    def earthquake(self, strength="normal", at=None, relay=None):
+        """Normal stays identical; strong adds two areas now and one at +10 sim s."""
+        if strength not in ("normal", "strong"):
+            raise ValueError("Unknown earthquake strength")
+        if strength == "normal":
+            return self.aftershock(at, relay)
+        if self.pending_aftershocks:
+            raise ValueError("Wait for the pending secondary collapse")
+        if relay is not None and (relay not in self.relays or self.relays[relay].get("destroyed")):
+            raise ValueError("Unknown or already destroyed relay")
+        active = [rid for rid, r in self.relays.items() if r["on"] and not r["phone"] and not r.get("destroyed")]
+        first = relay or next(iter(active), None)
+        anchor = at if at is not None else self.relays[first]["pos"] if first else (min(22, self.fp.W-self.fp.cell), self.fp.H/2)
+        x, y = map(float, anchor)
+        if not (math.isfinite(x) and math.isfinite(y) and 0 <= x < self.fp.W and 0 <= y < self.fp.H):
+            raise ValueError("Aftershock must be inside the building")
+        # Positions depend only on this world; no random draws alter robot/demo behavior.
+        areas = [[x, y]]
+        for fx, fy in ((.7, .3), (.3, .7), (.7, .7), (.3, .3), (.5, .5)):
+            point = [self.fp.W*fx, self.fp.H*fy]
+            if math.dist(point, self.fp.entry) > 3 and all(math.dist(point, p) > 3 for p in areas):
+                areas.append(point)
+            if len(areas) == 3:
+                break
+        if len(areas) < 3:
+            raise ValueError("Building is too small for a strong earthquake")
+        second = next((rid for rid in active if rid != first), None)
+        events = [self.aftershock(areas[0], first),
+                  self.aftershock(areas[1], second, destroy_relay=second is not None)]
+        self.pending_aftershocks.append({"t": round(self.time+10, 3), "at": areas[2]})
+        return {"strength": "strong", "areas": events, "secondary_at": round(self.time+10, 3)}
+
+    def aftershock(self, at=None, relay=None, *, destroy_relay=True):
         """Apply one validated truth-only collapse; robots react through normal IO."""
         if relay is not None and (relay not in self.relays or self.relays[relay].get("destroyed")):
             raise ValueError("Unknown or already destroyed relay")
-        if relay is None:
+        if relay is None and destroy_relay:
             relay = next((rid for rid, r in self.relays.items() if r["on"] and not r["phone"]), None)
         if at is None:
             at = self.relays[relay]["pos"] if relay else (min(22, self.fp.W - self.fp.cell), self.fp.H / 2)
@@ -392,6 +460,8 @@ class Sim:
         self.fp.add_rubble(poly)
         self.fp.data.setdefault("rubble", []).append(rubble)
         self.fp.add_wall(wall)
+        self.geometry_revision += 1
+        self.counters["aftershock_areas"] += 1
         self._invalidate_camera_frames()
         lost = 0
         if relay:
@@ -412,6 +482,7 @@ class Sim:
         s = size / 2
         poly = [[x - s, y - s], [x + s, y - s], [x + s, y + s], [x - s, y + s]]
         self.fp.add_rubble(poly)
+        self.geometry_revision += 1
         self.fp.data.setdefault("rubble", []).append({"id": f"RBX{len(self.fp.data['rubble'])}",
                                                        "poly": poly, "height": 1.0, "dynamic": True})
         self._invalidate_camera_frames()

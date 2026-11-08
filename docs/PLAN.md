@@ -40,7 +40,7 @@ Version 1 works end to end (every demo beat verified on the testing laptop), so 
 - **Demo guard test first.** `DEMO.md` becomes a pytest that runs seed 7 and asserts every beat time within a small tolerance. Any PR that moves a beat fails. Version 1 stays recordable at all times.
 - **Every new feature is behind a toggle or key** until it has passed a full dry run on the testing laptop.
 - **Record the Version 1 backup video tonight** (`?record`, then S, plus a screen recording) before big visual changes land.
-- **7:30 AM feature freeze still holds.** After it: fixes, video, Devpost, rehearsal only.
+- **Rayan announces the feature freeze.** After it: fixes, recording, Devpost, rehearsal only.
 
 ### UX fixes the team agreed on
 
