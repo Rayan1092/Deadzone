@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { connectScreen } from './net/socket'
 import Pane from './three/Pane'
-import { HelpOverlay, Sidebar, TopBar, useKeyboard } from './panels/Panels'
+import { HelpOverlay, RescueStatus, Sidebar, TopBar, useKeyboard } from './panels/Panels'
 import { JoinOverlay } from './panels/JoinPanel'
 import Toasts from './panels/Toasts'
 import Timeline from './panels/Timeline'
@@ -30,6 +30,7 @@ export default function BigScreen() {
             <Pane which="command" title="What the command post knows" subtitle="only what reached its antenna" />
           </>
         )}
+        <RescueStatus />
         <Toasts />
         <DirectorChip />
         <ReportPanel />

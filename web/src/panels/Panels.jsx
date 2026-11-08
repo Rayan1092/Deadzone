@@ -1,7 +1,7 @@
 import { Fragment, useEffect } from 'react'
 import { setNight, setPerf, setView, useSim } from '../store'
 import { control } from '../net/socket'
-import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt } from '../format'
+import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt, latestRoutes } from '../format'
 import { JoinButton } from './JoinPanel'
 import { requestReport } from './ReportPanel'
 import { ReplayChip } from './ReplayPanel'
@@ -21,11 +21,32 @@ function toggleView() {
   setView(useSim.getState().view === 'gap' ? 'split' : 'gap')
 }
 
+// Rescue Status: the first thing a judge reads, in plain words. Found = the robots' own
+// sightings (Reality); confirmed = those the onboard classifier scored as a person; reported
+// and routes = only what reached the command post.
+const AI_THRESHOLD = 0.6
+const NONE_LIST = []
+export function RescueStatus() {
+  const time = useSim((s) => s.time)
+  const found = useSim((s) => s.tick?.reality.survivors_found ?? NONE_LIST)
+  const reported = useSim((s) => s.tick?.command.survivors.length ?? 0)
+  const routes = useSim((s) => latestRoutes(s.tick?.command.routes ?? NONE_LIST).length)
+  const ids = new Set(found.map((f) => f.id))
+  const confirmed = new Set(found.filter((f) => (f.conf ?? 1) >= AI_THRESHOLD).map((f) => f.id)).size
+  return (
+    <div className="rescue-status" aria-label="Rescue status">
+      <div className="rs-cell found"><b>{ids.size}</b><span>survivors found</span></div>
+      <div className="rs-cell ai"><b>{confirmed}</b><span>confirmed by onboard AI</span></div>
+      <div className={`rs-cell cmd${reported < ids.size ? ' behind' : ''}`}><b>{reported}</b><span>reported to command</span></div>
+      <div className="rs-cell route"><b>{routes}</b><span>rescue routes ready</span></div>
+      <div className="rs-cell time"><b className="mono">{fmt(time)}</b><span>since collapse</span></div>
+    </div>
+  )
+}
+
 export function TopBar() {
   const fp = useSim((s) => s.floorplan)
   const time = useSim((s) => s.time)
-  const found = useSim((s) => new Set(s.tick?.reality.survivors_found.map((f) => f.id)).size)
-  const reported = useSim((s) => s.tick?.command.survivors.length ?? 0)
   const connected = useSim((s) => s.connected)
   const running = useSim((s) => s.running)
   const speed = useSim((s) => s.speed)
@@ -40,10 +61,6 @@ export function TopBar() {
       <div className="brand">DEADZONE</div>
       <div className="incident">{fp ? fp.name : 'Waiting for sim'}</div>
       <div className="clock mono">T+{fmt(time)}</div>
-      <div className="survivor-count" title="Found by robots vs known at the command post">
-        <span>Survivors: <b>{found}</b> found</span>
-        <span className={reported < found ? 'gap' : ''}><b>{reported}</b> at command</span>
-      </div>
       {detector && (
         <span className={`detector-chip ${detector.mode}`} title={detector.reason ?? ''}>
           Detector: {detector.mode === 'model' ? 'AI model' : 'sim fallback'}

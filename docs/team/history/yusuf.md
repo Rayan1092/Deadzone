@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/collapse-geometry`: Rayan's collapse list, steps 1-6 built. Step 1 merged (#85); PR for steps 2-6 open next. Final shots in `docs/visuals/` (`final-*`).
+- **Working on:** `p3/collapse-geometry`, final stretch per PLAN.md 12:20 AM: captions + judge labels + Rescue Status strip done; next earthquake v2 visuals + banners, generic props for unknown rooms, exterior shell. Dropped tonight: multi-story interior, voice UI, clinic map. PRs: #85 merged, #93 open (steps 2-6).
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,16 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 11:25 · p3/collapse-geometry · Captions on every AI image, judge-first labels, Rescue Status strip; OK for Aziz on J and I
+- **Did (PLAN.md "Purpose, trust and visibility", in its priority order):**
+  - **Caption every AI image:** "Real thermal camera image, Teledyne FLIR dataset: the same input a thermal camera on a rescue robot produces." on the AI cards, the robot camera's thermal view and the AI Lab (live crop, examples grid, in-building crops). `AI_CAPTION` in `format.js`.
+  - **Judge-first labels:** "No link, keeps searching", "Heading back to radio range", "Radio beacon left with survivor S1", "Route for rescuers to S1 · 52 m, avoids no-go zones", "… redrawn around new rubble", "R2 found S3, confirmed by onboard AI".
+  - **Rescue Status strip** across the top of the main view, judge language only: survivors found (robots' sightings), confirmed by onboard AI (score >= 0.6), reported to command and rescue routes ready (delivered data only), time since collapse. The old top-bar counter is gone; title, toasts, inset and robot camera moved under the strip.
+- **Contract changes:** none.
+- **For Aziz (the J judge test and I Under-the-hood panels in `web/`): yes, go ahead.** Conditions so we don't collide: new files only (`web/src/panels/JudgeTest.jsx`, `web/src/panels/UnderHood.jsx`, styles appended at the end of `web/src/styles.css` under a `/* J: judge test */` and `/* I: under the hood */` comment, or your own CSS file); mount them in `web/src/BigScreen.jsx` next to `<AILab />`; keys J and I in `web/src/panels/Panels.jsx` (`KEYS` list plus two lines in `useKeyboard`, same pattern as L); read from the store (`tick.stats`, events) and your own endpoints, no changes to `web/src/three/` or to `handleMessage` beyond passing new fields through; glass look: reuse the `.lab` / `.lab-head` / `.report-close` classes; captions: every FLIR image carries `AI_CAPTION` from `format.js`; `npm run build` before the PR. I'm editing `three/`, `Actors.jsx`, `Pane.jsx`, `store.js` (aftershock/banner fields) and `Props.jsx` tonight; if you need a store field, add it at the end of the state object.
+- **Heads-up for others:** Rayan: key N's banner reacts to a floorplan change in `hello` (any new building id or name), so it works as soon as Aziz's reset-into-floorplan control exists; the N key itself is wired once he posts the control's name and value. Dropped tonight as agreed: multi-story interior, voice UI, clinic map (`p3/clinic-map` stays unmerged).
+- **Next:** earthquake v2 visuals (4-6 s shake, falling slabs, dust, flickering lights, rumble, AFTERSHOCK banner), generic props for unknown rooms, exterior shell.
 
 ### 2026-11-08 11:00 · p3/collapse-geometry · Ceiling perf fix, Rayan's plain textures wired, final full-quality shots
 - **Did:**

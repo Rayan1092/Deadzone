@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Billboard } from '@react-three/drei'
 import * as THREE from 'three'
 import { FOCUS_HOLD_MS, useSim } from '../store'
+import { AI_CAPTION } from '../format'
 import Building from './Building'
 import { PersonFigure } from './Actors'
 import { ROBOT_SCALE } from './Rover'
@@ -328,7 +329,7 @@ export default function RobotEye() {
       ))}
       <FocusPanel robotId={robotId} />
       <span className="eye-note">
-        {thermal ? 'Thermal camera · warm objects are scored by the onboard person classifier'
+        {thermal ? `Thermal camera · ${AI_CAPTION} Warm objects are scored by the onboard person classifier.`
           : 'Forward camera · every warm object is scored by the onboard person classifier from its thermal crop'}
       </span>
     </div>

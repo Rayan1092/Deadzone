@@ -3,8 +3,8 @@
 export const STATE_LABEL = {
   DEPLOYING: 'Deploying',
   EXPLORING: 'Exploring',
-  LOST_LINK_EXPLORING: 'No link, exploring',
-  RETURNING_TO_SIGNAL: 'Returning to signal',
+  LOST_LINK_EXPLORING: 'No link, keeps searching',
+  RETURNING_TO_SIGNAL: 'Heading back to radio range',
   RETURNING_HOME: 'Returning home',
   REPLANNING: 'Replanning',
   FAULT: 'Fault',
@@ -39,21 +39,22 @@ export function fmtClock(t) {
 // One line per event, used by the sidebar feed and the toasts.
 export function describeEvent(e) {
   switch (e.kind) {
-    case 'survivor_found': return `${e.robot} found ${e.survivor}${e.linked ? '' : ' (no link, holding report)'}`
+    case 'survivor_found': return `${e.robot} found ${e.survivor}, confirmed by onboard AI${e.linked ? '' : ' (no link, holding the report)'}`
     case 'survivor_reported': return `${e.survivor} reached the command post (${e.delay_s}s after detection)`
     case 'link_lost': return `${e.robot} lost link, keeps exploring`
     case 'link_restored': return e.dark_s ? `${e.robot} back online after ${Math.round(e.dark_s)}s dark` : `${e.robot} link restored`
     case 'replan': return `${e.robot} replanned${e.reason ? `: ${REPLAN_REASON[e.reason] ?? e.reason}` : ''}`
     case 'fault': return `${e.robot} fault: ${FAULT_LABEL[e.fault] ?? e.fault}`
     case 'relay_dropped': // owner is a robot id, a relay phone's client label, or null
-      if (/^R\d+$/.test(e.owner ?? '')) return `${e.owner} dropped relay ${e.id}`
+      if (e.beacon_for) return `Radio beacon left with survivor ${e.beacon_for} (${e.id})`
+      if (/^R\d+$/.test(e.owner ?? '')) return `${e.owner} left a radio relay (${e.id})`
       return e.owner ? `Phone ${e.owner} joined as relay ${e.id}` : `Relay ${e.id} placed`
     case 'relay_power': return `${e.phone ? `Phone relay ${e.id}` : `Relay ${e.id}`} switched ${e.on ? 'on' : 'off'}`
     case 'hotspot_rejected': return `${e.robot}'s detector rejected hot spot ${e.id}: not a person`
     case 'rescue_route': return e.updated
-      ? `${e.robot} replanned the route to ${e.survivor} · ${Math.round(e.length_m)} m`
-      : `${e.robot} planned a safe route to ${e.survivor} · ${Math.round(e.length_m)} m${e.beacon ? `, beacon ${e.beacon}` : ''}`
-    case 'rescue_route_blocked': return `${e.robot}: route to ${e.survivor} blocked, no safe path right now`
+      ? `Route for rescuers to ${e.survivor} redrawn around new rubble · ${Math.round(e.length_m)} m`
+      : `Route for rescuers to ${e.survivor} · ${Math.round(e.length_m)} m, avoids no-go zones${e.beacon ? `, radio beacon ${e.beacon}` : ''}`
+    case 'rescue_route_blocked': return `Rescuers' route to ${e.survivor} is blocked, no safe path right now`
     case 'rescue_route_reported': return `${e.updated ? 'Updated route' : 'Route'} to ${e.survivor} reached the command post · ${Math.round(e.length_m)} m`
     case 'deadline_miss': return `${e.robot} missed a ${e.task} deadline`
     case 'rubble_fall': return 'Rubble fell'
@@ -87,3 +88,6 @@ export function latestRoutes(list) {
   routeCache.set(list, out)
   return out
 }
+
+// Every AI image on screen says what it is (Rayan's trust rule).
+export const AI_CAPTION = 'Real thermal camera image, Teledyne FLIR dataset: the same input a thermal camera on a rescue robot produces.'
