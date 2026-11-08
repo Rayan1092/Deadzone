@@ -15,6 +15,7 @@ owners. Existing screen messages and robot behavior continue to work.
 | `POST /api/dispatch` | `{ "plan_id": "P-1" }` | Recheck current knowledge; return `{ok: true, plan_id}` and queue plan bundles, or return safety violations |
 | `POST /api/fault` | `{type: "rubble", at: [x,y]}` or `{type: "overcurrent", robot: "R1"}` | Validated director fault injection |
 | `GET /api/report` | none | `{text, generated_at, source}` briefing, also broadcast to screens |
+| `POST /api/ask` | `{question:"where should team 2 go?"}` | Private `{text, generated_at, source:"gemini"|"local"}` answer using the same Command tools; no commands dispatched |
 
 For the opt-in Gemini briefing setup, tool boundary and local fallback, see
 [`GEMINI.md`](GEMINI.md). Source is `gemini` only after a successful tool-grounded

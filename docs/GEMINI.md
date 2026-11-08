@@ -52,6 +52,20 @@ no references to Sim, live robot state, live queues/RSSI, hidden survivors, trut
 rubble, director events or mutating APIs. Fault records and relay announcements
 are explicitly described as historical evidence.
 
+## Phone Ask contract
+
+`POST /api/ask` accepts `{ "question": "where should team 2 go?" }` and returns
+the same `{text,generated_at,source}` shape. Questions must be strings of 1-1000
+characters and are trimmed; blank questions or unknown fields return 422. It uses
+the same opt-in, model, six Command tools, snapshot and total 10-second deadline.
+Replies are private HTTP responses; questions and answers are not broadcast to
+the screen or other phones. A reset in flight returns 409 `report_reset`.
+
+When unavailable it returns `source:"local"` and explicitly says that the local
+Command summary does not answer the question. It never invents an answer. The
+phone UI, pending/error state, speech and optional browser question history are
+Yusuf's work; no frontend files changed here.
+
 ## Validation
 
 Tests use an in-process HTTP mock, never a real API key. They cover parallel and

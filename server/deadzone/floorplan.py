@@ -22,7 +22,7 @@ class FloorPlan:
 
         # Wall segments for propagation (rubble edges count too)
         segs, loss = [], []
-        for wall in data["walls"]:
+        for wall in [*data["walls"], *data.get("dynamic_walls", [])]:
             segs.append([*wall["a"], *wall["b"]])
             loss.append(mats[wall["material"]])
         for rb in data.get("rubble", []):
@@ -36,7 +36,7 @@ class FloorPlan:
 
         # Truth occupancy (walls + rubble) and hazard mask
         self.occ = np.zeros((self.h, self.w), dtype=bool)
-        for wall in data["walls"]:
+        for wall in [*data["walls"], *data.get("dynamic_walls", [])]:
             self._raster_segment(wall["a"], wall["b"])
         cx, cy = self.cell_centers()
         for rb in data.get("rubble", []):
@@ -92,3 +92,10 @@ class FloorPlan:
         ix = np.clip((pts[:, 0] // self.cell).astype(int), 0, self.w - 1)
         iy = np.clip((pts[:, 1] // self.cell).astype(int), 0, self.h - 1)
         self.occ[iy, ix] = True
+
+    def add_wall(self, wall):
+        """Runtime truth wall, separated from public pre-collapse wall metadata."""
+        self._raster_segment(wall["a"], wall["b"])
+        self.segs = np.vstack([self.segs, np.array([[*wall["a"], *wall["b"]]], dtype=float)])
+        self.seg_loss = np.append(self.seg_loss, self.data["materials"][wall["material"]])
+        self.data.setdefault("dynamic_walls", []).append(deepcopy(wall))
