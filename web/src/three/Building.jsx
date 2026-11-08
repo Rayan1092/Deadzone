@@ -10,6 +10,8 @@ import { CollapseLive, CollapseStatic, WallDetails, holedWallGeometry, wallDamag
 import { DisasterLive, DisasterStatic } from './Disaster'
 import FracturedWalls from './Fracture'
 import { AtmosphereLive, AtmosphereStatic } from './Atmosphere'
+import { LitterStatic, ScannedDebris } from './Litter'
+import { CeilingLive, CeilingStatic } from './Ceiling'
 
 // Thermal palette for the robot's-eye view: everything cold reads as deep blue.
 const COLD = { floor: '#070b1f', wall: '#1d3a8a', wallGlow: '#0b1d5c' }
@@ -305,10 +307,14 @@ export default function Building({ thermal = false, blueprint = false, props = t
         {damage && <CollapseStatic fp={fp} />}
         {damage && <DisasterStatic fp={fp} outside={!lite} />}
         {damage && <AtmosphereStatic fp={fp} />}
+        {damage && <LitterStatic fp={fp} perf={perf} />}
+        {damage && <ScannedDebris fp={fp} perf={perf} outside={!lite} />}
+        {damage && <CeilingStatic fp={fp} />}
       </Baked>
       {damage && <CollapseLive fp={fp} dust={!perf && !lite} />}
       {damage && !perf && !lite && <DisasterLive fp={fp} />}
       {damage && <AtmosphereLive fp={fp} night={night} perf={perf || lite} />}
+      {damage && <CeilingLive fp={fp} perf={perf || lite} />}
       {mode === 'plain' && (fp.hazards ?? []).map((hz) => <GasLeak key={hz.id} hazard={hz} />)}
       {blueprint && (
         <mesh position={w2t(cx, cy, 0.5)}>

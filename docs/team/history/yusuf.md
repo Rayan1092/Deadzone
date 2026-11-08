@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/collapse-geometry`: Rayan's "real collapse" list. Step 1 broken walls done; steps 2-4 (ceiling, debris, night atmosphere) being built in parallel worktrees and integrated next; then 5 cinematic camera, 6 robot glTF loader. Before/after shots in `docs/visuals/`.
+- **Working on:** `p3/collapse-geometry`: Rayan's collapse list. Steps 1, 4, 5 done; 2 (ceiling) and 3 (litter) integrated, one ceiling perf fix pending; 6 loader done. Step 1 is PR #85; a PR for 2-5 follows. Before/after in `docs/visuals/`.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,17 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 10:50 · p3/collapse-geometry · Steps 2 and 3: collapsed ceiling, debris everywhere; fog of war as a veil
+- **Did:**
+  - `web/src/three/Ceiling.jsx` (parallel agent; rules review clean, one perf finding being fixed): per room a pancaked ceiling slab leaning from the wall top (steep in normal rooms so the floor reach stays within 0.48 m of the wall; true shallow pancakes only inside hazard rooms), snapped I-beams in the odd rooms hinging into a V with rebar scraps, ceiling T-grid fragments with tiles hanging tilted from wall tops, a galvanized duct run with a crushed open section, dangling cables and conduits; three cables and one grid fragment sway. About 18 draw calls, 3-4k triangles.
+  - `web/src/three/Litter.jsx` (parallel agent; both reviews clean; a node audit checked every instance against the path rules on collapse_01 and two generated maps): mixed-size concrete chunks on every floor (open floor <= 0.12 m), 800 glass shards under the outer-wall windows, paper and folders, fallen ceiling tiles, generic overturned and crushed furniture against walls, heaved floor plates (<= 0.105 m) with crack decals, dust layers; plus `ScannedDebris`: the CC0 Poly Haven scans (moon rocks as concrete chunks, road barriers, desk and chairs overturned, tyres) decimated and instanced. About 173k triangles full, 93k in P mode, 30 draw calls.
+  - Fog of war is a dark veil (alpha 150 instead of 232) so unmapped rooms still read as unmapped while the collapse shows through.
+  - Ceiling T-bars toned to dusty aluminium (they read as neon).
+  - Shots: `docs/visuals/after-3-*.jpg`. 55-60 fps in this browser at the corridor and overview angles.
+- **Contract changes:** none. New static assets under `web/public/assets/models/` (13 MB, CC0, credited in `CREDITS.md`).
+- **Heads-up for others:** Rayan: steps 1-5 of your list are built; 6 keeps the procedural rover until a better glTF exists. The whole look is behind nothing: night is the default (K for day), P is the fallback.
+- **Next:** apply the ceiling perf fix, full-quality retakes, merge main, PR for steps 2-5.
 
 ### 2026-11-08 10:25 · p3/collapse-geometry · Step 4 scene module integrated (atmosphere), scout camera at night
 - **Did:**

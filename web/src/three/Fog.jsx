@@ -88,7 +88,9 @@ export default function Fog({ which, cover = true }) {
       const o = i * 4
       // fog: unknown = near black
       fog[o] = 12; fog[o + 1] = 14; fog[o + 2] = 17
-      fog[o + 3] = v === 0 && !solid?.[i] ? 232 : 0
+      // a dark veil, not a lid: unmapped rooms stay readable as unmapped while the
+      // collapse underneath still shows through
+      fog[o + 3] = v === 0 && !solid?.[i] ? 150 : 0
       // tint; free cells at the edge of real unknown space are the frontier the robots are
       // chasing. Lidar leaves speckles of unknown between distant beams, so require a real
       // chunk of unknown nearby (10 of the 24 neighbors in a 5x5 window).
