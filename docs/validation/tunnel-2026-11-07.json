@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "origin": "https://chair-challenge-large-plant.trycloudflare.com",
+  "origin": "https://sacred-thirty-grad-respect.trycloudflare.com",
   "checks": [
     "screen/phone/microphone HTML and built assets over HTTPS",
     "API and QR join use the same HTTPS origin",
