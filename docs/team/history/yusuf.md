@@ -17,6 +17,12 @@ Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Log
 
+### 2026-11-08 08:45 · p3/plan-v4 · PLAN.md: hyper-realism, honest scout camera, judge-first UI
+- **Did:** added "Hyper-realism, honest scout camera and judge-first UI (9:50 PM update)" to `docs/PLAN.md`: what shipped, the merge order of my stacked branches (#70 → `p3/disaster` → `p3/hyperreal`, plus `p3/clinic-map`), the rule that only warm objects get classifier scores (never invented numbers for cold ones), and asks for Rayan and Aziz.
+- **Contract changes:** none (docs only).
+- **Heads-up for others:** **Rayan, Aziz: read the new section; your asks are at the end.**
+- **Next:** multi-story shell.
+
 ### 2026-11-08 08:35 · p3/hyperreal · Photo-scanned world, honest scout-camera AI, true-scale people, rugged relays, explainer
 - **Did (Yusuf's ask: hyper-realistic, scout camera must match the robot, classify every object, realistic people, no run-overs, realistic beacons, judge-friendly UI):**
   - **Photo-scanned surfaces:** 7 CC0 Poly Haven sets at 1K (color, normal, roughness): damaged concrete floor, concrete wall, red brick, cracked concrete (debris, slabs, ruins), asphalt, rusty metal, painted plaster. Plus a CC0 HDRI sky (industrial sunset) for light and reflections. 14 MB in `web/public/assets/` with `CREDITS.md`. Each texture starts procedural and swaps to the photo when it loads; the HDRI falls back to the light panels. A missing file never breaks the view.

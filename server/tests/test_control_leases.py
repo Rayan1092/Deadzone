@@ -23,6 +23,7 @@ def session(monkeypatch):
     monkeypatch.setenv("DZ_AUTOSTART", "0")
     monkeypatch.setenv("DZ_ROBOTS", "3")
     monkeypatch.setenv("DZ_VOICE", "1")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("DZ_PRESENTER_TOKEN", "test-presenter-only")
     hub = api.Hub()
     now = [0.0]
@@ -137,7 +138,7 @@ def test_manual_and_voice_paths_require_holder_and_mode_is_atomic(session):
             for path, body in calls:
                 assert client.post(path, headers=headers(token), json=body).status_code == 403
         assert not hub.sim.network.queues["CMD"]
-        assert client.post("/api/voice", headers=headers(a), json=calls[2][1]).status_code == 501
+        assert client.post("/api/voice", headers=headers(a), json=calls[2][1]).status_code == 503
         assert not hub.sim.network.queues["CMD"]  # no invented voice response/command
         assert client.post(calls[0][0], headers=headers(a), json=calls[0][1]).status_code == 200
         assert len(hub.sim.network.queues["CMD"]) == 1

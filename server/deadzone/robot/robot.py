@@ -13,10 +13,11 @@ import re
 
 import numpy as np
 
-from ..floorplan import UNKNOWN
+from ..floorplan import FREE, UNKNOWN
 from ..geometry import points_in_poly, wrap_angle
 from ..network.dtn import PRIO, make_bundle
 from . import planning
+from .exploration import ProgressExplorer, line_clear
 from .mapping import OccupancyMap
 from .perception import filter_hits, get_detector
 from .power import Battery, RESERVE_PCT, wheel_current
@@ -58,6 +59,7 @@ REPLAN_COOLDOWN_S = 5.0    # repeat obstacles this soon after a replan are repla
 TRAPPED_AFTER_S = 10.0     # no route for this long raises a TRAPPED fault to the command post
 ROUTE_CHECK_PERIOD = 2.0   # s between "is the rescue route I sent still open on my map?" checks
 COLLAPSE_MARGINS_CELLS = (4, 2)  # rescue routes stay 1 m (else 0.5 m) clear of fresh collapse
+ROUTE_MAX_POINTS = 60      # Command's RescueRoute cap (Aziz, PR #28)
 
 # Wheel overcurrent (plan: above 6 A for 0.5 s -> stop, reverse 0.5 m, mark ahead, replan)
 OVERCURRENT_A = 6.0
@@ -103,6 +105,49 @@ def default_mode():
     """DZ_MODE=baseline starts every robot in baseline mode; anything else means deadzone."""
     mode = os.environ.get("DZ_MODE", "deadzone").strip().lower()
     return mode if mode in MODES else "deadzone"
+
+
+def _collinear_compact(pts):
+    """Command's own compaction (PR #28): drop exactly-collinear middle points only."""
+    out = []
+    for q in pts:
+        if out and q == out[-1]:
+            continue
+        while len(out) > 1:
+            a, b = out[-2:]
+            u = b[0] - a[0], b[1] - a[1]
+            v = q[0] - b[0], q[1] - b[1]
+            if u[0] * v[1] - u[1] * v[0] != 0 or u[0] * v[0] + u[1] * v[1] < 0:
+                break
+            out.pop()
+        out.append(q)
+    return out
+
+
+def fit_route(pts, cap=ROUTE_MAX_POINTS, tol=0.15):
+    """Rescue route points, rounded to cm, that Command will accept (at most `cap` after its
+    compaction). Routes that already fit are returned unchanged, so nothing about normal routes
+    (the demo's included) changes. Longer ones (big generated buildings) are simplified with
+    Douglas-Peucker at `tol` m, then thinned evenly, always keeping both ends."""
+    pts = [[round(px, 2), round(py, 2)] for px, py in pts]
+    if len(pts) <= cap or len(_collinear_compact(pts)) <= cap:
+        return pts
+
+    def dp(seg):
+        if len(seg) < 3:
+            return seg
+        (ax, ay), (bx, by) = seg[0], seg[-1]
+        L = math.hypot(bx - ax, by - ay) or 1e-9
+        d = [abs((bx - ax) * (ay - y) - (ax - x) * (by - ay)) / L for x, y in seg[1:-1]]
+        k = max(range(len(d)), key=d.__getitem__)
+        if d[k] <= tol:
+            return [seg[0], seg[-1]]
+        return dp(seg[:k + 2])[:-1] + dp(seg[k + 1:])
+    out = dp(pts)
+    if len(out) > cap:
+        idx = sorted({round(i * (len(out) - 1) / (cap - 1)) for i in range(cap)})
+        out = [out[i] for i in idx]
+    return out
 
 
 def resume_command(rid, now):
@@ -196,6 +241,8 @@ class Robot:
         self.active_cmd = None       # accepted go_to / return_home / explore_zone in progress
         self.goto = None             # go_to target (x, y)
         self._cmd_zone_id = None
+        self.explorer = (ProgressExplorer((h, w), cell)
+                         if os.environ.get("DZ_EXPLORATION_V2") == "1" else None)
 
     # ------------------------------------------------------------------ mode toggle
     def set_mode(self, mode):
@@ -220,6 +267,9 @@ class Robot:
 
         angles, ranges, hits = io.lidar()
         self.map.integrate(self.pose, angles, ranges, hits)
+        if self.explorer is not None:
+            self.explorer.observe(self.map.grid, self.pose, self.t,
+                                  self.state in ("EXPLORING", "LOST_LINK_EXPLORING"))
         self.lidar_pts = [[round(x + math.cos(a) * r, 2), round(y + math.sin(a) * r, 2)]
                           for a, r in zip(angles[::2], ranges[::2])]
 
@@ -282,16 +332,27 @@ class Robot:
         if "lost_link_budget_s" in plan:
             self.lost_budget = float(plan["lost_link_budget_s"])
         self.path = []                       # replan under the new plan right away
+        if self.explorer is not None:
+            self.explorer.reset_goal()
         self.events.append({"kind": "plan_applied", "robot": self.id, "plan_id": plan.get("plan_id"),
                             "zones": [z["id"] for z in self.zones]})
 
     def _active_zone(self):
         """Highest-priority zone that is not mapped yet, or None."""
         for z in self.zones:
-            known = (self.map.grid[z["mask"]] != UNKNOWN).mean()
-            if known < ZONE_DONE_KNOWN:
+            if not self._zone_complete(z):
                 return z
         return None
+
+    def _zone_complete(self, zone):
+        if (self.map.grid[zone["mask"]] != UNKNOWN).mean() < ZONE_DONE_KNOWN:
+            return False
+        if self.explorer is not None:
+            free = zone["mask"] & (self.map.grid == FREE) & ~self.nogo
+            surveyed = self.explorer.surveyed | self.explorer.team_surveyed
+            if free.any() and surveyed[free].mean() < .9:
+                return False
+        return True
 
     def _in_lost_link_ok_zone(self):
         ix, iy = self._cell(*self.pose[:2])
@@ -319,6 +380,8 @@ class Robot:
             return
         cmd = p.get("cmd")
         status, eta, reason, say = self._decide_command(cid, cmd, p)
+        if status == "accepted" and self.explorer is not None:
+            self.explorer.reset_goal()
         ack = {"cmd_id": cid, "robot": self.id, "cmd": cmd, "status": status,
                "eta_s": None if eta is None else int(round(eta)), "reason": reason, "say": say,
                "state": self.state, "t": round(self.t, 1), "issued_t": p.get("issued_t")}
@@ -424,7 +487,7 @@ class Robot:
         self.goto, self.path = None, []
         if self.state in ("HOLDING", "GOING_TO_POINT", "DONE", "RETURNING_HOME"):
             self._set_state("EXPLORING")
-        if (self.map.grid[mask] != UNKNOWN).mean() >= ZONE_DONE_KNOWN:
+        if self._zone_complete(self.zones[0]):
             return "accepted", 0, None, f"{name} is already searched. I'll check it again."
         saved = list(self.path)
         eta = (self._path_m() if self._plan_to(center) else 1.6 * math.dist(self.pose[:2], center)) / ETA_SPEED
@@ -450,7 +513,7 @@ class Robot:
             if z is None:
                 self.active_cmd = None            # a newer plan replaced the zone
                 return
-            if (self.map.grid[z["mask"]] != UNKNOWN).mean() >= ZONE_DONE_KNOWN:
+            if self._zone_complete(z):
                 done, say = True, f"Finished searching {c['zone'] or 'that area'}."
         if not done:
             return
@@ -478,6 +541,8 @@ class Robot:
             self.peers[p["id"]] = {"target": p.get("target"), "pose": p.get("pose"),
                                    "relays": p.get("relays", []), "found": p.get("found", []),
                                    "t": b["created"]}
+            if self.explorer is not None:
+                self.explorer.observe_peer(self.map.grid, p.get("pose"))
 
     def _claimed_targets(self):
         """Fresh targets of higher-priority peers. Lower rank wins, so claims never oscillate."""
@@ -607,7 +672,7 @@ class Robot:
         watch = [(cx, cy) for cx, cy in cells if trav[cy, cx]]
         centers = [((cx + 0.5) * self.cell, (cy + 0.5) * self.cell) for cx, cy in cells]
         pts = [list(self.entry)] + [list(p) for p in planning.simplify(cells, self.cell)] + [list(goal)]
-        pts = [[round(px, 2), round(py, 2)] for px, py in pts]
+        pts = fit_route(pts)
         length = math.dist(self.entry, centers[0]) + planning.path_length(centers) + math.dist(centers[-1], goal)
         return watch, pts, round(length, 1), planning.INFLATE_CELLS * self.cell
 
@@ -707,6 +772,10 @@ class Robot:
                 return
         else:
             self.over_since = None
+        if self.explorer is not None and self.cmd_v <= 0.2:
+            # Camera sweeps and alignment intentionally stop translation. Only
+            # sustained commanded travel belongs in the no-progress window.
+            self.stuck_ref = (x, y, self.t)
         rx, ry, rt = self.stuck_ref
         if self.t - rt > 3.0:
             moved = math.dist((x, y), (rx, ry))
@@ -983,6 +1052,18 @@ class Robot:
         return trav
 
     def _plan_frontier(self):
+        if self.explorer is not None:
+            result = self.explorer.plan(self.map.grid, self._drive_trav(), self.pose, self.t, self.path,
+                                        self._active_zone(), self._claimed_targets())
+            self.last_plan_t = self.t
+            if result is None:
+                return False
+            old = self.target
+            self.path, self.goal_cell = result
+            self.target = [(v + .5) * self.cell for v in self.goal_cell]
+            if old is None or math.dist(old, self.target) > PEER_TARGET_RADIUS:
+                self.last_telemetry_t = -99.0
+            return True
         trav = self._drive_trav()
         start = self._cell(*self.pose[:2])
         clusters, _, start = planning.frontier_clusters(self.map.grid, trav, start, self.blacklist)
@@ -1081,6 +1162,27 @@ class Robot:
     # ------------------------------------------------------------------ motion
     def _follow(self):
         x, y, th = self.pose
+        if self.explorer is not None and self.state in ("EXPLORING", "LOST_LINK_EXPLORING"):
+            if self.explorer.scan_left > .05 and self.t < self.explorer.scan_deadline:
+                return 0.0, 1.8
+            trav = self._trav()
+            while self.path and math.dist(self.path[0], (x, y)) < .35:
+                if (len(self.path) > 1 and math.dist(self.path[0], (x, y)) > .1
+                        and not line_clear(trav, (x, y), self.path[1], self.cell)):
+                    break
+                self.path.pop(0)
+            # A visible shortcut advances the path permanently. Merely aiming at
+            # path[1] near a distance threshold makes the target flip back and
+            # forth around a bend as the robot crosses that threshold.
+            while (len(self.path) > 1 and math.dist(self.path[0], (x, y)) < 1.0
+                   and line_clear(trav, (x, y), self.path[1], self.cell)):
+                self.path.pop(0)
+            if not self.path:
+                return 0.0, 0.0
+            tx, ty = self.path[0]
+            err = wrap_angle(math.atan2(ty - y, tx - x) - th)
+            v = 0.0 if abs(err) > 1 else V_MAX * math.cos(err)**2
+            return v, max(-2.0, min(2.0, 2.5 * err))
         while self.path and math.dist(self.path[0], (x, y)) < 0.35:
             self.path.pop(0)
         if not self.path:

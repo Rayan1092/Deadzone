@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "url": "http://127.0.0.1:8021",
+  "built_pages_and_assets": true,
+  "lab_image_urls_served": 46,
+  "examples": 24,
+  "example_split": "held-out FLIR validation, not training",
+  "training_curve_points": 0,
+  "curve_note": "Training curve pending: logged retrain not run yet.",
+  "visual_gpu_acceptance": "not tested here"
+}

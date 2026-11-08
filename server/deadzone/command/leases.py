@@ -29,10 +29,6 @@ class PresenterRelease(RobotRef):
     presenter_token: str = Field(min_length=1, max_length=256, strict=True)
 
 
-class VoiceRequest(RobotRef):
-    text: str = Field(min_length=1, max_length=1000, strict=True)
-
-
 class LeaseTable:
     """Mutate only on the Hub event loop, with no await between auth and enqueue."""
 

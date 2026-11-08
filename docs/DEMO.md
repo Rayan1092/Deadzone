@@ -39,10 +39,18 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    $env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=2
    py -m uvicorn deadzone.app:app --host 0.0.0.0 --port 8000
    ```
-4. The server log must say `survivor detector: trained model, threshold 0.60`. If it says `sim sensor fallback (...)`, fix torch before going on stage. The top-bar chip (coming from Yusuf) will show the same thing.
-5. Open `http://localhost:8000` on the big screen. Phones join with **Q** (QR) on the same Wi-Fi, or on the phone hotspot.
+4. The server log must say `survivor detector: trained model, threshold 0.60`. If it says `sim sensor fallback (...)`, fix torch before going on stage. The top-bar detector chip shows the same thing.
+   Optional features are off unless their flag is set before starting the server (only turn on what passed a dry run):
+   ```powershell
+   $env:DZ_AFTERSHOCK=1   # key A
+   $env:DZ_AI_LAB=1       # key L (serves ml/results and docs/assets read-only)
+   $env:DZ_GEMINI=1       # G briefing and phone Ask through Gemini (needs GEMINI_API_KEY in server/.env); without it they use the local summary
+   # $env:DZ_VOICE=1      # voice commands: NOT ready. Robot side is on main; /api/voice is still a placeholder (501) and the push-to-talk UI isn't on main
+   ```
+   **Don't set `DZ_VOICE` or `DZ_CONTROL_LEASES` for the main run:** with control leases on, **B** and **U** from the big screen need robot leases it doesn't hold, so they fail with a toast. R, F, O and A are not affected.
+5. Open `http://localhost:8000` on the big screen. Phones join with **Q** (QR) on the same Wi-Fi, or on the phone hotspot. Phone microphones need https: use Aziz's tunnel (`scripts/demo_tunnel.py`, see its docs) if voice or the mic is part of the run.
 6. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
-7. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped recording, and keep the file next to the backup video.
+7. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped recording, and keep the file on the demo laptop.
 8. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
 
 ## Director keys (big screen)
@@ -55,14 +63,19 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | 1–3 / 0 | follow robot 1–3 (or click its card) / back to overview. Command follows the robot's last *reported* pose | live |
 | R | drop rubble 1.5 m ahead of the **followed** robot (R1 if none) | live |
 | F | wheel overcurrent on the **followed** robot (R1 if none) | live |
-| G | briefing panel, "Local summary · Command data only" | live |
+| G | briefing panel, read aloud (Voice on/off toggle). "Gemini" with `DZ_GEMINI=1` and a key, else "Local summary · Command data only" | live (Gemini: keyed dry run pending) |
 | Q / Esc | QR join overlay on / off (Esc also closes the briefing) | live |
 | T | faint truth survivors and decoys on Reality only | live |
-| V | robot's-eye camera of the followed robot (with a Thermal toggle) | live |
+| V | robot's-eye camera of the followed robot (with a Thermal toggle). It also opens by itself on a detection, with the AI box and the robot's steps | live |
 | P | performance mode (no shadows, fewer lidar rays); press it if the big screen stutters | live |
 | S | save the recording (only when the page was opened with `?record`) | live |
 | O | perception overload on the **followed** robot: deadline misses for 3 s | live |
 | U | resume the followed robot from SAFE_STOP (also the "Send resume command" button on its card). Travels over the radio, so it needs a route to CMD | live |
+| B | baseline toggle: every robot switches to "without Deadzone" (stops when its link drops, no relays) and back. Red "Baseline" chip while on. Q&A only, never during the beat sheet | live |
+| A | aftershock: part of the building collapses where the first powered relay is, that relay is destroyed, the network reroutes and robots replan (and reroute rescue routes they see blocked) | needs `DZ_AFTERSHOCK=1`; Q&A only |
+| L | AI Lab overlay: training examples, training curve, confusion matrix, held-out metrics, and the crop a robot just judged with its Grad-CAM | needs `DZ_AI_LAB=1` |
+| K | night operations lighting (headlights, flood light, strobes) | live, off by default; dry run first |
+| D | auto-director camera (cuts to dark robots, finds, the reveal, aftershocks). Any drag, wheel or 0–9 hands the camera back for 20 s | live, off by default; good for a hands-free video |
 
 REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/fault -ContentType application/json -Body '{"type":"overcurrent","robot":"R3"}'`, G `Invoke-RestMethod http://127.0.0.1:8000/api/report`.
 
@@ -91,7 +104,7 @@ Space is pressed at **0:40**. Times after it come from a headless seed-7 run wit
 | 2:43 | +2:03 (246.0) | **S2** found by R2 while linked, with its route (bonus, only if R/F/O landed on time) | | |
 | 2:45 | | | Rayan | "The robots are autonomous, and AI detects survivors. Collapsed buildings, mines, wildfires, tunnels." |
 
-Rescue routes draw on Reality as soon as a robot computes them (yellow dashed line, beacon ring). On Command and phones they appear only once Aziz adds delivered `command.routes`; Yusuf's drawing is ready. Until then, point at the Reality route during the survivor burst.
+Rescue routes draw on Reality as soon as a robot computes them (yellow dashed line, beacon ring), and on Command and phones only when the route bundle is delivered. A rerouted route replaces the old one with a short flash (2:08).
 
 R, F, O and U hit the **followed** robot, so check the follow key first.
 
@@ -130,10 +143,21 @@ The safety check needs the command post to have heard each robot once. Startup a
 | Log says `sim sensor fallback` | Stop. Install CPU torch (pre-flight step 2) and restart the server. Without it there's no AI story (the sensor then emits no decoys, so no false survivors, but no rejection cards either). |
 | Server crashed | Restart it (pre-flight step 3). The browser reconnects by itself. Then reset and dispatch P-2 again. |
 | Phones can't reach the laptop | Move every device to the phone hotspot, or use `cloudflared`. The demo also runs without phones (plan fallback above). |
-| Nothing works | Replay the recording: open `/?replay` and drop the file in (Space pauses, Backspace restarts). It needs no sim, but the detection card images only load if the server is running. Last resort: the backup video. |
+| Nothing works | Replay the recording: open `/?replay` and drop the file in (Space pauses, Backspace restarts). It needs no sim, but the detection card images only load if the server is running. |
+
+## Q&A extras (after the close, only what passed a dry run)
+
+| Ask | Show | How |
+|---|---|---|
+| "Does it actually help?" | **B**: robots stop where the signal dies and drop no relays; press **B** again to switch back | Then the benchmark slide (`docs/assets/benchmark.png`): 60/60 vs 39/60 survivors reported and 90% vs 70% mapped, **in simulation** (radio numbers are chosen, not measured; say so) |
+| "What if the building shifts again?" | **A** (with `DZ_AFTERSHOCK=1`): collapse, relay crushed, links reroute, robots replan and resend rescue routes they see blocked | Best after the reveal; it changes everything after it |
+| "How was the AI trained?" | **L** (with `DZ_AI_LAB=1`): real FLIR examples, curve, confusion matrix, Grad-CAM "where the AI looked" | The training curve shows once the logged retrain has run on the testing laptop |
+| "Can you do a different building?" | A generated building (`py data/floorplans/generate.py --seed <judge's number> --png out.png`) | Preview image and a headless run today; loading it on the big screen needs Aziz's loader (asked in rayan.md) |
+| "Can I talk to a robot?" | Voice command | Not yet: the robot side is on main; Aziz's voice endpoint and Yusuf's push-to-talk UI are not |
 
 ## Judge questions (one answer each)
 
 - **"Is the AI driving the robot?"** No. Exploration, A\*, relay drops, the scheduler and fault protection are our own algorithms. The trained model only decides whether a hot spot is a person: 96% accuracy on held-out FLIR images (confusion matrix in tab 2).
 - **"How do you know the Command view isn't cheating?"** It only changes when a bundle physically arrives at the command post node. A test fails if it ever knows a survivor or map cell before that bundle was delivered. Robot code only sees the world through its sensors (`io`).
 - **"How would this run on real robots?"** The robot module only talks to `io` (lidar, thermal, odometry, drive, radio). Swap the sim behind `io` for ROS 2 drivers and the same code runs.
+- **"Did you compare against robots without this?"** Yes, in simulation: same robots, but they stop when the link drops. Over 20 random survivor layouts, Deadzone got 60 of 60 survivors to Command and the baseline 39 of 60. The radio model's numbers are chosen, not measured, so it's evidence the idea works in our model, not a field result.

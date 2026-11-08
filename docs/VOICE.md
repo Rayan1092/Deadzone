@@ -8,6 +8,7 @@ Enable `DZ_VOICE=1` only for a dry run. It implies the exclusive lease checks in
 
 Every command request sends `X-Controller-Token` from the private controller hello.
 Keep the phone heartbeat running every five wall seconds while recording/waiting.
+Hello includes `voice:{enabled:boolean}` for the UI toggle; this reveals no keys.
 The selected robot comes from the request, never the model. The backend checks the
 same live lease grant again after asynchronous work and immediately before enqueue;
 expiry, release/reclaim or reset during processing rejects the stale operation.
@@ -44,18 +45,23 @@ robot acknowledgement. Travel uses the existing SafetyChecker over public prior,
 delivered map/battery/relays and current plan no-go restrictions. Lost-link policy
 comes from the robot's delivered dispatched-plan assignment. Hold/resume add no
 travel, and the robot still decides fault/safe-stop/route feasibility on receipt.
+UI may read a safety refusal's `say` as labelled Command/browser speech immediately;
+it must not play it as a robot acknowledgement or wait for an ack that was never queued.
 
 `request_id` makes retries idempotent per live controller connection for five
 minutes (bounded 256 entries); reuse with different input is 409, in-progress retry
 409, capacity/concurrent command processing 429. Omit it only for a new operation.
 Reset invalidates pending work and the cache. No enqueue or robot mutation happens
 on provider error, unsupported/ambiguous intent, stale lease or failed safety.
+An HTTP client timeout is an unknown outcome, not a refusal: retry the same
+request_id and do not invent a new ID or claim no command was sent.
 
 ## Delivered acknowledgement, then speech
 
 Rayan's priority-1 `command` / `command_ack` payload is unchanged. Backend assigns
 unique cmd_id and enqueues at CMD; dark robots answer late over normal custody.
-`command_ack` gets explicit priority 1 in PRIO. CommandPost validates source/shape,
+`command_ack` gets explicit priority 1 in PRIO and its serialized payload size
+(plus the normal 64-byte allowance) is charged to link bandwidth. CommandPost validates source/shape,
 keeps the latest ack per cmd_id (max 256), ignores duplicates/older states and emits
 `command_ack_reported {...ack,reported_t,delay_s:now-t}` **on delivery only**.
 Phones and screens receive that event; delivered `command_acks` in Command views
@@ -68,7 +74,8 @@ current Command epoch; no arbitrary text or voice ID accepted. Returns
 or `{source:"browser",robot,cmd_id,status,t,text}` for labelled browser speech when
 the key/voice is missing, provider times out or synthesis fails. Unknown/undelivered
 ack is 404, reset during synthesis 409. This is read-only and needs no robot lease.
-Short server cache is bounded; subtitles always use returned text/status.
+Server cache holds at most 32 delivered ack versions per reset epoch; subtitles
+always use returned text/status.
 
 Config: ignored `server/.env` / process-only `ELEVENLABS_API_KEY`,
 `ELEVENLABS_VOICE_R1`, `_R2`, `_R3` (distinct server-selected voice IDs). Default
@@ -83,3 +90,8 @@ Provider interfaces checked against official [ElevenLabs STT](https://elevenlabs
 Yusuf owns push-to-talk, transcript/parsed command card, pending/locked state,
 labelled fallbacks and playback. Full keyed pipeline/two-phone UI dry run remains
 required before enabling on stage.
+
+Tunnel launcher opt-in (contract before code): `--voice` sets DZ_VOICE=1 for a
+keyed dry run; `--gemini` independently enables G/Ask. Defaults keep both off.
+Only Rayan/testing laptop supplies the ignored keys and reports real provider
+sources; no agent key insertion or keyed provider call is part of this validation.
