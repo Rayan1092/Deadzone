@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** UI pass (with Rayan's Version 2 plan). `p3/realism`: Step 3 plus a high-fidelity 3D world pass (full-height walls, furnished rooms, debris, rover model, truck, AO). Next: Step 4 collapsed scheduler, Step 5 auto-director.
+- **Working on:** `p3/aftershock`: key A for Aziz's aftershock director (done, not pushed). 3D world #51 merged. Next: Step 4 collapsed scheduler, Step 5 auto-director.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,19 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 03:05 · p3/aftershock · Key A: aftershock on the big screen
+- **Did:** wired Aziz's ask from `docs/AFTERSHOCK.md`.
+  - **A** sends `{do:"aftershock"}` and the server picks the spot: the first powered relay, which gets crushed, otherwise the corridor.
+  - The headline and the feed show "Aftershock: ceiling collapsed, relay RL2 crushed" and "Relay RL2 destroyed, N bundles lost". The crushed relay is drawn knocked flat with a snapped antenna and the label "RL2 destroyed".
+  - Reality panes shake for 1.4 s and a dust cloud billows out of the collapse.
+  - Without `DZ_AFTERSHOCK=1` the server's 409 shows as a toast: "Aftershock is off: start the server with DZ_AFTERSHOCK=1". Any refused director control now shows its message instead of failing silently.
+  - Honesty fix: rubble that falls during the run (R key, aftershock) is drawn only on Reality panes. The Command pane keeps the static rubble and learns about new rubble through delivered maps.
+  - A destroyed relay no longer also logs "switched off".
+  - Tested live with `DZ_AFTERSHOCK=1` at 4x. The first A crushed RL2 and R2 went dark. A second A crushed RL3 in the warehouse and all three robots lost their link. Command showed no new rubble.
+- **Contract changes:** none. New key A. The screen now reads the `error` envelope as a toast.
+- **Heads-up for others:** Aziz: wired as you specified (Reality-only walls and rubble, phones untouched). Rayan: A is a strong demo beat if the dry run passes. Without the env flag it only shows the toast.
+- **Next:** Step 4 collapsed scheduler strip, Step 5 auto-director camera.
 
 ### 2026-11-08 02:10 · p3/realism · High-fidelity 3D world
 - **Did:** rebuilt the 3D world on Yusuf's ask ("real 3D walls and objects"):

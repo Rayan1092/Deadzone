@@ -12,7 +12,7 @@ const OFF = '#4b5563'
 // Reality knows power state and queue; Command only knows an announced position.
 // Calm by default: the halo only pulses while the relay is carrying bundles, and only
 // relay phones (the audience's own devices) or switched-off relays get a label.
-function RelayNode({ pos, label, on = true, phone = false, known = true, busy = false }) {
+function RelayNode({ pos, label, on = true, phone = false, known = true, busy = false, destroyed = false }) {
   const halo = useRef()
   const phase = useRef(Math.random())
   useFrame(({ clock }) => {
@@ -23,6 +23,26 @@ function RelayNode({ pos, label, on = true, phone = false, known = true, busy = 
   })
   const lamp = !known ? '#6b7280' : on ? COLORS.teal : OFF
   const top = phone ? 0.5 : 0.62
+  if (destroyed) {
+    // crushed by the aftershock: knocked flat, antenna snapped, no lamp
+    return (
+      <group position={w2t(pos[0], pos[1], 0)}>
+        <mesh position={[0.05, 0.12, 0]} rotation={[0.2, 0.4, Math.PI / 2 - 0.15]}>
+          <cylinderGeometry args={[0.18, 0.22, 0.14, 16]} />
+          <meshStandardMaterial color="#4a3a22" roughness={0.9} />
+        </mesh>
+        <mesh position={[0.3, 0.03, 0.1]} rotation={[0, 0.7, Math.PI / 2]}>
+          <cylinderGeometry args={[0.015, 0.015, 0.3, 6]} />
+          <meshStandardMaterial color="#374151" />
+        </mesh>
+        {label && (
+          <Html position={[0, 0.7, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
+            <div className="tag relay off"><b>{label}</b></div>
+          </Html>
+        )}
+      </group>
+    )
+  }
   return (
     <group position={w2t(pos[0], pos[1], 0)}>
       {phone ? (
@@ -64,8 +84,8 @@ function RelayNode({ pos, label, on = true, phone = false, known = true, busy = 
 export function RealityRelays() {
   const relays = useSim((s) => s.tick?.reality.relays) ?? NONE
   return relays.map((r) => (
-    <RelayNode key={r.id} pos={r.pos} on={r.on} phone={r.phone} busy={r.queue > 0}
-               label={r.phone ? `${r.id} phone${r.on ? '' : ' · off'}` : r.on ? null : `${r.id} off`} />
+    <RelayNode key={r.id} pos={r.pos} on={r.on} phone={r.phone} busy={r.queue > 0} destroyed={r.destroyed}
+               label={r.destroyed ? `${r.id} destroyed` : r.phone ? `${r.id} phone${r.on ? '' : ' · off'}` : r.on ? null : `${r.id} off`} />
   ))
 }
 

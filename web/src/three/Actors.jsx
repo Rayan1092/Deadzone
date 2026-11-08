@@ -308,6 +308,57 @@ function TruthMarker({ pos, id, sub = 'not found yet', color = COLORS.red, decoy
   )
 }
 
+// --------------------------------------------------------------- aftershock
+// The world shakes for a moment when an aftershock hits (Reality panes only: it is truth),
+// and a dust cloud billows out of the collapse and settles.
+const SHAKE_S = 1.4
+const DUST_S = 6
+export function Shake({ children }) {
+  const ref = useRef()
+  useFrame(() => {
+    const g = ref.current
+    const a = useSim.getState().aftershock
+    if (!g) return
+    const age = a ? (performance.now() - a.born) / 1000 : Infinity
+    if (age > SHAKE_S) { if (g.position.lengthSq()) g.position.set(0, 0, 0); return }
+    const k = 0.22 * (1 - age / SHAKE_S) ** 2
+    const t = age * 40
+    g.position.set(Math.sin(t * 1.3) * k, Math.abs(Math.sin(t * 0.9)) * k * 0.4, Math.cos(t * 1.7) * k)
+  })
+  return <group ref={ref}>{children}</group>
+}
+
+function AftershockDust() {
+  const a = useSim((s) => s.aftershock)
+  const group = useRef()
+  const puffs = useMemo(() => Array.from({ length: 16 }, (_, i) => ({
+    ang: (i / 16) * Math.PI * 2 + (i % 3) * 0.4, dist: 0.6 + (i % 4) * 0.5, h: 0.4 + (i % 5) * 0.35, s: 1.6 + (i % 3) * 0.8,
+  })), [])
+  useFrame(() => {
+    if (!group.current || !a) return
+    const age = (performance.now() - a.born) / 1000
+    group.current.visible = age < DUST_S
+    const k = Math.min(1, age / 1.2)
+    group.current.children.forEach((sp, i) => {
+      const p = puffs[i]
+      const r = p.dist * (0.4 + k * 1.6)
+      sp.position.set(Math.cos(p.ang) * r, p.h * (0.5 + k), Math.sin(p.ang) * r)
+      sp.scale.setScalar(p.s * (0.5 + k))
+      sp.material.opacity = 0.55 * (1 - age / DUST_S)
+    })
+  })
+  if (!a) return null
+  return (
+    <group ref={group} position={w2t(a.at[0], a.at[1], 0)}>
+      {puffs.map((p, i) => (
+        <sprite key={i}>
+          <spriteMaterial map={materials().puff} color="#a89b88" transparent opacity={0} depthWrite={false} />
+        </sprite>
+      ))}
+    </group>
+  )
+}
+
 // --------------------------------------------------------------- views
 // survivors_found has one record per robot that saw a survivor; keep the earliest.
 function firstFinds(records) {
@@ -347,6 +398,7 @@ export function RealityActors({ gap = false }) {
           )}
         </group>
       ))}
+      <AftershockDust />
       <RealityLinks />
       <RealityRelays />
       <RealityRoutes gap={gap} />

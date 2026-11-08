@@ -4,7 +4,7 @@ import { create } from 'zustand'
 // fire too often and stay in the sidebar feed or the timeline.
 const TOAST_KINDS = new Set(['survivor_found', 'survivor_reported', 'link_lost', 'link_restored',
   'relay_dropped', 'fault', 'rubble_fall', 'safety_reject', 'plan_dispatched', 'plan_applied', 'resumed',
-  'rescue_route', 'rescue_route_reported'])
+  'rescue_route', 'rescue_route_reported', 'aftershock', 'relay_destroyed'])
 const COLLAPSE_KINDS = new Set(['replan', 'deadline_miss'])
 // Deliveries worth an antenna pulse; telemetry and map patches arrive several times a second.
 const BIG_DELIVERIES = new Set(['survivor', 'rescue_route', 'fault'])
@@ -57,6 +57,7 @@ export const useSim = create((set) => ({
   follow: null,        // robot id the cameras follow (keys 1-3), null = overview
   eyeRobot: null,      // robot whose forward camera is open (V key / card button)
   eyeThermal: false,   // thermal palette in the robot's-eye view
+  aftershock: null,    // { at, born } of the latest aftershock, for the shake and dust
   report: null,        // briefing from /api/report: { text, generated_at, source } | { loading } | { error }
   detector: null,      // { mode: 'model' | 'sim', reason } from hello, null until the server sends it
   detections: [],      // AI detection cards: { eid, side: 'reality' | 'command', verdict, crop, conf, ... }
@@ -104,7 +105,7 @@ export function handleMessage(msg) {
       s.set({ floorplan: data.floorplan, grid: data.grid, robotsMeta: data.robots,
               running: data.running, speed: data.speed, time,
               detector: data.detector ? { mode: data.detector, reason: data.detector_reason } : null,
-              ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [], detections: [], routes: {} } : {}) })
+              ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [], detections: [], routes: {}, aftershock: null } : {}) })
       break
     }
     case 'tick': {
@@ -112,7 +113,8 @@ export function handleMessage(msg) {
       // so "turn your phone relay off" shows up on the big screen.
       const was = Object.fromEntries((s.tick?.reality.relays ?? []).map((r) => [r.id, r.on]))
       const flips = data.reality.relays
-        .filter((r) => r.id in was && was[r.id] !== r.on)
+        // a relay crushed by an aftershock has its own event; don't also call it "switched off"
+        .filter((r) => r.id in was && was[r.id] !== r.on && !r.destroyed)
         .map((r) => ({ kind: 'relay_power', id: r.id, on: r.on, phone: r.phone, owner: r.owner, time, eid: ++eventId, at: Date.now() }))
       s.set({ tick: data, time, ...(flips.length ? {
         events: [...flips, ...s.events].slice(0, 40), toasts: [...s.toasts, ...flips].slice(-5) } : {}) })
@@ -142,6 +144,8 @@ export function handleMessage(msg) {
         top.reason === ev.reason && top.task === ev.task
       const events = fold ? [{ ...ev, count: (top.count ?? 1) + 1 }, ...s.events.slice(1)] : [ev, ...s.events]
       if (ev.kind === 'plan_dispatched') s.set({ dispatchedPlans: [...s.dispatchedPlans, ev.plan_id] })
+      // the 3D view shakes and throws up a dust cloud where the ceiling came down (Reality only)
+      if (ev.kind === 'aftershock') s.set({ aftershock: { at: ev.at, born: performance.now() } })
       // the robot's own route (Reality knowledge); Command draws only delivered command.routes
       if (ev.kind === 'rescue_route') s.set({ routes: { ...s.routes, [ev.survivor]: ev } })
       const card = detectionCard(ev, repeat, s.tick)
@@ -160,6 +164,12 @@ export function handleMessage(msg) {
     case 'control':
       s.set({ running: data.running, speed: data.speed })
       break
+    case 'error': {
+      // a director key the server refused (e.g. aftershock without DZ_AFTERSHOCK=1)
+      const ev = { kind: 'control_error', code: data.code, msg: data.msg, time: s.time, eid: ++eventId, at: Date.now() }
+      s.set({ toasts: [...s.toasts, ev].slice(-8) })
+      break
+    }
     default:
       break
   }

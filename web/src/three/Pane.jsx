@@ -6,7 +6,7 @@ import { ToneMappingMode } from 'postprocessing'
 import * as THREE from 'three'
 import Building from './Building'
 import Fog from './Fog'
-import { RealityActors, CommandActors } from './Actors'
+import { RealityActors, CommandActors, Shake } from './Actors'
 import { AntennaPulse } from './Network'
 import PlanZones from './PlanZones'
 import { COLORS } from './util'
@@ -185,11 +185,23 @@ export default function Pane({ which, title, subtitle }) {
         <fog attach="fog" args={[COLORS.bg, 80, 160]} />
         <Lights perf={perf} />
         <StaticShadows />
-        <Building props={which !== 'command'} />
-        <Fog which={which} />
-        <AntennaPulse />
-        <PlanZones />
-        {which === 'command' ? <CommandActors /> : <RealityActors gap={which === 'gap'} />}
+        {which === 'command' ? (
+          <>
+            <Building props={false} />
+            <Fog which={which} />
+            <AntennaPulse />
+            <PlanZones />
+            <CommandActors />
+          </>
+        ) : (
+          <Shake>
+            <Building />
+            <Fog which={which} />
+            <AntennaPulse />
+            <PlanZones />
+            <RealityActors gap={which === 'gap'} />
+          </Shake>
+        )}
         <SyncedControls id={which} />
         {!perf && (
           // contact shadows where walls, props and debris meet the floor; then only
