@@ -3,22 +3,22 @@
 Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on the testing laptop edits this file. Rayan's robot session writes `history/rayan.md`.
 
 ## Now
-- **Working on:** `rayan/detector`: PR open, waiting for Rayan's OK to merge.
-- **Works on main:** nothing from this session yet.
-- **In flight (not merged):** `rayan/detector`:
-  - Trained thermal survivor detector, MobileNetV3-Small, `ml/models/detector.pt` (6 MB).
-  - Held-out FLIR val (n=1200), threshold 0.6: acc 0.962, prec 0.963, rec 0.960, F1 0.962.
-  - `perception.filter_hits()` hook with sim fallback.
-  - 6 runtime crops in `ml/crops/runtime/`.
-- **Blocked on / need from others:**
-  - Rayan's robot session: the 2-line `robot.py` hookup (see Heads-up below).
-  - Aziz: decoys in the floorplan and `sim.py`, but only after that hookup lands.
+- **Working on:** `rayan/retrain-logged`: PR open, waiting for Rayan's OK (the logged retrain was PROMOTED, on a tie).
+- **Works on main:** trained survivor detector + `perception.filter_hits()` with sim fallback (PR #14), runtime crops, robot hookup and decoys (PR #17), Grad-CAM heatmaps (PR #49), AI Lab export (PR #68).
+- **In flight (not merged):** `rayan/retrain-logged`: retrained `ml/models/detector.pt` (same held-out accuracy 96.2%), `ml/results/train_history.json` (per-epoch curve), regenerated `lab.json`, lab crops, a heatmap and slide images.
+- **Blocked on / need from others:** nothing.
 - **Promises to others:**
   - `filter_hits(hits)` keeps the `io.thermal()` hit shape `{id,pos,crop,conf}`. Kept hits get `conf` = model P(person) and `detector:"model"`; rejected hits are dropped.
   - It falls back to passthrough (sim sensor) when `DETECTOR=sim` is set, when no model file exists, or when torch is missing.
   - Runtime crop names: `pos_0001..0003.png` are survivors, `neg_0001..0003.png` are decoys.
 
 ## Log
+
+### 2026-11-08 06:40 · rayan/retrain-logged · Logged retrain from the AI Lab entry (PROMOTED on a tie)
+- **Did:** ran the rayan.md AI Lab retrain exactly as written on main `4b210ab`. `train.py --epochs 5 --seed 0` on the RTX 3060: holdout acc 0.815, 0.918, 0.945, 0.965, 0.968 per epoch, logged to `ml/results/train_history.json`. `promote_if_better.py`: held-out FLIR val shipped 0.9617 vs candidate 0.9617, so it **PROMOTED** (the rule is equal or better, plus all 6 demo props right). Regenerated eval (metrics.json and confusion matrix unchanged: TN 578, FP 22, FN 24, TP 576), Grad-CAM (only `neg_0002` heatmap changed), slide assets, and `lab.json` (24/24 examples right, 5 curve points). Runtime scores: pos 1.000 / 0.889 / 0.999, neg 0.000 / 0.000 / 0.003. Tests: demo guard + gradcam + ai_lab 23 passed; full suite 341 passed, 1 skipped. `detector_logged.pt` and `detector_prev.pt` are not committed.
+- **Contract changes:** none (`lab.json` keeps Rayan's format; `curve` is now filled).
+- **Heads-up for others:** Yusuf: the key L training curve now has 5 points. `pos_0002` (S2) now scores 0.889 instead of near 1.0; still above 0.6.
+- **Next:** test-station refresh and DEMO.md dry run.
 
 ### 2026-11-07 17:05 · rayan/detector · Trained survivor detector + perception hook (covers ba654b6)
 - **Did:**
