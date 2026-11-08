@@ -339,6 +339,18 @@ button:hover { border-color: var(--teal); }
 .sig i:nth-child(3) { height: 11px; } .sig i:nth-child(4) { height: 14px; }
 .sig i.on { background: var(--teal); }
 .sig.none { font-size: 11px; color: var(--red); align-items: center; }
+/* robot cards: a stripe in the robot's own colour (same as its 3D body), link quality in dBm and words */
+.robot-card { border-left: 4px solid var(--c); padding-left: 9px; }
+.robot-card .row > .swatch, .robot-card .row > .cam-btn { flex-shrink: 0; }
+.robot-card .state { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.robot-card .state-text { min-width: 0; }
+.link-q { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.link-q .link-word { font-size: 11px; font-variant-numeric: tabular-nums; }
+.link-q.strong .link-word { color: #86efac; }
+.link-q.weak .link-word { color: #fcd34d; }
+.link-q.weak .sig i.on { background: #fbbf24; }
+.link-q.lost .link-word { color: var(--red); font-weight: 600; }
+.last-contact { font-size: 11px; color: #fca5a5; margin: -2px 0 6px; }
 .robot-card .bar { margin-bottom: 0; }
 .robot-detail { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .robot-detail .row { display: flex; justify-content: space-between; gap: 8px; }

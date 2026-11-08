@@ -14,6 +14,13 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Log
 
+### 2026-11-08 PT - p2/phone-frames - Integrate scripted-collapse and solid-prop main before F PR
+- **Did:** pre-PR fetch merged main 3236195 (#149 ML robot cards, #150 Rayan smart/scripted rubble, #151 Yusuf solid props). Resolved only RobotEye's adjacent import conflict by retaining decoyLayout and F's uploader. No teammate behavior rewritten; F's PR diff remains limited to its 15 feature/docs/test files.
+- **Contract changes:** F unchanged. Rayan's rubble_fall cause/robot and rubble control smart result are his upstream contract; current DEMO/guard now require DZ_SMART_RUBBLE=1 and script the secondary collapse at 162.5 s. Preserve those flags/guard as merged. Preflight derives them from DEMO automatically.
+- **Validation:** combined backend/frontend checks in progress; pre-integration backend 645 passed / 1 skipped, frontend 53/build green. Live visual limitation remains documented.
+- **Heads-up for others:** all new solid-prop and scripted-collapse source is from main, not an added F task. No protected-source edits by Aziz.
+- **Next:** combined full suite/build, immediate latest-main merge, publish/merge F, then G.
+
 ### 2026-11-08 PT - p2/phone-frames - F: Command-gated screen JPEGs on the phone, default off
 - **Did:** synced main a3037b7 first and isolated F from the held G work. Added bounded JPEG admission/cache, existing scout-canvas capture at <=3 fps, and phone JPEG display/frozen cache on the existing NO SIGNAL overlay. Uses delivered Command report age <=3 s (same phone contact rule), never the truth link graph; no new JPEG while dark, no old-incident upload after reset. Paused uploads publish to phones without ticking. No extra render contexts; closing/hiding the scout stops captures. Frontend changes are required by this explicitly requested end-to-end F path; teammate histories/protected source untouched.
 - **Contract changes:** DZ_PHONE_FRAMES=1 at Hub init/reset, default off. Screen/phone hello adds phone_frames:{epoch,max_width:320,max_height:180,max_fps:3}; POST /api/frames/{robot_id} accepts {epoch,t,jpeg}, bare base64 JPEG <=128 KiB and <=320x180, capture t in sim seconds. Fresh linked phone cmd_view robots[] gains phone_frame:{jpeg,mime,width,height,t,last_seen_s}. Dark publication omits it; phone preserves only its own previously received frame. Rate limit is per robot across uploaders, monotonic wall time; reset clears caches. PLAN.md documents shapes/errors/gates. Existing thermal camera fields unchanged; no JPEGs in screen ticks/maps, AI tools, bundles or persistent files. Pillow is now an explicit server dependency, lazily used only by upload validation.

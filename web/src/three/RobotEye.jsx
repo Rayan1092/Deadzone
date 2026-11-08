@@ -10,6 +10,7 @@ import { PersonFigure } from './Actors'
 import { ROBOT_SCALE } from './Rover'
 import RoverModel from './RoverModel'
 import { w2t } from './util'
+import { decoyLayout } from './furniture'
 import { captureJpeg, createFrameSender } from '../net/phoneFrames'
 
 function PhoneFrameUploader({ robotId }) {
@@ -111,7 +112,7 @@ function HotSpots({ thermal }) {
           ) : <PersonFigure id={s.id} />}
         </group>
       ))}
-      {(fp.decoys ?? []).map((d) => (
+      {decoyLayout(fp).map((d) => (
         <group key={d.id} position={w2t(d.pos[0], d.pos[1], 0)}>
           {thermal ? (
             <ThermalCrop name={d.thermal} fallback={(
@@ -201,7 +202,7 @@ function ClassifyBoxes({ robotId, thermal, boxes }) {
     if (!fp) return []
     const score = Object.fromEntries((m?.crops ?? []).map((c) => [c.file, c.conf]))
     const threshold = m?.threshold ?? 0.6
-    return [...(fp.survivors ?? []), ...(fp.decoys ?? [])].map((o) => ({
+    return [...(fp.survivors ?? []), ...decoyLayout(fp)].map((o) => ({ // decoys where their model is drawn
       ...o, conf: score[o.thermal], threshold, lying: !o.label,
       closeConf: o.thermal ? score[o.thermal.replace(/\.png$/, '_close.png')] : undefined,
     }))

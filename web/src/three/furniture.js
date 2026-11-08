@@ -4,9 +4,12 @@
 // bump into. No React or three here, so Node can run it.
 //
 // An item is { id, kind, x, y, rot, opts }: sim position, sim heading of the prop's local x
-// (props face local +z), and the component's own options. Large standing pieces are `solid`
-// and get a footprint; small and wall-mounted dressing (chairs, papers, boxes, pipes, signs)
-// stays visual only.
+// (props face local +z), and the component's own options. Everything standing on the floor that
+// a robot cannot drive through is `solid` and gets a footprint (desks, cabinets, shelves, pallets,
+// the forklift, counters, boilers, chairs, carton piles); flat and wall-mounted dressing (papers,
+// whiteboards, pipe runs 1.5 m up the wall, signs, extinguishers) stays visual only. Decoys (the
+// radiator, the engine, the coffee cart) are thermal targets: a footprint around one would block
+// the sim's line of sight to it, so they stay out until the sim looks past a target's own body.
 
 export const N = 0             // back to the north wall, facing south
 export const S = Math.PI       // back to the south wall
@@ -29,27 +32,73 @@ const SOLID = {
   fridge: () => ({ rect: [-0.35, 0.35, -0.34, 0.38], height: 1.8, material: 'metal' }),
   vending: () => ({ rect: [-0.45, 0.45, -0.4, 0.41], height: 1.85, material: 'metal' }),
   boiler: () => ({ rect: [-1.53, 2.03, -0.76, 0.76], height: 2.8, material: 'metal' }),
+  // a robot cannot drive through an office chair either: upright (seat and five-star base) or on its back
+  chair: ({ tipped = false }) => (tipped
+    ? { rect: [-0.42, 0.42, -0.16, 1.06], height: 0.52, material: 'metal' }
+    : { rect: [-0.31, 0.31, -0.31, 0.31], height: 0.95, material: 'metal' }),
+  // a pile of cartons (Boxes: up to 0.65 m wide, offsets ±0.2 / ±0.15, two per layer)
+  boxes: ({ n = 3 }) => ({ rect: [-0.56, 0.56, -0.46, 0.46], height: Math.round(0.36 * Math.ceil(n / 2) * 100) / 100, material: 'wood' }),
 }
 export const WOOD_LOSS_DB = 4   // added to a floor plan's materials when it gets wooden pieces
 
 export const isSolid = (kind) => kind in SOLID
+// An item is solid unless it is marked visual only (see MAIN_RUN_BASELINE below).
+const solidItem = (item) => isSolid(item.kind) && !item.opts?.visualOnly
 
 // Sim-space footprint polygon of an item (local x along `rot`, local +z = (sin, -cos)).
 export function footprint(item) {
+  return solidItem(item) ? bodyFootprint(item) : null
+}
+
+// The floor area a piece covers whether or not the sim treats it as solid (visual-only pieces
+// included), for checking that no robot path runs through what the screen draws.
+export function bodyFootprint(item) {
   const spec = SOLID[item.kind]?.(item.opts ?? {})
   if (!spec) return null
-  const [x0, x1, z0, z1] = spec.rect
+  return { ...rectPoly(item, spec.rect), height: spec.height, material: spec.material }
+}
+function rectPoly(item, [x0, x1, z0, z1]) {
   const c = Math.cos(item.rot ?? 0)
   const s = Math.sin(item.rot ?? 0)
   const at = (lx, lz) => [item.x + lx * c + lz * s, item.y + lx * s - lz * c]
-  return { poly: [at(x0, z0), at(x1, z0), at(x1, z1), at(x0, z1)], height: spec.height, material: spec.material }
+  return { poly: [at(x0, z0), at(x1, z0), at(x1, z1), at(x0, z1)] }
+}
+
+// ------------------------------------------------------------------ decoys
+// Decoys are thermal targets at fixed sim positions (their hot spot) and are never solid (a
+// footprint would block the sim's line of sight to them). The prop drawn for one must still not
+// stand on a path a robot drives in the main run, or the robot visibly drives through it: in
+// collapse_01, R1 crosses the engine's spot at sim 215-218 s (web/tests/fixtures/seed7-paths.json),
+// so its model stands beside that path, along it. The camera box and tags follow the model.
+export const DECOY_HALF = { radiator: [0.48, 0.12], engine: [0.8, 0.45], 'coffee machine': [0.4, 0.3] } // Props.jsx half extents (x, z)
+const MAIN_RUN_DECOY_MOVES = { D2: { at: [37, 12], x: 38.25, y: 12, rot: Math.PI / 2 } }
+export function decoyLayout(fp) {
+  const main = fp?.id === 'collapse_01'
+  return (fp?.decoys ?? []).map((d, i) => {
+    const mv = main ? MAIN_RUN_DECOY_MOVES[d.id] : null
+    const moved = Boolean(mv) && mv.at[0] === d.pos[0] && mv.at[1] === d.pos[1]
+    return { ...d, hotspot: d.pos, pos: moved ? [mv.x, mv.y] : d.pos, rot: moved ? mv.rot : 0.15 + i * 0.1 }
+  })
+}
+export function decoyFootprint(d) {
+  const [hx, hz] = DECOY_HALF[d.label] ?? [0.4, 0.4]
+  return rectPoly({ x: d.pos[0], y: d.pos[1], rot: d.rot }, [-hx, hx, -hz, hz]).poly
 }
 
 // ------------------------------------------------------------------ the demo building
 // collapse_01, placed by hand (each piece against its wall, robots' paths clear).
-function demoLayout() {
+// The main run (seed 7, DZ_OBSTACLES=1) and docs/DEMO.md's beats were measured with the demo
+// building's chairs and carton piles drive-through; making them solid moves every beat (the
+// demo guard: D1 57.9 to 72.1 s, S1 reported 118.5 to 160.2 s, S2 219.4 to 110.2 s). They stay
+// visual only here until Rayan re-baselines; set false, re-run the exporter and the guard.
+// Key-N variants (Q&A only) get them solid. Visual-only pieces stand where no robot drives in the
+// main run (web/tests/mainRunPaths.test.js checks every one against the recorded seed-7 paths).
+export const MAIN_RUN_BASELINE = true
+const LOOSE_IN_MAIN_RUN = new Set(['chair', 'boxes'])
+function demoLayout(mainRun) {
   const L = []
-  const add = (kind, x, y, rot = 0, opts = {}) => L.push({ kind, x, y, rot, opts })
+  const add = (kind, x, y, rot = 0, opts = {}) => L.push({ kind, x, y, rot,
+    opts: mainRun && MAIN_RUN_BASELINE && LOOSE_IN_MAIN_RUN.has(kind) ? { ...opts, visualOnly: true } : opts })
   // Office A
   add('desk', 2.2, 29.5, N); add('desk', 7.4, 29.5, N)
   add('chair', 2.4, 28.75, N); add('chair', 7.0, 28.5, N + 0.6, { tipped: true })
@@ -65,7 +114,7 @@ function demoLayout() {
   // Break room
   add('counter', 25.5, 29.55, N, { len: 3.6 }); add('fridge', 31.45, 29.45, N)
   add('vending', 20.58, 20.2, W)
-  add('chair', 23.4, 24.6, 1.2, { tipped: true })
+  add('chair', 20.5, 29.4, W, { tipped: true })   // in the corner: R2 crosses the middle of the room
   // Storage
   ;[3, 5.2, 9.6].forEach((y, i) => add('shelving', 0.42, y, W, { seed: 31 + i * 7 }))
   ;[3.4, 9.4].forEach((x, i) => add('shelving', x, 0.42, S, { seed: 61 + i * 7 }))
@@ -204,7 +253,7 @@ export function furnitureLayout(fp, { generic = false } = {}) {
   if (!fp) return []
   // key-N variants are the demo building with the people moved: same furniture, minus pieces on them
   const demo = !generic && /^collapse_01(_v\d+)?$/.test(fp.id ?? '')
-  const raw = demo ? demoLayout() : (fp.rooms ?? []).flatMap((room) => roomLayout(room, fp))
+  const raw = demo ? demoLayout(fp.id === 'collapse_01') : (fp.rooms ?? []).flatMap((room) => roomLayout(room, fp))
   const people = [...(fp.survivors ?? []), ...(fp.decoys ?? [])].map((p) => p.pos)
   const doors = fp.doors ?? []
   const [Wd, Hd] = fp.size ?? [Infinity, Infinity]
@@ -212,7 +261,7 @@ export function furnitureLayout(fp, { generic = false } = {}) {
   const out = []
   raw.forEach((item, i) => {
     const id = `F${i + 1}`
-    if (!isSolid(item.kind)) { out.push({ ...item, id, solid: false }); return }
+    if (!solidItem(item)) { out.push({ ...item, id, solid: false }); return }
     const f = footprint(item)
     const poly = f.poly.map(([x, y]) => [Math.min(Wd, Math.max(0, x)), Math.min(Hd, Math.max(0, y))])
     // an exported list is what the sim treats as solid: draw exactly that

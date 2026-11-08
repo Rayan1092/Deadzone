@@ -51,10 +51,10 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 4. Start the server **paused**. Leave `DZ_AUTOSTART` unset.
    ```powershell
    cd server
-   $env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=1.5; $env:DZ_OBSTACLES=1
+   $env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=1.5; $env:DZ_OBSTACLES=1; $env:DZ_SMART_RUBBLE=1
    python -m uvicorn deadzone.app:app --host 0.0.0.0 --port 8000
    ```
-   `DZ_OBSTACLES=1` is **required** for the main run (solid furniture; the demo guard runs with it on). Without it the beat sheet below is wrong: S1 is found at 129.0 s instead of 102.7 and the R key at 162.5 s hits nothing.
+   `DZ_OBSTACLES=1` and `DZ_SMART_RUBBLE=1` are **required** for the main run (the demo guard runs with both on). Without `DZ_OBSTACLES` the beat sheet below is wrong: S1 is found at 129.0 s instead of 102.7. Without `DZ_SMART_RUBBLE` there is no secondary collapse at 2:28 (sim 162.5), so no reroute beat.
 5. The server log must say `survivor detector: trained model, threshold 0.60`. If it says `sim sensor fallback (...)`, fix torch before going on stage. The top-bar detector chip shows the same thing.
    Optional features are off unless their flag is set before starting the server (only turn on what passed a dry run):
    ```powershell
@@ -65,6 +65,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    $env:DZ_SENSOR_VIEW=1  # safe: Aziz's Reality-only robot camera frames (#82) for Yusuf's renderer; the demo guard stays green with it on
    # DZ_EXPLORATION_V2    # must stay unset (0) for the main run: Aziz's opt-in exploration policy (#77) moves every beat below
    # DZ_OBSTACLES=1       # already set in step 4: required, every beat below depends on it (rayan.md 20:30)
+   # DZ_SMART_RUBBLE=1    # already set in step 4: required, the scripted collapse at sim 162.5 and the smart R key (rayan.md 22:10)
    ```
    **Don't set `DZ_VOICE`, `DZ_CONTROL_LEASES` or `DZ_EXPLORATION_V2` for the main run.** With control leases on, the top bar shows a **presenter lock**: **B** and **U** stay locked (with a hint) until you press **Unlock**, which takes every robot for the big screen (phones then see them locked; R, F, O and A are not affected). **Lock** releases the robots so phones can take them (Q&A). Unlock fails, naming the holder, while a phone holds a robot. Leases off: no lock, B and U as before. With `DZ_EXPLORATION_V2=1` the robots explore differently and every beat in the beat sheet moves (S3 found at 23.8 s instead of 14.4, S2 found at 106 s instead of 246). `DZ_SENSOR_VIEW=1` is safe: it only adds camera frames to the Reality pane.
 6. Open **`http://localhost:8000/?nointro`** on the big screen (`?nointro` keeps the first-visit explainer card from covering the scene; the **?** overlay can still show it). Phones join with **Q** (QR) on the same Wi-Fi, or on the phone hotspot. Phone microphones need https: use Aziz's tunnel (`scripts/demo_tunnel.py`, see its docs) if voice or the mic is part of the run.
@@ -80,7 +81,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | Backspace | reset to seed 7, paused | live |
 | `+` / `-` | sim speed ×2 / ÷2 | live |
 | 1–3 / 0 | follow robot 1–3 (or click its card) / back to overview. Command follows the robot's last *reported* pose | live |
-| R | drop rubble 1.5 m ahead of the **followed** robot (R1 if none) | live |
+| R | drop rubble on the **followed** robot's planned path 3–4 m ahead (R1 if none), at the nearest spot that walls nobody in (`DZ_SMART_RUBBLE=1`; without it, 1.5 m ahead). **Q&A only, never during the beat sheet:** the reroute beat is the scripted collapse at 2:28 | live |
 | F | wheel overcurrent on the **followed** robot (R1 if none) | live |
 | G | **Gemini briefing** from Command data only (`source: "gemini"`, about **6 s** to generate, then read aloud; Voice on/off toggle). Press it ~6 s before you want to talk over it | live with `DZ_GEMINI=1` (dry run passed) |
 | Q / Esc | QR join overlay on / off (Esc also closes the briefing) | live |
@@ -100,7 +101,7 @@ REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http:
 
 ## Beat sheet
 
-Space is pressed at **0:40**. Times after it come from the demo guard's headless seed-7 run (`server/tests/test_demo_guard.py`: P-1 rejected, fixed, dispatched; `DZ_OBSTACLES=1`; R / F / O at sim 162.5 / 177.5 / 187.5). Clock = 0:40 + sim seconds / 1.5. They are exact until the first director key is pressed. Re-check them at every rehearsal and update this table and the guard together if they drift.
+Space is pressed at **0:40**. Times after it come from the demo guard's headless seed-7 run (`server/tests/test_demo_guard.py`: P-1 rejected, fixed, dispatched; `DZ_OBSTACLES=1`, `DZ_SMART_RUBBLE=1`; the sim's scripted collapse at 162.5; F / O at sim 177.5 / 187.5). Clock = 0:40 + sim seconds / 1.5. They are exact until the first director key is pressed. Re-check them at every rehearsal and update this table and the guard together if they drift.
 
 | Clock | After Space (sim s) | On screen | Who | What to say |
 |---|---|---|---|---|
@@ -117,7 +118,7 @@ Space is pressed at **0:40**. Times after it come from the demo guard's headless
 | 1:59 | +1:19 (118.5) | R2 reconnects. Map, **S1 and its 49.7 m rescue route burst onto Command**, 16 s after detection | Rayan | "Store and forward: nothing lost, just late. Responders now have the way in." |
 | 2:02 | | Press **0**, then **G**: the Gemini briefing appears after about 6 s and is read aloud | Yusuf | While it generates: "Gemini writes this briefing only from what reached the antenna, never from the robots' own view." |
 | 2:26 | +1:46 (159) | Press **1**: follow R1, now in the corridor below the break room, on S1's rescue route | Rayan | |
-| 2:28 | +1:48.3 (162.5) | Press **R**: rubble falls ahead of R1 **on S1's rescue route**. R1 goes **REPLANNING** and drives around; R2, 4 m away, sees the rubble and reroutes S1 at once (sim 162.8): Command's S1 route **redraws around it, 52.1 m** (replaced, not doubled) | Rayan | "Rubble falls on the way in. Robot 1 sees it, stops and replans. Robot 2 saw it too and just sent responders a new route around it." |
+| 2:28 | +1:48.3 (162.5) | **Nothing to press.** A scripted **secondary collapse** drops rubble ahead of R1 **on S1's rescue route** (event `rubble_fall`, cause `collapse`). R1 goes **REPLANNING** and drives around; R2, 4 m away, sees the rubble and reroutes S1 at once (sim 162.8): Command's S1 route **redraws around it, 52.1 m** (replaced, not doubled) | Rayan | Narrate it: "A secondary collapse, right on the way in. Robot 1 sees it, stops and replans. Robot 2 saw it too and just sent responders a new route around it." |
 | 2:38 | +1:58.3 (177.5) | Press **3** then **F**: R3 gets an **OVERCURRENT** fault, backs up 0.5 m and replans | Rayan | "A wheel jams. Fault protection stops it, backs off and tries another way." |
 | 2:45 | +2:05 (187.5) | Press **1** then **O**: the scheduler strip shows **perception missing deadlines** (red) for 3 s, while **safety still runs at 0 and 50 ms** | Rayan | "Rate monotonic scheduling: when the AI overloads the CPU, perception misses deadlines, but the safety task always runs on time." |
 | 3:06 | +2:26.3 (219.4) | Press **0**. R2 finds **S2** while linked, with its 39.1 m route: all three survivors are on Command | Rayan | "Third survivor, this time with signal, so it's on Command instantly. Three for three." |
@@ -129,11 +130,11 @@ Rescue routes draw on Reality as soon as a robot computes them (yellow dashed li
 
 R, F, O and U hit the **followed** robot, so check the follow key first.
 
-**Press R, F and O on time** (2:28, 2:38, 2:45). They change what the robots do next. **R is the tight one:** the rubble must land on S1's route while R2 is close enough to see it, which happens between sim **162.5 and 163.1** (measured at every 0.1 s; watch the sim clock in the top bar and press at 162.5–162.7 for the instant reroute, 162.8–163.1 reroutes 2 s later). **Pressing early, at sim 162.2–162.4, seals the corridor and leaves R3 TRAPPED**, so when in doubt press late: from 163.2 on the press is harmless (R1 still replans) but the reroute beat is lost. Also never press R between sim 151 and 155, same trap. If this window proves too tight at the rehearsal, ask for a scheduled press (a director control with a sim time) or fall back to the recording.
+**At 2:28 a secondary collapse blocks R1; narrate it.** The sim drops it by itself at sim 162.5 every run (`DZ_SMART_RUBBLE=1`), so there is no R press in the script. **Press F and O on time** (2:38, 2:45): they change what the robots do next. **Don't press R during the beat sheet**: any rubble before 2:28 changes where the robots are when the collapse falls. R is for Q&A: it now drops on the followed robot's path ahead at a spot that never traps anyone (51 presses between sim 150 and 175 measured: 0 trapped, R1 replans every time).
 
 PowerShell fallbacks use `127.0.0.1`, not `localhost`: on Windows `localhost` tries IPv6 first and hangs about 2 s per call.
 
-Don't press **R** while the followed robot stands in a doorway: rubble in a doorway seals it in (TRAPPED after 10 s). At 2:28 (sim 162.5) R1 is in the corridor below the break room and gets around. That is the guard's run; watch it at the rehearsal.
+With `DZ_SMART_RUBBLE=1`, **R** never seals a doorway: it skips any spot whose rubble would cut a robot off from space it could reach (flood fill on the building), and only falls back to the old 1.5 m-ahead spot when the robot has no planned path 2–6 m long. Without the flag, don't press R while the followed robot stands in a doorway (TRAPPED after 10 s).
 
 ## Plan fallback: send it without the phone
 
