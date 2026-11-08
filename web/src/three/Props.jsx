@@ -3,7 +3,8 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { MAST_H, w2t } from './util'
 import { materials, signTexture, tiledSet } from './textures'
-import { N, S, W, decoyLayout, furnitureLayout } from './furniture'
+import { N, S, W, commandPostLayout, decoyLayout, furnitureLayout } from './furniture'
+import Human from './Human'
 
 // Set dressing for the Reality world: furniture against the walls, the decoy heat
 // sources as the real objects they are, boilers in the (no-go) boiler room, the command
@@ -499,13 +500,8 @@ export function CommandPost({ pos, entry, cold: isCold = false }) {
   })
   const livery = useMemo(() => signTexture(['INCIDENT COMMAND'], { w: 512, h: 64, bg: '#b91c1c', fg: '#ffffff', font: 'bold 40px Inter, sans-serif' }), [])
   const [x, y] = pos
-  // park the truck beside the mast, parallel to the wall, on the side away from the building
-  const [ex, ey] = entry ?? [x + 1, y]
-  const dl = Math.hypot(ex - x, ey - y) || 1
-  const dx = (ex - x) / dl
-  const dy = (ey - y) / dl
-  const truck = [x - dx * 1.18 - dy * 1.8, y - dy * 1.18 + dx * 1.8]
-  const heading = Math.atan2(dx, -dy)
+  // the truck parked along the wall beside the mast, the operators' canopy past its other end
+  const { truck, tent, heading } = commandPostLayout(pos, entry)
   return (
     <group>
       {/* truck: box body behind, cab facing north */}
@@ -537,6 +533,11 @@ export function CommandPost({ pos, entry, cold: isCold = false }) {
           </group>
         ))}
       </At>
+      {/* the command post itself: a pop-up canopy on the far side of the mast, three operators at
+          laptops (the people the robots' data reaches), screens glowing */}
+      <At x={tent[0]} y={tent[1]} rot={heading}>
+        <OperatorsTent M={M} cold={isCold} />
+      </At>
       {/* telescoping mast with antennas and the amber beacon */}
       <At x={x} y={y}>
         <C m={M.darkSteel} rt={0.35} rb={0.42} h={0.1} p={[0, 0.05, 0]} seg={6} />
@@ -551,6 +552,50 @@ export function CommandPost({ pos, entry, cold: isCold = false }) {
           <meshStandardMaterial color="#f59e0b" emissive="#f59e0b" emissiveIntensity={isCold ? 0 : 2.5} toneMapped={false} />
         </mesh>
       </At>
+    </group>
+  )
+}
+
+// Pop-up canopy (3 x 3 m, red roof), a folding table with three laptops and three operators
+// seated at it facing the building. Local frame like the truck: +x along the heading.
+const OPERATORS = ['op-a', 'op-b', 'op-c']
+function OperatorsTent({ M, cold: isCold }) {
+  // thin canopy fabric: the operators show through it from the top-down camera (C)
+  const roof = useMemo(() => new THREE.MeshStandardMaterial({ color: isCold ? '#3a3f45' : '#b91c1c', roughness: 0.85, side: THREE.DoubleSide, transparent: true, opacity: 0.42, depthWrite: false }), [isCold])
+  const screen = useMemo(() => new THREE.MeshStandardMaterial({ color: '#0b1220', emissive: isCold ? '#000000' : '#60a5fa', emissiveIntensity: 1.6, toneMapped: false }), [isCold])
+  return (
+    <group>
+      {/* four legs and a low pyramid roof */}
+      {[[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]].map(([lx, lz]) => (
+        <C key={`${lx}${lz}`} m={M.steel} rt={0.03} h={2.2} p={[lx, 1.1, lz]} seg={8} />
+      ))}
+      <mesh position={[0, 2.45, 0]} rotation={[0, Math.PI / 4, 0]} material={roof}>
+        <coneGeometry args={[2.2, 0.5, 4, 1, true]} />
+      </mesh>
+      {[[0, -1.5, 0], [0, 1.5, 0], [-1.5, 0, Math.PI / 2], [1.5, 0, Math.PI / 2]].map(([lx, lz, r], i) => (
+        <B key={i} m={M.truckWhite ?? M.white} s={[3.0, 0.22, 0.02]} p={[lx, 2.12, lz]} r={[0, r, 0]} shadow={false} />
+      ))}
+      {/* folding table along the front edge, laptops open toward the operators */}
+      <B m={M.white} s={[0.7, 0.04, 2.4]} p={[0.55, 0.74, 0]} />
+      {[[0.3, -1.1], [0.8, -1.1], [0.3, 1.1], [0.8, 1.1]].map(([lx, lz]) => (
+        <C key={`${lx}${lz}`} m={M.darkSteel} rt={0.015} h={0.72} p={[lx, 0.36, lz]} seg={6} />
+      ))}
+      {[-0.8, 0, 0.8].map((lz) => (
+        <group key={lz} position={[0.55, 0.76, lz]}>
+          <B m={M.darkSteel} s={[0.24, 0.015, 0.34]} p={[-0.02, 0, 0]} />
+          <mesh position={[0.1, 0.12, 0]} rotation={[0, 0, 0.25]}>
+            <boxGeometry args={[0.012, 0.22, 0.34]} />
+            <primitive object={screen} attach="material" />
+          </mesh>
+        </group>
+      ))}
+      {/* three operators on chairs, facing the table (+x) */}
+      {OPERATORS.map((id, i) => (
+        <group key={id} position={[-0.05, 0, (i - 1) * 0.8]}>
+          <SeatChair />
+          <Human id={id} pose="operator" />
+        </group>
+      ))}
     </group>
   )
 }

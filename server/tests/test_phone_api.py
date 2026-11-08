@@ -291,18 +291,26 @@ def test_join_url_uses_configured_public_frontend_or_request_lan_host(session, m
     monkeypatch.delenv("DZ_PUBLIC_URL")
     assert client.get("/api/join", headers={"Host": "192.168.1.8:5173"}).json() == {
         "url": "http://192.168.1.8:5173/phone"}
-    monkeypatch.setattr(api.socket, "gethostbyname_ex", lambda _: ("laptop", [], ["192.168.1.9"]))
+    monkeypatch.setattr(api, "lan_ipv4", lambda *args: "192.168.1.9")
     assert client.get("/api/join", headers={"Host": "localhost:5173"}).json() == {
         "url": "http://192.168.1.9:5173/phone"}
 
 
 def test_join_without_lan_address_returns_actionable_error(session, monkeypatch):
     client, _ = session
-    monkeypatch.setattr(api.socket, "gethostbyname_ex", lambda _: ("laptop", [], ["127.0.0.1"]))
+    monkeypatch.setattr(api, "lan_ipv4", lambda *args: None)
     assert client.get("/api/join", headers={"Host": "localhost:5173"}).status_code == 503
     for url in ("ftp://wrong", "http://localhost:bad", "http://[broken", "https://example.com/prefix"):
         monkeypatch.setenv("DZ_PUBLIC_URL", url)
         assert client.get("/api/join").status_code == 503
+
+
+@pytest.mark.parametrize("host", ["localhost", "127.0.0.2", "0.0.0.0", "[::1]", "laptop.local"])
+def test_join_replaces_local_hosts_even_when_configured(session, monkeypatch, host):
+    client, _ = session
+    monkeypatch.setenv("DZ_PUBLIC_URL", f"http://{host}:8000")
+    monkeypatch.setattr(api, "lan_ipv4", lambda *args: "10.84.29.47")
+    assert client.get("/api/join").json() == {"url": "http://10.84.29.47:8000/phone"}
 
 
 @pytest.mark.parametrize("query", ["role=admin", "client=bad%20name", "client="])

@@ -31,7 +31,9 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    The check activates `.venv`, loads the model on CPU, checks the two local API
    keys without printing them, verifies the effective flags against the active
    PowerShell assignments below, checks tools/ports, then runs its own paused
-   server for 10 seconds and verifies `hello.detector == "model"`. It stops only
+   server for 10 seconds and verifies `hello.detector == "model"` and HTTP access
+   through the laptop's LAN IP. A LAN failure prints the Windows Firewall command
+   to allow inbound TCP 8000; run it as administrator only if needed. It stops only
    that temporary server. Export the flag blocks below before rerunning; shell
    variables override `server/.env`. Extra nonempty `DZ_` variables fail even if
    their value is `0`; remove them for this exact demo profile. Commented-out
@@ -48,11 +50,12 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    python -m pip install pillow
    cd ..\web; npm install; npm run build; cd ..
    ```
-4. Start the server **paused**. Leave `DZ_AUTOSTART` unset.
+4. Start the server **paused**. Leave `DZ_AUTOSTART` unset. The default launcher
+   binds `0.0.0.0:8000` so phones can connect.
    ```powershell
    cd server
    $env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=1.5; $env:DZ_OBSTACLES=1; $env:DZ_ROBOT_COLLISIONS=1; $env:DZ_SMART_RUBBLE=1
-   python -m uvicorn deadzone.app:app --host 0.0.0.0 --port 8000
+   python -m deadzone
    ```
    `DZ_OBSTACLES=1` and `DZ_ROBOT_COLLISIONS=1` are **required** for the main run (the demo guard runs with both on). Without `DZ_OBSTACLES` the beat sheet below is wrong: S1 is found at 129.0 s instead of 102.7. Without `DZ_ROBOT_COLLISIONS` the robots can drive through each other and S2 lands at 3:06 (sim 219.4) instead of 3:04.8. `DZ_SMART_RUBBLE=1` makes the R key a no-trap drop for Q&A. The secondary collapse at 2:28 (sim 162.5) is a scenario event in `collapse_01.json` and runs with no flag; leave `DZ_SCENARIO_EVENTS` unset.
 5. The server log must say `survivor detector: trained model, threshold 0.60`. If it says `sim sensor fallback (...)`, fix torch before going on stage. The top-bar detector chip shows the same thing.
@@ -85,7 +88,9 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    Using the HTTPS origin on both keeps API/WebSocket/QR traffic on the same
    origin and permits phone microphones. For a local Wi-Fi-only check without a
    tunnel, use `http://localhost:8000/?nointro` on the laptop and its Q/QR link on
-   the same Wi-Fi/hotspot. `?nointro` keeps the first-visit explainer off the scene;
+   the same Wi-Fi/hotspot. **Phones must be on the same Wi-Fi, or use the tunnel.**
+   A LAN-IP preflight pass cannot detect guest-network/client isolation; use a
+   hotspot or the tunnel if another device still cannot connect. `?nointro` keeps the first-visit explainer off the scene;
    the **?** overlay can still show it.
 8. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
 9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped mission recording, and keep the file on the demo laptop.

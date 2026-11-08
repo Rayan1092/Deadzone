@@ -296,3 +296,20 @@ export function obstaclesFor(fp) {
     x: r2(it.x), y: r2(it.y), rot: Math.round(it.rot * 1000) / 1000,
   }))
 }
+
+// ------------------------------------------------------------------ command post
+// Where the command post's pieces stand around its mast (`command_post.pos`, where every radio
+// link ends): the incident truck parked along the wall, the operators' canopy past its other end.
+// d points from the mast to the entry; the truck's long side runs along p = (-dy, dx).
+export function commandPostLayout(pos, entry) {
+  const [x, y] = pos
+  const [ex, ey] = entry ?? [x + 1, y]
+  const dl = Math.hypot(ex - x, ey - y) || 1
+  const dx = (ex - x) / dl
+  const dy = (ey - y) / dl
+  return {
+    truck: [x - dx * 1.18 - dy * 1.8, y - dy * 1.18 + dx * 1.8],
+    tent: [x - dx * 2.0 + dy * 4.6, y - dy * 2.0 - dx * 4.6],
+    heading: Math.atan2(dx, -dy),
+  }
+}
