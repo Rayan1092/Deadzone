@@ -3,10 +3,10 @@
 Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on the testing laptop edits this file. Rayan's robot session writes `history/rayan.md`.
 
 ## Now
-- **Working on:** phone bug diagnosis (posted below, For Aziz), then big-screen performance profile; radio-vs-published benchmark study finished, PR next.
-- **Works on main:** trained survivor detector + `perception.filter_hits()` with sim fallback (PR #14), runtime crops, robot hookup and decoys (PR #17), Grad-CAM heatmaps (PR #49), AI Lab export (PR #68), logged retrain (PR #71), judge pool `ml/results/judge_pool/` (PR #96), benchmark v2 radio sweep (PR #97), fused Grad-CAM + 96.7% docs (PR #100), confidence calibration (PR #103), real-scene crops + detector fine-tuned on indoor thermal people, FLIR 96.7% / indoor 99.6% (PR #95).
+- **Working on:** big-screen performance profile (posted below, For Yusuf and Aziz). Next: radio-vs-published benchmark PR (study finished).
+- **Works on main:** trained survivor detector + `perception.filter_hits()` with sim fallback (PR #14), runtime crops, robot hookup and decoys (PR #17), Grad-CAM heatmaps (PR #49), AI Lab export (PR #68), logged retrain (PR #71), judge pool `ml/results/judge_pool/` (PR #96), benchmark v2 radio sweep (PR #97), fused Grad-CAM + 96.7% docs (PR #100), confidence calibration (PR #103), phone bug diagnosis (PR #107), real-scene crops + detector fine-tuned on indoor thermal people, FLIR 96.7% / indoor 99.6% (PR #95).
 - **In flight (not merged):** `rayan-ml/radio-published` (benchmark at published 2.4 GHz values).
-- **Blocked on / need from others:** **Aziz:** phone plan fixes 1.1 and 1.2 (phone-diagnosis entry). **Yusuf:** fixes 1.4, 2.1, 2.2 (same entry); 3D survivor poses + `shows` captions (gradcam-poses entry). **Rayan (robot session):** fix 1.3, escape from a no-go (same entry).
+- **Blocked on / need from others:** **Aziz:** phone plan fixes 1.1 and 1.2 (phone-diagnosis entry); screen payload items 4a-4b (perf-profile entry). **Yusuf:** phone fixes 1.4, 2.1, 2.2; big-screen items 1-3, 4c, 5 (perf-profile entry); 3D survivor poses + `shows` captions (gradcam-poses entry). **Rayan (robot session):** phone fix 1.3, escape from a no-go.
 - **Promises to others:**
   - `filter_hits(hits)` keeps the `io.thermal()` hit shape `{id,pos,crop,conf}`. Kept hits get `conf` = model P(person) and `detector:"model"`; rejected hits are dropped.
   - It falls back to passthrough (sim sensor) when `DETECTOR=sim` is set, when no model file exists, or when torch is missing.
@@ -15,6 +15,26 @@ Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on
   - Judge pool manifest format below (judge-test entry), readable by Aziz's `readJudgePool`.
 
 ## Log
+
+### 2026-11-08 16:10 · rayan-ml/perf-profile · Big-screen performance profile (diagnosis only, no fixes)
+
+**For Yusuf and Aziz.** Main `2fbfb98`, built web served by the server, Chrome headless at 1920 x 1080 on this laptop, seed 7, 3 robots, speed 2, night scene, two panes, perf off (everything on). Measured on both GPUs: RTX 3060 Laptop and the integrated AMD Radeon. Harness (puppeteer + WebGL hooks + CDP profiler) is in the testing laptop's scratchpad.
+
+**fps, clean run (no hooks):** all on **19.5-21.9 fps** (RTX) / 20.6-21.3 (integrated); robot camera open (V) **10.9** / 16.6; perf mode P 28.9 on the integrated GPU once its shaders finish compiling. **Same fps on both GPUs: the main thread (JavaScript) is the limit, not the GPU** (58-81 ms of JS per frame under the profiler). A faster GPU will not help; the fixes below are CPU work.
+
+**Top costs, biggest first, and what to change without removing anything visible:**
+1. **Line materials rebuilt every tick: about 40% of the main thread.** 58 shader programs linked per second, steadily (`getProgramInfoLog` alone is 34-46% of JS self time); all are three's `LineMaterial` (dashed and plain). Cause: drei 9.122 `Line` (`node_modules/@react-three/drei/core/Line.js`) rebuilds its geometry whenever the `points` array is a new object and its effect cleanup also **disposes the material**, so three destroys and relinks the program. We pass new `points` arrays every tick in `Routes.jsx:39` (`route.path.map`), `Network.jsx:172-180` (links, home routes, dark lines), `Actors.jsx:360` (robot path) and `Actors.jsx:401` (ghost line). **Yusuf, fix:** memoize every `points` array on its content (`useMemo` keyed on `route.t`, the path, or the two endpoint positions), and for lines that really change every tick (robot paths, links) keep one `<Line>` and update it in place through its ref (`ref.current.geometry.setPositions(flat)`). Same pixels, no relinking.
+2. **About 1,400-1,600 draw calls per frame (about 700 per pane).** Per-draw CPU work (`renderBufferDirect`, uniform `setValue`, `updateMatrixWorld`) is most of the remaining JS. **Yusuf, fix:** merge static debris, props and ceiling pieces per room into one geometry per material (`BufferGeometryUtils.mergeGeometries`) or `InstancedMesh` for repeated pieces, and set `matrixAutoUpdate = false` on everything static. Same look, far fewer draws.
+3. **Every extra view renders the whole scene again.** Two panes vs one: 11.9 vs 21 fps under the profiler; opening the robot camera halves the frame rate (21.9 to 10.9 on the RTX). **Yusuf, fix:** render the robot camera at half resolution and at most 15 Hz, and redraw the Command pane only when Command data changes (it only changes when a bundle is delivered; `invalidate()` on new `command` data), keep Reality at full rate. Nothing disappears.
+4. **Network payload parsed on the main thread: about 0.6-0.7 MB/s.** Screen `tick` 6.8 kB each at about 31-35 per second early, growing to 12 kB (215 to 395 kB/s over the run); `maps` 51 kB each at 6-7 per second (about 320 kB/s); map texture uploads (`texSubImage2D`) another 3.5% of JS. **Aziz, fix:** (a) send screen ticks at 15 Hz (the frontend already interpolates poses) and (b) send `maps` only when a map changed, or as changed rectangles / a binary frame instead of base64 JSON. **Yusuf, fix:** (c) upload a map texture only when its `maps.version` changes.
+5. **Post-processing: about 30 bloom passes per frame** (16 downsampling + 14 upsampling over the two panes) plus SMAA (edge + luminance) and about 130 small full-screen or quad draws. **Yusuf, fix:** bloom `levels` 8 to 5 with `resolutionScale` 0.5 (the glow looks the same at projector distance) and one composer per pane.
+- **Shadows:** at night (the demo scene) shadow passes are small; day lighting (K) added about 300 shadow-map draws per frame in the first profile. If day is used: `shadowMap.autoUpdate = false` for the static scene and update it only when the building changes (aftershock), robots keep a small separate shadow.
+- **Lidar points: negligible** (4-5 draws, about 1,000 vertices per frame). No change needed.
+- **Perf mode P:** helps once compiled (21 to 29 fps on the integrated GPU) but **toggling it recompiles every material** (still 5.3 fps 10 s after the toggle on the RTX), and it does not touch costs 1-4 (draws 1,423 to 1,405). Set it before the demo, never during.
+
+- **Contract changes:** none (diagnosis only).
+- **Heads-up for others:** Yusuf: items 1-3, 4c, 5 (item 1 alone should give the biggest jump). Aziz: 4a, 4b.
+- **Next:** radio-vs-published benchmark PR.
 
 ### 2026-11-08 15:10 · rayan-ml/phone-diagnosis · Phone no-go and add-zone bugs traced end to end (diagnosis only, no fixes)
 
