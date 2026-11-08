@@ -454,7 +454,7 @@ Two WebSockets carry everything live: `/ws/screen` for the big screen and `/ws/p
 | server to screen | `maps` | every 5 ticks | `w`, `h`, `reality` (b64), `command` (b64) |
 | server to screen | `event` | when it happens | `kind` + fields, used for toasts, sounds and camera cues |
 | server to screen | `report` | after `/api/report` | `text`, `generated_at` |
-| screen to server | `control` | keyboard and buttons | `action`: `start`, `pause`, `reset`, `speed`, `director` + `value` |
+| screen to server | `control` | keyboard and buttons | `action`: `start`, `pause`, `reset`, `speed`, `director` + `value`; **`rubble` + `robot`** (`{t:"control", data:{action:"rubble", robot:"R2"}}`, REST `POST /api/control {action:"rubble", robot:"R2"}`: the R key on the followed robot, missing `robot` means R1; with `DZ_SMART_RUBBLE=1` the rubble lands on that robot's planned path 3-4 m ahead at a spot that traps nobody, otherwise 1.5 m ahead of it) |
 
 #### Optional RSSI field (`DZ_COVERAGE_GRID`, default off)
 
@@ -786,7 +786,7 @@ The demo runs on a fixed seed with a director so every beat happens on cue, whil
 | Space | start or pause |
 | 1 to 3 | follow cam on robot 1 to 3 |
 | 0 | overhead cutaway |
-| R | drop rubble in front of the followed robot |
+| R | drop rubble in front of the followed robot: `control` with `action: "rubble"`, `robot: "R2"` (missing means R1) |
 | F | inject wheel overcurrent on the followed robot |
 | G | request a Gemini briefing |
 | + and - | sim speed |
