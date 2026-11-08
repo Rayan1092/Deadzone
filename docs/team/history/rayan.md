@@ -3,13 +3,57 @@
 Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions edit this file.
 
 ## Now
-- **Working on:** `rayan/route-recompute` (PR open): rescue routes are recomputed and resent when new rubble blocks them. Next: `rayan/ai-lab` (AI Lab export for Yusuf's key L), then `rayan/scenario-gen` (seeded collapsed-building generator, Q&A only). **Later, only when Rayan asks (before the presentation):** refine the benchmark with more realistic data (published radio wall losses, sensitivity sweep over radio settings, random rubble). **Later, low priority (Rayan said not now):** speed up my robot planner (vectorize the frontier search) so the sim reaches 10x during exploration.
+- **Working on:** `rayan/voice-commands`: robot side of voice control (contract below, in the voice-contract entry). Next: `rayan/ai-lab` (AI Lab export + logged retrain on the testing laptop), then `rayan/scenario-gen` (seeded collapsed-building generator, Q&A only). **Later, only when Rayan asks (before the presentation):** refine the benchmark with more realistic data (published radio wall losses, sensitivity sweep over radio settings, random rubble). **Later, low priority (Rayan said not now):** speed up my robot planner (vectorize the frontier search) so the sim reaches 10x during exploration.
 - **Works on main:** frontier exploration, 3-robot target sharing, relay auto-drop, A* return home, lost-link + 10 s reconnect hold, REPLANNING around rubble, rate monotonic scheduler with carry-over and deadline misses, full fault FSM (OVERCURRENT, STUCK, SAFE_STOP, LOW_BATTERY, TRAPPED), SAFE_STOP resume command (PR #13), robots follow dispatched plans (PR #15), robots perceive through the trained detector with decoys in the floor plan (PR #14 + #17). Seed 7, 3 robots: S1 found dark at 182.3 s, on Command at 187.3 s, 4 relays.
-- **In flight (not merged):** `rayan/route-recompute`. On main: PLAN.md voice control + https tunnel + one controller per robot (PR #61), PLAN.md realistic visuals + AI showcase (PR #57), soak test + PR #28 review (PR #53), benchmark labeled "in simulation" (PR #48), Grad-CAM heatmaps + crop manifest (PR #49), baseline mode + benchmark (PR #41), no attribution setting (PR #43), demo guard (PR #36), Version 2 plan (PR #34), pitch assets (PR #33), demo polish (PR #29), beacon_for tag (PR #32), rescue route + beacon (PR #25), `docs/DEMO.md`, detector hookup + decoys (PR #17).
+- **In flight (not merged):** `rayan/voice-commands`. On main: rescue route recompute after aftershocks (PR #62), PLAN.md voice control + https tunnel + one controller per robot (PR #61), PLAN.md realistic visuals + AI showcase (PR #57), soak test + PR #28 review (PR #53), benchmark labeled "in simulation" (PR #48), Grad-CAM heatmaps + crop manifest (PR #49), baseline mode + benchmark (PR #41), no attribution setting (PR #43), demo guard (PR #36), Version 2 plan (PR #34), pitch assets (PR #33), demo polish (PR #29), beacon_for tag (PR #32), rescue route + beacon (PR #25), `docs/DEMO.md`, detector hookup + decoys (PR #17).
 - **Blocked on / need from others:** **Yusuf: an updated rescue route for the same survivor (a second `rescue_route_reported` with a newer `t`) must replace the old route on screen, never show as a second route** (coming with my aftershock route update). Yusuf: baseline key + "Baseline" chip + `WAITING_FOR_LINK: 'No link, waiting'` label (Aziz's control is done in PR #54: `{action: "mode", value: "baseline" | "deadzone"}`, `mode` echoed in hello/control). Rayan (testing laptop): Gemini key + the keyed G / Ask dry run, report whether both say `source: "gemini"` (Aziz's PR #54). Aziz: quiet P-1 preload (demo-polish entry; or Yusuf), Gemini briefing (pitch-assets entry). Done by Aziz: `/crops`, `hello.detector`, `command.routes` (PR #28). Yusuf (all agreed, 3 AM): survivor figures, bigger robots, phone robot tap, liquid glass, rescue route drawing from `command.routes`, robot's-eye view (his). Done on main: decoys in thermal + none in fallback, O / U resume, detection cards, detector chip (waits for `hello.detector`). Details in the Blocked sections below; owners/targets in `docs/PLAN.md` Added scope. Keep `PEER_FRESH_S` in robot.py (sim.py imports it).
 - **Promises to others:** states final: DEPLOYING, EXPLORING, LOST_LINK_EXPLORING, RETURNING_TO_SIGNAL, RETURNING_HOME, REPLANNING, FAULT, DONE, plus WAITING_FOR_LINK (baseline mode only). Robot `mode`: deadzone (default) or baseline, `Robot.set_mode()`. Faults final: null, OVERCURRENT, STUCK, LOW_BATTERY, TRAPPED, SAFE_STOP. `tasks` slices as in PR #7, `missed` can now be true. Robot hooks: `inject_overcurrent(seconds=1.0)`, `inject_perception_overload(seconds=3.0, wcet_ms=400)`.
 
 ## Log
+
+### 2026-11-08 04:05 · rayan/voice-contract · Voice command + `command_ack` contract (robot side)
+- **Did:** the contract for PLAN.md "Voice control with ElevenLabs", posted before the code so Aziz and Yusuf can build in parallel. Code follows in `rayan/voice-commands`.
+- **Contract changes (new, additive):**
+  - **Command bundle, CMD → robot.** Existing kind `command` (priority 1, `dst` = robot id). Payload:
+    ```
+    {"cmd_id": "V-0007",                     # unique, [A-Za-z0-9_.-]{1,64}
+     "cmd": "explore_zone" | "go_to" | "return_home" | "hold" | "resume",
+     "zone": {"id": "E1", "name": "Warehouse Floor", "poly": [[x, y], ...]},   # explore_zone only, from prior `rooms`
+     "target": [x, y],                         # go_to only, metres
+     "source": "voice" | "phone", "by": "<client id>", "issued_t": <sim s>}
+    ```
+    The old `{"cmd": "resume"}` without `cmd_id` (SAFE_STOP resume) keeps working and gets no ack.
+  - **What the robot does:**
+    - `explore_zone`: the zone becomes its top-priority zone, the same as a plan zone. It searches there until 80% is mapped, then carries on with its plan.
+    - `go_to`: drives to the point over its own known map (new state `GOING_TO_POINT`), then stops there (`HOLDING`).
+    - `return_home`: `RETURNING_HOME`, then `DONE`.
+    - `hold`: stops and stays (`HOLDING`); it still maps, looks for survivors and reports.
+    - `resume`: leaves `HOLDING` / `GOING_TO_POINT` and goes back to `EXPLORING`; it also clears `SAFE_STOP` as today.
+    - The same `cmd_id` twice gets the same ack again and is not run twice.
+    - A dark robot gets the command when it reconnects (normal custody), so its ack is late, which is the demo moment.
+  - **`command_ack` bundle, robot → CMD.** New kind `command_ack`, **priority 1**. Payload:
+    ```
+    {"cmd_id", "robot", "cmd",
+     "status": "accepted" | "refused" | "completed",
+     "eta_s": <sim s> | null,                 # accepted go_to / explore_zone / return_home; null otherwise
+     "reason": null | "low_battery" | "battery_reserve" | "fault" | "safe_stop" | "no_route" | "outside_building" | "no_go" | "bad_command",
+     "say": "Heading to Warehouse Floor, about 40 seconds.",   # short plain sentence for the voice reply
+     "state": "<robot state after deciding>", "t": <robot sim s when it decided>, "issued_t": <echo>}
+    ```
+    `completed` follows when a `go_to` arrives, `return_home` reaches the entrance, or the `explore_zone` zone is mapped. `say` never includes the robot's name; the voice picks that.
+  - **Robot events (Reality only, at decision time):** `command_received {robot, cmd_id, cmd, status, eta_s, reason, say}` and `command_completed {robot, cmd_id, cmd, say}`.
+  - **New states:** `GOING_TO_POINT`, `HOLDING`.
+- **Heads-up for others:**
+  - **Aziz:**
+    1. Add `"command_ack": 1` to `PRIO` in `network/dtn.py`.
+    2. In `CommandPost.receive`, keep the latest ack per `cmd_id` and emit **`command_ack_reported {...ack, delay_s: now - t}`** (Command side). The voice reply should play on this event, not when the command is sent.
+    3. In `/api/voice`: resolve room names to the `zone` object from the prior `rooms` (id, name, poly), check that `target` is inside the building, check the lease, then enqueue the `command` bundle in the CMD queue with `dst` = robot (like `resume_command`).
+    4. TTS: use `say` as the reply text, or your own template.
+  - **Yusuf:**
+    1. Play the robot's voice and subtitle on `command_ack_reported` (a dark robot answers late).
+    2. Show the parsed command card when it is sent and mark it as "waiting for the robot" until the ack arrives.
+    3. Add the new state labels: `GOING_TO_POINT: 'Going to point'`, `HOLDING: 'Holding'`.
+- **Next:** build it in `rayan/voice-commands`.
 
 ### 2026-11-08 03:50 · rayan/plan-sync-v3 · PLAN.md: voice control, https tunnel, one controller per robot
 - **Did:** committed Rayan's new `docs/PLAN.md` section "Voice control with ElevenLabs (8:45 PM update)", including the https tunnel and one controller per robot. The realistic visuals and AI showcase / scenario generator sections are already on main (PR #57).
