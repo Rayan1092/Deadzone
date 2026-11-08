@@ -70,6 +70,41 @@ The team chose a realistic look over the stylized one. Yusuf owns it. The **simu
 
 **Scenario generator (Rayan):** any seed produces a random collapsed building: layout, wall materials, steel dead zones, hazards (gas, fire, flooding, unstable floor), reachable survivors and decoys, plus a disaster timeline built from existing director actions (aftershock, rubble, relay destroyed). New event types such as spreading fire need Aziz (sim) and Yusuf (visuals) and come second. Every generated building is checked for connectivity and reachable survivors. The demo building (seed 7, `collapse_01`) never changes; the generator is for Q&A.
 
+### Voice control with ElevenLabs (8:45 PM update)
+
+Responders can talk to a robot, and it answers in its own ElevenLabs voice. Manual phone control stays as it is. Behind `DZ_VOICE=1` until a dry run passes.
+
+1. **Speech to text:** ElevenLabs speech-to-text, with browser speech recognition as a fallback.
+2. **Gemini parses intent only:** the sentence becomes a structured command such as `{robot: "R2", action: "explore_zone", zone: "warehouse"}`. Allowed actions: explore a zone or room, go to a point, return home, hold, resume. Gemini never drives a robot.
+3. **Same safety checker** as the phone planner. A refused command gets a spoken reason.
+4. **Delivered over the network** as a command bundle. A robot that is dark gets it when it reconnects.
+5. **The robot acknowledges** with a priority-1 `command_ack` bundle (accepted with ETA, or refused with reason). The voice reply plays only when that ack reaches Command, so a dark robot answers late (the demo moment).
+6. **ElevenLabs text-to-speech** runs on the server with `ELEVENLABS_API_KEY` in `server/.env` (never committed), one voice per robot, with browser speech as a labelled fallback.
+
+Microphones need `https` or `localhost`: push-to-talk works on the big-screen laptop; phones need an https tunnel.
+
+| Part | Owner |
+| --- | --- |
+| Robot side: handle the voice command actions, send `command_ack` with status, ETA or refusal reason | Rayan |
+| `/api/voice` endpoint: speech-to-text, Gemini intent parsing, safety check, command bundle; ack delivery to screens; ElevenLabs text-to-speech proxy; https tunnel for phones | Aziz |
+| Push-to-talk on the big screen and the phone, transcript and parsed command card, playing the robot's voice with subtitles | Yusuf |
+
+**HTTPS for phones:** a free Cloudflare tunnel (`cloudflared`) on the demo laptop gives one public `https://` address for the web app, API and WebSockets, so phone microphones work. Vercel and Supabase don't help here: the sim server can't run on Vercel, an https page can't call the laptop over plain http anyway, and the server already holds all state. Aziz sets up and tests the tunnel on the venue Wi-Fi early; big-screen push-to-talk on localhost is the fallback.
+
+**One controller per robot (new, needs building):**
+
+- A phone claims a robot ("Take control of Scout 2"); the server grants an exclusive lease. Nobody else can take it: they see "controlled by \<name>" and a disabled button. No kick-offs, no double control.
+- The server rejects voice and manual commands for a robot from anyone who doesn't hold its lease.
+- The lease frees itself on disconnect, after about 15 s without a heartbeat, or when the holder taps Release.
+- The presenter can free any robot from the big screen (override), so a judge walking away can't strand a robot on stage.
+- When all 3 robots are taken, extra phones join as spectators or relays.
+- Search planning stays shared (co-planning); only direct robot commands need the lease.
+
+| Part | Owner |
+| --- | --- |
+| Lease API: claim, release, heartbeat, expiry, presenter override; enforced on `/api/voice` and every direct command; lease state broadcast to phones and screens | Aziz |
+| Phone robot picker showing each robot's controller, take and release buttons, locked state; presenter override on the big screen | Yusuf |
+
 ### Owners and priorities
 
 | Priority | Item | Owner | Prize it serves |
