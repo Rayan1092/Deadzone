@@ -49,7 +49,6 @@ export function RescueStatus() {
 
 export function TopBar() {
   const fp = useSim((s) => s.floorplan)
-  const time = useSim((s) => s.time)
   const connected = useSim((s) => s.connected)
   const running = useSim((s) => s.running)
   const speed = useSim((s) => s.speed)
@@ -63,7 +62,7 @@ export function TopBar() {
     <header className="topbar">
       <div className="brand">DEADZONE</div>
       <div className="incident">{fp ? fp.name : 'Waiting for sim'}</div>
-      <div className="clock mono">T+{fmt(time)}</div>
+      {/* the run clock lives in the Rescue Status strip ("since collapse"); one clock on screen */}
       {detector && (
         <span className={`detector-chip ${detector.mode}`} title={detector.reason ?? ''}>
           Detector: {detector.mode === 'model' ? 'AI model' : 'sim fallback'}
