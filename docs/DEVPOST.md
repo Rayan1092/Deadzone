@@ -25,7 +25,7 @@ Deadzone simulates three rescue robots searching a collapsed warehouse. The big 
 
 Here's the demo:
 
-1. A judge plans the search on their phone (just a web page, scan a QR code). They send Robot 2 into the north-east corner. Our safety checker rejects it because the steel cage there is a predicted radio dead zone. They tap "Allow it to go dark" and the plan goes through.
+1. A judge plans the search on their phone (just a web page, scan a QR code). They send Robot 2 into the north-east corner. Our safety checker rejects it because the steel cage there is a predicted radio dead zone. They tap "Allow signal loss here" and the plan goes through.
 2. The robots split up the building, map it with lidar, and drop relays right before their signal breaks.
 3. Robot 2 goes into the steel cage and loses signal. On the command post it turns into a grey ghost.
 4. 11 seconds later it finds a survivor in the dark. The AI model on the robot says "person, 100%". Only the Reality side knows. Robot 2 drops a beacon relay next to the survivor and plans the safest route in from the entrance.
@@ -85,7 +85,7 @@ These are still simulation results, not real-world ones. They show the idea hold
 
 - The whole loop works end to end with no fake data path. A survivor found in the dark reaches the command post only when a real bundle gets there.
 - The AI runs where it would in real life, on the robot, and it rejects decoys on its own.
-- 736 automated server tests and 85 web tests, including a demo guard that replays the whole story and the "command post never knows early" test.
+- 817 automated server tests and 86 web tests, including a demo guard that replays the whole story and the "command post never knows early" test.
 - The demo is deterministic, so it's the same 3-minute story every time.
 
 ## What we learned
