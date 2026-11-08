@@ -19,7 +19,7 @@ from ..network.dtn import PRIO, make_bundle
 from . import planning
 from .exploration import ProgressExplorer, line_clear
 from .mapping import OccupancyMap
-from .belief import Belief
+from .belief import EXPECTED_DEFAULT, RANGE_M as SENSOR_REACH_M, Belief
 from .perception import close_crop, filter_hits, get_detector
 from .power import Battery, RESERVE_PCT, wheel_current
 from .scheduler import Scheduler
@@ -186,7 +186,10 @@ def robot_rank(rid):
 
 class Robot:
     def __init__(self, rid, name, color, pose, fp_shape, cell, entry, nogo=None,
-                 lost_link_budget_s=45.0):
+                 lost_link_budget_s=45.0, belief_prior=None, expected_survivors=None):
+        """`belief_prior` / `expected_survivors`: the building prior for the survivor belief
+        (belief.prior_grid / belief.expected_survivors), handed over at deploy like the plan; without
+        them the robot's belief uses a flat prior over cells its map does not call occupied."""
         h, w = fp_shape
         self.id, self.name, self.color = rid, name, color
         self.pose = list(pose)
@@ -198,7 +201,11 @@ class Robot:
         self.escaping = False     # walking out of a cell plans may not start from (no-go drawn over us)
         # survivor belief evidence from this robot's own camera (display only, Phase 1): the miss
         # grid, confirmations and rejections; the team view merges them with the building prior
-        self.belief = Belief(np.ones((h, w), dtype=np.float32), cell)
+        self.belief = Belief(np.ones((h, w), dtype=np.float32) if belief_prior is None else np.asarray(belief_prior, dtype=np.float32),
+                             cell, EXPECTED_DEFAULT if expected_survivors is None else int(expected_survivors))
+        # Phase 2, opt-in: frontiers are scored by the expected missing mass of this robot's own
+        # belief within sensor reach, divided by travel time. Off: the legacy score, unchanged.
+        self.search_bayes = os.environ.get("DZ_SEARCH_BAYES") == "1"
         self.belief_t = -99.0
         self.zones = []                     # this robot's dispatched zones, highest priority first
         self.battery = Battery()
@@ -1323,7 +1330,37 @@ class Robot:
                 per_m = VOICE_ZONE_PULL_PER_M if zone["id"].startswith("voice:") else ZONE_PULL_PER_M
                 s -= per_m * math.dist((gx, gy), pull)
             return s
-        clusters.sort(key=score, reverse=True)
+
+        if self.search_bayes:
+            # DZ_SEARCH_BAYES: expected missing mass within sensor reach of the frontier, per second
+            # of travel; the peer claim and the zone pull become factors
+            mass = self.belief.missing_grid()
+            mass[self.map.grid == OCC] = 0.0
+            r = int(math.ceil(SENSOR_REACH_M / self.cell))
+            ys, xs = np.ogrid[-r:r + 1, -r:r + 1]
+            disk = xs * xs + ys * ys <= r * r
+            h, w = mass.shape
+
+            def reach_mass(gx_cell, gy_cell):
+                x0, x1 = max(0, gx_cell - r), min(w, gx_cell + r + 1)
+                y0, y1 = max(0, gy_cell - r), min(h, gy_cell + r + 1)
+                sub = disk[y0 - (gy_cell - r):y1 - (gy_cell - r), x0 - (gx_cell - r):x1 - (gx_cell - r)]
+                return float(mass[y0:y1, x0:x1][sub].sum())
+
+            def bayes_score(c):
+                travel_s = c["dist"] * self.cell / V_MAX + 1.0
+                s = reach_mass(*c["goal"]) / travel_s
+                gx, gy = (c["goal"][0] + 0.5) * self.cell, (c["goal"][1] + 0.5) * self.cell
+                if self.goal_cell and abs(c["goal"][0] - self.goal_cell[0]) + abs(c["goal"][1] - self.goal_cell[1]) < 8:
+                    s *= 1.1
+                if any(math.dist((gx, gy), t) < PEER_TARGET_RADIUS for t in claimed):
+                    s *= 0.3
+                if pull is not None:
+                    s /= 1.0 + math.dist((gx, gy), pull) / 10.0
+                return s
+            clusters.sort(key=bayes_score, reverse=True)
+        else:
+            clusters.sort(key=score, reverse=True)
         for c in clusters[:4]:
             cells = planning.astar(trav, start, c["goal"], planning.wall_cost(self.map.grid))
             if cells:
