@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Html, Line } from '@react-three/drei'
+import { Html } from '@react-three/drei'
+import Line from './FastLine' // drei's Line relinks its shader on every new points array
 import * as THREE from 'three'
 import { useSim } from '../store'
 import { COLORS, FOG_H, w2t } from './util'

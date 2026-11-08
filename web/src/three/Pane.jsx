@@ -1,4 +1,4 @@
-import { Component, Suspense, useEffect, useMemo, useRef } from 'react'
+import { Component, Suspense, memo, useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Environment, Lightformer, OrbitControls } from '@react-three/drei'
 import { Bloom, BrightnessContrast, EffectComposer, HueSaturation, N8AO, Noise, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
@@ -193,24 +193,74 @@ function SyncedControls({ id }) {
   )
 }
 
+// The live counters re-render every tick; kept out of Pane so the canvas (and the post-processing
+// chain, which rebuilds and recompiles its passes whenever Pane re-renders) does not.
+function PaneStats() {
+  const delivered = useSim((s) => s.tick?.stats.delivered ?? 0)
+  const waiting = useSim((s) => s.tick?.stats.in_flight ?? 0)
+  return (
+    <span className="pane-stats mono" title="Bundles delivered to the command post · still in transit">
+      {delivered.toLocaleString()} delivered · {waiting} in transit
+    </span>
+  )
+}
+
+// contact shadows where walls, props and debris meet the floor; then only materials pushed
+// past the threshold bloom (robot LEDs, survivors, beacons). Memoized: EffectComposer makes new
+// effect passes (new shader programs) every time its children change.
+const Grading = memo(function Grading({ which, night }) {
+  return (
+    <EffectComposer multisampling={0}>
+      <N8AO halfRes quality="performance" aoRadius={1.4} distanceFalloff={1} intensity={2.6} color="#0b0d10" />
+      {/* 5 mip levels at half resolution (rayan-ml's profile: ~30 bloom passes a frame before); same glow at projector distance */}
+      <Bloom mipmapBlur levels={5} resolutionScale={0.5} luminanceThreshold={0.95} luminanceSmoothing={0.25} intensity={which === 'command' ? 0.5 : 0.85} />
+      <ToneMapping mode={ToneMappingMode.AGX} />
+      {/* disaster grading: drained color, a little more contrast, film grain */}
+      <HueSaturation saturation={night ? -0.28 : -0.12} />
+      <BrightnessContrast brightness={night ? 0.02 : 0} contrast={night ? 0.08 : 0.05} />
+      <Vignette offset={0.3} darkness={night ? 0.75 : 0.5} />
+      {night && <Noise premultiply opacity={0.65} />}
+      <SMAA />
+    </EffectComposer>
+  )
+})
+
+// Command's view only changes when a bundle reaches the antenna (or the map, the building or the
+// camera changes), so its canvas renders on demand: on each of those, and for 1.5 s after (the
+// antenna pulse, ghosts gliding to a newly reported pose). Reality keeps rendering every frame.
+const COMMAND_SETTLE_MS = 1500
+function CommandRedraw() {
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => {
+    let raf = 0
+    let until = 0
+    let last = []
+    const loop = () => {
+      const s = useSim.getState()
+      const now = performance.now()
+      const sig = [s.tick?.stats.delivered, s.bigDeliveries, s.maps.version, shared.rev, s.floorplan, s.night, s.follow, s.showTruth]
+      if (sig.some((v, i) => v !== last[i])) { last = sig; until = now + COMMAND_SETTLE_MS }
+      if (now < until) invalidate()
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [invalidate])
+  return null
+}
+
 export default function Pane({ which, title, subtitle }) {
   const showTruth = useSim((s) => s.showTruth)
   const follow = useSim((s) => s.follow)
   const perf = useSim((s) => s.perf)
   const night = useSim((s) => s.night)
-  const delivered = useSim((s) => s.tick?.stats.delivered ?? 0)
-  const waiting = useSim((s) => s.tick?.stats.in_flight ?? 0)
   return (
     <div className={`pane pane-${which}`}>
       <div className="pane-title">
         <span className={`dot ${which}`} />
         <b>{title}</b>
         <span className="muted">{subtitle}</span>
-        {which === 'command' && (
-          <span className="pane-stats mono" title="Bundles delivered to the command post · still in transit">
-            {delivered.toLocaleString()} delivered · {waiting} in transit
-          </span>
-        )}
+        {which === 'command' && <PaneStats />}
         {which !== 'command' && showTruth && <span className="truth-chip">Truth overlay · T</span>}
         {follow && <span className="follow-chip">{which === 'command' ? `${follow} last report` : `Following ${follow}`} · 0</span>}
       </div>
@@ -235,7 +285,7 @@ export default function Pane({ which, title, subtitle }) {
       <DetectionCards side={which} sides={which === 'gap' ? ['command', 'reality'] : undefined} />
       {which !== 'command' && <RobotEye />}
       {which === 'gap' && <CommandInset />}
-      <Canvas shadows={!perf} dpr={perf ? 1 : [1, 1.5]} camera={{ fov: 42, near: 0.1, far: 300 }}
+      <Canvas shadows={!perf} dpr={perf ? 1 : [1, 1.5]} camera={{ fov: 42, near: 0.1, far: 300 }} frameloop={which === 'command' ? 'demand' : 'always'}
               gl={{ toneMapping: THREE.AgXToneMapping, toneMappingExposure: 1.1 }}>
         <color attach="background" args={[night ? '#08090b' : COLORS.bg]} />
         {/* night: dust haze thickens with distance; day: plain depth fog */}
@@ -246,6 +296,7 @@ export default function Pane({ which, title, subtitle }) {
         <StaticShadows />
         {which === 'command' ? (
           <>
+            <CommandRedraw />
             <Building props={false} />
             <Fog which={which} />
             <AntennaPulse />
@@ -262,21 +313,7 @@ export default function Pane({ which, title, subtitle }) {
           </Shake>
         )}
         <SyncedControls id={which} />
-        {!perf && (
-          // contact shadows where walls, props and debris meet the floor; then only
-          // materials pushed past the threshold bloom (robot LEDs, survivors, beacons)
-          <EffectComposer multisampling={0}>
-            <N8AO halfRes quality="performance" aoRadius={1.4} distanceFalloff={1} intensity={2.6} color="#0b0d10" />
-            <Bloom mipmapBlur luminanceThreshold={0.95} luminanceSmoothing={0.25} intensity={which === 'command' ? 0.5 : 0.85} />
-            <ToneMapping mode={ToneMappingMode.AGX} />
-            {/* disaster grading: drained color, a little more contrast, film grain */}
-            <HueSaturation saturation={night ? -0.28 : -0.12} />
-            <BrightnessContrast brightness={night ? 0.02 : 0} contrast={night ? 0.08 : 0.05} />
-            <Vignette offset={0.3} darkness={night ? 0.75 : 0.5} />
-            {night && <Noise premultiply opacity={0.65} />}
-            <SMAA />
-          </EffectComposer>
-        )}
+        {!perf && <Grading which={which} night={night} />}
       </Canvas>
     </div>
   )
