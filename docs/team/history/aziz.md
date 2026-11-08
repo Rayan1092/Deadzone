@@ -4,6 +4,8 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
+- **New batch queued (Rayan, via Aziz):** one PR each: (1) flagged hard robot collisions/blocked odometry; (2) shelf obstacle occupancy and material radio loss, footprints/data from Yusuf/Rayan; (3) delivered-telemetry-only per-robot phone camera plus last_seen age, keep exclusive leases; (4) actual bundle_hop/bundle_held + node queues and compatible payload optimization; (5) trace-driven investigation of phone zones/no-go dispatch/DTN. No new branch until #101 is merged and confirmed on main. Aziz clarified: no PLAN batch update yet; collision/camera contracts will land in rayan.md, testing trace in rayan-ml.md in about 30 minutes. Continue collision work and team-sync every 30 minutes.
+
 - **Working on:** `p2/phone-sync`, fixing phone/main-app synchronization with Yusuf's approval reported by Aziz. Integrated latest `origin/main` 80f554e (#95–100 detector, crops, judge pool, benchmark, random-quake UI, showcase/variants/counters and fused heatmaps) before the PR. One PR only; no next branch until merged and confirmed on main.
 - **Works in this branch:** no-go-only and cleared drafts share with all phones/screens; saves are acknowledged before checks/dispatch; unsaved edits survive same-incident reconnects, reset discards them; dispatch status survives reconnect; paused relay controls immediately update the main screen. Gemini Ask provides a safe explanation of fallback, cancels old-incident replies and keeps Command-only/private semantics. G's response shape is unchanged.
 - **Contracts:** quiet drafts may have 0 zones; check/dispatch require >=1 (`empty_plan`, 422). `POST /api/plan/check {plan_id,plan_epoch?}`; optional `plan_epoch` on save/dispatch, mismatches `plan_reset` 409 inside plan lock. Phone hello adds `plan_epoch` and `dispatched_plan_ids`. Phones get existing `event {kind:"plan_dispatched",plan_id}`. Ask-only local responses add fixed `unavailable_reason`; never provider error bodies or secrets. Whole-draft last-write-wins remains, no CRDT claims. See the newest log for the pre-code record.
@@ -12,6 +14,13 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 - **Validation:** final combined backend on main 80f554e **477 passed, 1 skipped** (155.80 s), including fixed seed-7 guard; frontend **15 tests passed**, production **754-module build passed**. Explicit demo guard before the last main merge was **10 passed** and is green in the final full run too. Fresh HTTPS screen/phone/mic pages/assets, matching QR origin, screen plus 2 phone WSS pass; local and public phone hello have the same incident epoch and trained detector. Public Ask confirms honest missing_key fallback; judge pool serves 40 actual items. Two old detector-status tests now explicitly consume the newly immediate paused-relay screen tick; full suite green.
 
 ## Log
+
+### 2026-11-07 PT · p2/phone-sync · Close existing PR before Rayan backend batch
+- **Did:** fetched origin/main 2da65d2 (#102 demo Q&A, #103 calibration assets) and integrated before closing #101. Those commits change no server or web code; the 477-test backend / 15-test frontend / 754-module validation remains applicable, with guard and asset tests rerun below. New five-item batch queued in Now; one PR each, behavior flags default off.
+- **Contract changes:** none in this integration; each batch contract will be recorded before its code.
+- **Heads-up for others:** no teammate-owned source edited; no test-laptop trace supplied yet. Existing #101 is finished first per one-PR-at-a-time rule. Gemini key still deferred by Aziz.
+- **Validation:** seed-7 guard plus AI asset tests **19 passed** (19.34 s); main's new commits change no server/web source, retaining the 477 backend / 15 frontend / 754-module validation.
+- **Next:** merge #101 and confirm on main, then start hard robot collision PR. Aziz confirmed pending contracts/trace are in progress on the other laptops; continue independent collision work.
 
 ### 2026-11-07 PT · p2/phone-sync · Integrate last-minute main before phone PR
 - **Did:** initial phone fix committed as ba2f5f6. The pre-PR remote-head check caught #99/#100 landing; merged origin/main 80f554e without conflict and re-read Rayan/ML histories. Main's showcase, variants, robot counters, close-look behavior and fused heatmap changes are preserved without edits to their source.
