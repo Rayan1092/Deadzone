@@ -10,3 +10,14 @@ export function pickRobot(zones, robots, reported, poly) {
   const far = (id) => (pose[id] ? Math.hypot(pose[id][0] - cx, pose[id][1] - cy) : Infinity)
   return [...robots].sort((a, b) => load[a.id] - load[b.id] || far(a.id) - far(b.id))[0]?.id ?? 'R1'
 }
+
+// A plan worth checking and dispatching: search zones, or no-go areas alone (Rayan's P0: the
+// server keeps the current assignments, sends the exclusion to every robot and they route around).
+export const hasPlanContent = (draft) => Boolean(draft && (draft.zones?.length || draft.no_go?.length))
+
+// What the red refusal banner says: the server's own words, plus the safety rules a dispatch broke.
+export function refusalText(path, { message, violations } = {}) {
+  const what = path === '/api/dispatch' ? 'Dispatch refused' : 'Check refused'
+  const rules = (violations ?? []).map((v) => v.msg).filter(Boolean)
+  return `${what}: ${rules.length ? rules.join('; ') : message ?? 'the server did not accept this plan'}`
+}
