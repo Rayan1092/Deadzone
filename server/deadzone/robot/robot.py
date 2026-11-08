@@ -19,7 +19,7 @@ from ..network.dtn import PRIO, make_bundle
 from . import planning
 from .exploration import ProgressExplorer, line_clear
 from .mapping import OccupancyMap
-from .perception import filter_hits, get_detector
+from .perception import close_crop, filter_hits, get_detector
 from .power import Battery, RESERVE_PCT, wheel_current
 from .scheduler import Scheduler
 
@@ -76,6 +76,15 @@ PERCEPTION_OVERLOAD_MS = 400
 PERCEPTION_OVERLOAD_S = 3.0
 
 # Dispatched plans
+# "Unsure, moving closer": a hot spot the detector scores between these from a distance is not
+# decided yet when a close-up crop exists; the robot drives to CLOSE_LOOK_M of it and judges the
+# close-up (ml/crops/runtime/<crop>_close.png). The six demo crops score near 0 or 1, so the
+# demo beats never take this path.
+UNSURE_LO, UNSURE_HI = 0.35, 0.75
+CLOSE_LOOK_M = 2.0         # judge the close-up from here
+CLOSE_LOOK_STANDOFF_M = 1.4  # drive to this distance from the hot spot, never onto it
+CLOSE_LOOK_TIMEOUT_S = 20.0  # could not get close: decide on the distant view
+
 ZONE_PULL_PER_M = 0.7      # before the zone is on our map: score falls with distance to the zone
 VOICE_ZONE_PULL_PER_M = 2.0  # a spoken "explore X" outweighs nearby frontiers (distance costs 1/m)
 ZONE_DONE_KNOWN = 0.8      # stop pulling once this share of the zone's cells is mapped
@@ -198,6 +207,8 @@ class Robot:
         self.crumbs = [tuple(pose[:2])]
         self.found = {}           # survivor id -> record
         self.rejected = set()     # hot spot ids the detector turned down (reported once)
+        self.unsure = {}          # hot spot id -> {pos, conf_far, since, crop, close}: waiting for a close look
+        self.look_at = None       # the unsure hot spot the robot is driving toward, or None
         self.found_while_dark = False
         self.dark_declared = False   # link_lost raised for the current outage
         self.reconnect_t = None      # when the link last came back after an outage
@@ -224,6 +235,11 @@ class Robot:
 
         self.scheduler = Scheduler()
         self.tasks = []
+        # Reality-side tallies for the "Under the hood" panel (Aziz sums them into tick.stats).
+        # Never put in a bundle: Command learns about the robot only through delivered messages.
+        self.counters = {"detector_calls": 0, "detector_persons": 0, "detector_rejections": 0,
+                         "detector_unsure": 0, "deadlines_met": 0, "deadlines_missed": 0,
+                         "rescue_routes": 0, "replans": 0, "dark_s": 0.0}
         self.wheel_a = 0.0
         self.spike_until = -1.0      # director-injected overcurrent ends at this time
         self.over_since = None       # wheel current above the limit since
@@ -560,7 +576,9 @@ class Robot:
     def _perceive(self, io):
         # every hot spot goes through the trained detector (sim sensor fallback if no model)
         hits = io.thermal()
-        kept = filter_hits(hits)
+        hits, finals = self._triage_unsure(hits)
+        kept = filter_hits(hits) + [h for h, conf in finals if conf >= get_detector().threshold]
+        hits = hits + [h for h, _ in finals]
         kept_ids = {h["id"] for h in kept}
         if self.sensor_view:
             detector = get_detector()
@@ -573,13 +591,16 @@ class Robot:
                     "conf": score, "source": "model" if score is not None else "sim"})
             self.camera_frame = {"t": self.t, "pose": list(self.pose), "hits": observations}
         for h in hits:
-            if h["id"] in kept_ids or h["id"] in self.rejected:
-                continue
+            if h["id"] in kept_ids or h["id"] in self.rejected or h["id"] in self.found:
+                continue                  # (a person confirmed from close up still scores low from afar)
             self.rejected.add(h["id"])    # the robot only knows "hot, but not a person"
+            self.counters["detector_calls"] += 1
+            self.counters["detector_rejections"] += 1
             self.events.append({"kind": "hotspot_rejected", "robot": self.id, "id": h["id"],
                                 "pos": [round(h["pos"][0], 2), round(h["pos"][1], 2)],
                                 "crop": h.get("crop"), "conf": get_detector().score(h.get("crop")),
-                                "heatmap": get_detector().heatmap(h.get("crop"))})
+                                "heatmap": get_detector().heatmap(h.get("crop")),
+                                **{k: h[k] for k in ("conf_far", "looked_closer") if k in h}})
         for s in kept:
             if s["id"] in self.found:
                 continue
@@ -587,13 +608,81 @@ class Robot:
                    "by": self.id, "t": round(self.t, 1), "conf": s.get("conf", 0.99), "crop": s.get("crop"),
                    "heatmap": get_detector().heatmap(s.get("crop"))}
             self.found[s["id"]] = rec
+            self.counters["detector_calls"] += 1
+            self.counters["detector_persons"] += 1
             if not self.linked and not self._peer_found(s["id"]):
                 self.found_while_dark = True    # new news: go back to signal and report it
             self.outbox.append(make_bundle(self.id, "CMD", "survivor", rec, self.t, 400))
             self.events.append({"kind": "survivor_found", "robot": self.id, "survivor": s["id"],
                                 "pos": rec["pos"], "linked": self.linked,
-                                "crop": rec["crop"], "conf": rec["conf"], "heatmap": rec["heatmap"]})
+                                "crop": rec["crop"], "conf": rec["conf"], "heatmap": rec["heatmap"],
+                                **{k: s[k] for k in ("conf_far", "looked_closer") if k in s}})
             self._on_survivor_confirmed(io, rec)
+
+    def _triage_unsure(self, hits):
+        """Split thermal hits into the ones to judge now and the ones decided after a close look.
+        A new hot spot whose distant score is unsure (and that has a close-up crop) is held while
+        the robot drives toward it; within CLOSE_LOOK_M it is judged on the close-up, after
+        CLOSE_LOOK_TIMEOUT_S on the distant view. Returns (hits to judge normally, [(hit, conf)])."""
+        det = get_detector()
+        normal, finals = [], []
+        for h in hits:
+            hid = h["id"]
+            u = self.unsure.get(hid)
+            if hid in self.found or hid in self.rejected:
+                normal.append(h)
+                continue
+            if u is None:
+                s = det.score(h.get("crop"))
+                close = close_crop(h.get("crop"))
+                if s is None or close is None or not (UNSURE_LO <= s < UNSURE_HI):
+                    normal.append(h)
+                    continue
+                # held in every state (a robot still deploying or returning sees it too); only an
+                # exploring robot drives over, the others decide on the distant view at the timeout
+                u = self.unsure[hid] = {"pos": list(h["pos"]), "conf_far": s, "since": self.t,
+                                        "crop": h.get("crop"), "close": close}
+                self.counters["detector_calls"] += 1
+                self.counters["detector_unsure"] += 1
+                self.events.append({"kind": "hotspot_unsure", "robot": self.id, "id": hid,
+                                    "pos": [round(h["pos"][0], 2), round(h["pos"][1], 2)], "crop": h.get("crop"),
+                                    "conf": s, "heatmap": det.heatmap(h.get("crop")),
+                                    "say": f"AI unsure {s * 100:.0f}%, moving closer"})
+                if self.look_at is None:
+                    self.look_at = hid
+            near = math.dist(self.pose[:2], h["pos"]) <= CLOSE_LOOK_M
+            if not near and self.t - u["since"] <= CLOSE_LOOK_TIMEOUT_S and u.get("approaching", True):
+                continue                                  # still on the way: not decided yet
+            s2 = det.score(u["close"]) if near else None
+            conf = s2 if s2 is not None else u["conf_far"]
+            finals.append(({**h, "crop": u["close"] if s2 is not None else h.get("crop"), "conf": conf,
+                            "detector": "model", "conf_far": u["conf_far"], "looked_closer": s2 is not None}, conf))
+            self.unsure.pop(hid, None)
+            if self.look_at == hid:
+                self.look_at = None
+        return normal, finals
+
+    def _look_closer(self):
+        """While an unsure hot spot is pending, own the path: drive to CLOSE_LOOK_STANDOFF_M of it.
+        Returns True while approaching (the caller skips frontier planning)."""
+        if self.look_at is None:
+            return False
+        u = self.unsure.get(self.look_at)
+        if u is None or self.t - u["since"] > CLOSE_LOOK_TIMEOUT_S:
+            if u is not None:
+                u["approaching"] = False              # decide on the distant view at the next sighting
+            self.look_at = None
+            return False
+        ux, uy = u["pos"]
+        d = math.dist(self.pose[:2], (ux, uy))
+        if d <= CLOSE_LOOK_M:
+            return False                                  # close enough: _perceive judges the close-up
+        goal = (ux + (self.pose[0] - ux) / d * CLOSE_LOOK_STANDOFF_M,
+                uy + (self.pose[1] - uy) / d * CLOSE_LOOK_STANDOFF_M)
+        if not self.path or self.target != list(goal) or self.t - self.last_plan_t > REPLAN_PERIOD:
+            if not self._plan_to(goal):
+                return False              # no route on our map yet: explore this tick, try again next
+        return True
 
     # ------------------------------------------------------------------ rescue route
     def _peer_found(self, sid):
@@ -632,6 +721,7 @@ class Robot:
         payload = {"survivor": sid, "by": self.id, "path": path, "length_m": length_m,
                    "clearance_m": clearance_m, "beacon": r["beacon"], "t": round(self.t, 1)}
         self.outbox.append(self._bundle("rescue_route", payload, 64 + 12 * len(path)))
+        self.counters["rescue_routes"] += 1
         self.events.append({"kind": "rescue_route", "robot": self.id, "survivor": sid, "path": path,
                             "length_m": length_m, "clearance_m": clearance_m, "beacon": r["beacon"],
                             "reason": reason})
@@ -759,6 +849,10 @@ class Robot:
         self.tasks = self.scheduler.run_frame(int(round(self.t / dt)))
         for name in dict.fromkeys(self.scheduler.new_misses):
             self.events.append({"kind": "deadline_miss", "robot": self.id, "task": name})
+        self.counters["deadlines_met"] = self.scheduler.met
+        self.counters["deadlines_missed"] = self.scheduler.missed
+        if not self.linked:
+            self.counters["dark_s"] = round(self.counters["dark_s"] + dt, 1)
 
     # ------------------------------------------------------------------ fault protection FSM
     #   NOMINAL --(wheel > 6 A for 0.5 s)--> OVERCURRENT -+
@@ -912,6 +1006,8 @@ class Robot:
             if self._path_blocked():
                 self._start_replan("obstacle")
                 return
+            if self._look_closer():                     # approaching an unsure hot spot
+                return
             if not self.path or self.t - self.last_plan_t > REPLAN_PERIOD:
                 if not self._plan_frontier():
                     self._set_state("RETURNING_HOME")   # nothing left to explore
@@ -986,6 +1082,7 @@ class Robot:
                 return
         if self.state != "REPLANNING":
             self.resume_state = self.state
+            self.counters["replans"] += 1
             self.events.append({"kind": "replan", "robot": self.id, "reason": reason})
         self.path = []
         self._set_state("REPLANNING")

@@ -1,0 +1,39 @@
+{
+ "variants": [
+  {
+   "file": "collapse_01_v1.json",
+   "id": "collapse_01_v1",
+   "name": "Eastside Warehouse Collapse, variant 1",
+   "base": "collapse_01",
+   "default_plan": "collapse_01_v1.plan.json"
+  },
+  {
+   "file": "collapse_01_v2.json",
+   "id": "collapse_01_v2",
+   "name": "Eastside Warehouse Collapse, variant 2",
+   "base": "collapse_01",
+   "default_plan": "collapse_01_v2.plan.json"
+  },
+  {
+   "file": "collapse_01_v3.json",
+   "id": "collapse_01_v3",
+   "name": "Eastside Warehouse Collapse, variant 3",
+   "base": "collapse_01",
+   "default_plan": "collapse_01_v3.plan.json"
+  },
+  {
+   "file": "collapse_01_v4.json",
+   "id": "collapse_01_v4",
+   "name": "Eastside Warehouse Collapse, variant 4",
+   "base": "collapse_01",
+   "default_plan": "collapse_01_v4.plan.json"
+  },
+  {
+   "file": "collapse_01_v5.json",
+   "id": "collapse_01_v5",
+   "name": "Eastside Warehouse Collapse, variant 5",
+   "base": "collapse_01",
+   "default_plan": "collapse_01_v5.plan.json"
+  }
+ ]
+}

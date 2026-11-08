@@ -1,0 +1,53 @@
+{
+ "note": "Pairs for the robot's 'AI unsure, moving closer' behaviour: the distant crop scores near 0.5 with the shipped model, the close-up of the same class is clear. Teledyne FLIR thermal dataset, val split.",
+ "crops": {
+  "unsure_person_01.png": {
+   "label": "person",
+   "split": "images_thermal_val (held out, never trained on)",
+   "frame": "video-zp8ed5vPKfAJ2fKWh-frame-001938-DJCRyQ7WeetwmSLnG.jpg",
+   "box_xyxy": [
+    472,
+    214,
+    556,
+    298
+   ],
+   "role": "unsure from a distance"
+  },
+  "unsure_person_01_close.png": {
+   "label": "person",
+   "split": "images_thermal_val (held out, never trained on)",
+   "frame": "video-JhYLiFCieHQHaY8o7-frame-002225-mmtt6AEj7rw4apcGq.jpg",
+   "box_xyxy": [
+    258,
+    196,
+    323,
+    261
+   ],
+   "role": "close-up view"
+  },
+  "unsure_object_01.png": {
+   "label": "car",
+   "split": "images_thermal_val (held out, never trained on)",
+   "frame": "video-nMfT5vK8MfEEjQ44W-frame-001500-ZFpATxvREwp4jKX8T.jpg",
+   "box_xyxy": [
+    166,
+    206,
+    249,
+    289
+   ],
+   "role": "unsure from a distance"
+  },
+  "unsure_object_01_close.png": {
+   "label": "car",
+   "split": "images_thermal_val (held out, never trained on)",
+   "frame": "video-JhYLiFCieHQHaY8o7-frame-000000-xT7BXRKKyuWEsnywX.jpg",
+   "box_xyxy": [
+    222,
+    174,
+    353,
+    305
+   ],
+   "role": "close-up view"
+  }
+ }
+}

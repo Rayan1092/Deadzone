@@ -128,7 +128,7 @@
    "id": "Z6",
    "robot": "R3",
    "priority": 2,
-   "comms": "relay",
+   "comms": "lost_link_ok",
    "poly": [
     [
      34.0,

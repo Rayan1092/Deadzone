@@ -137,6 +137,39 @@ def test_showcase_building_on_disk_matches_its_generator_and_plan():
         assert (ROOT / "data" / "floorplans" / "generated" / sample["default_plan"]).exists()
 
 
+def test_variants_of_the_demo_building_keep_the_dark_survivor_and_shuffle_the_rest(tmp_path):
+    base = json.loads((ROOT / "data" / "floorplans" / "collapse_01.json").read_text(encoding="utf-8"))
+    inherited = set(generate.validate(base))                     # collapse_01's own geometry findings
+    cage = next(r for r in base["rooms"] if r["id"] == "E2")
+    original = tuple(tuple(p["pos"]) for p in base["survivors"] + base["decoys"])
+    seen = set()
+    for seed in (1, 2, 3):
+        v = generate.variant_of(base, seed)
+        assert all(v[k] == base[k] for k in ("walls", "doors", "rooms", "hazards", "rubble", "entry", "command_post", "size"))
+        assert v["id"] == f"collapse_01_v{seed}" and v["default_plan"] == f"{v['id']}.plan.json"
+        assert not (set(generate.validate(v)) - inherited)
+        assert generate.in_poly(v["survivors"][0]["pos"], cage["poly"])          # the dark find stays in the cage
+        assert [s["thermal"] for s in v["survivors"]] == [s["thermal"] for s in base["survivors"]]
+        assert not any(generate.in_poly(d["pos"], cage["poly"]) for d in v["decoys"])
+        placement = tuple(tuple(p["pos"]) for p in v["survivors"] + v["decoys"])
+        assert placement != original and placement not in seen
+        seen.add(placement)
+        assert json.dumps(generate.variant_of(base, seed), sort_keys=True) == json.dumps(v, sort_keys=True)
+    folder = ROOT / "data" / "floorplans" / "variants"
+    index = json.loads((folder / "index.json").read_text(encoding="utf-8"))
+    assert [e["id"] for e in index["variants"]] == [f"collapse_01_v{s}" for s in range(1, 6)]
+    for e in index["variants"]:                                  # shipped files match the generator
+        on_disk = json.loads((folder / e["file"]).read_text(encoding="utf-8"))
+        again = generate.variant_of(base, on_disk["generator"]["seed"])
+        assert json.dumps(on_disk, sort_keys=True) == json.dumps(again, sort_keys=True)
+        assert (folder / e["default_plan"]).exists()
+    v1 = generate.variant_of(base, 1)
+    path = tmp_path / "v1.json"
+    path.write_text(json.dumps(v1))
+    result = generate.check_plan(path, generate.default_plan(v1))
+    assert result["ok"], result["violations"]
+
+
 def test_robots_run_the_showcase_with_its_plan_and_earthquake():
     data = json.loads(SHOWCASE.read_text(encoding="utf-8"))
     plan = generate.default_plan(data)

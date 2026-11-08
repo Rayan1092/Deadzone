@@ -57,7 +57,13 @@ class Scheduler:
         self.jobs = []                 # unfinished jobs carried between frames
         self.misses = {name: 0 for name in NAMES}
         self.new_misses = []           # task names that missed a deadline in the last frame
+        self.met = 0                   # jobs finished before their deadline (cumulative)
         self._cache = {}
+
+    @property
+    def missed(self):
+        """Deadline misses so far: late jobs plus releases skipped because the last job overran."""
+        return sum(self.misses.values())
 
     def set_wcet(self, name, ms):
         self.wcet[name] = int(ms)
@@ -74,13 +80,18 @@ class Scheduler:
         if not self.jobs and self.nominal():
             key = frame % self.cycle
             if key not in self._cache:
+                met_before = self.met
                 slices, left = self._simulate(key)
                 if left:                     # cannot happen at U = 0.377, but stay correct
                     self.jobs = left
                     return slices
-                self._cache[key] = slices
+                self._cache[key] = (slices, self.met - met_before)
+                self.new_misses = []
+                return slices
+            slices, met = self._cache[key]   # a cached frame still finished its jobs on time
+            self.met += met
             self.new_misses = []
-            return self._cache[key]
+            return slices
         slices, self.jobs = self._simulate(frame, self.jobs)
         return slices
 
@@ -114,6 +125,8 @@ class Scheduler:
                 slices.append({"name": job.name, "start": ms, "dur": 1, "missed": job.missed})
             last = job
             if job.left <= 0:
+                if not job.missed:
+                    self.met += 1
                 jobs.remove(job)
                 last = None
         return slices, jobs

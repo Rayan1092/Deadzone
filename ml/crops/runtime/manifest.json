@@ -93,6 +93,54 @@
     5.0,
     26.0
    ]
+  },
+  {
+   "id": null,
+   "file": "unsure_object_01.png",
+   "heatmap": "heatmaps/unsure_object_01.png",
+   "heatmap_alpha": "heatmaps/unsure_object_01_alpha.png",
+   "label": "not person",
+   "conf": 0.497,
+   "predicted": "not person",
+   "role": null,
+   "object": null,
+   "pos": null
+  },
+  {
+   "id": null,
+   "file": "unsure_object_01_close.png",
+   "heatmap": "heatmaps/unsure_object_01_close.png",
+   "heatmap_alpha": "heatmaps/unsure_object_01_close_alpha.png",
+   "label": "not person",
+   "conf": 0.0,
+   "predicted": "not person",
+   "role": null,
+   "object": null,
+   "pos": null
+  },
+  {
+   "id": null,
+   "file": "unsure_person_01.png",
+   "heatmap": "heatmaps/unsure_person_01.png",
+   "heatmap_alpha": "heatmaps/unsure_person_01_alpha.png",
+   "label": "not person",
+   "conf": 0.519,
+   "predicted": "not person",
+   "role": null,
+   "object": null,
+   "pos": null
+  },
+  {
+   "id": null,
+   "file": "unsure_person_01_close.png",
+   "heatmap": "heatmaps/unsure_person_01_close.png",
+   "heatmap_alpha": "heatmaps/unsure_person_01_close_alpha.png",
+   "label": "not person",
+   "conf": 1.0,
+   "predicted": "person",
+   "role": null,
+   "object": null,
+   "pos": null
   }
  ]
 }

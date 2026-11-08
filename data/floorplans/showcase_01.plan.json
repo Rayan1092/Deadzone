@@ -440,7 +440,7 @@
    "id": "Z19",
    "robot": "R3",
    "priority": 4,
-   "comms": "relay",
+   "comms": "lost_link_ok",
    "poly": [
     [
      64.0,

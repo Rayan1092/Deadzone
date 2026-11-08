@@ -104,7 +104,7 @@
    "id": "Z5",
    "robot": "R3",
    "priority": 1,
-   "comms": "relay",
+   "comms": "lost_link_ok",
    "poly": [
     [
      34.0,

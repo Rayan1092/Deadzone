@@ -64,6 +64,9 @@ MORE_NAMES = ["Open Office", "Archive", "Mail Room", "Copy Room", "Meeting Room"
 HAZARDS = ["gas", "fire", "flooding", "unstable_floor"]
 DECOYS = [("radiator", "neg_0001.png"), ("engine", "neg_0002.png"), ("coffee machine", "neg_0003.png")]
 SURVIVOR_CROPS = ["pos_0001.png", "pos_0002.png", "pos_0003.png"]
+# crops the model scores near 0.5 from a distance, each with a clear <name>_close.png: the robot
+# says "AI unsure, moving closer" and decides on the close-up (showcase and key-N variants only)
+UNSURE_PERSON, UNSURE_OBJECT = "unsure_person_01.png", "unsure_object_01.png"
 DOOR_W = 1.2
 MAX_VARIANTS = 40
 ROBOTS = ["R1", "R2", "R3"]                        # the default plan assumes the demo's 3 robots
@@ -402,6 +405,10 @@ def place_people(data, rng, info):
         return False
     data["survivors"] = [{"id": f"S{k + 1}", "pos": [r1(x), r1(y)], "thermal": SURVIVOR_CROPS[k % len(SURVIVOR_CROPS)]}
                          for k, (x, y) in enumerate(chosen)]
+    if info.get("big"):
+        # the entrance-hall survivor and the second decoy use the crops the model is unsure about
+        # from a distance, so the showcase shows "AI unsure, moving closer" in its first minute
+        data["survivors"][len(info["cages"])]["thermal"] = UNSURE_PERSON
     decoys = []
     for p in far:
         if len(decoys) == n:
@@ -412,6 +419,8 @@ def place_people(data, rng, info):
         return False
     data["decoys"] = [{"id": f"D{k + 1}", "label": DECOYS[k % len(DECOYS)][0], "pos": [r1(x), r1(y)],
                        "thermal": DECOYS[k % len(DECOYS)][1]} for k, (x, y) in enumerate(decoys)]
+    if info.get("big") and len(data["decoys"]) > 1:
+        data["decoys"][1]["thermal"] = UNSURE_OBJECT
     return True
 
 
@@ -498,6 +507,8 @@ def default_plan(data, robots=ROBOTS):
     cmd = data["command_post"]
     hazards = data["hazards"]
     steel_ids = {r["id"] for r in steel_rooms(data)}
+    steel_centres = [((r["poly"][0][0] + r["poly"][2][0]) / 2, (r["poly"][0][1] + r["poly"][2][1]) / 2)
+                     for r in steel_rooms(data)]
 
     def bounds(poly):
         xs, ys = [p[0] for p in poly], [p[1] for p in poly]
@@ -541,8 +552,11 @@ def default_plan(data, robots=ROBOTS):
         acc += a
         centre = ((x0 + x1) / 2, (y0 + y1) / 2)
         level = rssi(fp, cmd["pos"], centre, cmd["tx_dbm"])
+        # a zone that holds a steel dead zone may go dark even if its centre is in range
+        # (the warehouse floor is in line of sight down the corridor, the cage inside it is not)
+        holds_dead_zone = any(in_poly(steel_centre, rect(x0, y0, x1, y1)) for steel_centre in steel_centres)
         zones.append({"robot": robots[robot], "poly": rect(x0, y0, x1, y1), "dist": math.dist(entry, centre),
-                      "comms": "relay" if level >= LINK_DOWN_DBM + COMMS_MARGIN_DB else "lost_link_ok"})
+                      "comms": "lost_link_ok" if holds_dead_zone or level < LINK_DOWN_DBM + COMMS_MARGIN_DB else "relay"})
     plan_zones = []
     for rid in robots:
         mine = sorted([z for z in zones if z["robot"] == rid], key=lambda z: z["dist"])
@@ -590,6 +604,82 @@ def generate(seed, size=None, plan_id=None, name=None):
                 "every room at least 30% reachable", "every steel room has no direct link to the command post"]}
             return data
     raise RuntimeError(f"seed {seed}: no valid building in {MAX_VARIANTS} variants ({last})")
+
+
+def variant_of(base, seed):
+    """Key N: the same building with the people shuffled. A validated variant of `base`
+    (collapse_01): walls, rooms, doors, hazards, rubble, entry and command post stay byte for
+    byte; one survivor stays deep inside every steel dead zone (the S1-style dark find), the other
+    survivors and all decoys move to new reachable cells out of hazards and debris, at least 8 m
+    from the entrance, people 6 m apart, decoys 4 m from everyone and never inside a dead zone.
+    Crops stay with their slot (S1 keeps pos_0001.png ...), so the detector's verdicts are the
+    same as in the demo. Deterministic for (base id, seed)."""
+    if not isinstance(seed, int) or seed < 0:
+        raise ValueError("seed must be a non-negative integer")
+    base_id = base["id"]
+    inherited = set(validate(base))     # geometry findings the base already has (collapse_01's gas
+    for attempt in range(MAX_VARIANTS):  # room is mostly hazard); a variant is judged on its people only
+        rng = random.Random(f"variant:{base_id}:{seed}:{attempt}")
+        data = json.loads(json.dumps(base))
+        fp = FloorPlan(data)
+        reach = reachable(fp)
+        iy, ix = np.nonzero(reach)
+        entry = fp.entry
+        far = [((x + 0.5) * fp.cell, (y + 0.5) * fp.cell) for x, y in zip(ix, iy)]
+        far = [p for p in far if math.dist(p, entry) >= 8 and not any(in_poly(p, h["poly"]) for h in data["hazards"])]
+        rng.shuffle(far)
+        steel = [r["poly"] for r in steel_rooms(data)]
+        chosen = []
+        for poly in steel:
+            inside = sorted((p for p in far if in_poly(p, poly)), key=lambda p: -math.dist(p, entry))
+            if not inside:
+                break
+            chosen.append(rng.choice(inside[:max(1, len(inside) // 3)]))   # the deep third of the room
+        for p in far:
+            if len(chosen) == len(base["survivors"]):
+                break
+            if not any(in_poly(p, s) for s in steel) and all(math.dist(p, c) >= 6 for c in chosen):
+                chosen.append(p)
+        decoys = []
+        for p in far:
+            if len(decoys) == len(base.get("decoys", [])):
+                break
+            if not any(in_poly(p, s) for s in steel) and all(math.dist(p, c) >= 4 for c in chosen + decoys):
+                decoys.append(p)
+        if len(chosen) < len(base["survivors"]) or len(decoys) < len(base.get("decoys", [])):
+            continue
+        data["survivors"] = [dict(s, pos=[r1(x), r1(y)]) for s, (x, y) in zip(base["survivors"], chosen)]
+        data["decoys"] = [dict(d, pos=[r1(x), r1(y)]) for d, (x, y) in zip(base.get("decoys", []), decoys)]
+        # the last survivor and the last decoy take the "unsure from a distance" crops, so key N
+        # also shows the look-closer moment; the dead-zone survivor keeps the demo's crop
+        if len(data["survivors"]) > len(steel):
+            data["survivors"][-1]["thermal"] = UNSURE_PERSON
+        if data["decoys"]:
+            data["decoys"][-1]["thermal"] = UNSURE_OBJECT
+        data["id"] = f"{base_id}_v{seed}"
+        data["name"] = f"{base['name']}, variant {seed}"
+        data["generator"] = {"kind": "variant", "base": base_id, "seed": seed, "attempt": attempt, "version": VERSION,
+                             "people": len(chosen)}
+        data["default_plan"] = f"{data['id']}.plan.json"
+        if not [p for p in validate(data) if p not in inherited]:
+            data["validation"] = {"ok": True, "checks": [
+                "same walls, rooms, hazards, debris, entry and command post as the base building",
+                "one survivor deep inside every steel dead zone", "survivors and decoys reachable, out of hazards and debris",
+                "every steel room has no direct link to the command post"]}
+            return data
+    raise RuntimeError(f"{base_id} variant {seed}: no valid placement in {MAX_VARIANTS} attempts")
+
+
+def write_variant_index(folder):
+    """variants/index.json: the files in the folder, for the reset-into-floorplan control to pick from."""
+    files = sorted(p.name for p in Path(folder).glob("*.json") if not p.name.endswith(".plan.json") and p.name != "index.json")
+    entries = []
+    for name in files:
+        d = json.loads((Path(folder) / name).read_text(encoding="utf-8"))
+        entries.append({"file": name, "id": d["id"], "name": d["name"], "base": d.get("generator", {}).get("base"),
+                        "default_plan": d.get("default_plan")})
+    (Path(folder) / "index.json").write_text(json.dumps({"variants": entries}, indent=1), encoding="utf-8")
+    return entries
 
 
 def play(sim, timeline, done):
@@ -695,9 +785,17 @@ def main():
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--png", type=Path, default=None)
     ap.add_argument("--check", action="store_true", help="run the default plan through the safety checker")
+    ap.add_argument("--variant-of", type=Path, default=None, metavar="BUILDING.json",
+                    help="instead of a new building: the same building with survivors and decoys shuffled "
+                         "(key N), written to data/floorplans/variants/<id>_v<seed>.json")
     args = ap.parse_args()
-    data = generate(args.seed, size=tuple(args.size) if args.size else None, plan_id=args.id, name=args.name)
-    out = args.out or HERE / "generated" / f"{data['id']}.json"
+    if args.variant_of:
+        base = json.loads(args.variant_of.read_text(encoding="utf-8"))
+        data = variant_of(base, args.seed)
+        out = args.out or HERE / "variants" / f"{data['id']}.json"
+    else:
+        data = generate(args.seed, size=tuple(args.size) if args.size else None, plan_id=args.id, name=args.name)
+        out = args.out or HERE / "generated" / f"{data['id']}.json"
     if out.resolve() == (HERE / "collapse_01.json").resolve():
         sys.exit("refusing to overwrite collapse_01.json")
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -707,10 +805,16 @@ def main():
     plan_path.write_text(json.dumps(plan, indent=1), encoding="utf-8")
     if args.png:
         preview(data, args.png, plan)
+    if args.variant_of:
+        index = write_variant_index(out.parent)
+        print(f"wrote {out}: people shuffled, {len(data['survivors'])} survivors, {len(data['decoys'])} decoys; "
+              f"index.json lists {len(index)} variant(s)")
     W, H = data["size"]
+    g = data["generator"]
     print(f"wrote {out}: {W:g} x {H:g} m, {len(data['rooms'])} rooms, {len(steel_rooms(data))} steel dead zone(s), "
           f"{len(data['hazards'])} hazards, {len(data['rubble'])} debris piles, {len(data['survivors'])} survivors, "
-          f"{sum(e['do'] == 'aftershock' for e in data['timeline'])} collapse area(s), variant {data['generator']['variant']}")
+          f"{sum(e['do'] == 'aftershock' for e in data.get('timeline', []))} collapse area(s), "
+          f"variant {g.get('variant', g.get('attempt'))}")
     print(f"wrote {plan_path}: {len(plan['zones'])} zones, "
           f"{sum(z['comms'] == 'lost_link_ok' for z in plan['zones'])} lost_link_ok")
     if args.check:
