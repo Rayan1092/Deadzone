@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "origin": "https://sacred-thirty-grad-respect.trycloudflare.com",
+  "checks": [
+    "screen/phone/microphone HTML and built assets over HTTPS",
+    "API and QR join use the same HTTPS origin",
+    "screen + two Command-only phone handshakes over WSS"
+  ],
+  "microphone": "requires manual phone /mic-check test",
+  "venue_wifi": "User confirmed laptop is on venue Wi-Fi; public HTTPS/WSS probe passed from that laptop",
+  "phone_microphone": "Awaiting physical phone record/playback result; phone must use venue Wi-Fi"
+}

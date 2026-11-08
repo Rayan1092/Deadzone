@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deadzone microphone check</title>
+<style>body{max-width:38rem;margin:3rem auto;padding:1rem;font:18px system-ui;background:#101b24;color:#edf7fc}button{padding:1rem;font:inherit}audio{display:block;width:100%;margin-top:1rem}#status{white-space:pre-wrap}</style>
+<h1>Phone microphone check</h1>
+<p>Record five seconds, then play it back. Audio stays on this device and is never uploaded. This checks microphone access; voice commands are a separate feature.</p>
+<p id="status"></p><button id="record">Record five seconds</button><audio id="playback" controls></audio>
+<script>
+const status = document.querySelector('#status'), button = document.querySelector('#record'), playback = document.querySelector('#playback');
+status.textContent = window.isSecureContext ? 'Secure connection ready. Allow microphone access when prompted.' : 'Open the HTTPS tunnel URL or localhost to use the microphone.';
+button.disabled = !window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !window.MediaRecorder;
+let stream, recorder, timer, previousURL;
+function cleanup() { clearTimeout(timer); stream?.getTracks().forEach(t => t.stop()); stream = undefined; }
+button.onclick = async () => {
+  button.disabled = true;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    recorder = new MediaRecorder(stream);
+    const parts = [];
+    recorder.ondataavailable = e => { if (e.data.size) parts.push(e.data); };
+    recorder.onerror = () => { status.textContent = 'Recording failed. Check this browser’s microphone settings.'; cleanup(); button.disabled = false; };
+    recorder.onstop = () => {
+      cleanup();
+      if (previousURL) URL.revokeObjectURL(previousURL);
+      previousURL = URL.createObjectURL(new Blob(parts, {type:recorder.mimeType}));
+      playback.src = previousURL;
+      status.textContent = parts.length ? 'Recording finished. Tap Play to check the sound.' : 'No audio recorded. Check microphone permissions and try again.';
+      button.disabled = false;
+    };
+    recorder.start(); status.textContent = 'Recording for five seconds…';
+    timer = setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, 5000);
+  } catch (error) {
+    cleanup(); status.textContent = 'Microphone unavailable: ' + error.name + '. Check browser permissions and try again.'; button.disabled = false;
+  }
+};
+window.addEventListener('pagehide', () => { if (recorder?.state === 'recording') recorder.stop(); cleanup(); });
+</script></html>

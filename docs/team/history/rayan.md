@@ -24,11 +24,12 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
     py ml/promote_if_better.py --candidate ml/models/detector_logged.pt
     # only if it printed PROMOTED: regenerate everything that depends on the model, then check the demo
     py ml/eval.py; py ml/gradcam.py; py ml/make_slide_assets.py
-    cd server; py -m pytest -q tests/test_demo_guard.py tests/test_gradcam.py tests/test_ai_lab.py; cd ..
+    cd server; py -m pytest -q tests/test_demo_guard.py tests/test_gradcam.py tests/test_ai_lab_export.py tests/test_ai_lab.py; cd ..
     # always:
     py ml/make_ai_lab.py
     ```
     Commit `ml/results/train_history.json`, `ml/results/lab.json`, `ml/results/lab/*.png` (and, only if promoted, `ml/models/detector.pt`, `ml/results/metrics.json`, `ml/results/confusion_matrix.png`, `ml/crops/runtime/manifest.json`, `ml/crops/runtime/heatmaps/*.png`, `docs/assets/*.png`). Never commit `ml/models/detector_logged.pt` or `detector_prev.pt`.
+- **Note:** my format test is `server/tests/test_ai_lab_export.py`; `server/tests/test_ai_lab.py` is Aziz's serving test (PR #69), untouched.
 - **Next:** `rayan/scenario-gen`.
 
 ### 2026-11-08 05:00 · rayan/team-sync-rule · INSTRUCTIONS.md: run /team-sync before each task and every 30 minutes

@@ -1,54 +1,66 @@
-"""AI Lab export (ml/make_ai_lab.py) matches the format Yusuf asked for in yusuf.md and only
-points at files that exist. No torch needed."""
-import json
+"""Exercise real export bytes and opt-in/read-only boundaries through ASGI."""
+import importlib
 import sys
 from pathlib import Path
 
-from PIL import Image
+import pytest
+from fastapi.testclient import TestClient
+from starlette.applications import Starlette
+from starlette.routing import Mount
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from deadzone.ai_lab import AILabAssets
 
-from deadzone.robot.perception import CROP_DIR, ML_DIR  # noqa: E402
-
-RESULTS = ML_DIR / "results"
-LAB = json.loads((RESULTS / "lab.json").read_text(encoding="utf-8"))
-
-
-def test_top_level_shape():
-    assert {"model", "metrics", "confusion", "curve", "examples"} <= set(LAB)
-    assert {"name", "input_px", "params", "onboard_ms"} <= set(LAB["model"])
-    assert {"accuracy", "precision", "recall", "f1", "n_test"} <= set(LAB["metrics"])
+api = importlib.import_module("deadzone.app")
+ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_metrics_and_confusion_match_eval():
-    m = json.loads((RESULTS / "metrics.json").read_text())
-    c = m["confusion"]
-    assert LAB["confusion"]["labels"] == ["person", "not person"]
-    assert LAB["confusion"]["matrix"] == [[c["tp"], c["fn"]], [c["fp"], c["tn"]]]
-    assert sum(map(sum, LAB["confusion"]["matrix"])) == LAB["metrics"]["n_test"] == m["n"]
-    assert abs(LAB["metrics"]["accuracy"] - m["accuracy"]) < 1e-3
+def test_feature_disabled(monkeypatch):
+    monkeypatch.delenv("DZ_AI_LAB", raising=False)
+    with TestClient(api.app) as client:
+        for path in ("results/metrics.json", "slides/confusion_matrix.png"):
+            assert client.get("/ai-lab/" + path).status_code == 404
+            assert client.head("/ai-lab/" + path).status_code == 404
 
 
-def test_examples_are_12_and_12_and_exist_at_192px():
-    ex = LAB["examples"]
-    assert sum(e["label"] == "person" for e in ex) == 12
-    assert sum(e["label"] == "not person" for e in ex) == 12
-    for e in ex:
-        assert {"file", "label", "predicted", "conf"} <= set(e)
-        path = RESULTS / e["file"]
-        assert path.is_file() and Image.open(path).size == (192, 192)
-        assert e["predicted"] == ("person" if e["conf"] >= LAB["model"]["threshold"] else "not person")
+@pytest.mark.parametrize("root,asset,media", [
+    ("results", "metrics.json", "application/json"),
+    ("results", "confusion_matrix.png", "image/png"),
+    ("slides", "pipeline.png", "image/png"),
+    ("slides", "crops_grid.png", "image/png"),
+    ("slides", "stats_card.png", "image/png"),
+    ("slides", "benchmark.json", "application/json"),
+])
+def test_export_bytes_and_head(monkeypatch, root, asset, media):
+    monkeypatch.setenv("DZ_AI_LAB", "1")
+    directory = ROOT / ("ml/results" if root == "results" else "docs/assets")
+    with TestClient(api.app) as client:
+        url = f"/ai-lab/{root}/{asset}"
+        response = client.get(url)
+        assert response.status_code == 200
+        assert response.content == (directory / asset).read_bytes()
+        assert response.headers["content-type"].startswith(media)
+        assert response.headers["cache-control"] == "no-cache"
+        head = client.head(url)
+        assert head.status_code == 200 and head.content == b""
+        assert head.headers["content-length"] == response.headers["content-length"]
+        monkeypatch.setenv("DZ_AI_LAB", "0")
+        assert client.get(url, headers={"If-None-Match": response.headers["etag"]}).status_code == 404
 
 
-def test_curve_points_have_all_fields():
-    for p in LAB["curve"]:
-        assert {"epoch", "train_loss", "val_loss", "train_acc", "val_acc"} <= set(p)
-    assert LAB["curve"] or "pending" in LAB["curve_note"]
-
-
-def test_runtime_crops_point_at_served_files():
-    assert len(LAB["runtime"]) == 6
-    for e in LAB["runtime"]:
-        for key in ("file", "heatmap", "heatmap_alpha"):
-            assert e[key].startswith("/crops/")
-            assert (CROP_DIR / e[key][len("/crops/"):]).is_file()
+def test_read_only_and_path_boundaries(monkeypatch, tmp_path):
+    monkeypatch.setenv("DZ_AI_LAB", "1")
+    exports = tmp_path / "exports"
+    exports.mkdir()
+    (exports / "curve.json").write_text('{"epochs": [1]}')
+    (exports / "weights.pt").write_bytes(b"not-public")
+    (exports / ".private.json").write_text('{"private": true}')
+    (tmp_path / "outside.json").write_text('{"outside": true}')
+    app = Starlette(routes=[Mount("/exports", app=AILabAssets(directory=exports))])
+    with TestClient(app) as client:
+        assert client.get("/exports/curve.json").json() == {"epochs": [1]}
+        for path in ("", "missing.json", "weights.pt", ".private.json", "%2e%2e%2foutside.json"):
+            assert client.get("/exports/" + path).status_code == 404
+        for method in ("POST", "PUT", "PATCH", "DELETE"):
+            assert client.request(method, "/exports/curve.json", content=b"overwrite").status_code == 405
+        assert (exports / "curve.json").read_text() == '{"epochs": [1]}'
