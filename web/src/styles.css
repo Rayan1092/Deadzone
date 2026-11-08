@@ -369,13 +369,41 @@ button:hover { border-color: var(--teal); }
 .split.single { grid-template-columns: 1fr; }
 .view-btn { padding: 6px 12px; }
 
-/* Command inset: top-right corner of the one-view pane */
-.cmd-inset { position: absolute; z-index: 4; top: 70px; right: 12px; width: 300px; height: 232px; display: flex;
-  flex-direction: column; overflow: hidden; border-radius: 14px; border: 1px solid rgba(127,178,255,.35);
+/* Command post inset (one view): about a quarter of the screen, bottom right. C swaps it with the main view. */
+.pane-view { position: absolute; inset: 0; }
+.cmd-inset { position: absolute; z-index: 4; right: 12px; bottom: 12px; width: 46%; height: 48%; display: flex;
+  flex-direction: column; overflow: hidden; border-radius: 14px; border: 1px solid rgba(245,158,11,.45);
   background: #081325; box-shadow: 0 12px 32px rgba(0,0,0,.5), var(--glass-hi); }
-.cmd-inset > div:not(.inset-head) { flex: 1; }
-.inset-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12px; color: #bfdbfe;
-  border-bottom: 1px solid rgba(127,178,255,.2); }
+.cmd-inset > div:not(.inset-head):not(.inset-legend) { flex: 1; min-height: 0; }
+.inset-head, .view-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 12px; font-size: 15px; color: #fde68a;
+  border-bottom: 1px solid rgba(245,158,11,.25); background: rgba(8,19,37,.92); white-space: nowrap; }
+.inset-head b, .view-head b { font-weight: 700; }
+.inset-head span, .view-head span { color: rgba(230,237,243,.8); font-weight: 500; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.inset-swap { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; font-size: 13px; border-radius: 999px; flex: none; }
+.inset-swap kbd { font: 600 11px 'JetBrains Mono', ui-monospace, monospace; padding: 0 4px; border-radius: 4px; background: #232a31; border: 1px solid #3a434d; }
+/* swapped: the command post fills the pane, the building view becomes the inset */
+.cmd-inset.big { z-index: 1; inset: 0; width: auto; height: auto; border: 0; border-radius: 0; box-shadow: none; }
+.cmd-inset.big .inset-head { position: absolute; z-index: 2; top: 70px; left: 12px; padding: 8px 14px; font-size: 17px;
+  border: 1px solid rgba(245,158,11,.45); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.inset-legend { z-index: 2; }
+.pane-gap.swapped > .pane-title, .pane-gap.swapped > .pane-legend { display: none; }
+.pane-gap.swapped > .pane-view { z-index: 4; inset: auto 12px 12px auto; width: 32%; height: 36%; overflow: hidden; border-radius: 14px;
+  border: 1px solid rgba(45,212,191,.45); box-shadow: 0 12px 32px rgba(0,0,0,.5); }
+.pane-gap.swapped > .pane-view > div:not(.view-head) { height: calc(100% - 38px) !important; }
+.view-head { color: #99f6e4; border-bottom-color: rgba(45,212,191,.25); }
+/* last-report tags on the blueprint: robot id; dark robots grey with the counter */
+.inset-tag { transform: translate(-50%, calc(-100% - 12px)); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 2px 8px; border-radius: 999px; font-size: 12px; color: #e6edf3; background: rgba(8,19,37,.88); border: 1px solid rgba(127,178,255,.4); }
+.inset-tag b { font-weight: 700; }
+.inset-tag.dark { color: #cbd5e1; border-color: #64748b; background: rgba(30,41,59,.92); }
+.inset-tag.dark span { font-variant-numeric: tabular-nums; }
+.inset-tag.survivor { transform: translate(14px, -50%); color: #fde68a; border-color: rgba(245,158,11,.7); }
+.pane-gap.swapped .robot-eye { display: none; } /* the scout camera belongs to the building view */
+.cmd-inset.big .inset-tag { font-size: 15px; padding: 3px 10px; }
+.lg-robot { width: 9px; height: 9px; border-radius: 50%; background: var(--teal); }
+.lg-robot.dark { background: transparent; border: 2.5px solid #64748b; width: 10px; height: 10px; box-sizing: border-box; }
+.lg-survivor { width: 10px; height: 10px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 0 3px rgba(251,191,36,.3); }
+.split.single .director-chip { left: 27%; }
 .pane-gap .robot-eye { right: auto; left: 12px; top: 170px; } /* below the headline toast */
 
 /* status tags: amber while Command hasn't heard yet */
@@ -386,7 +414,7 @@ button:hover { border-color: var(--teal); }
 .lg-haze { width: 14px; height: 10px; border-radius: 2px; background: rgba(245,158,11,.45); }
 .lg-link.tether { border-top: 2px dashed var(--amber); }
 .lg-route { width: 16px; height: 0; border-top: 3px dashed #facc15; }
-.pane-gap .det-cards { top: 296px; bottom: auto; right: 12px; width: 300px; }
+.pane-gap .det-cards { top: 70px; bottom: auto; right: 12px; width: 300px; max-height: calc(52% - 96px); overflow: hidden; }
 
 /* AI Lab (L) */
 .lab-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(5,7,9,.55);
