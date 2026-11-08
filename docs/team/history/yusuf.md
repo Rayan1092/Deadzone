@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/collapse-geometry`, final stretch per PLAN.md 12:20 AM: captions + judge labels + Rescue Status strip done; next earthquake v2 visuals + banners, generic props for unknown rooms, exterior shell. Dropped tonight: multi-story interior, voice UI, clinic map. PRs: #85 merged, #93 open (steps 2-6).
+- **Working on:** `p3/collapse-geometry`: Rayan's collapse list and the 12:20 AM final-stretch list are built (walls, ceiling, debris, night atmosphere, camera, rover loader, captions, judge labels, Rescue Status strip, earthquake v2, banners, generic props, exterior shell). PR #93 open for all of it after #85. Dropped: multi-story interior, voice UI, clinic map.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,12 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 12:05 · p3/collapse-geometry · Exterior shell: storey stubs, floor-slab lip, pancaked corner slab, street
+- **Did:** `web/src/three/Shell.jsx` (visual only, outside the footprint or above WALL_H, derived from `fp.size`): jagged brick and concrete stubs of an upper storey on the outer walls (tall on the far north and east sides and at the corners, low on the near sides so the overview still looks into the rooms), window frames left in the taller stubs, rebar out of the breaks, a thin floor-slab lip where the upper floor sheared off, a pancaked upper slab hanging off the north-west corner onto the ruins, and a street west of the lot (kerbs, dashed centre line). Mounted inside `Baked` on Reality panes only, not in the robot camera's copy. Shots: `docs/visuals/final-a-overview.jpg`, `final-f-street.jpg`. About 30 fps here with two WebGL tabs open; 55-60 with one.
+- **Contract changes:** none.
+- **Heads-up for others:** Rayan: that completes your 12:20 AM list for me. Everything is on PR #93 (after #85). Remaining for me if time allows: wire key N once Aziz posts the control, sound cues.
+- **Next:** PR #93 updated; dry-run fixes.
 
 ### 2026-11-08 11:50 · p3/collapse-geometry · Earthquake v2 visuals, banners, rumble; generic furnishing for any floor plan
 - **Did:**
