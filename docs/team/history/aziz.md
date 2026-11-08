@@ -4,11 +4,11 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** p2/public-tunnel-origin follow-up validated; publish draft for review, no late merge without user deadline extension. Performance #207 already merged before 1:30.
+- **Working on:** p2/public-tunnel-origin / PR #209 validated; user explicitly approved the deadline extension. Merge and restart the existing backend with its public tunnel origin. Performance #207 merged before 1:30.
 - **Works on main:** performance #207 merged at 1:23 Eastern (841 backend / 1 skipped, 105 web/build); deployment #186/#191/#199 and LAN #178. Latest main also includes Rayan's README #208.
 - **In flight (not merged):** shared validated phone URL helper; configured-only public_url/phone_url in both hello messages; exact PowerShell assignment from tunnel.ps1; DEMO order tunnel -> set server-terminal origin -> start server.
 - **Validation:** targeted public URL / script checks and full backend in progress. Existing live user-test server and tunnel remain on merged #207; private .env untouched.
-- **Blocked on / need from others:** permission to merge this follow-up after 1:30 Eastern if tests run beyond it. Do not treat silence as approval.
+- **Blocked on / need from others:** none. User explicitly answered "Yes, finish and merge the follow-up" after the full suite passed.
 
 ## Log
 
@@ -16,7 +16,8 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 - **Did:** factored the existing /api/join URL validation/LAN fallback into a shared helper; both screen and phone hello advertise the configured public origin and /phone link. The Q/QR endpoint uses the same helper. tunnel.ps1 prints an exact copyable $env:DZ_PUBLIC_URL assignment and DEMO explicitly starts tunnel, sets that variable in the server terminal, then starts server. Setting it in the tunnel terminal cannot update an already-running backend.
 - **Contract changes:** when DZ_PUBLIC_URL is configured and valid, hello.data adds public_url and phone_url on screen/phone sockets. With it unset these fields are absent, preserving old hello shape. Invalid settings remain a 503 at /api/join and are never advertised. REST {url} shape and LAN fallback unchanged.
 - **Validation:** configured screen/phone hello equals /api/join; no advertisement for missing/invalid/credential-bearing origins; script double checks exact printed assignment. Targeted suite 101 passed; full backend 842 passed / 1 skipped (564.39 s), demo guard green. No private keys or protected sources changed.
-- **Next:** immediate main sync and draft follow-up PR. Full suite ended after the deadline; merge only if user extends it.
+- **Approval:** user explicitly authorized finishing and merging after 1:30 Eastern.
+- **Next:** user approved the deadline extension after validation; mark #209 ready, merge, and restart/verify the existing user-testing backend. No additional feature work.
 
 ### 2026-11-08 PT - p2/tunnel-performance - Production HTTP and remote viewer streams
 - **Did:** confirmed the backend already serves web/dist (baseline was not Vite); added GZipMiddleware minimum_size=1000, immutable one-year caching only on hashed production assets, revalidated HTML, default-on lossless screen deltas with legacy opt-out. Public HTTPS pages auto-select a per-socket lite stream; localhost/private LAN keep full detail. DEMO tells operators to build before starting, keep the laptop local and use the tunnel for phones/viewers.
