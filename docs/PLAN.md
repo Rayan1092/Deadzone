@@ -105,44 +105,48 @@ Microphones need `https` or `localhost`: push-to-talk works on the big-screen la
 | Lease API: claim, release, heartbeat, expiry, presenter override; enforced on `/api/voice` and every direct command; lease state broadcast to phones and screens | Aziz |
 | Phone robot picker showing each robot's controller, take and release buttons, locked state; presenter override on the big screen | Yusuf |
 
-### Hyper-realism, honest scout camera and judge-first UI (9:50 PM update, Yusuf)
+### Purpose, trust and visibility pass (midnight update)
 
-Yusuf asked for the most realistic look we can ship, a scout camera that matches what the robot really sees, every object classified, realistic people that robots never run over, realistic beacons, and a screen a judge understands at first glance. Where each part lives:
+Everything we ship from here must pass one test: **a judge can answer "did we find someone, and can rescuers get to them?" from the screen in five seconds, and can verify the AI is real with their own hands.** Rayan owns the story and the judge experience from now on; Aziz and Yusuf own the implementation in their areas.
 
-**Branches, merge in this order:**
-1. `p3/collapse` (#70): collapse look, AI Lab (L), night lighting (K), auto-director (D).
-2. `p3/disaster`: the whole site as a disaster zone, one rover model for map and camera, scheduler redesign.
-3. `p3/hyperreal`: photo-scanned materials and sky, honest scout camera, true-scale people, rugged relays, first-glance explainer. Also one small robot commit for Rayan to review.
-4. `p3/clinic-map` (from `p3/disaster`): second building `clinic_02` and the `DZ_FLOORPLAN` switch, for Rayan and Aziz to review.
+**Trust: judges verify the AI themselves**
 
-**Done:**
-- **Photo-scanned world:** seven CC0 Poly Haven texture sets (concrete floor and walls, brick, cracked concrete, asphalt, rusty metal, plaster) and a CC0 HDRI sky, 14 MB in `web/public/assets/` with `CREDITS.md`. Every surface falls back to the procedural texture if a file is missing.
-- **Disaster site:** debris on every floor and against every wall, a collapse mound in the no-go hazard room, collapsed neighbouring buildings with smoke and fire, a cracked lot, crushed cars, a downed pole. Visual only: the truth grid, radio and robots are unchanged, and nothing sits on a robot's path.
-- **Scout camera = the robot's real view:**
-  - Chassis-mounted, always facing the robot's heading. It no longer swings to a survivor behind the robot.
-  - Every warm object in view gets a box with the onboard classifier's score for that object's real FLIR crop (the same crops and model output the robot uses, `/crops/manifest.json`). Within the 5 m thermal range it is judged; farther away it is marked "warm · come closer".
-  - **Rule:** cold objects are never given a score. They never reach the classifier, and a number for them would be fake. To show more objects with real scores, add more real FLIR crops as decoys (Rayan).
-- **People:** sculpted at true scale (1.72 m), pinned under debris. The "run over" look was drawing scale (people were 1.35×). Measured: robots never came closer than 1.96 m to a survivor on seed 7. Robots now also keep 0.5 m off confirmed survivors in motion planning (Rayan's code, separate commit; the demo guard passes).
-- **Robots:** one detailed tracked rover model used everywhere, including through other robots' cameras.
-- **Relays and beacons:** rugged yellow hard cases with antenna mast and blinking LED; phone relays as a phone on a stand.
-- **First glance:**
-  - A three-line "How to read this screen" card once per session and from the `?` overlay.
-  - Plain pane titles ("Inside the building", "What's really happening", "What the command post knows").
-  - "Survivors: N found · M at command" in the top bar.
-  - Scheduler collapsed to one line unless a robot is overloaded or misses a deadline.
+- **Live judge test (key J, Q&A):** shows a random held-out FLIR thermal crop the model has never trained on, hides the label, lets the judge guess person or not, then the model answers with its confidence and the truth is revealed. A running tally ("model 5 of 5, judge 4 of 5"). Rayan ships the held-out pool and labels in `ml/results/judge_pool/` with a manifest; Aziz serves it read-only; Yusuf builds the overlay.
+- **Caption every AI image:** "Real thermal camera image, Teledyne FLIR dataset: the same input a thermal camera on a rescue robot produces." On the AI cards, the robot's-eye thermal view and the AI Lab.
+- **Show the failures:** the AI Lab keeps the misses visible and the pitch mentions them.
+- **Numbers stay real:** confidence is the model's number, never rounded up; the detector chip always shows model vs fallback.
 
-**Asks:**
-- **Rayan:**
-  - Review the 0.5 m survivor clearance (`SURVIVOR_CLEAR_M`) and the `clinic_02` map.
-  - A CC0/CC-BY photo-scanned human GLB in a lying pose if your asset pack can include one (no free CC0 scan exists without an account); it drops into `web/src/three/Human.jsx`.
-  - More real FLIR crops as decoys, so the scout camera has more real objects to score.
-- **Aziz:**
-  - Review the one-line `DZ_FLOORPLAN` switch.
-  - Run the demo server with `DZ_AI_LAB=1` (and `DZ_AFTERSHOCK=1` if A is in the demo).
+**Purpose: survivors and routes are the headline**
 
-**Still to do (Yusuf), in cut order (first cut first):** scheduler polish done; multi-story shell; more scanned props (furniture, cars); phone take/release robot picker (Aziz's lease API is merged); voice push-to-talk UI.
+- **Rescue Status strip** at the top of the big screen, judge language only: survivors found, confirmed by onboard AI, reported to command, rescue routes ready, time since collapse. It is the first thing a judge reads.
+- **Judge-first labels** everywhere: "No link, keeps searching" not LOST\_LINK\_EXPLORING; "Radio beacon left with survivor" not relay dropped; "Route for rescuers, 52 m, avoids gas" not rescue\_route.
+- **Pitch opener:** "72 hours is how long a trapped person usually survives. In a collapsed building the radio dies in the first ten meters. We built robots that keep searching anyway." The inspiration is the DARPA Subterranean Challenge (not NASA).
 
-**Limits:** 30 fps on the testing laptop with P as the fallback, CC0/CC-BY only and credited, new looks behind keys (K night, D director, L AI Lab) until a dry run passes.
+**Visibility: the backend and ML on screen**
+
+- **Under the hood panel (key I):** live counters from the real system: bundles held in custody and delivered, hops per delivery, bytes repaired by Reed-Solomon, scheduler deadlines met and missed, rescue routes computed, detector calls and rejections. Aziz exposes the counters in `tick.stats`; Yusuf draws the panel; Rayan supplies detector and scheduler counters.
+
+**Proof it is not scripted (judges will ask)**
+
+Robots compute every path live (frontier exploration plus A\* on their own map). Runs look identical only because the demo seed is fixed for reliability. Navigation is classic autonomy, not ML, and the pitch says so: humans decide where to search (phone zones), robots decide how, trained AI decides who is a person.
+
+- **Key N, new scenario:** same building, survivors and decoys shuffled, new seed; the robots find them anyway. Rayan generates validated variants of `collapse_01` (reachable survivors, S1-style dead-zone survivor kept) in `data/floorplans/variants/`; Aziz adds a control to reset into one; Yusuf adds the key and a "new scenario" banner. Q&A only, never the main run.
+- **Unsure, moving closer:** when the detector confidence is between about 0.35 and 0.75 the robot approaches and classifies again; the AI card shows "AI unsure 58%, moving closer" then the final verdict. Perception visibly steering the path, with real numbers. Rayan. No effect on the demo beats (all six demo crops score near 0 or near 1).
+- Already live: R and A replan around new rubble, phone zones redirect robots, B shows the stop-and-wait baseline, the generator builds any seed.
+
+**Aftershock status:** built and on main (Aziz backend, Yusuf key A, Rayan reroutes), behind `DZ_AFTERSHOCK=1`. Remaining work is rehearsal only: Rayan rehearses A after the 2:45 close on the testing laptop and writes the beat into `DEMO.md` as a Q&A extra.
+
+**Final-stretch decisions (12:20 AM)**
+
+- **Freeze and presentation timing: Rayan decides and announces it**.
+- **Earthquake v2:** Aziz adds a strength setting (strong = 2 to 3 collapse areas, a second collapse about 10 s later, 1 to 2 relays destroyed). Yusuf adds 4 to 6 s of shake, falling slabs, dust clouds, flickering lights, a rumble and an "AFTERSHOCK" banner. Robots already reroute. Rayan rehearses A after the close.
+- **Map size:** `collapse_01` stays as it is for the main run (beats, radio tuning and the 3-minute script depend on it). The scene gets bigger two ways: Yusuf's exterior shell (collapsed surroundings, an upper floor, the street with the truck) and a big showcase building (about 80 by 60 m) from Rayan's generator for the earthquake and Q&A, loaded through Aziz's floor plan switch.
+- **Random maps work by design** (every part reads the floor plan file). To confirm: Aziz adds one reset-into-floorplan control (serves key N variants, the showcase building and generated seeds) and a timeline player for generated disaster scripts; Yusuf makes props generic with a default for unknown rooms; Rayan ships a default search plan with every generated building; the testing laptop runs two generated buildings end to end and reports.
+- **Testing laptop is now a builder** for ML and benchmark work in `ml/` and `docs/assets/` (history file `rayan-ml.md`): benchmark refinement (sensitivity sweep over radio settings, random rubble, more seeds, two generated buildings), then the earthquake rehearsal report.
+- **Yusuf's cut list tonight:** multi-story interior, voice UI, clinic map. **Handed to Aziz with Yusuf's OK:** the judge test overlay (J) and the Under the hood panel (I), both data panels.
+- **Aziz's queue:** short G briefing, B/U presenter fix, earthquake strength, floor plan switch and timeline player, counters in `tick.stats`, judge pool serving, then J and I panels.
+
+**Priority against the 7:30 AM freeze:** live judge test and captions first (cheap, highest trust), Rescue Status strip second, Under the hood third. These rank above multi-story, voice UI and the clinic map. The main run stays exactly as `DEMO.md`; J and I are for after the close and Q&A.
 
 ### Owners and priorities
 

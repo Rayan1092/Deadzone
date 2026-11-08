@@ -1,6 +1,7 @@
 # Deadzone asset pack
 
-CC0 assets for the realistic look, compressed for the web (about 23 MB total). Everything is
+CC0 assets for the realistic look, compressed for the web (about 23 MB, plus 23 MB of plain
+JPG/PNG copies in `plain/` for a loader without KTX2 support, see below). Everything is
 CC0 1.0. Sources needed no login: Poly Haven (textures, HDRI) and Poly Pizza (CC0 models only).
 The robot and the crack and stain decals are procedural (our own work, CC0).
 Per-file credits: `CREDITS.md`. Machine-readable list: `manifest.json` (path, bytes, format,
@@ -17,6 +18,14 @@ Kept outside `web/` on purpose. To use a file, copy it into `web/public/assets/`
 | `hdri/sky_overcast.hdr` | Overcast Industrial Courtyard, 1K | Radiance HDR |
 | `models/robot.glb` | Tracked rescue robot, 1508 tris | GLB, meshopt + quantized |
 | `models/person.glb` | Adult lying on its back, arms out, 3928 tris, KTX2 texture | GLB, meshopt + quantized |
+
+## Plain copies (no KTX2 loader needed)
+
+`plain/` holds uncompressed copies of three sets in the `web/public/assets/textures/<set>/{diff,nor_gl,rough}.jpg`
+layout Yusuf's loader already uses: `cracked_concrete_wall`, `cracked_concrete_floor`, `damaged_plaster`
+(2K JPG straight from Poly Haven: `diff` sRGB, `nor_gl` OpenGL +Y normal, `rough` linear), and the five
+decals as 1K RGBA PNG in `plain/decals/`. Copy `plain/textures/*` into `web/public/assets/textures/`.
+Listed under `plain` in `manifest.json`; same credits as the KTX2 files.
 
 ## Conventions
 
@@ -62,6 +71,7 @@ mkdir $env:TEMP/dz-tools; cd $env:TEMP/dz-tools; npm init -y
 npm i ktx2-encoder@0.6.0 sharp@0.33.5 @gltf-transform/core@4.1.1 @gltf-transform/extensions@4.1.1 @gltf-transform/functions@4.1.1 meshoptimizer@0.22.0
 copy <repo>/assets-pack/_build/build.mjs .
 node build.mjs $env:TEMP/dz-pack <repo>/assets-pack          # writes KTX2/GLB/HDR + manifest + CREDITS
+py -I <repo>/assets-pack/_build/plain.py $env:TEMP/dz-pack <repo>/assets-pack   # step 3: plain/ copies
 ```
 
 The build is deterministic for the procedural parts (fixed seeds). The texture encode takes a
