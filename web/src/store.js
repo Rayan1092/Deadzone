@@ -44,6 +44,17 @@ export function setNight(on) {
   useSim.getState().set({ night: on })
 }
 
+// E key: 'judge' (the default: the map, robots, survivors and the Rescue Status strip; the
+// sidebar, scheduler, legends and top-bar controls appear on hover) or 'full' (everything
+// always on). Remembered per browser.
+function readLayout() {
+  try { return localStorage.getItem('dz-layout') === 'full' ? 'full' : 'judge' } catch { return 'judge' }
+}
+export function setLayout(layout) {
+  try { localStorage.setItem('dz-layout', layout) } catch { /* storage blocked: session only */ }
+  useSim.getState().set({ layout })
+}
+
 export function setPerf(on) {
   try { localStorage.setItem('dz-perf', on ? '1' : '0') } catch { /* storage blocked: session only */ }
   useSim.getState().set({ perf: on })
@@ -91,6 +102,7 @@ export const useSim = create((set) => ({
   night: readNight(),  // night operations lighting is the default scene; K switches to day
   perf: readPerf(),    // P key: lighter rendering for a slow demo laptop (remembered per browser)
   view: readView(),    // M key: 'split' (two panes) or 'gap' (one view + Command gap), remembered
+  layout: readLayout(), // E key: 'judge' (map first, chrome on hover) or 'full'
   recorder: null,      // ?record: { frames, ms, bytes } of the captured stream
   replay: null,        // ?replay: { loaded, playing, rate, pos, dur, ended }
   set,

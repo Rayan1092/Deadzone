@@ -21,8 +21,9 @@ export default function BigScreen() {
   useKeyboard()
   useDirector()
   const view = useSim((s) => s.view)
+  const layout = useSim((s) => s.layout)
   return (
-    <div className="app">
+    <div className={`app ${layout}`}>
       <TopBar />
       <main className={view === 'gap' ? 'split single' : 'split'}>
         {view === 'gap' ? (
@@ -39,7 +40,10 @@ export default function BigScreen() {
         <DirectorChip />
         <ReportPanel />
       </main>
+      {/* judge layout: the sidebar and the scheduler slide in from the edges on hover */}
+      <div className="side-peek" aria-hidden />
       <Sidebar />
+      <div className="time-peek" aria-hidden />
       <Timeline />
       <JoinOverlay />
       <ReplayLoader />
