@@ -287,18 +287,20 @@ export default function Building({ thermal = false, blueprint = false, props = t
   const [cx, cy] = fp.command_post.pos
   return (
     <group>
-      {mode === 'plain' ? <Lot W={W} H={H} /> : (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={w2t(W / 2, H / 2, -0.01)}>
-          <planeGeometry args={[W + 30, H + 30]} />
-          <meshStandardMaterial color={blueprint ? PRINT.floor : COLD.floor} roughness={1} />
-        </mesh>
-      )}
-      {mode === 'plain' && <Slab W={W} H={H} />}
-      {mode === 'plain' && fp.rooms.map((r) => <RoomFloor key={r.id} room={r} />)}
-      <Walls walls={fp.walls} mode={mode} damage={damage} size={fp.size} />
-      {/* aftershock walls are truth geometry: Reality panes only, never Command or the inset */}
-      {props && fp.dynamic_walls?.length > 0 && <Walls walls={fp.dynamic_walls} mode={mode} />}
+      {/* everything static for this floor plan is merged per look (an aftershock brings a new
+          floor plan, so the bake redoes itself); fractured walls are already merged soups */}
       <Baked deps={[fp, mode, props]}>
+        {mode === 'plain' ? <Lot W={W} H={H} /> : (
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={w2t(W / 2, H / 2, -0.01)}>
+            <planeGeometry args={[W + 30, H + 30]} />
+            <meshStandardMaterial color={blueprint ? PRINT.floor : COLD.floor} roughness={1} />
+          </mesh>
+        )}
+        {mode === 'plain' && <Slab W={W} H={H} />}
+        {mode === 'plain' && fp.rooms.map((r) => <RoomFloor key={r.id} room={r} />)}
+        <Walls walls={fp.walls} mode={mode} damage={damage} size={fp.size} />
+        {/* aftershock walls are truth geometry: Reality panes only, never Command or the inset */}
+        {props && fp.dynamic_walls?.length > 0 && <Walls walls={fp.dynamic_walls} mode={mode} />}
         {mode === 'plain' && (fp.doors ?? []).map((d, i) => <Door key={i} door={d} walls={fp.walls} />)}
         {/* rubble that fell during the run (R key, aftershock) is truth: Reality panes only */}
         {!blueprint && <Debris rubble={props ? fp.rubble ?? NO_RUBBLE : staticRubble(fp)} cold={thermal} />}

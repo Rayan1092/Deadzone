@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import Line from './FastLine' // drei's Line relinks its shader on every new points array
 import * as THREE from 'three'
-import { useSim } from '../store'
+import { useSim, useStable } from '../store'
 import { COLORS, FOG_H, w2t } from './util'
 import { materials, tiledSet } from './textures'
 import { ROBOT_SCALE } from './Rover'
@@ -408,22 +408,32 @@ function GapOverlay() {
   })
 }
 
+// What the Command pane draws, as a key that changes only when the picture would: robot poses,
+// ghost or live, the whole seconds on a ghost's "Ns ago" tag, and the survivors. Re-rendering on
+// every tick redrew the (on-demand) Command canvas about 25 times a second for nothing.
+function commandView(s) {
+  const c = s.tick?.command
+  if (!c) return null
+  return {
+    robots: c.robots.map((r) => {
+      const stale = s.time - r.last_seen
+      return { id: r.id, pose: r.pose, ghost: stale > 3, ago: stale > 3 ? Math.floor(stale) : null }
+    }),
+    survivors: c.survivors.map((v) => ({ id: v.id, pos: v.pos })),
+  }
+}
+
 export function CommandActors() {
-  const tick = useSim((s) => s.tick)
-  const time = useSim((s) => s.time)
-  const births = useBirths((tick?.command.survivors ?? []).map((s) => s.id)) // when Command first learned each
-  if (!tick) return null
-  const { robots, survivors } = tick.command
+  const view = useStable(commandView)
+  const births = useBirths((view?.survivors ?? []).map((s) => s.id)) // when Command first learned each
+  if (!view) return null
+  const { robots, survivors } = view
   return (
     <group>
-      {robots.map((r) => {
-        const stale = time - r.last_seen
-        const ghost = stale > 3
-        return (
-          <RobotBody key={r.id} pose={r.pose} color={ghost ? '#94a3b8' : '#2dd4bf'} tag={r.id} ghost={ghost}
-                     headlight={false} label={r.id} sub={ghost ? `${stale.toFixed(0)}s ago` : null} />
-        )
-      })}
+      {robots.map((r) => (
+        <RobotBody key={r.id} pose={r.pose} color={r.ghost ? '#94a3b8' : '#2dd4bf'} tag={r.id} ghost={r.ghost}
+                   headlight={false} label={r.id} sub={r.ghost ? `${r.ago}s ago` : null} />
+      ))}
       <CommandRelays />
       <CommandRoutes />
       {survivors.map((s) => (

@@ -20,7 +20,7 @@ def setup(tmp_path, monkeypatch):
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs/DEMO.md").write_text('''## Pre-flight checks (T-30 min)
 ```powershell
-$env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=2
+$env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=1.5; $env:DZ_OBSTACLES=1
 $env:DZ_GEMINI=1 # enabled
 # $env:DZ_VOICE=1
 ```
@@ -45,7 +45,7 @@ $env:DZ_DO_NOT_ALLOW=1
     monkeypatch.setattr(preflight, "version", lambda command, pattern: "v22.0.0" if command == "node" else "Python 3.12.0")
     calls = []
     monkeypatch.setattr(preflight, "server_probe", lambda *args, **kwargs: calls.append(args) or True)
-    env = {"DZ_ROBOTS": "3", "DZ_SEED": "7", "DZ_SPEED": "2", "DZ_GEMINI": "1"}
+    env = {"DZ_ROBOTS": "3", "DZ_SEED": "7", "DZ_SPEED": "1.5", "DZ_OBSTACLES": "1", "DZ_GEMINI": "1"}
     return tmp_path, env, calls
 
 

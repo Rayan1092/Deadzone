@@ -4,15 +4,23 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** item D, p2/demo-preflight, from main 9a423cb (Yusuf judge-first layout read; no backend wire changes). Add shared secret-safe preflight checks with PowerShell and POSIX wrappers, and make running preflight step 1 of DEMO.md.
+- **Working on:** item D, p2/demo-preflight, from main 9a423cb; main 504e82d now integrated (Yusuf draw calls and Rayan 1.5x furniture-on demo re-baseline). Add shared secret-safe preflight checks with PowerShell and POSIX wrappers, and make running preflight step 1 of DEMO.md.
 - **Works on main:** A #108, B #126, delivered camera #115, compact sparse screen stream #137. Latest running app remains isolated on :8000 and is not stopped by preflight. Rayan's global no-go default and protected source remain untouched.
 - **Preflight contract:** one PASS/FAIL line per check, exit 1 on any FAIL. Activates .venv; tests torch/model CPU, .env/key presence (only set/missing), derives exact allowed DZ flags from active DEMO pre-flight assignments (process overrides .env; extra nonempty DZ flags fail even when 0), tests ports 8000/5173, cloudflared PATH, node/py versions, then owns a paused 10 s localhost server and requires hello.data.detector=model. Busy 8000 prevents starting or touching any existing server. Unix uses py or python3 for version reporting; all real probes use .venv Python.
-- **In flight (not merged):** final validation/PR. Both real wrappers agree on this laptop's setup FAILs; actual torch/model CPU checks pass. A real isolated 10 s hello probe on an unused test port passed with its child cleaned up; the production script always requires 8000 free. Full backend 600 passed / 1 skipped (149.55 s), including fixed seed-7 guard; 22 preflight regressions pass.
+- **In flight (not merged):** final validation/PR. Both real wrappers agree on this laptop's setup FAILs; actual torch/model CPU checks pass. A real isolated 10 s hello probe on an unused test port passed with its child cleaned up; the production script always requires 8000 free. Pre-integration backend 600 passed / 1 skipped (149.55 s); 22 preflight regressions pass; final combined suite pending after Rayan re-baseline.
 - **Local key safety (explicit follow-up request):** preserved server/.env values, added missing blank API key field, broadened .gitignore to .env.* except .env.example, and documented both blank fields in the example. Verified ignored/untracked, ordinary git add refusal, .env URLs 404, and Windows current-user/SYSTEM-only access for the local file and the existing ignored running-app copy. No keys printed, committed, or requested in chat. ACL changes are local, not versioned.
 - **Blocked on / need from others:** to pass real demo preflight, Aziz supplies keys locally, exports DEMO flags, puts cloudflared on PATH and stops the currently running servers. Checker diagnoses only; it does not repair configuration or stop existing processes.
 - **Promises to others:** one PR, merge main immediately before opening, run full backend/demo guard. No changes to floorplan.py, command/plan.py, command/safety.py or WebSocket shapes. Never stage server/.env. The private file is ready for local editing; processes running as the user can still read it.
 
 ## Log
+
+### 2026-11-08 PT - p2/demo-preflight - Integrate the new 1.5x furniture-on demo before PR
+- **Did:** merged main 504e82d (Rayan's re-baseline plus Yusuf's draw calls). Resolved only the runbook overlap: preserved all new beats, speed 1.5 and required DZ_OBSTACLES=1 while keeping preflight step 1 and activated-python commands. The parser picks up the new flags without checker changes.
+- **Contract changes:** no wire changes from D. Rayan's main-run environment now requires DZ_SPEED=1.5 / DZ_OBSTACLES=1. His guard and all robot/web source remain unedited in this PR.
+- **Validation:** integrated full suite pending; pre-integration full suite 600 passed / 1 skipped and real CPU/model-hello/secret-safety checks passed. Added decimal-speed/obstacles coverage to the existing runbook fixture.
+- **Heads-up for others:** preflight intentionally follows the current DEMO.md rather than the older 2x/no-furniture profile. The running :8000 app is not reset or stopped.
+- **Next:** finish integrated validation, merge latest main immediately before the one item D PR, publish/merge.
+
 
 ### 2026-11-08 PT - p2/demo-preflight - Secret-safe cross-platform laptop checks and private key file setup
 - **Did:** synced main first, added preflight.ps1/preflight.sh plus one shared checker, and inserted preflight as DEMO step 1. Both wrappers activate .venv and avoid the wrong global interpreter; check keys/flags/tools/ports and a real-model hello from an owned temporary server. Demo producer and runtime behavior unchanged.

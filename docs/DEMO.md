@@ -1,6 +1,6 @@
 # Deadzone demo runbook
 
-The 3-minute live demo, step by step. Seed, plan and timings are fixed, so the story happens on cue every time. Between cues the robots act on their own.
+The 4-minute live demo, step by step. Seed, plan and timings are fixed, so the story happens on cue every time. Between cues the robots act on their own.
 
 ## The fixed setup
 
@@ -8,7 +8,8 @@ The 3-minute live demo, step by step. Seed, plan and timings are fixed, so the s
 |---|---|
 | Seed | `7` |
 | Robots | `3` (R1 Scout 1, R2 Scout 2, R3 Scout 3) |
-| Speed | `2x` (all wall times below are at 2x) |
+| Speed | `1.5x` (all wall times below are at 1.5x: clock = 0:40 + sim seconds / 1.5) |
+| Furniture | **`DZ_OBSTACLES=1`**: solid shelves and desks (#119), 1 dB radio loss per piece (#128). Every beat below was measured with it on |
 | Detector | trained model (top bar must say AI model, see the pre-flight checks) |
 | Plan | **P-1** preloaded from the laptop; judges fix it on the phone and dispatch it **before** Space |
 
@@ -50,9 +51,10 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 4. Start the server **paused**. Leave `DZ_AUTOSTART` unset.
    ```powershell
    cd server
-   $env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=2
+   $env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=1.5; $env:DZ_OBSTACLES=1
    python -m uvicorn deadzone.app:app --host 0.0.0.0 --port 8000
    ```
+   `DZ_OBSTACLES=1` is **required** for the main run (solid furniture; the demo guard runs with it on). Without it the beat sheet below is wrong: S1 is found at 129.0 s instead of 102.7 and the R key at 162.5 s hits nothing.
 5. The server log must say `survivor detector: trained model, threshold 0.60`. If it says `sim sensor fallback (...)`, fix torch before going on stage. The top-bar detector chip shows the same thing.
    Optional features are off unless their flag is set before starting the server (only turn on what passed a dry run):
    ```powershell
@@ -62,7 +64,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    # $env:DZ_VOICE=1      # voice commands: robot side and Aziz's /api/voice are on main; the push-to-talk UI isn't yet, and leases block B/U (below)
    $env:DZ_SENSOR_VIEW=1  # safe: Aziz's Reality-only robot camera frames (#82) for Yusuf's renderer; the demo guard stays green with it on
    # DZ_EXPLORATION_V2    # must stay unset (0) for the main run: Aziz's opt-in exploration policy (#77) moves every beat below
-   # DZ_OBSTACLES         # must stay unset (0) for the main run: solid furniture (#119) makes the safety checker reject P-1 and moves the dark moment to 205 s (rayan.md 17:00)
+   # DZ_OBSTACLES=1       # already set in step 4: required, every beat below depends on it (rayan.md 20:30)
    ```
    **Don't set `DZ_VOICE`, `DZ_CONTROL_LEASES` or `DZ_EXPLORATION_V2` for the main run.** With control leases on, the top bar shows a **presenter lock**: **B** and **U** stay locked (with a hint) until you press **Unlock**, which takes every robot for the big screen (phones then see them locked; R, F, O and A are not affected). **Lock** releases the robots so phones can take them (Q&A). Unlock fails, naming the holder, while a phone holds a robot. Leases off: no lock, B and U as before. With `DZ_EXPLORATION_V2=1` the robots explore differently and every beat in the beat sheet moves (S3 found at 23.8 s instead of 14.4, S2 found at 106 s instead of 246). `DZ_SENSOR_VIEW=1` is safe: it only adds camera frames to the Reality pane.
 6. Open **`http://localhost:8000/?nointro`** on the big screen (`?nointro` keeps the first-visit explainer card from covering the scene; the **?** overlay can still show it). Phones join with **Q** (QR) on the same Wi-Fi, or on the phone hotspot. Phone microphones need https: use Aziz's tunnel (`scripts/demo_tunnel.py`, see its docs) if voice or the mic is part of the run.
@@ -98,7 +100,7 @@ REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http:
 
 ## Beat sheet
 
-Space is pressed at **0:40**. Times after it come from a headless seed-7 run with P-2. They are exact until the first director key is pressed. Re-check them at every rehearsal and update this table if they drift.
+Space is pressed at **0:40**. Times after it come from the demo guard's headless seed-7 run (`server/tests/test_demo_guard.py`: P-1 rejected, fixed, dispatched; `DZ_OBSTACLES=1`; R / F / O at sim 162.5 / 177.5 / 187.5). Clock = 0:40 + sim seconds / 1.5. They are exact until the first director key is pressed. Re-check them at every rehearsal and update this table and the guard together if they drift.
 
 | Clock | After Space (sim s) | On screen | Who | What to say |
 |---|---|---|---|---|
@@ -106,29 +108,32 @@ Space is pressed at **0:40**. Times after it come from a headless seed-7 run wit
 | 0:15 | paused | Q: judges scan the QR and see **P-1** on the phone. A judge taps **Run safety check**: the card rejects it, *"Zone ZNE predicts a dead zone; use a relay chain or lost_link_ok"*, and ZNE pulses red | Yusuf | "The safety checker only uses what the command post knows. It predicts the steel cage is a radio dead zone, so it blocks the plan until we say that zone may go dark." |
 | 0:30 | paused | Judge taps **Allow ZNE to go dark**, runs the check again (pass), taps **Dispatch** | Yusuf | "Robot 2 is now allowed to lose signal in the north-east for up to 60 seconds." |
 | 0:40 | 0 | **Space.** Robots enter. Each takes its zone (`plan_applied`) | Aziz | "Every message, even this plan, travels over the simulated radio." |
-| 0:47 | +0:07 (14.4) | R1 finds **S3** in Office A while linked. It appears on both sides at once, with its **rescue route** from the entrance (14.2 m) | Aziz | "With signal, the report is instant, and the robot sends responders the safest route in." |
-| 1:08 | +0:28 (56.7) | R1's camera sees the **radiator** (D1). The detector rejects it | Rayan | "That's a radiator. Our model, trained on real FLIR thermal images, says it's not a person, so no false alarm." |
-| 1:09 | +0:28.5 (57.1) | R3 drops **relay RL1** | Aziz | "Robots drop relays just before the link breaks, like the DARPA SubT teams did." |
-| 1:38 | +0:58 | Press **2**: follow R2 | Rayan | |
-| 1:40 | +0:59.5 (119.1) | R2 enters the **steel cage** and loses link. Command shows a **ghost R2** (its camera stays at the last reported pose) | Rayan | "Steel kills radio. Command post goes blind, but Robot 2 keeps searching." |
-| 1:44 | +1:04.5 (129.0) | R2 finds **S1** in the dark, confidence 1.0, and drops **beacon relay RL2** next to them. **Reality side only** | Rayan | Point at the ghost: "Command doesn't know yet. The report and the rescue route wait in the robot's outbox. It leaves a beacon so responders get radio at the survivor." |
-| 1:52 | +1:11.5 (143.1) | R2 reconnects. Map, **S1 and its 49.7 m rescue route burst onto Command**, 14 s after detection | Rayan | "Store and forward: nothing lost, just late. Responders now have the way in." |
-| 1:55 | +1:15 (150) | Press **1** then **R**: rubble falls ahead of R1, which goes **REPLANNING** and drives around | Rayan | "Rubble falls. The robot sees it, stops and replans on its own." |
-| 2:02 | +1:22.5 (165) | Press **3** then **F**: R3 gets an **OVERCURRENT** fault, backs up 0.5 m and replans | Rayan | "A wheel jams. Fault protection stops it, backs off and tries another way." |
-| 2:07 | +1:27.5 (175) | Press **1** then **O**: the scheduler strip shows **perception missing deadlines** (red) for 3 s, while **safety still runs at 0 and 50 ms** | Rayan | "Rate monotonic scheduling: when the AI overloads the CPU, perception misses deadlines, but the safety task always runs on time." |
-| 2:08 | +1:28.5 (177.0) | R2 drives past the rubble from **R**: it blocks S1's rescue route, so R2 reroutes it. Command's S1 route **redraws around the rubble, about 52 m** (replaced, not doubled) | Rayan (optional, if O is done) | "That rubble fell on the way in. The robot saw it and sent responders a new route." |
-| 2:10 | | Press **0**, then **G**: the Gemini briefing appears after about 6 s and is read aloud | Yusuf | While it generates: "Gemini writes this briefing only from what reached the antenna, never from the robots' own view." |
-| 2:45 | | | Rayan | "The robots are autonomous, and AI detects survivors. Collapsed buildings, mines, wildfires, tunnels." |
+| 0:49 | +0:09.4 (14.1) | R1 finds **S3** in Office A while linked. It appears on both sides at once, with its **rescue route** from the entrance (14.2 m) | Aziz | "With signal, the report is instant, and the robot sends responders the safest route in." |
+| 1:19 | +0:38.6 (57.9) | R1's camera sees the **radiator** (D1). The detector rejects it | Rayan | "That's a radiator. Our model, trained on real FLIR thermal images, says it's not a person, so no false alarm." |
+| 1:25 | +0:45 (67.5) | R3 drops **relay RL1** | Aziz | "Robots drop relays just before the link breaks, like the DARPA SubT teams did." |
+| 1:38 | +0:58 (87) | Press **2**: follow R2 | Rayan | |
+| 1:41 | +1:00.9 (91.3) | R2 enters the **steel cage** and loses link. Command shows a **ghost R2** (its camera stays at the last reported pose) | Rayan | "Steel kills radio. Command post goes blind, but Robot 2 keeps searching." |
+| 1:48 | +1:08.5 (102.7) | R2 finds **S1** in the dark, confidence 1.0, and drops a **beacon relay** next to them. **Reality side only** | Rayan | Point at the ghost: "Command doesn't know yet. The report and the rescue route wait in the robot's outbox. It leaves a beacon so responders get radio at the survivor." |
+| 1:59 | +1:19 (118.5) | R2 reconnects. Map, **S1 and its 49.7 m rescue route burst onto Command**, 16 s after detection | Rayan | "Store and forward: nothing lost, just late. Responders now have the way in." |
+| 2:02 | | Press **0**, then **G**: the Gemini briefing appears after about 6 s and is read aloud | Yusuf | While it generates: "Gemini writes this briefing only from what reached the antenna, never from the robots' own view." |
+| 2:26 | +1:46 (159) | Press **1**: follow R1, now in the corridor below the break room, on S1's rescue route | Rayan | |
+| 2:28 | +1:48.3 (162.5) | Press **R**: rubble falls ahead of R1 **on S1's rescue route**. R1 goes **REPLANNING** and drives around; R2, 4 m away, sees the rubble and reroutes S1 at once (sim 162.8): Command's S1 route **redraws around it, 52.1 m** (replaced, not doubled) | Rayan | "Rubble falls on the way in. Robot 1 sees it, stops and replans. Robot 2 saw it too and just sent responders a new route around it." |
+| 2:38 | +1:58.3 (177.5) | Press **3** then **F**: R3 gets an **OVERCURRENT** fault, backs up 0.5 m and replans | Rayan | "A wheel jams. Fault protection stops it, backs off and tries another way." |
+| 2:45 | +2:05 (187.5) | Press **1** then **O**: the scheduler strip shows **perception missing deadlines** (red) for 3 s, while **safety still runs at 0 and 50 ms** | Rayan | "Rate monotonic scheduling: when the AI overloads the CPU, perception misses deadlines, but the safety task always runs on time." |
+| 3:06 | +2:26.3 (219.4) | Press **0**. R2 finds **S2** while linked, with its 39.1 m route: all three survivors are on Command | Rayan | "Third survivor, this time with signal, so it's on Command instantly. Three for three." |
+| 3:10 | | | Rayan | "The robots are autonomous, and AI detects survivors. Collapsed buildings, mines, wildfires, tunnels." |
 
-Rescue routes draw on Reality as soon as a robot computes them (yellow dashed line, beacon ring), and on Command and phones only when the route bundle is delivered. A rerouted route replaces the old one with a short flash (2:08).
+That ends at about 3:25, with 35 s of slack before 4:00.
+
+Rescue routes draw on Reality as soon as a robot computes them (yellow dashed line, beacon ring), and on Command and phones only when the route bundle is delivered. A rerouted route replaces the old one with a short flash (2:28).
 
 R, F, O and U hit the **followed** robot, so check the follow key first.
 
-**Press R, F and O on time** (1:55, 2:02, 2:07). They change what the robots do next. S2 is no longer in the main script: it lands at 2:44.8 (sim 246.0), right at the close, so only mention it in Q&A.
+**Press R, F and O on time** (2:28, 2:38, 2:45). They change what the robots do next. **R is the tight one:** the rubble must land on S1's route while R2 is close enough to see it, which happens between sim **162.5 and 163.1** (measured at every 0.1 s; watch the sim clock in the top bar and press at 162.5–162.7 for the instant reroute, 162.8–163.1 reroutes 2 s later). **Pressing early, at sim 162.2–162.4, seals the corridor and leaves R3 TRAPPED**, so when in doubt press late: from 163.2 on the press is harmless (R1 still replans) but the reroute beat is lost. Also never press R between sim 151 and 155, same trap. If this window proves too tight at the rehearsal, ask for a scheduled press (a director control with a sim time) or fall back to the recording.
 
 PowerShell fallbacks use `127.0.0.1`, not `localhost`: on Windows `localhost` tries IPv6 first and hangs about 2 s per call.
 
-Don't press **R** while the followed robot stands in a doorway: rubble in a doorway seals it in (TRAPPED after 10 s). At 1:55 (sim 150) R1 is near the break-room door and still gets around. That worked in the dry run, but watch it.
+Don't press **R** while the followed robot stands in a doorway: rubble in a doorway seals it in (TRAPPED after 10 s). At 2:28 (sim 162.5) R1 is in the corridor below the break room and gets around. That is the guard's run; watch it at the rehearsal.
 
 ## Plan fallback: send it without the phone
 
@@ -172,7 +177,7 @@ The safety check needs the command post to have heard each robot once. Startup a
 | "Can you do a different building?" | **N** (Yusuf): reset into another registered building; **Shift+N** comes back to the main one. Pick-a-seed: `py data/floorplans/generate.py --seed <judge's number>` writes `data/floorplans/generated/gen_<number>.json` (validated: everything reachable, a steel dead zone, 3 survivors, 3 decoys, a disaster script), then reset into `generated/gen_<number>` (`{action:"reset", value:{floorplan:"generated/gen_<number>", timeline:true}}`) | Timelines need `DZ_SCENARIO_TIMELINE=1` (and `DZ_AFTERSHOCK=1`, every script has one aftershock). Robots start without a plan; to give them one, `POST /api/plan` with `data/plans/generated/gen_<number>.plan.json` and dispatch `P-gen_<number>`, until Aziz preloads it |
 | "How big can it go?" | **`showcase_01`**: 80 x 60 m, 36 rooms, two steel dead zones (storage cage and vault), 4 survivors, 4 decoys, a **three-area earthquake** at 184 s (warehouse), 194 s (cross hall) and 246 s (far hall), 2 relays crushed. Reset into `showcase_01` with `timeline: true` | **Show the earthquake and the pick-a-seed, not a dead-zone find:** with 3 robots the dead-zone survivors take over 5 minutes of sim time. What does land early: the hall survivor at ~44 s with the "AI unsure 58%, moving closer" card, then "Person 100%". Plan: `data/plans/showcase_01.plan.json` as above (`P-showcase_01`). Big maps run slower (about 6x real time headless on the dev laptop) |
 | "Same building, new survivors?" | **N** prefers the five validated variants of the demo building (`variants/collapse_01_v1..v5`): same walls, S1 still deep in the steel cage, the other people and decoys moved; the NEW SCENARIO banner names it | S3 and D3 in every variant use the "unsure from a distance" crops, so the look-closer card shows up here too. Never during the main run |
-| "Are there more survivors?" | Keep the run going: R2 finds **S2** while linked at 2:44.8 (sim 246.0), with its route | Only if R / F / O landed on time |
+| "Are there more survivors?" | No: all three are on Command by 3:06 (S2 at sim 219.4). After that the robots finish mapping and return home on battery; nothing else is scripted | Only if R / F / O landed on time; otherwise S2 lands between sim 216 and 233 |
 | "Can I talk to a robot?" | Voice command | Not yet: robot side and Aziz's `/api/voice` are on main; Yusuf's push-to-talk UI is not |
 
 ## Judge questions (one answer each)

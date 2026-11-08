@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import Line from './FastLine' // drei's Line relinks its shader on every new points array
 import * as THREE from 'three'
-import { useSim } from '../store'
+import { useSim, useStable } from '../store'
 import { COLORS, MAST_H, w2t } from './util'
 
 const NONE = []
@@ -117,7 +117,7 @@ export function RealityRelays() {
 }
 
 export function CommandRelays() {
-  const relays = useSim((s) => s.tick?.command.relays) ?? NONE
+  const relays = useStable((s) => s.tick?.command.relays) ?? NONE
   return relays.map((r) => <RelayNode key={r.id} pos={r.pos} known={false} />)
 }
 
