@@ -1,5 +1,7 @@
 """Planning estimates from the building prior and DELIVERED Command knowledge."""
 from dataclasses import dataclass
+from collections import deque
+import os
 
 import numpy as np
 
@@ -35,6 +37,7 @@ class SafetyChecker:
     def __init__(self, prior, robot_specs, energy_time_scale=1.0):
         self.prior, self.robot_specs = prior, robot_specs
         self.energy_time_scale = energy_time_scale
+        self.global_no_go = os.environ.get("DZ_GLOBAL_NO_GO") == "1"
 
     def _comms(self, pos, relays):
         """Predicted reachability; never inspect the simulation's live link graph."""
@@ -71,12 +74,17 @@ class SafetyChecker:
             a, b = fp.to_cell(*start), fp.to_cell(*goal)
             key = a, b
             if key not in route_cache:
-                if not all(fp.in_bounds(*p) and trav[p[1], p[0]] for p in (a, b)):
+                if not fp.in_bounds(*a) or not fp.in_bounds(*b) or not trav[b[1], b[0]]:
                     route_cache[key] = None
                 else:
-                    path = planning.astar(trav, a, b)
-                    route_cache[key] = None if path is None else planning.path_length(
-                        [fp.to_world(*p) for p in path])
+                    escape = self._escape_start(a, trav, grid, blocked)
+                    if escape is None:
+                        route_cache[key] = None
+                    else:
+                        safe_start, distance = escape
+                        path = planning.astar(trav, safe_start, b)
+                        route_cache[key] = None if path is None else distance + planning.path_length(
+                            [fp.to_world(*p) for p in path])
             return route_cache[key]
 
         for zone in sorted(plan.zones, key=lambda z: (z.robot, z.priority, z.id)):
@@ -126,3 +134,27 @@ class SafetyChecker:
                 reject(zone, "comms_plan", False, True,
                        f"Zone {zone.id} predicts a dead zone; use a relay chain or lost_link_ok with a positive budget")
         return {"ok": not violations, "plan_id": plan.plan_id, "violations": violations}
+
+    def _escape_start(self, start, trav, grid, blocked):
+        sx, sy = start
+        if trav[sy, sx]:
+            return start, 0.0
+        fp = self.prior
+        # Only a new responder exclusion can permit this estimate. Occupied cells
+        # and the building's static hazards never become traversable here.
+        if (not self.global_no_go or not blocked[sy, sx] or fp.nogo[sy, sx]
+                or grid[sy, sx] == OCC):
+            return None
+        limit = int(6.0 / fp.cell)  # same coordinate window as Rayan's physical escape
+        seen, queue = {start}, deque([(sx, sy, 0)])
+        while queue:
+            x, y, steps = queue.popleft()
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if (not fp.in_bounds(nx, ny) or (nx, ny) in seen or grid[ny, nx] == OCC
+                        or fp.nogo[ny, nx] or abs(nx - sx) > limit or abs(ny - sy) > limit):
+                    continue
+                if trav[ny, nx]:
+                    return (nx, ny), (steps + 1) * fp.cell
+                seen.add((nx, ny))
+                queue.append((nx, ny, steps + 1))
+        return None
