@@ -21,10 +21,11 @@ def session(monkeypatch):
         yield client, hub
 
 
-def test_mode_control_switches_all_robots_and_reset_restores_default(session):
+@pytest.mark.parametrize("field", ["value", "mode"])
+def test_mode_control_switches_all_robots_and_reset_restores_default(session, field):
     client, hub = session
     tick = hub.sim.tick_n
-    result = client.post("/api/control", json={"action":"mode", "value":"baseline"}).json()
+    result = client.post("/api/control", json={"action":"mode", field:"baseline"}).json()
     assert result["mode"] == "baseline" and not result["running"]
     assert {r.mode for r in hub.sim.robots.values()} == {"baseline"}
     assert hub.sim.tick_n == tick and not hub.sim.network.queues["CMD"]
@@ -32,12 +33,13 @@ def test_mode_control_switches_all_robots_and_reset_restores_default(session):
     assert {r.mode for r in hub.sim.robots.values()} == {"deadzone"}
 
 
-def test_screen_control_echo_and_reconnect_hello_include_mode(session):
+@pytest.mark.parametrize("field", ["value", "mode"])
+def test_screen_control_echo_and_reconnect_hello_include_mode(session, field):
     client, hub = session
     with client.websocket_connect("/ws/screen") as screen:
         frames = [screen.receive_json() for _ in range(4)]
         assert frames[0]["data"]["mode"] == "deadzone"
-        screen.send_json({"t":"control", "data":{"action":"mode", "value":"baseline"}})
+        screen.send_json({"t":"control", "data":{"action":"mode", field:"baseline"}})
         message = screen.receive_json()
         assert message["t"] == "control" and message["data"]["mode"] == "baseline"
     with client.websocket_connect("/ws/screen") as screen:
@@ -46,8 +48,27 @@ def test_screen_control_echo_and_reconnect_hello_include_mode(session):
 
 
 @pytest.mark.parametrize("value", [None, "teleop", 1, [], {}])
-def test_invalid_mode_never_partially_changes_robots(session, value):
+@pytest.mark.parametrize("field", ["value", "mode"])
+def test_invalid_mode_never_partially_changes_robots(session, value, field):
     client, hub = session
-    response = client.post("/api/control", json={"action":"mode", "value":value})
+    response = client.post("/api/control", json={"action":"mode", field:value})
     assert response.status_code == 422 and response.json()["detail"]["code"] == "invalid_mode"
     assert {r.mode for r in hub.sim.robots.values()} == {"deadzone"}
+
+
+def test_mode_alias_conflicts_rejected_over_rest_and_screen_then_matching_aliases_work(session):
+    client, hub = session
+    with client.websocket_connect("/ws/screen") as screen:
+        for _ in range(4):
+            screen.receive_json()
+        payload = {"action":"mode", "mode":"baseline", "value":"deadzone"}
+        response = client.post("/api/control", json=payload)
+        assert response.status_code == 422 and response.json()["detail"]["code"] == "invalid_mode"
+        screen.send_json({"t":"control", "data":payload})
+        error = screen.receive_json()
+        assert error["t"] == "error" and error["data"]["code"] == "invalid_mode"
+        assert {r.mode for r in hub.sim.robots.values()} == {"deadzone"}
+        payload["value"] = "baseline"
+        assert client.post("/api/control", json=payload).json()["mode"] == "baseline"
+        assert screen.receive_json()["data"]["mode"] == "baseline"
+        assert {r.mode for r in hub.sim.robots.values()} == {"baseline"}

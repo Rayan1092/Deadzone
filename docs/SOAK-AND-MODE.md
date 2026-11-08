@@ -8,6 +8,10 @@ The baseline Q&A control delegates to Rayan's `Robot.set_mode` for all robots:
 
 Send it to `POST /api/control`, or wrap it as
 `{t:"control",data:{action:"mode",value:"baseline"}}` on the screen WebSocket.
+Rayan's requested `{action:"mode",mode:"baseline"}` shape also works through
+either transport. Existing `value` callers stay supported. Supplying both fields
+is accepted only when they agree; conflicting values return 422 `invalid_mode`
+(screen `error`) before any robot changes.
 Use `value:"deadzone"` to switch back. Invalid values return 422 `invalid_mode`
 before changing any robot. The default is unchanged; initial/reset mode follows
 `DZ_MODE`. This is an explicit experiment control, never an AI/responder command.
@@ -16,6 +20,9 @@ Screen `hello`, `control` and REST control replies add `mode`. It is `baseline` 
 `deadzone` for the normal all-robot control; diagnostic `mixed` is possible if
 backend code manually switches individual robots. Yusuf owns the key/chip and
 `WAITING_FOR_LINK` label. No frontend source was edited here.
+
+Rayan owns Gemini key creation and the keyed testing-laptop G/Ask dry run. Aziz
+does not add/use a key; Rayan reports whether both responses say `source:"gemini"`.
 
 Run the opt-in soak from the repository root:
 

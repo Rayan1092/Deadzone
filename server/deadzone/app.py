@@ -215,6 +215,15 @@ class Hub:
         for ev in self.sim.drain_events():
             await self.send_all(self.screens, self.envelope("event", ev))
 
+    async def control_message(self, data):
+        """Normalize the board's mode alias identically on REST and WebSocket."""
+        value = data.get("value")
+        if data.get("action") == "mode" and "mode" in data:
+            if "value" in data and value != data["mode"]:
+                raise PlanError("invalid_mode", "mode and value must agree", 422)
+            value = data["mode"]
+        await self.control(data.get("action"), value)
+
     async def control(self, action, value=None):
         if action == "start":
             self.running = True
@@ -461,7 +470,7 @@ async def ordered_rescues():
 
 @app.post("/api/control")
 async def control(body: dict):
-    await hub.control(body.get("action"), body.get("value"))
+    await hub.control_message(body)
     return {"ok": True, **hub.control_state()}
 
 
@@ -481,7 +490,7 @@ async def ws_screen(ws: WebSocket):
                     raise PlanError("invalid_message", "Expected an envelope with object data", 422)
                 if msg.get("t") == "control":
                     d = msg["data"]
-                    await hub.control(d.get("action"), d.get("value"))
+                    await hub.control_message(d)
             except (PlanError, ValidationError, json.JSONDecodeError) as error:
                 data = {"code": "invalid_message", "msg": "Invalid screen control"}
                 if isinstance(error, PlanError):
