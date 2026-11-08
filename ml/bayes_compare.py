@@ -3,6 +3,7 @@ Reports survivors found over time, Reality map coverage (known cells / cells tha
 the truth plan) at 60 s and 180 s, and Command's known cells. Prints one JSON line per run."""
 import json
 import os
+os.environ.setdefault("DZ_SCENARIO_EVENTS", "0")  # results predate scenario events (collapse_01's 162.5 s collapse)
 import sys
 import time
 from pathlib import Path
