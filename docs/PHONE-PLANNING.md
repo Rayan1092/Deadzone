@@ -16,6 +16,10 @@ owners. Existing screen messages and robot behavior continue to work.
 | `POST /api/fault` | `{type: "rubble", at: [x,y]}` or `{type: "overcurrent", robot: "R1"}` | Validated director fault injection |
 | `GET /api/report` | none | `{text, generated_at, source}` briefing, also broadcast to screens |
 | `POST /api/ask` | `{question:"where should team 2 go?"}` | Private `{text, generated_at, source:"gemini"|"local"}` answer using the same Command tools; no commands dispatched |
+| `PUT /api/plan-sync` | Search plan | Explicitly seed a new offline epoch (DZ_CRDT=1) |
+| `GET /api/plan-sync?plan_id=P-1` | none | `{epoch,plan,ops,valid,issues}` |
+| `POST /api/plan-sync` | `{epoch,plan_id,ops}` | Merge stamped fields; valid plans broadcast `plan_state`, all candidates broadcast phone `plan_sync` |
+| `GET /api/rescue-order` | none | Opt-in `{generated_at,source:"command",survivors:[{survivor,by,length_m,risk,reasons,reported_t}]}` from delivered routes only |
 
 For the opt-in Gemini briefing setup, tool boundary and local fallback, see
 [`GEMINI.md`](GEMINI.md). Source is `gemini` only after a successful tool-grounded
@@ -66,7 +70,10 @@ the current motion physics. Person 3 can read these capabilities in phone `hello
 
 Repeated dispatch of the same saved ID is idempotent. To modify an already
 dispatched plan, create a new `plan_id`. Plans are held in memory and cleared by
-simulation reset. Shared draft edits use last-write-wins; CRDT merging is later work.
+simulation reset. Legacy whole-plan edits use last-write-wins.
+Opt-in operation merging is now available alongside legacy whole-plan edits; see
+[`CO-PLANNING.md`](CO-PLANNING.md) for epochs, offline queues, tombstones, conflicts
+and safety/dispatch blocking. Legacy whole-plan saves invalidate that plan's epoch.
 
 ## Phone WebSocket contract
 
