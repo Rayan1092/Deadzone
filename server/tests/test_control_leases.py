@@ -200,6 +200,8 @@ def test_malformed_screen_credentials_and_mic_feature_gate(session, monkeypatch)
     monkeypatch.setenv("DZ_CONTROL_LEASES", "0")
     monkeypatch.setenv("DZ_VOICE", "0")
     assert client.get("/mic-check").status_code == 404
+    monkeypatch.setenv("DZ_MIC_CHECK", "1")
+    assert client.get("/mic-check").status_code == 200
     assert change(client, "claim", None, name="off").status_code == 409
     assert client.post("/api/robot-command", json={"robot":"R1","action":"resume"}).status_code == 409
 

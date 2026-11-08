@@ -7,6 +7,20 @@ installed:
 .\.venv\Scripts\python.exe -u scripts/demo_tunnel.py
 ```
 
+For the fixed main demo while presenter lease UI is awaiting acceptance:
+
+```powershell
+$env:DZ_AI_LAB = '1'
+.\.venv\Scripts\python.exe -u scripts/demo_tunnel.py --no-leases --gemini
+```
+
+This keeps B/U available and leaves voice off. Gemini still requires Rayan's
+ignored key; the launcher never creates one. `--voice --no-leases` is rejected.
+After the controller/presenter dry run, use the normal leased profile for voice.
+The launcher enables `DZ_MIC_CHECK=1` in both profiles. Standalone servers may
+set it explicitly to serve the local record/playback diagnostic without enabling
+voice or control leases; it does not upload audio or grant robot control.
+
 The launcher installs a portable official Cloudflare binary under ignored
 `.demo/bin/` if needed, checks its SHA256 against official release metadata,
 builds the frontend, binds FastAPI to loopback port 8000, and starts a Quick

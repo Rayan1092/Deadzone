@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "origin": "https://gibson-launched-quote-said.trycloudflare.com",
+  "checks": [
+    "current voice audio/TTS routes",
+    "trained model",
+    "AI Lab 5-point curve",
+    "voice/leases off",
+    "mic diagnostic independent of robot control",
+    "baseline/deadzone B controls",
+    "quiet P-1 saved without safety_reject",
+    "paused seed 7, 3 robots"
+  ],
+  "provider_calls": 0,
+  "phone_microphone": "physical new-origin permission/record/playback remains manual"
+}
