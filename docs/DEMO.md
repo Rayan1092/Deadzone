@@ -87,7 +87,7 @@ Space is pressed at **0:40**. Times after it come from a headless seed-7 run wit
 | 2:02 | +1:22.5 (165) | Press **3** then **F**: R3 gets an **OVERCURRENT** fault, backs up 0.5 m and replans | Rayan | "A wheel jams. Fault protection stops it, backs off and tries another way." |
 | 2:07 | +1:27.5 (175) | Press **1** then **O**: the scheduler strip shows **perception missing deadlines** (red) for 3 s, while **safety still runs at 0 and 50 ms** | Rayan | "Rate monotonic scheduling: when the AI overloads the CPU, perception misses deadlines, but the safety task always runs on time." |
 | 2:20 | | Press **0**, then **G**: briefing panel appears | Yusuf | "This briefing only uses what reached the antenna." |
-| 2:43 | +2:03 (245.8) | **S2** found by R2 while linked, with its route (bonus, only if R/F/O landed on time) | | |
+| 2:43 | +2:03 (246.0) | **S2** found by R2 while linked, with its route (bonus, only if R/F/O landed on time) | | |
 | 2:45 | | | Rayan | "The robots are autonomous, and AI detects survivors. Collapsed buildings, mines, wildfires, tunnels." |
 
 Rescue routes draw on Reality as soon as a robot computes them (yellow dashed line, beacon ring). On Command and phones they appear only once Aziz adds delivered `command.routes`; Yusuf's drawing is ready. Until then, point at the Reality route during the survivor burst.
