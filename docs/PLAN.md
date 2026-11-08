@@ -690,7 +690,7 @@ not detector input or a new ML inference source.
 | `POST /api/dispatch` | `{plan_id}` | `{ok}` or safety result with violations |
 | `POST /api/fault` | `{type: "rubble", at: [x, y]}` or `{type: "overcurrent", robot: "R1"}` | `{ok}` |
 | `GET /api/report` |  | `{text}` from Gemini, also pushed as `report` |
-| `GET /api/join` |  | phone join URL for the QR code |
+| `GET /api/join` |  | `{url}` for Q/QR: local/loopback/wildcard frontend hosts become the routed laptop LAN IPv4 (port preserved), never localhost; public HTTPS/tunnel origins stay unchanged. Returns 503 if no usable LAN address exists. |
 
 ### Inside the server
 

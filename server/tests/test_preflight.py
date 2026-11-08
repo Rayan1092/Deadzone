@@ -45,8 +45,10 @@ $env:DZ_DO_NOT_ALLOW=1
     monkeypatch.setattr(preflight, "listening_processes", lambda port: [])
     monkeypatch.setattr(preflight.shutil, "which", lambda command: command)
     monkeypatch.setattr(preflight, "version", lambda command, pattern: "v22.0.0" if command == "node" else "Python 3.12.0")
+    monkeypatch.setattr(preflight, "lan_ipv4", lambda: "192.168.1.9")
+    monkeypatch.setattr(preflight, "lan_health", lambda *args: True)
     calls = []
-    monkeypatch.setattr(preflight, "server_probe", lambda *args, **kwargs: calls.append(args) or True)
+    monkeypatch.setattr(preflight, "server_probe", lambda *args, **kwargs: calls.append(args) or {"model": True, "lan": True})
     env = {"DZ_ROBOTS": "3", "DZ_SEED": "7", "DZ_SPEED": "1.5", "DZ_OBSTACLES": "1", "DZ_GEMINI": "1"}
     return tmp_path, env, calls
 
@@ -60,7 +62,7 @@ def test_all_pass_has_one_line_per_check_zero_exit_and_never_echoes_keys(setup, 
     root, env, calls = setup
     assert preflight.run_checks(root, activation="ok", environ=env) == 0
     lines = capsys.readouterr().out.splitlines()
-    assert len(lines) == 15 and all(line.startswith("PASS ") for line in lines)
+    assert len(lines) == 16 and all(line.startswith("PASS ") for line in lines)
     assert "PASS GEMINI_API_KEY: set" in lines and "PASS ELEVENLABS_API_KEY: set" in lines
     assert "fake-secret" not in "\n".join(lines)
     assert len(calls) == 1
@@ -92,7 +94,7 @@ def test_any_failure_is_nonzero_without_exposing_values(setup, monkeypatch, caps
         monkeypatch.setattr(preflight, "version", lambda command, pattern:
             None if command == kind else "v22.0.0" if command == "node" else "Python 3.12.0")
     elif kind == "hello":
-        monkeypatch.setattr(preflight, "server_probe", lambda *args, **kwargs: False)
+        monkeypatch.setattr(preflight, "server_probe", lambda *args, **kwargs: {"model": False, "lan": True})
     assert preflight.run_checks(root, activation="ok", environ=env) == 1
     output = capsys.readouterr().out
     assert any(line.startswith("FAIL ") for line in output.splitlines())
@@ -123,6 +125,26 @@ def test_busy_tcp_port_is_detected_without_disturbing_its_owner():
         assert listener.fileno() >= 0
 
 
+def test_lan_failure_prints_firewall_guidance(setup, monkeypatch, capsys):
+    root, env, _ = setup
+    monkeypatch.setattr(preflight, "server_probe", lambda *args, **kwargs: {"model": True, "lan": False})
+    assert preflight.run_checks(root, activation="ok", environ=env) == 1
+    output = capsys.readouterr().out
+    assert "PASS server hello" in output
+    assert "FAIL server LAN: http://192.168.1.9:8000 is unreachable" in output
+    assert preflight.FIREWALL_COMMAND in output
+
+
+def test_busy_server_gets_read_only_lan_check(setup, monkeypatch, capsys):
+    root, env, calls = setup
+    monkeypatch.setattr(preflight, "port_free", lambda port: port != 8000)
+    addresses = []
+    monkeypatch.setattr(preflight, "lan_health", lambda address: addresses.append(address) or True)
+    assert preflight.run_checks(root, activation="ok", environ=env) == 1
+    assert addresses == ["192.168.1.9"] and not calls
+    assert "PASS server LAN: http://192.168.1.9:8000/phone answers" in capsys.readouterr().out
+
+
 def test_cpu_worker_failure_and_timeout_do_not_print_subprocess_output(monkeypatch, capsys):
     monkeypatch.setattr(preflight.subprocess, "run", lambda *args, **kwargs:
                         SimpleNamespace(returncode=1, stdout=b"secret", stderr=b"other-secret"))
@@ -148,6 +170,7 @@ def test_model_probe_requires_model_hello_and_always_stops_its_own_child(monkeyp
     seen = {}
     def start(*args, **kwargs):
         seen.update(kwargs)
+        seen["args"] = args[0]
         return child
     class Socket:
         def __enter__(self): return self
@@ -157,7 +180,11 @@ def test_model_probe_requires_model_hello_and_always_stops_its_own_child(monkeyp
     monkeypatch.setattr(client, "connect", lambda *args, **kwargs: Socket())
     monkeypatch.setattr(preflight, "stop_process", lambda owned: owned.terminate() or True)
     monkeypatch.setattr(preflight, "listener_gone", lambda port: listener_closed)
-    assert preflight.server_probe(ROOT, sys.executable, {"DZ_AUTOSTART": "1"}, seconds=.05) is expected
+    monkeypatch.setattr(preflight, "lan_health", lambda *args: True)
+    result = preflight.server_probe(ROOT, sys.executable, {"DZ_AUTOSTART": "1"}, seconds=.05, lan_address="192.168.1.9")
+    assert result["model"] is expected
+    assert result["lan"] is listener_closed
+    assert seen["args"][1:] == ["-m", "deadzone", "--port", "8000"]
     assert child.stopped and seen["env"]["DZ_AUTOSTART"] == "0"
     assert seen["stdout"] == subprocess.DEVNULL and seen["stderr"] == subprocess.DEVNULL
 
