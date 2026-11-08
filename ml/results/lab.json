@@ -3,7 +3,7 @@
   "name": "MobileNetV3-Small",
   "input_px": 96,
   "params": 1519906,
-  "onboard_ms": 4.9,
+  "onboard_ms": 4.8,
   "size_mb": 6.2,
   "threshold": 0.6,
   "trained_on": "FLIR ADAS v2 thermal street crops + SDT real indoor thermal crops (people lying, sitting, standing), 96 px"
@@ -37,6 +37,16 @@
    ]
   },
   "data": "SDT real indoor thermal frames (FLIR Lepton 3.5): people lying, sitting, standing, plus empty floor; the held-out 20% of every recording block"
+ },
+ "calibration": {
+  "ece": {
+   "FLIR street (held-out val)": 0.0058,
+   "Indoor, SDT (held-out 20%)": 0.0016
+  },
+  "temperature_tested": 1.159,
+  "temperature_shipped": false,
+  "chart": "/ai-lab/slides/calibration.png",
+  "note": "ECE = average gap between confidence and how often the model is right (0 is perfectly honest)."
  },
  "confusion": {
   "labels": [

@@ -119,6 +119,22 @@ def reset_detector():
     _detector = None
 
 
+_close_cache = {}
+
+
+def close_crop(crop_name):
+    """The close-up view of a runtime crop, by convention `<name>_close.<ext>` next to it in
+    ml/crops/runtime, or None when there is no such file. A hot spot the model is unsure about
+    from a distance is judged again on this image once the robot has moved close."""
+    if not crop_name:
+        return None
+    if crop_name not in _close_cache:
+        p = Path(crop_name)
+        candidate = f"{p.stem}_close{p.suffix}"
+        _close_cache[crop_name] = candidate if (CROP_DIR / candidate).is_file() else None
+    return _close_cache[crop_name]
+
+
 def filter_hits(hits, detector=None):
     """Score each thermal hit with the trained model and keep likely survivors."""
     det = detector or get_detector()

@@ -12,8 +12,14 @@ at /crops, so the files are at /crops/heatmaps/<name>.png and /crops/manifest.js
 Grad-CAM (Selvaraju et al. 2017): weight each channel of a conv layer's activations by the mean
 gradient of the "person" score, sum, ReLU, upsample. We use the person class for every crop,
 so on a decoy the map shows what looked most person-like, even though the model said no.
-Layer: features[8], the last block at 1/16 resolution (6 x 6 for a 96 px crop). The final
-block is only 3 x 3, too coarse to show anything on a 96 px crop.
+
+The exported maps are a fused Grad-CAM (fused_cam): the last conv layer, features[12] (3 x 3,
+it knows *where* the person is), multiplied by features[1] (24 x 24, fine detail), both for the
+person-minus-not-person logit. Measured on the 3 survivors + 11 indoor person examples, the share
+of heat on the body (warm pixels, Otsu threshold; the body covers 23% of a crop) is 62% fused vs
+44% for features[12] alone and 15% for the old single features[8] map, which was below chance.
+Occlusion maps were tried too and fail here: scores are saturated near 1.0, so covering one
+patch never moves them. `gradcam()` (single layer, default features[8]) stays for the tests.
 """
 import argparse
 import json
@@ -31,7 +37,8 @@ import common  # noqa: E402
 
 RUNTIME = ML_DIR / "crops" / "runtime"
 FLOORPLAN = REPO / "data" / "floorplans" / "collapse_01.json"
-LAYER = 8
+LAYER = 8                        # single-layer gradcam() default (kept for tests)
+FUSE_LAYERS = (12, 1)            # fused_cam(): last conv layer x a 24 x 24 early layer
 OUT_PX = 192                     # 2x the crop: smoother for cards and textures
 HEAT_RGB = (235, 104, 52)        # one warm hue; opacity carries the magnitude
 MAX_ALPHA = 0.75
@@ -57,6 +64,36 @@ def gradcam(model, x, layer=LAYER, cls=1):
     cam = cam / cam.max() if cam.max() > 0 else cam
     prob = float(torch.softmax(logits.detach(), dim=1)[0, cls])
     return cam.numpy(), prob
+
+
+def _layer_cam(model, x, layer):
+    """Grad-CAM for the person-minus-not-person logit at one layer, normalized to [0, 1]."""
+    acts, grads = {}, {}
+
+    def keep(module, inp, out):
+        acts["a"] = out
+        out.register_hook(lambda g: grads.__setitem__("g", g))
+
+    h = model.features[layer].register_forward_hook(keep)
+    try:
+        model.zero_grad(set_to_none=True)
+        logits = model(x)
+        (logits[0, 1] - logits[0, 0]).backward()
+    finally:
+        h.remove()
+    a, g = acts["a"][0].detach(), grads["g"][0].detach()
+    cam = torch.relu((g.mean(dim=(1, 2))[:, None, None] * a).sum(0)).numpy()
+    return cam / cam.max() if cam.max() > 0 else cam
+
+
+def fused_cam(model, x, layers=FUSE_LAYERS):
+    """Product of per-layer Grad-CAMs upsampled to the input size, normalized to [0, 1]."""
+    size = x.shape[-1]
+    out = np.ones((size, size), dtype=np.float64)
+    for layer in layers:
+        c = _layer_cam(model, x, layer)
+        out *= np.asarray(Image.fromarray(np.uint8(c * 255)).resize((size, size), Image.BICUBIC), float) / 255
+    return out / out.max() if out.max() > 0 else out
 
 
 def render(crop_path, cam, out_dir):
@@ -117,7 +154,7 @@ def main():
     entries = []
     for p in sorted(crops.glob("*.png")):
         x = tf(Image.open(p)).unsqueeze(0)
-        cam, prob = gradcam(model, x)
+        cam = fused_cam(model, x)
         with torch.no_grad():   # the same score the robot's detector computes
             conf = round(float(common.predict_pos_prob(model, x)[0]), 3)
         heatmap, alpha = render(p, cam, out)
@@ -127,7 +164,7 @@ def main():
             "file": p.name,                      # /crops/<file>
             "heatmap": heatmap,                  # /crops/<heatmap>, crop + heatmap blended
             "heatmap_alpha": alpha,              # /crops/<heatmap_alpha>, RGBA overlay only
-            "label": "person" if p.stem.startswith("pos") else "not person",   # ground truth
+            "label": "person" if p.stem.startswith(("pos", "unsure_person")) else "not person",   # ground truth
             "conf": conf,                        # model P(person), same as survivor_found.conf
             "predicted": "person" if conf >= thr else "not person",
             "role": use.get("role"),             # survivor / decoy
@@ -140,7 +177,7 @@ def main():
         })
         print(f"{p.name}: {entries[-1]['id']} conf {conf:.3f} -> {heatmap}")
 
-    manifest = {"threshold": thr, "layer": f"features[{LAYER}]", "size_px": OUT_PX, "caption": caption,
+    manifest = {"threshold": thr, "layer": "fused Grad-CAM: features[12] x features[1], person minus not-person logit", "size_px": OUT_PX, "caption": caption,
                 "note": ("Grad-CAM for the person class. Paths are relative to /crops. Crops are held-out "
                          "FLIR ADAS v2 frames picked by ml/real_crops.py; `object` is the decoy's role in "
                          "the building, `shows` is what the real image is."),

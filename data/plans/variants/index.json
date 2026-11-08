@@ -1,0 +1,44 @@
+{
+ "variants": [
+  {
+   "file": "data/floorplans/variants/collapse_01_v1.json",
+   "scenario": "variants/collapse_01_v1",
+   "id": "collapse_01_v1",
+   "name": "Eastside Warehouse Collapse, variant 1",
+   "base": "collapse_01",
+   "default_plan": "data/plans/variants/collapse_01_v1.plan.json"
+  },
+  {
+   "file": "data/floorplans/variants/collapse_01_v2.json",
+   "scenario": "variants/collapse_01_v2",
+   "id": "collapse_01_v2",
+   "name": "Eastside Warehouse Collapse, variant 2",
+   "base": "collapse_01",
+   "default_plan": "data/plans/variants/collapse_01_v2.plan.json"
+  },
+  {
+   "file": "data/floorplans/variants/collapse_01_v3.json",
+   "scenario": "variants/collapse_01_v3",
+   "id": "collapse_01_v3",
+   "name": "Eastside Warehouse Collapse, variant 3",
+   "base": "collapse_01",
+   "default_plan": "data/plans/variants/collapse_01_v3.plan.json"
+  },
+  {
+   "file": "data/floorplans/variants/collapse_01_v4.json",
+   "scenario": "variants/collapse_01_v4",
+   "id": "collapse_01_v4",
+   "name": "Eastside Warehouse Collapse, variant 4",
+   "base": "collapse_01",
+   "default_plan": "data/plans/variants/collapse_01_v4.plan.json"
+  },
+  {
+   "file": "data/floorplans/variants/collapse_01_v5.json",
+   "scenario": "variants/collapse_01_v5",
+   "id": "collapse_01_v5",
+   "name": "Eastside Warehouse Collapse, variant 5",
+   "base": "collapse_01",
+   "default_plan": "data/plans/variants/collapse_01_v5.plan.json"
+  }
+ ]
+}

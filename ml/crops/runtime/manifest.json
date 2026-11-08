@@ -1,6 +1,6 @@
 {
  "threshold": 0.6,
- "layer": "features[8]",
+ "layer": "fused Grad-CAM: features[12] x features[1], person minus not-person logit",
  "size_px": 192,
  "caption": "Real FLIR thermal frame, same input as the AI",
  "note": "Grad-CAM for the person class. Paths are relative to /crops. Crops are held-out FLIR ADAS v2 frames picked by ml/real_crops.py; `object` is the decoy's role in the building, `shows` is what the real image is.",
@@ -118,6 +118,70 @@
    "shows": "person slumped in a chair, indoor overhead view",
    "caption": "Real FLIR thermal frame, same input as the AI",
    "source": "sdt/image_t_3620.png#63,0,543,480"
+  },
+  {
+   "id": null,
+   "file": "unsure_object_01.png",
+   "heatmap": "heatmaps/unsure_object_01.png",
+   "heatmap_alpha": "heatmaps/unsure_object_01_alpha.png",
+   "label": "not person",
+   "conf": 0.441,
+   "predicted": "not person",
+   "role": null,
+   "object": null,
+   "pos": null,
+   "pose": null,
+   "shows": null,
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": null
+  },
+  {
+   "id": null,
+   "file": "unsure_object_01_close.png",
+   "heatmap": "heatmaps/unsure_object_01_close.png",
+   "heatmap_alpha": "heatmaps/unsure_object_01_close_alpha.png",
+   "label": "not person",
+   "conf": 0.0,
+   "predicted": "not person",
+   "role": null,
+   "object": null,
+   "pos": null,
+   "pose": null,
+   "shows": null,
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": null
+  },
+  {
+   "id": null,
+   "file": "unsure_person_01.png",
+   "heatmap": "heatmaps/unsure_person_01.png",
+   "heatmap_alpha": "heatmaps/unsure_person_01_alpha.png",
+   "label": "person",
+   "conf": 0.584,
+   "predicted": "not person",
+   "role": null,
+   "object": null,
+   "pos": null,
+   "pose": null,
+   "shows": null,
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": null
+  },
+  {
+   "id": null,
+   "file": "unsure_person_01_close.png",
+   "heatmap": "heatmaps/unsure_person_01_close.png",
+   "heatmap_alpha": "heatmaps/unsure_person_01_close_alpha.png",
+   "label": "person",
+   "conf": 1.0,
+   "predicted": "person",
+   "role": null,
+   "object": null,
+   "pos": null,
+   "pose": null,
+   "shows": null,
+   "caption": "Real FLIR thermal frame, same input as the AI",
+   "source": null
   }
  ]
 }
