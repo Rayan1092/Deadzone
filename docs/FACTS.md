@@ -6,7 +6,7 @@ Every number we say on stage, with the file in this repo it comes from. If it ca
 
 | Say | Number | Source |
 |---|---|---|
-| Model | MobileNetV3-Small, 96 px thermal crops, 6 MB, runs on the robot (CPU, about 7 ms per crop) | `ml/results/lab.json` (`model`), `server/deadzone/robot/perception.py` |
+| Model | MobileNetV3-Small, 96 px thermal crops, 1.52 M parameters, 6.2 MB, runs on the robot (CPU, 4.8 ms per crop) | `ml/results/lab.json` (`model`), `server/deadzone/robot/perception.py` |
 | Street accuracy | **96.7%** accuracy, **97.3%** precision, **96.0%** recall on **1,200 held-out FLIR ADAS v2 val crops** (threshold 0.6; 576 / 24 / 16 / 584 tp / fn / fp / tn) | `ml/results/metrics.json`, `docs/assets/confusion_matrix.png` |
 | Indoor accuracy | **99.6%** accuracy, **100%** precision, **99.2%** recall on **2,273 held-out SDT indoor frames** (people lying, sitting, standing, empty floor; 10 misses, 0 false alarms) | `ml/results/lab.json` (`metrics_indoor`) |
 | Calibration | Expected calibration error **0.6%** street, **0.2%** indoor. A **90%+ confident answer is right 98.9%** of the time on street and **100%** (2,246 of 2,246) indoor. Temperature scaling (T = 1.16) tested, not shipped | `ml/results/calibration.json`, `docs/assets/calibration.png`, `py ml/calibration.py` |
