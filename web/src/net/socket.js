@@ -3,6 +3,7 @@ import { RECORDING, REPLAY, recordFrame, replayControl } from './replay'
 import { controllerToken, setControllerToken } from './presenter'
 import { redactHello } from './leaseState'
 import { MapStreamDecoder, recordableFrame } from './mapStream'
+import { screenPath } from './screenProfile'
 
 let ws = null
 
@@ -20,7 +21,7 @@ export function connectScreen() {
   const open = () => {
     const decoder = new MapStreamDecoder()
     // Older servers ignore the query; browsers without zlib decoding keep legacy maps.
-    const path = typeof DecompressionStream === 'function' ? '/ws/screen?map_deltas=1' : '/ws/screen'
+    const path = screenPath(location, typeof DecompressionStream === 'function')
     const connection = sock = ws = new WebSocket(wsUrl(path))
     let pending = Promise.resolve()
     sock.onopen = () => useSim.getState().set({ connected: true })

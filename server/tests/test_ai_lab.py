@@ -36,12 +36,13 @@ def test_export_bytes_and_head(monkeypatch, root, asset, media):
     directory = ROOT / ("ml/results" if root == "results" else "docs/assets")
     with TestClient(api.app) as client:
         url = f"/ai-lab/{root}/{asset}"
-        response = client.get(url)
+        # Compare HEAD/GET lengths for the same uncompressed representation.
+        response = client.get(url, headers={"Accept-Encoding": "identity"})
         assert response.status_code == 200
         assert response.content == (directory / asset).read_bytes()
         assert response.headers["content-type"].startswith(media)
         assert response.headers["cache-control"] == "no-cache"
-        head = client.head(url)
+        head = client.head(url, headers={"Accept-Encoding": "identity"})
         assert head.status_code == 200 and head.content == b""
         assert head.headers["content-length"] == response.headers["content-length"]
         monkeypatch.setenv("DZ_AI_LAB", "0")
