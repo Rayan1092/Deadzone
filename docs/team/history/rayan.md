@@ -11,6 +11,12 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 
 ## Log
 
+### 2026-11-08 17:10 · rayan/instructions · INSTRUCTIONS.md Rule 2 gains the PR ordering rule
+- **Did:** Rayan's rule, added as step 5 of Rule 2: merge main into your branch immediately before opening a PR, and merge each PR before starting the next branch; the history files conflict otherwise. Docs only.
+- **Contract changes:** none.
+- **Heads-up for others:** **Aziz, Yusuf:** that is the one step that keeps `docs/team/history/*.md` conflict-free; it applies to every session.
+- **Next:** obstacles-check PR (17:00 entry, on its branch), then hold.
+
 ### 2026-11-08 16:20 · rayan/search-bayes · Belief map Phase 2 behind `DZ_SEARCH_BAYES=1`: frontiers by expected missing mass per second of travel; seed-7 comparison
 - **Did:** opt-in `DZ_SEARCH_BAYES=1` (read at robot construction). When on, frontier clusters are ranked by the expected missing mass of the robot's **own** belief (its prior × its miss grid, occupied cells zeroed) within 5 m of the frontier, divided by travel time (BFS distance / 0.8 m/s + 1 s); the peer-claim penalty (×0.3), the keep-going bonus (×1.1) and the pull toward an unmapped zone (÷(1 + d/10)) stay as factors. Off, the legacy score is untouched: **demo guard green with the flag off**. `Robot(..., belief_prior=, expected_survivors=)` now accepts the building prior at construction; without it the belief uses a flat prior over non-occupied cells. Tests in `test_search_bayes.py` (the flagged scorer turns away from a room already looked at and toward the unexamined one; the flag off ignores the belief; seed 7 runs flag-on).
 - **Comparison, seed 7, 3 robots, P-1 dispatched, 300 s (in simulation):**
