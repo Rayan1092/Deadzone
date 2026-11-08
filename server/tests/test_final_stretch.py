@@ -232,9 +232,17 @@ def test_transport_counts_multihop_expiry_and_destruction_once():
 
 
 def test_robot_owned_diagnostics_only_aggregate_complete_actual_counters(hub, monkeypatch):
+    # Exercise older/incomplete telemetry explicitly, even after Rayan adds counters
+    # to the default report. No guessed zeroes while any robot has not reported.
+    originals = {rid: robot.telemetry for rid, robot in hub.sim.robots.items()}
+    for rid, robot in hub.sim.robots.items():
+        def without_counters(link, original=originals[rid]):
+            report = original(link)
+            return {key: value for key, value in report.items() if key != "counters"}
+        monkeypatch.setattr(robot, "telemetry", without_counters)
     assert "detector_calls" not in hub.sim.snapshot()["stats"]
-    for index, robot in enumerate(hub.sim.robots.values()):
-        original = robot.telemetry
+    for index, (rid, robot) in enumerate(hub.sim.robots.items()):
+        original = originals[rid]
         monkeypatch.setattr(robot, "telemetry", lambda link, original=original, index=index:
             original(link) | {"counters":{"detector_calls":index+1, "scheduler_deadlines_met":10}})
         stats = hub.sim.snapshot()["stats"]

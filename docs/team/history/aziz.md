@@ -4,13 +4,22 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** deployment pass item 1, p2/phone-deployment; server public text next, public-repo hygiene third, one PR/merge each.
-- **Works on main:** all A-G backend items; LAN #178 and phone empty-plan clearing #181 merged. Protected floorplan.py/command plan/safety remain untouched.
-- **In flight (not merged):** phone Join / Pick a robot / Control / Plan screens, console glass tokens, 48 px controls, connection lifecycle states and acknowledged action confirmations. Existing server protocol/DTN gates retained. npm test now invokes the existing Node runner.
-- **Blocked on / need from others:** none. Existing :8000 service stays running. No real tunnel/firewall change. Public strings change without simulation policy changes or new flags, as explicitly requested.
-- **Promises to others:** read current main before each PR, merge each before next. Own history only; no secrets. Next server pass will normalize display text at presentation boundaries while preserving machine codes and shapes, including protected modules' messages without editing them.
+- **Working on:** p2/public-server-text, deployment item 2 plus audit #14-20/#33-35/#37 status. Phone deployment #186 merged (99 frontend, build, 736 backend / 1 skip). Public-release hygiene is item 3 after this merges, subject to 11:15 freeze (using Eastern until timezone confirmed).
+- **Works on main:** A-G, LAN #178, empty-plan #181, phone deployment #186. Existing :8000 service remains running.
+- **In flight (not merged):** public sentence-case messages at HTTP/WebSocket boundaries and before acknowledgement speech. Error codes/IDs/decisions/geometry/images unchanged; protected planner/safety/robot files not edited. Assigned audit rows marked fixed; #38 aggregation ready, awaiting Rayan telemetry.
+- **Counter contract:** Sim.snapshot already sums detector_calls, detector_rejections, scheduler_deadlines_met only when every robot supplies a valid counter. Updated regression explicitly tests older/incomplete telemetry rather than asserting defaults never have counters. Rayan can add counters to telemetry without turning that test red. No invented zeroes or truth-to-Command copy.
+- **Blocked on / need from others:** #38 complete telemetry publication from Rayan. No other input required. Preserve protected files and .env; no tunnel/firewall action.
+- **Promises to others:** finish/merge current work before freeze; no new item unless it can merge before then. Separate PRs/merge main first, own history each commit. All WS/REST shapes unchanged; display text intentionally changes.
 
 ## Log
+
+### 2026-11-08 PT - p2/public-server-text - Public server wording and deployment audit
+- **Did:** after phone #186 merged, added one public text boundary for REST and WS and reused it before delivered-ack speech. Feature gates explain availability, plan/controller errors give next steps, safety prose keeps real violation values, robot/area names replace internal labels, detector fallback no longer exposes flags or model paths. Assigned audit #14-20/#33-35/#37 marked fixed (phone items reference #186); corrected phone refusal fallback sentence case.
+- **Contract changes:** no message shape/key/type change. msg/say/report text/plan_state/detector_reason are display strings; codes, identifiers, reason enums, values/outcomes and stored telemetry/acks are retained. PLAN documents presentation semantics. Planner/safety source untouched; no new simulation flag/behavior.
+- **Validation:** 143 public/API/lease/voice regressions pass; 105 public/final-stretch/detector cases pass after audit/counter-test updates. Full backend/demo and frontend validation pending integrated-main run. No raw input/credential printing; maps/geometry/image arrays bypass formatting.
+- **Counter handoff:** #38 aggregation already consumes detector_calls, detector_rejections, scheduler_deadlines_met. Its test now explicitly constructs missing/partial telemetry so Rayan can publish counters by default. Audit status is aggregation verified, awaiting Rayan telemetry; do not claim end-to-end fixed until it arrives.
+- **Heads-up for others:** errors retain machine codes for client branching; raw exception prose remains internal. Client-visible strings deliberately change. Existing :8000 untouched; no real tunnel/firewall change. Freeze requested for 11:15; using earlier Eastern deadline pending clarification.
+- **Next:** merge latest main, complete required suites, publish/merge this audit/server PR before freeze; then hygiene only if time allows.
 
 ### 2026-11-08 PT - p2/phone-deployment - Phone field screens and public wording
 - **Did:** starts from merged main 4f0acea; integrated main 63beaaa (#182 no-go holding fix, #183 frosted top bar). Reorganized phone into Join, Pick a robot, Control and Plan with relay alternative, frosted shared glass tokens, accessible focus, 48 px inputs/buttons, offline state on Join and active screens, initial connect/reconnect/handshake timeout. Display labels use scout/area names instead of internal ids; no setup flags shown. Save/send/control/relay receipts remain tied to actual acknowledgements; sent does not mean delivered to a dark robot. Added npm test entry for existing Node test runner.

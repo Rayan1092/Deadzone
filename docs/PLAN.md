@@ -523,6 +523,15 @@ Two WebSockets carry everything live: `/ws/screen` for the big screen and `/ws/p
 {"t": "tick", "seq": 812, "time": 81.2, "data": {}}
 ```
 
+Public display strings (`msg`, `say`, report `text`, `plan_state` and
+`detector_reason`) use sentence-case English and public robot/area names at the
+HTTP/WebSocket presentation boundary. Error `code`, `rule`, `reason` enums,
+identifiers, positions, timestamps and all envelope/response shapes are unchanged.
+Safety messages retain the real violation values and outcomes; only their prose
+is formatted. Planning, robot telemetry and stored acknowledgements stay intact.
+Maps, geometry and camera bytes bypass text formatting. The same formatting is
+applied to delivered acknowledgement speech before synthesis.
+
 ### Big screen: `WS /ws/screen`
 
 | Direction | `t` | When | `data` |

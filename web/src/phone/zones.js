@@ -19,5 +19,5 @@ export const hasPlanContent = (draft) => Boolean(draft && (draft.zones?.length |
 export function refusalText(path, { message, violations } = {}) {
   const what = path === '/api/dispatch' ? 'Dispatch refused' : 'Check refused'
   const rules = (violations ?? []).map((v) => v.msg).filter(Boolean)
-  return `${what}: ${rules.length ? rules.join('; ') : message ?? 'the server did not accept this plan'}`
+  return `${what}: ${rules.length ? rules.join('; ') : message ?? 'The server did not accept this plan.'}`
 }
