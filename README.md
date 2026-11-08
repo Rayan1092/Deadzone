@@ -31,7 +31,7 @@ Same seed every time, so the story happens on cue. The full script with timings 
 - **Robots** (`server/deadzone/robot/`): lidar mapping, frontier exploration, A\* paths, relay drop rule, lost-link behaviour, a rate monotonic task scheduler, fault protection, and rescue routes. Robot code can only touch the world through its sensors and radio. It never reads the sim's truth.
 - **Network** (`server/deadzone/network/`): a radio model where every wall costs signal (metal costs the most), plus store and forward with custody, so a message is never lost, just late.
 - **Command post** (`server/deadzone/command/`): only changes when a message actually arrives. It also runs the safety checker for phone plans.
-- **AI survivor detector** (`ml/`): MobileNetV3-Small trained on real FLIR thermal images. 96.2% accuracy, 96.3% precision, 96.0% recall on 1,200 images it never trained on. The model is 6 MB and runs on the robot, so it works with no signal.
+- **AI survivor detector** (`ml/`): MobileNetV3-Small trained on real thermal images (FLIR street scenes plus SDT indoor scenes). 96.7% accuracy, 97.3% precision, 96.0% recall on 1,200 FLIR images it never trained on. Adding the indoor images raised accuracy on held-out people lying and sitting from 83.9% to 99.6%. The model is 6 MB and runs on the robot, so it works with no signal.
 - **Big screen and phones** (`web/`): React and three.js. Phones are just a web page, so there's nothing to install.
 
 ## Run it
@@ -104,6 +104,11 @@ For web development, run `npm run dev` in `web/` and open http://localhost:5173.
 cd server
 python -m pytest -q
 ```
+
+## Data and resources
+
+- **Teledyne FLIR ADAS v2 thermal dataset**: street-scene thermal images with person boxes; training data and the held-out test set (1,200 images), the judge test pool and the decoy images.
+- **SDT, Synthetic Depth & Thermal dataset** ([Zenodo 4124309](https://zenodo.org/records/4124309)), licensed **CC BY 4.0** (the record also says non-commercial research use): we use only its real indoor test split, FLIR Lepton 3.5 frames of people lying, sitting and standing plus empty rooms. 80% is used for training, 20% is held out; the sim's three survivors come from the held-out part.
 
 ## Team
 
