@@ -1,5 +1,6 @@
 import { wsUrl } from '../net/socket'
 import { usePhone, handlePhoneMessage } from './store'
+import { flush } from './plan'
 
 let ws = null
 
@@ -29,19 +30,44 @@ export function connectPhone(role) {
   const client = clientLabel()
   const qs = new URLSearchParams({ role, ...(client ? { client } : {}) })
   let closed = false
+  let retry = null
+  let socket = null
   const open = () => {
-    ws = new WebSocket(wsUrl(`/ws/phone?${qs}`))
-    ws.onopen = () => usePhone.getState().set({ connected: true })
-    ws.onmessage = (e) => handlePhoneMessage(JSON.parse(e.data))
-    ws.onclose = () => {
+    socket = new WebSocket(wsUrl(`/ws/phone?${qs}`))
+    ws = socket
+    socket.onmessage = (e) => {
+      if (closed) return
+      const msg = JSON.parse(e.data)
+      handlePhoneMessage(msg)
+      if (msg.t === 'hello') {
+        usePhone.getState().set({ connected: true })
+        flush().then(() => {
+          // A save may already have been failing when the hello arrived.
+          if (!closed && usePhone.getState().pending && usePhone.getState().connected) flush()
+        })
+      }
+    }
+    socket.onclose = () => {
+      if (closed) return
       usePhone.getState().set({ connected: false })
-      if (!closed) setTimeout(open, 1000) // phones drop off Wi-Fi a lot, keep retrying
+      retry = setTimeout(open, 1000) // phones drop off Wi-Fi a lot, keep retrying
     }
   }
   open()
-  return () => { closed = true; ws?.close() }
+  return () => {
+    closed = true
+    clearTimeout(retry)
+    socket?.close()
+    if (ws === socket) ws = null
+    usePhone.getState().set({ connected: false })
+  }
 }
 
 export function sendPhone(t, data) {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t, data }))
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ t, data }))
+    return true
+  }
+  usePhone.getState().set({ error: { code: 'offline', msg: 'Reconnect before sending this control.', at: Date.now() }, relayPending: null })
+  return false
 }

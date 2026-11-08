@@ -173,12 +173,17 @@ async def command_report(post, now, *, client=None, question=None):
     if question is not None:
         fallback["text"] = ("Gemini is unavailable. This local Command summary does not answer your question. "
                             "No instructions have been sent.\n" + fallback["text"])
+    def unavailable(reason):
+        # Keep G's original response shape; phone Ask can explain its fallback.
+        return fallback | {"unavailable_reason": reason} if question is not None else fallback
     key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if os.environ.get("DZ_GEMINI") != "1" or not key:
-        return fallback
+    if os.environ.get("DZ_GEMINI") != "1":
+        return unavailable("disabled")
+    if not key:
+        return unavailable("missing_key")
     model = os.environ.get("GEMINI_MODEL", DEFAULT_MODEL)
     if not re.fullmatch(r"gemini-[A-Za-z0-9.-]+", model):
-        return fallback
+        return unavailable("invalid_model")
     try:
         # This single deadline covers connecting, every model turn and every tool.
         async with asyncio.timeout(REPORT_TIMEOUT_S):
@@ -186,6 +191,10 @@ async def command_report(post, now, *, client=None, question=None):
                 return await _gemini(tools, key, model, client, question)
             async with httpx.AsyncClient(timeout=REPORT_TIMEOUT_S) as session:
                 return await _gemini(tools, key, model, session, question)
-    except (TimeoutError, httpx.HTTPError, ValueError, KeyError, IndexError, TypeError, AttributeError):
+    except TimeoutError:
+        return unavailable("timeout")
+    except httpx.HTTPError:
+        return unavailable("provider_error")
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError):
         # Never log exceptions: transport errors can contain credentials or prompts.
-        return fallback
+        return unavailable("invalid_response")

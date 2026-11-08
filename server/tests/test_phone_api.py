@@ -65,6 +65,102 @@ def test_rest_save_check_dispatch_and_duplicate_dispatch(session):
     assert client.post("/api/dispatch", json={"plan_id": "missing"}).status_code == 404
 
 
+def test_no_go_only_and_cleared_drafts_sync_to_screen_and_both_phones(session):
+    client, hub = session
+    data = draft() | {"zones": [], "no_go": [{"id": "NG1", "poly": [[8, 8], [9, 8], [9, 9], [8, 9]],
+                                              "reason": "Responder no-go area"}]}
+    with client.websocket_connect("/ws/screen") as screen, \
+            client.websocket_connect("/ws/phone?client=phone-a") as a, \
+            client.websocket_connect("/ws/phone?client=phone-b") as b:
+        for _ in range(4):
+            screen.receive_json()
+        hello, _ = initial(a)
+        initial(b)
+        data["plan_epoch"] = hello["plan_epoch"]
+        for regions in (data["no_go"], []):
+            data["no_go"] = regions
+            assert client.post("/api/plan?check=false", json=data).json()["saved"]
+            for viewer in (screen, a, b):
+                message = viewer.receive_json()
+                assert message["t"] == "plan_state"
+                assert message["data"]["no_go"] == regions
+                assert message["data"]["zones"] == []
+                assert "plan_epoch" not in message["data"]
+        for path in ("/api/plan/check", "/api/dispatch"):
+            response = client.post(path, json={"plan_id": "P-1", "plan_epoch": hello["plan_epoch"]})
+            assert response.status_code == 422
+            assert response.json()["detail"]["code"] == "empty_plan"
+        assert not hub.sim.network.queues["CMD"]
+
+
+def test_dispatch_notifies_all_phones_and_reconnect_retains_immutability(session):
+    client, hub = session
+    assert client.post("/api/plan?check=false", json=draft()).json()["saved"]
+    with client.websocket_connect("/ws/phone?client=phone-a") as a, \
+            client.websocket_connect("/ws/phone?client=phone-b") as b:
+        hello, _ = initial(a)
+        initial(b)
+        ref = {"plan_id": "P-1", "plan_epoch": hello["plan_epoch"]}
+        result = client.post("/api/plan/check", json=ref)
+        assert result.json()["ok"]
+        for phone in (a, b):
+            assert phone.receive_json()["t"] == "safety"
+        assert client.post("/api/dispatch", json=ref).json()["ok"]
+        for phone in (a, b):
+            assert phone.receive_json()["t"] == "plan_state"
+            assert phone.receive_json()["data"] == {"kind": "plan_dispatched", "plan_id": "P-1"}
+    with client.websocket_connect("/ws/phone?client=phone-b") as phone:
+        restored, _ = initial(phone)
+        assert restored["dispatched_plan_ids"] == ["P-1"]
+        assert restored["plan_epoch"] == hello["plan_epoch"]
+
+
+def test_stale_phone_requests_cannot_write_check_or_dispatch_into_reset(session):
+    client, hub = session
+    with client.websocket_connect("/ws/phone?client=phone-a") as phone:
+        old, _ = initial(phone)
+        assert client.post("/api/control", json={"action": "reset"}).status_code == 200
+        new, _ = initial(phone)
+        assert new["plan_epoch"] != old["plan_epoch"]
+        assert not new["dispatched_plan_ids"]
+    assert client.post("/api/plan?check=false", json=draft()).json()["saved"]
+    stale = {"plan_epoch": old["plan_epoch"]}
+    for path, body in (("/api/plan?check=false", draft() | stale),
+                       ("/api/plan/check", {"plan_id": "P-1"} | stale),
+                       ("/api/dispatch", {"plan_id": "P-1"} | stale)):
+        response = client.post(path, json=body)
+        assert response.status_code == 409
+        assert response.json()["detail"]["code"] == "plan_reset"
+    assert not hub.sim.network.queues["CMD"]
+
+
+def test_relay_join_controls_and_disconnect_update_paused_screen_without_time_step(session):
+    client, hub = session
+    with client.websocket_connect("/ws/screen") as screen:
+        for _ in range(4):
+            screen.receive_json()
+        tick = hub.sim.tick_n
+        with client.websocket_connect("/ws/phone?client=relay-a&role=relay") as phone:
+            initial(phone)
+            relay = phone.receive_json()["data"]
+            joined = screen.receive_json()
+            assert joined["t"] == "tick"
+            assert joined["data"]["reality"]["relays"][0]["id"] == relay["id"]
+            for message, field, value in (
+                ({"t": "relay_power", "data": {"on": False}}, "on", False),
+                ({"t": "relay_place", "data": {"pos": [8, 15]}}, "pos", [8, 15]),
+                ({"t": "relay_power", "data": {"on": True}}, "on", True),
+            ):
+                phone.send_json(message)
+                assert phone.receive_json()["t"] == "relay_state"
+                update = screen.receive_json()
+                assert update["data"]["reality"]["relays"][0][field] == value
+                assert hub.sim.tick_n == tick and not hub.running
+        gone = screen.receive_json()
+        assert not gone["data"]["reality"]["relays"][0]["on"]
+        assert hub.sim.tick_n == tick
+
+
 def test_dispatch_uses_latest_delivered_battery_not_old_approval(session):
     client, hub = session
     assert client.post("/api/plan", json=draft()).json()["ok"]

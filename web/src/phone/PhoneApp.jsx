@@ -168,8 +168,9 @@ function Snackbar() {
 function Shell({ role }) {
   const hello = usePhone((s) => s.hello)
   const error = usePhone((s) => s.error)
+  const checking = usePhone((s) => s.checking)
   // Another phone dispatched this plan ID first; keep editing under a new ID.
-  useEffect(() => { if (error?.code === 'plan_dispatched') forkDispatched() }, [error])
+  useEffect(() => { if (!checking && error?.code === 'plan_dispatched') forkDispatched() }, [error, checking])
   const connected = usePhone((s) => s.connected)
   const time = usePhone((s) => s.time)
   return (

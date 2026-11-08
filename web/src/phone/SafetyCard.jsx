@@ -7,6 +7,7 @@ export default function SafetyCard() {
   const draft = usePhone((s) => s.draft)
   const safety = usePhone((s) => s.safety)
   const checking = usePhone((s) => s.checking)
+  const connected = usePhone((s) => s.connected)
   const dispatched = usePhone((s) => s.dispatched)
   if (!draft?.zones.length) return null
 
@@ -29,10 +30,10 @@ export default function SafetyCard() {
         <b>Safety check passed</b>
         <span className="muted small">Battery, reach, no-go and radio all check out for {robots}.</span>
         <div className="actions">
-          <button className="filled" disabled={checking} onClick={dispatchPlan}>
+          <button className="filled" disabled={!connected || checking} onClick={dispatchPlan}>
             {checking ? 'Dispatching…' : `Dispatch ${draft.plan_id}`}
           </button>
-          <button className="text-btn" disabled={checking} onClick={checkPlan}>Check again</button>
+          <button className="text-btn" disabled={!connected || checking} onClick={checkPlan}>Check again</button>
         </div>
       </section>
     )
@@ -54,7 +55,7 @@ export default function SafetyCard() {
           </div>
         ))}
         <div className="actions">
-          <button className="filled" disabled={checking} onClick={checkPlan}>{checking ? 'Checking…' : 'Check again'}</button>
+          <button className="filled" disabled={!connected || checking} onClick={checkPlan}>{checking ? 'Checking…' : 'Check again'}</button>
         </div>
       </section>
     )
@@ -65,7 +66,7 @@ export default function SafetyCard() {
       <b>Ready to check {draft.plan_id}</b>
       <span className="muted small">The command post checks battery, reach, no-go areas and radio coverage from what it knows.</span>
       <div className="actions">
-        <button className="filled" disabled={checking} onClick={checkPlan}>{checking ? 'Checking…' : 'Run safety check'}</button>
+        <button className="filled" disabled={!connected || checking} onClick={checkPlan}>{checking ? 'Checking…' : 'Run safety check'}</button>
       </div>
     </section>
   )
