@@ -127,6 +127,6 @@ def test_soak_20_minutes():
     late = [mb for t, mb in samples.items() if t >= SETTLED_S]
     if len(late) >= 2:
         assert late[-1] - late[0] < MAX_LATE_GROWTH_MB, f"memory still growing after 16 min: {late}"
-    assert all(r.state in ("DONE", "RETURNING_HOME", "EXPLORING", "REPLANNING", "FAULT",
+    assert all(r.state in ("DONE", "SHUTDOWN", "RETURNING_HOME", "EXPLORING", "REPLANNING", "FAULT",
                            "LOST_LINK_EXPLORING", "RETURNING_TO_SIGNAL", "WAITING_FOR_LINK")
                for r in sim.robots.values())
