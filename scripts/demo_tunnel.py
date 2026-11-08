@@ -68,6 +68,8 @@ def main():
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--install-only", action="store_true")
+    parser.add_argument("--voice", action="store_true", help="opt in to the voice pipeline for a keyed dry run")
+    parser.add_argument("--gemini", action="store_true", help="opt in to keyed G/Ask briefings")
     parser.add_argument("--duration", type=float, help="optional seconds after readiness, for a smoke run")
     args = parser.parse_args()
     LOCAL.mkdir(exist_ok=True)
@@ -105,7 +107,7 @@ def main():
             raise RuntimeError("No Quick Tunnel URL after 60s; inspect .demo/cloudflared.log and venue firewall")
         env = os.environ.copy()
         env.update(DZ_PUBLIC_URL=origin, DZ_AUTOSTART="0", DZ_ROBOTS="3", DZ_SEED="7", DZ_SPEED="2",
-                   DZ_CONTROL_LEASES="1", DZ_VOICE="0", DZ_GEMINI="0")
+                   DZ_CONTROL_LEASES="1", DZ_VOICE="1" if args.voice else "0", DZ_GEMINI="1" if args.gemini else "0")
         env["DZ_PRESENTER_TOKEN"] = env.get("DZ_PRESENTER_TOKEN") or secrets.token_urlsafe(32)
         private_path = LOCAL / "presenter-token.txt"
         fd = os.open(private_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -130,7 +132,8 @@ def main():
         state = {"url":origin, "backend_pid":backend.pid, "tunnel_pid":tunnel.pid, "port":args.port}
         state_path.write_text(json.dumps(state, indent=2))
         print(json.dumps({"url":origin, "phone":origin+"/phone", "microphone_check":origin+"/mic-check",
-                          "presenter_token_file":str(private_path), "voice":"off; pipeline pending", "stop":"Ctrl+C"}), flush=True)
+                          "presenter_token_file":str(private_path), "voice":"on" if args.voice else "off",
+                          "gemini_briefings":"on" if args.gemini else "off", "stop":"Ctrl+C"}), flush=True)
         started = time.monotonic()
         while args.duration is None or time.monotonic() - started < args.duration:
             if backend.poll() is not None or tunnel.poll() is not None:

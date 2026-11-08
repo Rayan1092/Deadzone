@@ -1,12 +1,13 @@
 """What the command post knows. Updated ONLY by bundles delivered through the network."""
 from copy import deepcopy
-from collections import deque
+from collections import OrderedDict, deque
 import logging
 
 import numpy as np
 from pydantic import ValidationError
 
 from .rescue import RescueRoute
+from .ack import CommandAck, STATUS_ORDER
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class CommandPost:
         self.survivors = {}   # id -> record + reported_t
         self.faults = {}
         self.routes = {}      # survivor id -> latest delivered route
+        self.command_acks = OrderedDict()  # bounded latest delivered decision per cmd_id
         self.delivered = 0
         self.events = []
         # Bounded, delivered-only evidence for read-only briefings. Sim.events
@@ -36,6 +38,17 @@ class CommandPost:
         if b["bid"] in self._seen:
             return False
         route = None
+        ack = None
+        if b["kind"] == "command_ack":
+            try:
+                ack = CommandAck.model_validate(b["payload"])
+            except ValidationError:
+                log.warning("Rejected command_ack bundle %s: invalid payload", b["bid"])
+                return False
+            if (ack.robot != b["src"] or ack.t > now + .11
+                    or (ack.issued_t is not None and ack.issued_t > ack.t + .11)):
+                log.warning("Rejected command_ack bundle %s: source or timestamps invalid", b["bid"])
+                return False
         if b["kind"] == "rescue_route":
             try:
                 route = RescueRoute.model_validate(b["payload"])
@@ -83,6 +96,21 @@ class CommandPost:
                 self.routes[route.survivor_id] = record
                 self.events.append({"kind": "rescue_route_reported", **deepcopy(record),
                                     "delay_s": round(now - route.t, 1)})
+        elif k == "command_ack":
+            prev = self.command_acks.get(ack.cmd_id)
+            fresh = (prev is None or (
+                prev["robot"] == ack.robot and prev["cmd"] == ack.cmd
+                and prev["issued_t"] == ack.issued_t
+                and STATUS_ORDER[ack.status] >= STATUS_ORDER[prev["status"]]
+                and (ack.t, STATUS_ORDER[ack.status]) > (prev["t"], STATUS_ORDER[prev["status"]])))
+            if fresh:
+                record = ack.model_dump(mode="json") | {"reported_t": round(now, 1),
+                                                       "delay_s": round(max(0, now - ack.t), 1)}
+                self.command_acks[ack.cmd_id] = record
+                self.command_acks.move_to_end(ack.cmd_id)
+                while len(self.command_acks) > 256:
+                    self.command_acks.popitem(last=False)
+                self.events.append({"kind": "command_ack_reported", **deepcopy(record)})
         elif k == "survivor":
             if p["id"] not in self.survivors:
                 rec = dict(p)
@@ -112,5 +140,8 @@ class CommandPost:
                   for r in self.relays.values()]
         faults = [{k: v for k, v in f.items() if k != "sent_t"} for f in self.faults.values()]
         routes = [deepcopy(self.routes[sid]) for sid in sorted(self.routes)]
-        return {"robots": robots, "survivors": list(self.survivors.values()), "relays": relays,
-                "faults": faults, "routes": routes}
+        result = {"robots": robots, "survivors": list(self.survivors.values()), "relays": relays,
+                  "faults": faults, "routes": routes}
+        if self.command_acks:
+            result["command_acks"] = deepcopy(list(self.command_acks.values()))
+        return result

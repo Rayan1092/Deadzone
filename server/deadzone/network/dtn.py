@@ -11,14 +11,14 @@ from copy import deepcopy
 
 from .propagation import throughput_bps
 
-PRIO = {"survivor": 0, "fault": 1, "command": 1, "plan": 1, "rescue_route": 1,
+PRIO = {"survivor": 0, "fault": 1, "command": 1, "command_ack": 1, "plan": 1, "rescue_route": 1,
         "telemetry": 2, "map_patch": 3}
 RELAY_QUEUE_BYTES = 2_000_000
 _seq = itertools.count(1)
 
 
 def make_bundle(src, dst, kind, payload, created, size, ttl=900.0):
-    if kind == "rescue_route":
+    if kind in ("rescue_route", "command_ack"):
         size = max(size, len(json.dumps(payload, separators=(",", ":")).encode()) + 64)
     return {
         "bid": f"{src}-{next(_seq):06d}",

@@ -23,7 +23,8 @@ Use `http://127.0.0.1:<port>` for the laptop's presenter screen; its override
 credential then stays on loopback. QR still points phones at the HTTPS origin.
 
 The backend starts paused: seed 7, three robots, 2x, control leases enabled, voice
-and Gemini disabled. Other feature gates keep their explicit process settings.
+and Gemini disabled. Explicit `--voice` and `--gemini` opt in independently for
+keyed testing-laptop dry runs. Other gates keep their explicit process settings.
 The launcher does not create/read an API key. Its generated presenter credential
 is in `.demo/presenter-token.txt` while running, for the presenter only. Logs and
 the credential never go into git. Ctrl+C stops the two processes started by this
@@ -70,6 +71,8 @@ with the address can view the demo; presenter credentials stay separate. See
 [Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)
 and [official downloads](https://developers.cloudflare.com/tunnel/downloads/).
 
-The protected `/api/voice` boundary is ready for lease enforcement; complete
-speech/intent/action acknowledgement/TTS still needs its own implementation and
-keyed dry run. The microphone preflight does not imply that pipeline works.
+The full backend speech/intent/safety/DTN acknowledgement/TTS contract is in
+[VOICE.md](VOICE.md). Provider calls have been verified with mocked transports;
+the real keyed pipeline and Yusuf's push-to-talk UI still need dry runs. User
+confirmed the phone microphone preflight works on venue Wi-Fi; that alone does
+not establish STT, Gemini intent or synthesized speech acceptance.

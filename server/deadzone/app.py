@@ -4,6 +4,8 @@ Run:  uvicorn deadzone.app:app --host 0.0.0.0 --port 8000
 """
 import asyncio
 import base64
+from copy import deepcopy
+import hashlib
 import ipaddress
 import json
 import math
@@ -28,7 +30,9 @@ from pydantic import ValidationError
 from .ai_lab import AILabAssets
 from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
 from .command.crdt import MergeBatch, PlanSync
-from .command.leases import LeaseClaim, LeaseTable, PresenterRelease, RobotRef, VoiceRequest
+from .command.leases import LeaseClaim, LeaseTable, PresenterRelease, RobotRef
+from .command import voice as voice_services
+from .command.voice import ManualCommand, SpeechRequest, VoiceRequest
 from .command.controls import AskQuestion, FaultRequest, RelayPlace, RelayPower, director_adapter
 from .command.reports import command_report
 from .command.rescue_order import rescue_order
@@ -36,6 +40,7 @@ from .command.safety import SafetyChecker
 from .robot.robot import resume_command
 from .robot.perception import CROP_DIR, get_detector
 from .sim import DT, ROBOT_DEFS, Sim
+from .network.dtn import make_bundle
 
 MAPS_EVERY = 5
 load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
@@ -74,6 +79,8 @@ class Hub:
         checker = SafetyChecker(self.sim.prior, self.sim.robot_specs, self.sim.energy_time_scale)
         self.plans = PlanManager(self.sim, checker)
         self.plan_sync = PlanSync(self.plans)
+        self.command_requests = {}
+        self.speech_cache = {}
 
     def envelope(self, t, data):
         self.seq += 1
@@ -147,9 +154,110 @@ class Hub:
         if self.leases_enabled():
             self.leases.require(robot, token)
 
+    def require_voice(self):
+        if os.environ.get("DZ_VOICE") != "1":
+            raise PlanError("feature_disabled", "Enable DZ_VOICE=1 for voice control", 409)
+
+    def live_grant(self, robot, token, post, grant):
+        if post is not self.sim.post:
+            raise PlanError("voice_reset", "Simulation reset during command; submit a new request", 409)
+        self.leases.require(robot, token)
+        if self.leases.leases[robot] is not grant:
+            raise PlanError("lease_changed", "Control was released or reclaimed; submit a new request", 409)
+
+    async def issue_command(self, robot, token, *, intent=None, text=None, audio=None, mime=None, request_id=None):
+        self.require_leases()
+        self.leases.require(robot, token)
+        is_voice = intent is None
+        if is_voice or intent.action != "resume":
+            self.require_voice()
+        post, grant = self.sim.post, self.leases.leases[robot]
+        book = self.command_requests
+        key = token, request_id or secrets.token_hex(16)
+        fingerprint = hashlib.sha256(json.dumps({"robot":robot,"text":text,"mime":mime,
+            "audio":hashlib.sha256(audio).hexdigest() if audio is not None else None,
+            "intent":intent.model_dump(mode="json") if intent is not None else None},sort_keys=True).encode()).hexdigest()
+        for old in list(book):
+            if book[old]["result"] is not None and book[old]["expires"] <= time.monotonic():
+                del book[old]
+        if key in book:
+            entry = book[key]
+            if entry["fingerprint"] != fingerprint:
+                raise PlanError("request_conflict", "Use a new request_id for different input", 409)
+            if entry["result"] is None:
+                raise PlanError("request_in_progress", "This request is processing; retry the same ID later", 409)
+            return deepcopy(entry["result"])
+        if len(book) >= 256 or any(k[0] == token and e["robot"] == robot and e["result"] is None for k,e in book.items()):
+            raise PlanError("command_busy", "Command processing is busy; retry later with the same request_id", 429)
+        entry = {"robot":robot,"fingerprint":fingerprint,"result":None,"expires":0}
+        book[key] = entry
+        try:
+            stt_source, intent_source = "manual", "manual"
+            if is_voice:
+                stt_source, intent_source = "browser", "gemini"
+                if audio is not None:
+                    text = await voice_services.transcribe(audio, mime)
+                    stt_source = "elevenlabs"
+                    self.live_grant(robot, token, post, grant)
+                rooms = [{k:r[k] for k in ("id","name")} for r in self.sim.prior.data.get("rooms", [])]
+                intent = await voice_services.parse_intent(text, rooms)
+            async with self.plan_lock:
+                self.live_grant(robot, token, post, grant)
+                draft = self.plans.current()
+                if draft and intent.action not in ("hold", "resume"):
+                    self.plan_sync.assert_valid(draft["plan_id"])
+                cmd_id = "V-" + secrets.token_hex(16)
+                command, safety = voice_services.command_and_safety(
+                    self.sim.prior, self.plans, post, self.sim.time, robot, intent, cmd_id, self.leases.actor(token))
+                # Checking a large room can take time: recheck expiry after safety too.
+                self.live_grant(robot, token, post, grant)
+                now = self.sim.time
+                result = {"queued":safety["ok"], "cmd_id":cmd_id if safety["ok"] else None,
+                          "robot":robot,"action":intent.action,"command":command,"transcript":text,
+                          "stt_source":stt_source,"intent_source":intent_source,"safety":safety,
+                          "status":"waiting_for_robot" if safety["ok"] else "refused","issued_t":now}
+                if safety["ok"]:
+                    payload = {**command,"cmd_id":cmd_id,"source":"voice" if is_voice else "phone",
+                               "by":self.leases.actor(token),"issued_t":now}
+                    size = len(json.dumps(payload,separators=(",",":")).encode()) + 64
+                    self.sim.network.queues["CMD"].append(make_bundle("CMD",robot,"command",payload,now,size))
+                else:
+                    result["say"] = "Command safety check refused: " + "; ".join(v["msg"] for v in safety["violations"])
+                entry["result"], entry["expires"] = deepcopy(result), time.monotonic()+300
+                return result
+        finally:
+            if entry["result"] is None:
+                book.pop(key, None)
+
+    async def delivered_speech(self, cmd_id):
+        self.require_voice()
+        post = self.sim.post
+        ack = deepcopy(post.command_acks.get(cmd_id))
+        if ack is None:
+            raise PlanError("ack_not_delivered", "No delivered acknowledgement for this command", 404)
+        cache = self.speech_cache
+        key = cmd_id, ack["status"], ack["t"]
+        if key not in cache:
+            while len(cache) >= 32:
+                evict = next((k for k,e in cache.items() if e["result"] is not None), None)
+                if evict is None:
+                    raise PlanError("speech_busy", "Speech requests are busy; retry later", 429)
+                del cache[evict]
+            cache[key] = {"lock":asyncio.Lock(),"result":None}
+        entry = cache[key]
+        async with entry["lock"]:
+            if post is not self.sim.post:
+                raise PlanError("voice_reset", "Simulation reset during speech", 409)
+            if entry["result"] is None:
+                result = await voice_services.speech(ack)
+                if post is not self.sim.post:
+                    raise PlanError("voice_reset", "Simulation reset during speech", 409)
+                entry["result"] = result
+            return deepcopy(entry["result"])
+
     def hello(self, ws=None):
         return self.envelope("hello", self.sim.hello() | self.control_state()
-                             | detector_status() | {"leases": self.lease_state()}
+                             | detector_status() | {"leases": self.lease_state(), "voice":{"enabled":os.environ.get("DZ_VOICE") == "1"}}
                              | self.controller_hello(ws))
 
     def control_state(self):
@@ -167,6 +275,7 @@ class Hub:
                 "robots": robots, "plan": self.plans.current(), "client": client, "role": role,
                 "relay_id": self.relay_clients.get(client) if role == "relay" else None,
                 "leases": self.lease_state(),
+                "voice": {"enabled":os.environ.get("DZ_VOICE") == "1"},
                 **detector_status()}
 
     def attach_relay(self, client):
@@ -295,7 +404,10 @@ class Hub:
             await self.send_all(self.phones, self.envelope("cmd_view", self.phone_view()))
             await self.relay_states()
         for ev in self.sim.drain_events():
-            await self.send_all(self.screens, self.envelope("event", ev))
+            message = self.envelope("event", ev)
+            await self.send_all(self.screens, message)
+            if ev.get("kind") == "command_ack_reported":
+                await self.send_all(self.phones, message)
 
     async def reset(self):
         async with self.plan_lock:
@@ -483,25 +595,42 @@ async def override_lease(body: PresenterRelease):
 
 
 @app.post("/api/robot-command")
-async def robot_command(body: dict, request: Request):
-    hub.require_leases()
-    # Only the existing radio-delivered resume action is implemented here.
-    ref = RobotRef.model_validate({"robot": body.get("robot")})
-    if body.get("action") != "resume" or set(body) != {"robot", "action"}:
-        raise PlanError("unsupported_command", "Only resume is available until the robot command contract lands", 422)
-    await hub.control("director", {"do": "resume", "robot": ref.robot},
-                      controller_token=request.headers.get("x-controller-token"))
-    return {"queued": True, "robot": ref.robot, "action": "resume"}
+async def robot_command(body: ManualCommand, request: Request):
+    return await hub.issue_command(body.robot,request.headers.get("x-controller-token"),
+                                   intent=body,request_id=body.request_id)
 
 
 @app.post("/api/voice")
 async def voice(body: VoiceRequest, request: Request):
-    # Fail closed until speech/intent and Rayan's action/ack contract are wired.
+    return await hub.issue_command(body.robot,request.headers.get("x-controller-token"),
+                                   text=body.text,request_id=body.request_id)
+
+
+@app.post("/api/voice/audio")
+async def voice_audio(request: Request, robot: str, request_id: str | None = None):
+    ref = VoiceRequest(robot=robot,text="audio",request_id=request_id)
     hub.require_leases()
-    hub.leases.require(body.robot, request.headers.get("x-controller-token"))
-    if os.environ.get("DZ_VOICE") != "1":
-        raise PlanError("feature_disabled", "Enable DZ_VOICE=1 for voice control", 409)
-    raise PlanError("voice_not_ready", "Speech/intent and robot action acknowledgements are not wired yet", 501)
+    hub.leases.require(robot,request.headers.get("x-controller-token"))
+    hub.require_voice()
+    post, grant = hub.sim.post, hub.leases.leases[robot]
+    mime = request.headers.get("content-type", "").split(";",1)[0].lower().strip()
+    if mime not in voice_services.AUDIO_TYPES:
+        raise PlanError("unsupported_audio", "Send raw WebM, MP4, WAV, OGG or MPEG audio", 415)
+    audio = bytearray()
+    async for chunk in request.stream():
+        if len(audio) + len(chunk) > voice_services.MAX_AUDIO:
+            raise PlanError("audio_too_large", "Recording exceeds 2 MiB", 413)
+        audio.extend(chunk)
+    if not audio:
+        raise PlanError("empty_audio", "Recording is empty", 422)
+    hub.live_grant(robot,request.headers.get("x-controller-token"),post,grant)
+    return await hub.issue_command(robot,request.headers.get("x-controller-token"),
+                                   audio=bytes(audio),mime=mime,request_id=ref.request_id)
+
+
+@app.post("/api/voice/tts")
+async def voice_speech(body: SpeechRequest):
+    return await hub.delivered_speech(body.cmd_id)
 
 
 @app.get("/api/floorplan")
