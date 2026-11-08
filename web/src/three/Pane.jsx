@@ -277,6 +277,7 @@ export default function Pane({ which, title, subtitle }) {
   const follow = useSim((s) => s.follow)
   const perf = useSim((s) => s.perf)
   const night = useSim((s) => s.night)
+  const traffic = useSim((s) => s.traffic)
   return (
     <div className={`pane pane-${which}`}>
       <div className="pane-title">
@@ -303,6 +304,7 @@ export default function Pane({ which, title, subtitle }) {
           <span><i className="lg-link weak" />Weak</span>
           <span><i className="lg-link down" />No link</span>
           <span><i className="lg-relay" />Relay</span>
+          {traffic && <span><i className="lg-packet" />Data packet</span>}
         </div>
       )}
       <DetectionCards side={which} sides={which === 'gap' ? ['command', 'reality'] : undefined} />
