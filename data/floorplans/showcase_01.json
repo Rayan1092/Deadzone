@@ -2716,7 +2716,7 @@
    "label": "Area 3 of 3: the far hall collapses"
   }
  ],
- "default_plan": "showcase_01.plan.json",
+ "default_plan": "data/plans/showcase_01.plan.json",
  "validation": {
   "ok": true,
   "checks": [

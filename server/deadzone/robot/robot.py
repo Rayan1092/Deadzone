@@ -237,8 +237,10 @@ class Robot:
         self.tasks = []
         # Reality-side tallies for the "Under the hood" panel (Aziz sums them into tick.stats).
         # Never put in a bundle: Command learns about the robot only through delivered messages.
+        # Names follow Aziz's tick.stats contract (docs/FINAL-STRETCH-BACKEND.md): his snapshot sums
+        # detector_calls, detector_rejections and scheduler_deadlines_met from telemetry().counters.
         self.counters = {"detector_calls": 0, "detector_persons": 0, "detector_rejections": 0,
-                         "detector_unsure": 0, "deadlines_met": 0, "deadlines_missed": 0,
+                         "detector_unsure": 0, "scheduler_deadlines_met": 0, "scheduler_deadlines_missed": 0,
                          "rescue_routes": 0, "replans": 0, "dark_s": 0.0}
         self.wheel_a = 0.0
         self.spike_until = -1.0      # director-injected overcurrent ends at this time
@@ -849,8 +851,8 @@ class Robot:
         self.tasks = self.scheduler.run_frame(int(round(self.t / dt)))
         for name in dict.fromkeys(self.scheduler.new_misses):
             self.events.append({"kind": "deadline_miss", "robot": self.id, "task": name})
-        self.counters["deadlines_met"] = self.scheduler.met
-        self.counters["deadlines_missed"] = self.scheduler.missed
+        self.counters["scheduler_deadlines_met"] = self.scheduler.met
+        self.counters["scheduler_deadlines_missed"] = self.scheduler.missed
         if not self.linked:
             self.counters["dark_s"] = round(self.counters["dark_s"] + dt, 1)
 
@@ -1349,4 +1351,5 @@ class Robot:
             "tasks": self.tasks,
             "outbox": len(self.outbox),
             "last_link_t": round(self.last_link_t, 1),
+            "counters": dict(self.counters),   # Reality view only; the telemetry bundle above omits them
         }

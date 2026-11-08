@@ -109,7 +109,8 @@ def test_big_building_has_two_dead_zones_and_a_three_area_earthquake():
 def test_default_plan_passes_the_real_safety_checker(tmp_path, kw):
     data = generate.generate(**kw)
     plan = generate.default_plan(data)
-    assert plan["plan_id"] == f"P-{data['id']}" and data["default_plan"] == f"{data['id']}.plan.json"
+    assert plan["plan_id"] == f"P-{data['id']}"
+    assert data["default_plan"].startswith("data/plans/") and data["default_plan"].endswith(f"/{data['id']}.plan.json")
     assert {z["robot"] for z in plan["zones"]} == set(generate.ROBOTS)
     dark = [z for z in plan["zones"] if z["comms"] == "lost_link_ok"]
     for room in generate.steel_rooms(data):                       # every dead zone sits in a lost_link_ok zone
@@ -126,15 +127,21 @@ def test_default_plan_passes_the_real_safety_checker(tmp_path, kw):
 def test_showcase_building_on_disk_matches_its_generator_and_plan():
     data = json.loads(SHOWCASE.read_text(encoding="utf-8"))
     g = data["generator"]
-    again = generate.generate(g["seed"], size=tuple(data["size"]), plan_id=data["id"], name=data["name"])
+    again = generate.generate(g["seed"], size=tuple(data["size"]), plan_id=data["id"], name=data["name"],
+                              location="showcase_01")
     assert json.dumps(again, sort_keys=True) == json.dumps(data, sort_keys=True)
     assert generate.validate(data) == [] and len(generate.steel_rooms(data)) == 2
     assert data["size"] == [80.0, 60.0] and sum(e["do"] == "aftershock" for e in data["timeline"]) == 3
-    plan = json.loads(SHOWCASE.with_name(data["default_plan"]).read_text(encoding="utf-8"))
+    assert data["default_plan"] == "data/plans/showcase_01.plan.json"
+    plan = json.loads((ROOT / data["default_plan"]).read_text(encoding="utf-8"))
     assert plan == generate.default_plan(data)
     for name in ("gen_1", "gen_2", "gen_3"):                      # every shipped sample has its plan file
         sample = json.loads((ROOT / "data" / "floorplans" / "generated" / f"{name}.json").read_text(encoding="utf-8"))
-        assert (ROOT / "data" / "floorplans" / "generated" / sample["default_plan"]).exists()
+        assert sample["default_plan"] == f"data/plans/generated/{name}.plan.json"
+        assert (ROOT / sample["default_plan"]).exists()
+    # nothing but buildings under data/floorplans/: the server registers every JSON there as a map
+    stray = [p for p in (ROOT / "data" / "floorplans").rglob("*.json") if p.name.endswith(".plan.json") or p.name == "index.json"]
+    assert stray == []
 
 
 def test_variants_of_the_demo_building_keep_the_dark_survivor_and_shuffle_the_rest(tmp_path):
@@ -146,7 +153,7 @@ def test_variants_of_the_demo_building_keep_the_dark_survivor_and_shuffle_the_re
     for seed in (1, 2, 3):
         v = generate.variant_of(base, seed)
         assert all(v[k] == base[k] for k in ("walls", "doors", "rooms", "hazards", "rubble", "entry", "command_post", "size"))
-        assert v["id"] == f"collapse_01_v{seed}" and v["default_plan"] == f"{v['id']}.plan.json"
+        assert v["id"] == f"collapse_01_v{seed}" and v["default_plan"] == generate.plan_location(f"variants/{v['id']}")
         assert not (set(generate.validate(v)) - inherited)
         assert generate.in_poly(v["survivors"][0]["pos"], cage["poly"])          # the dark find stays in the cage
         assert [s["thermal"] for s in v["survivors"]] == [s["thermal"] for s in base["survivors"]]
@@ -155,14 +162,14 @@ def test_variants_of_the_demo_building_keep_the_dark_survivor_and_shuffle_the_re
         assert placement != original and placement not in seen
         seen.add(placement)
         assert json.dumps(generate.variant_of(base, seed), sort_keys=True) == json.dumps(v, sort_keys=True)
-    folder = ROOT / "data" / "floorplans" / "variants"
-    index = json.loads((folder / "index.json").read_text(encoding="utf-8"))
+    index = json.loads((ROOT / "data" / "plans" / "variants" / "index.json").read_text(encoding="utf-8"))
     assert [e["id"] for e in index["variants"]] == [f"collapse_01_v{s}" for s in range(1, 6)]
     for e in index["variants"]:                                  # shipped files match the generator
-        on_disk = json.loads((folder / e["file"]).read_text(encoding="utf-8"))
+        assert e["scenario"] == f"variants/{e['id']}"           # the id GET /api/scenarios lists (has "variant")
+        on_disk = json.loads((ROOT / e["file"]).read_text(encoding="utf-8"))
         again = generate.variant_of(base, on_disk["generator"]["seed"])
         assert json.dumps(on_disk, sort_keys=True) == json.dumps(again, sort_keys=True)
-        assert (folder / e["default_plan"]).exists()
+        assert (ROOT / e["default_plan"]).exists()
     v1 = generate.variant_of(base, 1)
     path = tmp_path / "v1.json"
     path.write_text(json.dumps(v1))

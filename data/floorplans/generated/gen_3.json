@@ -840,7 +840,7 @@
    "label": "Aftershock: part of the warehouse roof collapses (the first relay is lost if one is up)"
   }
  ],
- "default_plan": "gen_3.plan.json",
+ "default_plan": "data/plans/generated/gen_3.plan.json",
  "validation": {
   "ok": true,
   "checks": [

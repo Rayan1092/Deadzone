@@ -71,6 +71,14 @@ DOOR_W = 1.2
 MAX_VARIANTS = 40
 ROBOTS = ["R1", "R2", "R3"]                        # the default plan assumes the demo's 3 robots
 COMMS_MARGIN_DB = 6.0                              # "relay" only when the centroid is clearly in range
+PLANS = REPO / "data" / "plans"                    # default plans live here, mirroring data/floorplans/
+
+
+def plan_location(location):
+    """Repo-relative path of the default plan for a building at data/floorplans/<location>.json.
+    Plans sit under data/plans/ (not data/floorplans/) because the server registers every JSON
+    under data/floorplans/ as a selectable building."""
+    return f"data/plans/{location}.plan.json"
 
 
 def r1(v):
@@ -568,8 +576,10 @@ def default_plan(data, robots=ROBOTS):
             "no_go": [], "zones": plan_zones}
 
 
-def generate(seed, size=None, plan_id=None, name=None):
-    """The building for this seed (first valid variant). Deterministic for (seed, size)."""
+def generate(seed, size=None, plan_id=None, name=None, location=None):
+    """The building for this seed (first valid variant). Deterministic for (seed, size).
+    `location` is where the CLI writes it under data/floorplans/ (default generated/<id>); it only
+    sets the `default_plan` path."""
     if not isinstance(seed, int) or seed < 0:
         raise ValueError("seed must be a non-negative integer")
     if size is not None and (len(size) != 2 or min(size) < 24 or max(size) > 120):
@@ -597,7 +607,7 @@ def generate(seed, size=None, plan_id=None, name=None):
                 data["id"] = plan_id
             if name:
                 data["name"] = name
-            data["default_plan"] = f"{data['id']}.plan.json"
+            data["default_plan"] = plan_location(location or f"generated/{data['id']}")
             data["validation"] = {"ok": True, "checks": [
                 "everything reachable from the entrance with 1-cell wall inflation",
                 "survivors and decoys out of hazards and debris", "no hazard over a door",
@@ -660,7 +670,7 @@ def variant_of(base, seed):
         data["name"] = f"{base['name']}, variant {seed}"
         data["generator"] = {"kind": "variant", "base": base_id, "seed": seed, "attempt": attempt, "version": VERSION,
                              "people": len(chosen)}
-        data["default_plan"] = f"{data['id']}.plan.json"
+        data["default_plan"] = plan_location(f"variants/{data['id']}")
         if not [p for p in validate(data) if p not in inherited]:
             data["validation"] = {"ok": True, "checks": [
                 "same walls, rooms, hazards, debris, entry and command post as the base building",
@@ -671,14 +681,19 @@ def variant_of(base, seed):
 
 
 def write_variant_index(folder):
-    """variants/index.json: the files in the folder, for the reset-into-floorplan control to pick from."""
-    files = sorted(p.name for p in Path(folder).glob("*.json") if not p.name.endswith(".plan.json") and p.name != "index.json")
+    """data/plans/variants/index.json: the variant buildings in `folder` (data/floorplans/variants/)
+    with their scenario ids (`variants/<id>`, as GET /api/scenarios lists them) and plan paths.
+    Kept out of data/floorplans/ so the server never registers it as a building."""
+    folder = Path(folder)
+    files = sorted(p.name for p in folder.glob("*.json"))
     entries = []
     for name in files:
-        d = json.loads((Path(folder) / name).read_text(encoding="utf-8"))
-        entries.append({"file": name, "id": d["id"], "name": d["name"], "base": d.get("generator", {}).get("base"),
-                        "default_plan": d.get("default_plan")})
-    (Path(folder) / "index.json").write_text(json.dumps({"variants": entries}, indent=1), encoding="utf-8")
+        d = json.loads((folder / name).read_text(encoding="utf-8"))
+        entries.append({"file": f"data/floorplans/variants/{name}", "scenario": f"variants/{name[:-5]}", "id": d["id"],
+                        "name": d["name"], "base": d.get("generator", {}).get("base"), "default_plan": d.get("default_plan")})
+    index = PLANS / "variants" / "index.json"
+    index.parent.mkdir(parents=True, exist_ok=True)
+    index.write_text(json.dumps({"variants": entries}, indent=1), encoding="utf-8")
     return entries
 
 
@@ -794,13 +809,23 @@ def main():
         data = variant_of(base, args.seed)
         out = args.out or HERE / "variants" / f"{data['id']}.json"
     else:
-        data = generate(args.seed, size=tuple(args.size) if args.size else None, plan_id=args.id, name=args.name)
-        out = args.out or HERE / "generated" / f"{data['id']}.json"
+        out = args.out
+        location = None
+        if out is not None and out.resolve().is_relative_to(HERE.resolve()):
+            location = out.resolve().relative_to(HERE.resolve()).with_suffix("").as_posix()
+        data = generate(args.seed, size=tuple(args.size) if args.size else None, plan_id=args.id, name=args.name,
+                        location=location)
+        out = out or HERE / "generated" / f"{data['id']}.json"
     if out.resolve() == (HERE / "collapse_01.json").resolve():
         sys.exit("refusing to overwrite collapse_01.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     plan = default_plan(data)
-    plan_path = out.with_name(data["default_plan"])
+    if out.resolve().is_relative_to(HERE.resolve()):
+        plan_path = REPO / data["default_plan"]          # data/plans/<same relative path>.plan.json
+    else:
+        plan_path = out.with_suffix(".plan.json")        # a building written elsewhere keeps its plan next to it
+        data["default_plan"] = plan_path.name
+    plan_path.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(data, indent=1), encoding="utf-8")
     plan_path.write_text(json.dumps(plan, indent=1), encoding="utf-8")
     if args.png:

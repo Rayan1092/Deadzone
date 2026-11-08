@@ -12,8 +12,8 @@ from deadzone.robot import perception  # noqa: E402
 from deadzone.robot.scheduler import Scheduler  # noqa: E402
 from deadzone.sim import Sim  # noqa: E402
 
-KEYS = {"detector_calls", "detector_persons", "detector_rejections", "detector_unsure", "deadlines_met",
-        "deadlines_missed", "rescue_routes", "replans", "dark_s"}
+KEYS = {"detector_calls", "detector_persons", "detector_rejections", "detector_unsure", "scheduler_deadlines_met",
+        "scheduler_deadlines_missed", "rescue_routes", "replans", "dark_s"}
 
 
 def test_scheduler_counts_deadlines_met_and_missed():
@@ -53,16 +53,16 @@ def test_robot_counters_follow_the_demo_run():
         assert set(c) == KEYS and all(v >= 0 for v in c.values())
         assert c["detector_calls"] == c["detector_persons"] + c["detector_rejections"] + c["detector_unsure"]
         assert c["detector_unsure"] == 0                  # the six demo crops are never unsure
-        assert c["deadlines_met"] > 0
+        assert c["scheduler_deadlines_met"] > 0
+        assert r.telemetry({})["counters"] == c          # the Reality snapshot carries them for tick.stats
     total = {k: sum(r.counters[k] for r in sim.robots.values()) for k in KEYS}
     assert total["detector_persons"] == sum(len(r.found) for r in sim.robots.values()) >= 1   # S3 at 14.4 s
     assert total["detector_rejections"] == sum(e["kind"] == "hotspot_rejected" for e in events)
     assert total["rescue_routes"] == sum(e["kind"] == "rescue_route" for e in events) >= 1
     assert total["replans"] == sum(e["kind"] == "replan" for e in events) >= 1                # rubble ahead of R1
-    assert sim.robots["R3"].counters["deadlines_missed"] >= 1                                 # overloaded at 20 s
-    assert sim.robots["R1"].counters["deadlines_missed"] == 0
+    assert sim.robots["R3"].counters["scheduler_deadlines_missed"] >= 1                       # overloaded at 20 s
+    assert sim.robots["R1"].counters["scheduler_deadlines_missed"] == 0
     # never on the radio or in Command: the panel reads Reality
-    assert "counters" not in sim.robots["R1"].telemetry({})
     assert "counters" not in json.dumps(sim.snapshot()["command"])
     for queue in sim.network.queues.values():
         assert "counters" not in json.dumps(queue)
