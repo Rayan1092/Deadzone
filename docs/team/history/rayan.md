@@ -11,6 +11,14 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 
 ## Log
 
+### 2026-11-09 11:35 · rayan/lidar-peers · Another robot never walls a robot in (tester's TRAPPED trace)
+- **Cause (tester's trace, reproduced exactly):** required flags, seed 7, no plan, Space: R1 bumps R3 in Office A's doorway at 9.4 s. Not the sim's lidar (it ray-casts the static grid only, robots are invisible to it): robot code's bump handling (`odometry().blocked` → `_block_ahead`) wrote the two cells in front as walls, and the mapper never clears an occupied cell, so R3's body sealed Office A on R1's map for good; RETURNING_HOME found no route, **TRAPPED at 37.4 s**.
+- **Fix (robot.py only, through `io`):** when odometry says `blocked_by` (another robot's ids, the sim's existing tag with collisions on), the marked cells are recorded as **peer marks** with the value they had before. They still steer the robot around the peer (behaviour unchanged while routes exist), but the moment a route or a frontier is missing they are given back and the robot plans again, before it could go home early or count as trapped. A motion fault right after a peer block marks a peer cell too. Real obstacles are kept as before.
+- **Two variants rejected on the way:** never marking peers made robots push head-on in the doorway until STUCK and SAFE_STOP; expiring the marks after 8 s fixed the repro but moved the guard (R1's collapse replan at 169.5, S2 216.8). The chosen fix changes nothing in the guard run.
+- **Measured:** repro after the fix: no faults, all three exploring at 120 s (before: R1 TRAPPED 37.4). **Guard green, every beat unchanged.** New `tests/test_peer_not_a_wall.py` (2).
+- **Contract changes:** none.
+- **Next:** stop.
+
 ### 2026-11-09 10:45 · rayan/readme-keys · README key table matches the screen's help (H) and DEMO.md
 - **Did:** the README key table now follows the web's own help list (`web/src/panels/keys.js`, key H) and DEMO.md: E, T, K, S and `?` removed; H (help), Esc, I (under-the-hood counters) and W (predicted radio coverage) added; C described for both views; Shift+N "back to the main scenario"; Space opens from the street shot. The README no longer mentions T or S elsewhere. Recording, from Yusuf's file: open the page with `?record`, then click the **REC** chip ("Save the mission recording"); that sentence is now in DEMO.md's recording step and the README. The mission clock is mentioned in the top bar.
 - **Contract changes:** none.
