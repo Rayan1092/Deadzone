@@ -17,6 +17,21 @@ Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Log
 
+### 2026-11-08 07:55 · p3/clinic-map · Second building: Northgate Clinic (`clinic_02`), `DZ_FLOORPLAN` (owners please review)
+- **Did:** Yusuf asked for a completely different second map. **This touches Rayan's `data/floorplans/` and one line of Aziz's `app.py`**, with Yusuf's OK to build it and flag the owners.
+  - `data/floorplans/clinic_02.json`, 36 × 28 m:
+    - a north-south spine corridor (the demo building's runs east-west)
+    - a radiology suite inside metal shielding: a deep radio dead zone with survivor S1 inside it
+    - a concrete stair core, a lab reached through radiology, a pharmacy
+    - an operating theatre that is a gas no-go (ruptured oxygen line), and a big open waiting hall
+    - seven rubble piles (one half-blocks the spine corridor), entrance and command post on the south side
+  - Same crop files and ids as `collapse_01` (S1–S3, D1–D3), so the detector and AI cards work unchanged.
+  - `app.py`: `DZ_FLOORPLAN=data/floorplans/clinic_02.json` picks another building, default unchanged.
+  - **Checked:** a headless sim with 3 robots on seed 7 found all three survivors (S1 at 19 s, S3 at 112 s, S2 at 162 s) with link losses, relays, rescue routes and reports, and all robots DONE by 900 s. Ran live in the browser at 4x. Full suite 336 passed. `collapse_01`, the demo guard and the default are untouched.
+- **Contract changes:** additive only: new env var `DZ_FLOORPLAN` (path relative to the repo root).
+- **Heads-up for others:** **Rayan**: please review the map (it's your folder). Reachability is fine in the sim; your generator could check it too. **Aziz**: the one-line `DZ_FLOORPLAN` switch in `Hub.__init__`, please review. The demo still uses `collapse_01`; this is for Q&A or a second run.
+- **Next:** 9 multi-story shell.
+
 ### 2026-11-08 07:40 · p3/disaster · Disaster site, one rover model everywhere, scheduler redesign
 - **Did (Yusuf's ask: "an actual disaster site", "fix the scheduler", "robots hyper realistic and the same from above and in the scout camera"):**
   - **Disaster site** (`Disaster.jsx`, Reality only, visual only):

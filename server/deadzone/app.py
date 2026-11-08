@@ -35,7 +35,7 @@ from .command.rescue_order import rescue_order
 from .command.safety import SafetyChecker
 from .robot.robot import resume_command
 from .robot.perception import CROP_DIR, get_detector
-from .sim import DT, ROBOT_DEFS, Sim
+from .sim import DT, ROBOT_DEFS, ROOT, Sim
 
 MAPS_EVERY = 5
 load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
@@ -53,7 +53,10 @@ def detector_status():
 
 class Hub:
     def __init__(self):
-        self.sim = Sim(n_robots=int(os.environ.get("DZ_ROBOTS", "1")), seed=int(os.environ.get("DZ_SEED", "7")))
+        # DZ_FLOORPLAN picks another building (path relative to the repo), default collapse_01
+        plan = os.environ.get("DZ_FLOORPLAN")
+        self.sim = Sim(**({"plan_path": ROOT / plan} if plan else {}),
+                       n_robots=int(os.environ.get("DZ_ROBOTS", "1")), seed=int(os.environ.get("DZ_SEED", "7")))
         self.sim.tick()  # real sensor/bundle delivery before the paused QR/plan demo beat
         self.running = False
         self.speed = float(os.environ.get("DZ_SPEED", "2"))
