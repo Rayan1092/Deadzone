@@ -50,7 +50,11 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    python -m pip install pillow
    cd ..\web; npm install; npm run build; cd ..
    ```
-4. Start the server **paused**. Leave `DZ_AUTOSTART` unset. The default launcher
+4. **Run `cd web; npm run build; cd ..` before starting the server** after every pull.
+   The production server serves `web/dist` at `/`; never point the tunnel at
+   the Vite dev server on 5173. Hashed JS/CSS cache for one year; HTML revalidates.
+   Compact screen maps are on by default (`DZ_COMPACT_STREAM=0` opts out).
+   Start the server **paused**. Leave `DZ_AUTOSTART` unset. The default launcher
    binds `0.0.0.0:8000` so phones can connect.
    ```powershell
    cd server
@@ -83,15 +87,19 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    **Phone URL** (`/phone`). Leave that terminal open; **Ctrl+C** stops the tunnel.
    It uses the already-running server and does not start/reset it. The URL changes
    on each run. No tunnel is started by preflight or installation.
-7. **Test the phone:** open the printed HTTPS URL with `/?nointro` on the big
-   screen and the printed **Phone URL** on the phone (or use **Q** for its QR).
-   Using the HTTPS origin on both keeps API/WebSocket/QR traffic on the same
-   origin and permits phone microphones. For a local Wi-Fi-only check without a
-   tunnel, use `http://localhost:8000/?nointro` on the laptop and its Q/QR link on
-   the same Wi-Fi/hotspot. **Phones must be on the same Wi-Fi, or use the tunnel.**
-   A LAN-IP preflight pass cannot detect guest-network/client isolation; use a
-   hotspot or the tunnel if another device still cannot connect. `?nointro` keeps the first-visit explainer off the scene;
-   the **H** help popup can still open it.
+7. **Test the phone:** keep the laptop big screen local at `http://localhost:8000/?nointro`.
+   Use the tunnel's HTTPS **Phone URL** on phones away from the LAN, and the
+   HTTPS origin for **remote viewers** (`/?nointro&lite`). Public HTTPS viewers
+   automatically receive half-rate ticks with no lidar points; `?lite=0` opts
+   back into full detail. Maps/events and the local screen keep full fidelity.
+   For Q/QR on a local screen to advertise the tunnel, set `DZ_PUBLIC_URL` to its
+   verified HTTPS origin before restarting the backend; otherwise use the printed
+   Phone URL directly. Wait for public `/api/health` to return 200 before sharing
+   a newly printed tunnel address. Phone microphones require HTTPS.
+   For a LAN-only run, leave `DZ_PUBLIC_URL` unset (or use the laptop's LAN origin)
+   and use Q/QR. **Phones must be on the same Wi-Fi, or use the tunnel.**
+   Guest Wi-Fi/client isolation may require a hotspot. `?nointro` hides the
+   first-visit explainer; H can still open it.
 8. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
 9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, then click **Save recording** next to the REC status to save the gzipped recording, and keep the file on the demo laptop.
 10. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
