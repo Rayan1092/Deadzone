@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { usePhone } from './store'
 import { MIN_SIDE, addRegion, pointInPoly, rectPoly, snap } from './plan'
 import { sendPhone } from './socket'
+import { latestRoutes } from '../format'
 
 // 2D plan of the building: the pre-collapse prior plus delivered Command knowledge.
 // Margins in meters; the CMD antenna sits outside the west wall at x = -2.
@@ -222,7 +223,7 @@ export default function PlanMap() {
       }
 
       // rescue routes Command has received (entrance → survivor), with the beacon relay if any
-      for (const route of view?.routes ?? []) {
+      for (const route of latestRoutes(view?.routes ?? [])) {
         ctx.beginPath()
         route.path.forEach(([x, y], i) => (i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))))
         ctx.setLineDash([6, 4])

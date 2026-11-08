@@ -206,3 +206,19 @@
 .safety.sent { background: rgba(45,212,191,.1); }
 .editor, .region-row, .relay-stats > div, .neighbor, .last-crop { background: rgba(255,255,255,.05); }
 .sw.route { height: 0; border-top: 3px dashed #facc15; border-radius: 0; }
+
+/* Ask Gemini */
+.ask-form { display: flex; gap: 8px; margin-top: 10px; }
+.ask-form input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--outline); background: var(--surface-2); color: inherit; }
+.ask-form input:focus { outline: none; border-color: var(--teal); }
+.ask-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ask-chips .chip-btn { font-size: 13px; }
+.ask-answer { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--outline); }
+.ask-answer p { margin: 4px 0 6px; line-height: 1.45; white-space: pre-wrap; }
+.ask-q { font-weight: 600; font-size: 14px; }
+.ask-answer.pending .muted { animation: ask-pulse 1.2s ease-in-out infinite; }
+@keyframes ask-pulse { 50% { opacity: .4; } }
+.ask-source { color: var(--muted); }
+.ask-source.gemini { color: #a5b4fc; }
+.ask-error { margin-top: 8px; color: var(--red); }

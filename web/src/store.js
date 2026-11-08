@@ -4,7 +4,7 @@ import { create } from 'zustand'
 // fire too often and stay in the sidebar feed or the timeline.
 const TOAST_KINDS = new Set(['survivor_found', 'survivor_reported', 'link_lost', 'link_restored',
   'relay_dropped', 'fault', 'rubble_fall', 'safety_reject', 'plan_dispatched', 'plan_applied', 'resumed',
-  'rescue_route', 'rescue_route_reported', 'aftershock', 'relay_destroyed'])
+  'rescue_route', 'rescue_route_reported', 'aftershock', 'relay_destroyed', 'mode_changed'])
 const COLLAPSE_KINDS = new Set(['replan', 'deadline_miss'])
 // Deliveries worth an antenna pulse; telemetry and map patches arrive several times a second.
 const BIG_DELIVERIES = new Set(['survivor', 'rescue_route', 'fault'])
@@ -14,6 +14,7 @@ const SKIP_KINDS = new Set(['link_up', 'link_down', 'bundle_delivered'])
 let eventId = 0
 let planSavedAt = 0
 const PRELOAD_WINDOW_MS = 1000
+export const FOCUS_HOLD_MS = 12000 // how long the robot camera stays on a judged hot spot
 
 function readPerf() {
   try { return localStorage.getItem('dz-perf') === '1' } catch { return false }
@@ -57,6 +58,8 @@ export const useSim = create((set) => ({
   follow: null,        // robot id the cameras follow (keys 1-3), null = overview
   eyeRobot: null,      // robot whose forward camera is open (V key / card button)
   eyeThermal: false,   // thermal palette in the robot's-eye view
+  eyeFocus: null,      // the hot spot the onboard classifier just judged: { kind, subject, robot, pos, conf, linked, born }
+  mode: null,          // 'deadzone' | 'baseline' | 'mixed' from hello/control (Rayan's baseline mode)
   aftershock: null,    // { at, born } of the latest aftershock, for the shake and dust
   report: null,        // briefing from /api/report: { text, generated_at, source } | { loading } | { error }
   detector: null,      // { mode: 'model' | 'sim', reason } from hello, null until the server sends it
@@ -103,9 +106,9 @@ export function handleMessage(msg) {
       // hello also arrives after a rubble drop; only a reset (time going back) clears history
       const reset = time < s.time
       s.set({ floorplan: data.floorplan, grid: data.grid, robotsMeta: data.robots,
-              running: data.running, speed: data.speed, time,
+              running: data.running, speed: data.speed, mode: data.mode ?? null, time,
               detector: data.detector ? { mode: data.detector, reason: data.detector_reason } : null,
-              ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [], detections: [], routes: {}, aftershock: null } : {}) })
+              ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [], detections: [], routes: {}, aftershock: null, eyeFocus: null } : {}) })
       break
     }
     case 'tick': {
@@ -133,8 +136,14 @@ export function handleMessage(msg) {
       // plan_state. That is the demo's laptop preload: keep it off screen so the judges'
       // own "Run safety check" is the first rejection anyone sees.
       if (data.kind === 'safety_reject' && Date.now() - planSavedAt < PRELOAD_WINDOW_MS) break
+      // every robot reports the B switch; one line for the whole fleet
+      if (data.kind === 'mode_changed' && s.events[0]?.kind === 'mode_changed' && s.events[0].mode === data.mode &&
+          s.events[0].time === time) break
       // eid, not id: some events (relay_dropped) carry their own id field
       const ev = { ...data, time, eid: ++eventId }
+      // a second route for the same survivor is a replan, not a new rescue
+      if ((ev.kind === 'rescue_route' || ev.kind === 'rescue_route_reported') &&
+          s.events.some((e) => e.kind === ev.kind && e.survivor === ev.survivor)) ev.updated = true
       // every robot that sees a survivor reports it; only the first sighting is news
       const repeat = ev.kind === 'survivor_found' &&
         s.events.some((e) => e.kind === 'survivor_found' && e.survivor === ev.survivor)
@@ -147,7 +156,24 @@ export function handleMessage(msg) {
       // the 3D view shakes and throws up a dust cloud where the ceiling came down (Reality only)
       if (ev.kind === 'aftershock') s.set({ aftershock: { at: ev.at, born: performance.now() } })
       // the robot's own route (Reality knowledge); Command draws only delivered command.routes
-      if (ev.kind === 'rescue_route') s.set({ routes: { ...s.routes, [ev.survivor]: ev } })
+      if (ev.kind === 'rescue_route') {
+        // a newer route for the same survivor replaces the old one; an older one is ignored
+        const old = s.routes[ev.survivor]
+        if (!old || (ev.t ?? 0) >= (old.t ?? 0)) s.set({ routes: { ...s.routes, [ev.survivor]: ev } })
+      }
+      // AI showcase: open that robot's camera on the hot spot its classifier just judged
+      // (first sighting of each survivor, first rejection of each decoy). A showcase that
+      // is still playing is not interrupted.
+      const firstReject = ev.kind === 'hotspot_rejected' &&
+        !s.events.some((e) => e.kind === 'hotspot_rejected' && e.id === ev.id)
+      if ((ev.kind === 'survivor_found' && !repeat) || firstReject) {
+        const busy = s.eyeFocus && performance.now() - s.eyeFocus.born < FOCUS_HOLD_MS
+        if (!busy) {
+          s.set({ eyeRobot: ev.robot, eyeFocus: { kind: ev.kind === 'survivor_found' ? 'person' : 'decoy',
+            subject: ev.survivor ?? ev.id, robot: ev.robot, pos: ev.pos, conf: ev.conf, linked: ev.linked,
+            born: performance.now() } })
+        }
+      }
       const card = detectionCard(ev, repeat, s.tick)
       if (card) s.set({ detections: [...s.detections, card].slice(-6) })
       s.set({ events: events.slice(0, 40),
@@ -162,7 +188,7 @@ export function handleMessage(msg) {
       s.set({ plan: data })
       break
     case 'control':
-      s.set({ running: data.running, speed: data.speed })
+      s.set({ running: data.running, speed: data.speed, ...(data.mode ? { mode: data.mode } : {}) })
       break
     case 'error': {
       // a director key the server refused (e.g. aftershock without DZ_AFTERSHOCK=1)

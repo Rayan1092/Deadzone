@@ -6,13 +6,13 @@ import { describeEvent } from '../format'
 // survivor reaching Command is never bumped by link chatter. Everything is in the feed.
 const RANK = {
   survivor_reported: 6, aftershock: 6, relay_destroyed: 5, control_error: 4, survivor_found: 5, rescue_route_reported: 5, safety_reject: 5,
-  fault: 4, plan_dispatched: 3, plan_applied: 3, resumed: 3, relay_power: 3,
+  fault: 4, mode_changed: 4, plan_dispatched: 3, plan_applied: 3, resumed: 3, relay_power: 3,
   rescue_route: 2, rubble_fall: 2, link_lost: 2, link_restored: 2, relay_dropped: 1,
 }
 const TONE = {
   survivor_found: 'alert', survivor_reported: 'alert', aftershock: 'alert', relay_destroyed: 'alert', control_error: 'warn', fault: 'alert', safety_reject: 'alert',
   link_lost: 'warn', rubble_fall: 'warn', rescue_route: 'route', rescue_route_reported: 'route',
-  link_restored: 'ok', plan_dispatched: 'ok', plan_applied: 'ok', resumed: 'ok',
+  link_restored: 'ok', mode_changed: 'warn', plan_dispatched: 'ok', plan_applied: 'ok', resumed: 'ok',
 }
 const rank = (t) => RANK[t.kind] ?? 1
 const lifetime = (t) => (rank(t) >= 5 ? 6000 : 4000)

@@ -9,6 +9,7 @@ export const STATE_LABEL = {
   REPLANNING: 'Replanning',
   FAULT: 'Fault',
   DONE: 'Done',
+  WAITING_FOR_LINK: 'No link, waiting', // baseline mode: no Deadzone, the robot stops until it hears CMD
 }
 
 export const FAULT_LABEL = {
@@ -47,10 +48,15 @@ export function describeEvent(e) {
       return e.owner ? `Phone ${e.owner} joined as relay ${e.id}` : `Relay ${e.id} placed`
     case 'relay_power': return `${e.phone ? `Phone relay ${e.id}` : `Relay ${e.id}`} switched ${e.on ? 'on' : 'off'}`
     case 'hotspot_rejected': return `${e.robot}'s detector rejected hot spot ${e.id}: not a person`
-    case 'rescue_route': return `${e.robot} planned a safe route to ${e.survivor} · ${Math.round(e.length_m)} m${e.beacon ? `, beacon ${e.beacon}` : ''}`
-    case 'rescue_route_reported': return `Route to ${e.survivor} reached the command post · ${Math.round(e.length_m)} m`
+    case 'rescue_route': return e.updated
+      ? `${e.robot} replanned the route to ${e.survivor} · ${Math.round(e.length_m)} m`
+      : `${e.robot} planned a safe route to ${e.survivor} · ${Math.round(e.length_m)} m${e.beacon ? `, beacon ${e.beacon}` : ''}`
+    case 'rescue_route_reported': return `${e.updated ? 'Updated route' : 'Route'} to ${e.survivor} reached the command post · ${Math.round(e.length_m)} m`
     case 'deadline_miss': return `${e.robot} missed a ${e.task} deadline`
     case 'rubble_fall': return 'Rubble fell'
+    case 'mode_changed': return e.mode === 'baseline'
+      ? 'Baseline mode: without Deadzone, robots stop and wait when they lose the link'
+      : 'Deadzone on: robots keep exploring in the dark'
     case 'aftershock': return `Aftershock: ceiling collapsed${e.destroyed_relay ? `, relay ${e.destroyed_relay} crushed` : ''}`
     case 'relay_destroyed': return `Relay ${e.id} destroyed${e.lost_bundles ? `, ${e.lost_bundles} bundles lost with it` : ''}`
     case 'control_error': return e.code === 'feature_disabled' ? 'Aftershock is off: start the server with DZ_AFTERSHOCK=1' : e.msg
@@ -61,4 +67,20 @@ export function describeEvent(e) {
     case 'safety_reject': return `Plan ${e.plan_id} rejected: ${e.violations?.[0]?.msg ?? 'safety check failed'}`
     default: return e.kind
   }
+}
+
+// One route per survivor: a newer route (larger t, e.g. replanned after an aftershock)
+// replaces the old one on screen instead of being drawn as a second route.
+const routeCache = new WeakMap()
+export function latestRoutes(list) {
+  if (!list?.length) return list ?? []
+  if (routeCache.has(list)) return routeCache.get(list)
+  const best = new Map()
+  for (const r of list) {
+    const cur = best.get(r.survivor)
+    if (!cur || (r.t ?? 0) >= (cur.t ?? 0)) best.set(r.survivor, r)
+  }
+  const out = [...best.values()]
+  routeCache.set(list, out)
+  return out
 }

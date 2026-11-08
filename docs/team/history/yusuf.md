@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/ai-eye`, the Version 3 plan below. Items 1–3 now: route replace + key B / Baseline chip / "No link, waiting", AI recognition in the robot's-eye view, phone Ask Gemini + spoken G briefing.
+- **Working on:** `p3/ai-eye`: plan items 1–3 done (route replace, key B, AI recognition in the robot camera, phone Ask Gemini, spoken G). Next: item 4 collapse look, then 5 AI Lab (waits on Rayan's `ml/results/lab.json`).
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,22 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 04:40 · p3/ai-eye · Plan items 1–3: route replace, key B, AI recognition in the robot camera, Ask Gemini, spoken briefing
+- **Did:**
+  - **Route replace (Rayan's ask):** one route per survivor everywhere: Reality, Command pane, Command inset and phone map. A newer `t` replaces the old route. The gap view's "not reported yet" waits for Command to hold that version. The feed says "R1 replanned the route to S1" and "Updated route to S1 reached the command post".
+  - **Key B:** sends `{action:"mode", value}`. A red "Baseline · without Deadzone" chip shows from hello/control `mode`. `WAITING_FOR_LINK` reads "No link, waiting". The three per-robot `mode_changed` events fold into one headline.
+  - **AI recognition (Rayan's item 1):** on `survivor_found` (first sighting) or the first `hotspot_rejected` of each decoy:
+    - That robot's camera opens, grows to 560×400 and turns to the hot spot for 12 s. A showcase in progress isn't interrupted.
+    - A red box shows "PERSON 100% onboard AI" with the real `conf`. Decoys get a grey dashed box, "NOT A PERSON 0% rejected".
+    - Steps tick only on real events: detected, location marked, rescue route planned (`rescue_route`), "No signal: beacon RLx dropped" (`relay_dropped.beacon_for`), report reached command (`survivor_reported`).
+    - Caption: "Box marks the hot spot the onboard classifier judged from its thermal crop". The box is the object's known extent projected through the robot camera, so we never claim the model localized it.
+  - **Phone "Ask Gemini" card (both roles):** `POST /api/ask` with suggestion chips and a pending state. Each answer is labelled "Gemini" or "Local summary · Gemini unavailable" from `source`, with a 15 s client timeout.
+  - **G briefing read aloud:** browser speech, with a "Voice on/off" toggle remembered per browser.
+  - **Tested live at 4x:** S3 detection opened Scout 3's camera with the box and all four steps ticked. D2 was rejected by R2 with the grey box. The phone Ask returned the local fallback labelled correctly (no key on this laptop). B showed the chip and one feed line, and B again turned it off.
+- **Contract changes:** none. New key B.
+- **Heads-up for others:** Rayan: the box and steps use your `conf`, `rescue_route`, `beacon_for` and `survivor_reported`. The route replace is ready for your recompute PR. With your key, check the phone Ask shows "Gemini". The robot camera now opens by itself on detections; press × or V to close it.
+- **Next:** item 4 collapse look.
 
 ### 2026-11-08 03:30 · p3/ai-eye · Plan for Rayan's realistic visuals + AI showcase (answer to his ask)
 - **Plan, in order, with estimates (from about 8:45 PM; freeze 7:30 AM):**

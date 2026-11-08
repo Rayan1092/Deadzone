@@ -1,8 +1,8 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Billboard } from '@react-three/drei'
 import * as THREE from 'three'
-import { useSim } from '../store'
+import { FOCUS_HOLD_MS, useSim } from '../store'
 import Building from './Building'
 import { PersonFigure } from './Actors'
 import { w2t } from './util'
@@ -11,6 +11,13 @@ import { w2t } from './util'
 // button). Reality pane only: it shows what the robot's own camera sees. A third
 // WebGL canvas, so it only exists while open and renders small at dpr 1.
 const EYE_H = 0.4 // m, camera height on the robot
+
+// While the classifier's verdict is on screen the camera turns from straight ahead to
+// the judged hot spot, then back.
+function focusFor(robotId) {
+  const f = useSim.getState().eyeFocus
+  return f && f.robot === robotId && performance.now() - f.born < FOCUS_HOLD_MS ? f : null
+}
 
 function EyeCamera({ robotId }) {
   const { camera } = useThree()
@@ -21,11 +28,14 @@ function EyeCamera({ robotId }) {
     if (!r) return
     const [x, y, th] = r.pose
     const goal = new THREE.Vector3(...w2t(x, y, EYE_H))
-    const ahead = new THREE.Vector3(...w2t(x + Math.cos(th), y + Math.sin(th), EYE_H - 0.05))
+    const f = focusFor(robotId)
+    const ahead = f
+      ? new THREE.Vector3(...w2t(f.pos[0], f.pos[1], 0.2))
+      : new THREE.Vector3(...w2t(x + Math.cos(th), y + Math.sin(th), EYE_H - 0.05))
     if (!at.current) { at.current = goal.clone(); look.current.copy(ahead) }
     const k = Math.min(1, dt * 8) // 10 Hz poses, smoothed to the frame rate
     at.current.lerp(goal, k)
-    look.current.lerp(ahead, k)
+    look.current.lerp(ahead, f ? Math.min(1, dt * 3) : k)
     camera.position.copy(at.current)
     camera.lookAt(look.current)
   })
@@ -100,14 +110,118 @@ function OtherRobots({ robotId, thermal }) {
   ))
 }
 
+// Screen box around the judged object: its known extent projected through the robot
+// camera. The classifier scores a crop; it does not localize, so the box only marks the
+// object that was judged.
+const corner = new THREE.Vector3()
+function FocusBox({ robotId, thermal, boxRef }) {
+  const { camera, size } = useThree()
+  useFrame(() => {
+    const el = boxRef.current
+    if (!el) return
+    const f = focusFor(robotId)
+    if (!f) { el.style.display = 'none'; return }
+    const person = f.kind === 'person'
+    const r = thermal ? 0.55 : person ? 0.85 : 0.6
+    const [y0, y1] = thermal ? [0.05, 1.15] : person ? [0, 0.45] : [0, 1.1]
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity
+    let behind = false
+    for (const dx of [-r, r]) for (const dz of [-r, r]) for (const y of [y0, y1]) {
+      corner.set(f.pos[0] + dx, y, -(f.pos[1] + dz)).project(camera)
+      if (corner.z > 1) behind = true
+      x0 = Math.min(x0, corner.x); x1 = Math.max(x1, corner.x)
+      z0 = Math.min(z0, corner.y); z1 = Math.max(z1, corner.y)
+    }
+    if (behind || x1 < -1 || x0 > 1) { el.style.display = 'none'; return }
+    const clamp = (v) => Math.max(-1, Math.min(1, v))
+    const left = ((clamp(x0) + 1) / 2) * size.width
+    const right = ((clamp(x1) + 1) / 2) * size.width
+    const top = ((1 - clamp(z1)) / 2) * size.height
+    const bottom = ((1 - clamp(z0)) / 2) * size.height
+    el.style.display = ''
+    el.style.transform = `translate(${left}px, ${top}px)`
+    el.style.width = `${Math.max(24, right - left)}px`
+    el.style.height = `${Math.max(24, bottom - top)}px`
+  })
+  return null
+}
+
+const pct = (c) => `${(c * 100).toFixed(c > 0 && c < 0.01 ? 1 : 0)}%`
+
+// What the robot does next, ticked off only by real events (never assumed).
+function steps(f, events) {
+  if (f.kind === 'decoy') {
+    return [
+      { done: true, text: 'Hot spot found on the thermal camera' },
+      { done: true, text: `Onboard classifier: not a person (${pct(f.conf ?? 0)})` },
+      { done: true, text: 'Rejected · keeps exploring' },
+    ]
+  }
+  const mine = (e) => e.survivor === f.subject
+  const route = events.find((e) => e.kind === 'rescue_route' && mine(e))
+  const beacon = events.find((e) => e.kind === 'relay_dropped' && e.beacon_for === f.subject)
+  const reported = events.find((e) => e.kind === 'survivor_reported' && mine(e))
+  const out = [
+    { done: true, text: `Person detected · ${pct(f.conf ?? 1)} (onboard classifier)` },
+    { done: true, text: `Location marked · ${f.pos[0].toFixed(1)}, ${f.pos[1].toFixed(1)} m` },
+    { done: !!route, text: route ? `Rescue route planned · ${Math.round(route.length_m)} m` : 'Planning rescue route…' },
+  ]
+  if (beacon) out.push({ done: true, text: `No signal: beacon ${beacon.id} dropped next to them` })
+  else if (!f.linked && !reported) out.push({ done: false, text: 'No signal: holding the report' })
+  out.push({ done: !!reported, text: reported ? `Report reached command (${reported.delay_s}s)` : 'Sending report to command…' })
+  return out
+}
+
+function FocusPanel({ robotId, boxRef }) {
+  const f = useSim((s) => (s.eyeFocus?.robot === robotId ? s.eyeFocus : null))
+  const events = useSim((s) => s.events)
+  const [, tick] = useState(0)
+  useEffect(() => {
+    if (!f) return
+    const id = setTimeout(() => tick((n) => n + 1), Math.max(0, f.born + FOCUS_HOLD_MS - performance.now()) + 50)
+    return () => clearTimeout(id)
+  }, [f])
+  const live = f && performance.now() - f.born < FOCUS_HOLD_MS
+  const person = f?.kind === 'person'
+  return (
+    <>
+      <div ref={boxRef} className={`eye-box ${person ? 'person' : 'decoy'}`} style={{ display: 'none' }}>
+        {f && (
+          <span className="eye-box-label">
+            {person ? `PERSON ${pct(f.conf ?? 1)}` : `NOT A PERSON ${pct(f.conf ?? 0)}`}
+            <small>{person ? 'onboard AI' : 'rejected'}</small>
+          </span>
+        )}
+      </div>
+      {live && (
+        <ol className={`eye-steps ${person ? 'person' : 'decoy'}`}>
+          {steps(f, events).map((st, i) => (
+            <li key={i} className={st.done ? 'done' : 'wait'}><i />{st.text}</li>
+          ))}
+        </ol>
+      )}
+    </>
+  )
+}
+
 export default function RobotEye() {
   const robotId = useSim((s) => s.eyeRobot)
   const thermal = useSim((s) => s.eyeThermal)
   const meta = useSim((s) => s.robotsMeta.find((r) => r.id === s.eyeRobot))
   const set = useSim((s) => s.set)
+  const focused = useSim((s) => s.eyeFocus?.robot === s.eyeRobot && s.eyeFocus)
+  const [, rerender] = useState(0)
+  const boxRef = useRef()
+  // grow while a verdict is on screen, then shrink back to the corner
+  const live = focused && performance.now() - focused.born < FOCUS_HOLD_MS
+  useEffect(() => {
+    if (!live) return
+    const id = setTimeout(() => rerender((n) => n + 1), Math.max(0, focused.born + FOCUS_HOLD_MS - performance.now()) + 50)
+    return () => clearTimeout(id)
+  }, [live, focused])
   if (!robotId) return null
   return (
-    <div className={`robot-eye${thermal ? ' thermal' : ''}`}>
+    <div className={`robot-eye${thermal ? ' thermal' : ''}${live ? ' focus' : ''}`}>
       <div className="eye-head">
         <i className="swatch" style={{ background: meta?.color }} />
         <b>{meta?.name ?? robotId} camera</b>
@@ -127,8 +241,13 @@ export default function RobotEye() {
         <HotSpots thermal={thermal} />
         <OtherRobots robotId={robotId} thermal={thermal} />
         <EyeCamera robotId={robotId} />
+        <FocusBox robotId={robotId} thermal={thermal} boxRef={boxRef} />
       </Canvas>
-      <span className="eye-note">{thermal ? 'Thermal: walls cold, people and hot objects glow' : 'Forward camera'}</span>
+      <FocusPanel robotId={robotId} boxRef={boxRef} />
+      <span className="eye-note">
+        {live ? 'Box marks the hot spot the onboard classifier judged from its thermal crop'
+          : thermal ? 'Thermal: walls cold, people and hot objects glow' : 'Forward camera'}
+      </span>
     </div>
   )
 }

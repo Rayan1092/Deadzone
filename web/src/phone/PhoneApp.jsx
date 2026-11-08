@@ -7,6 +7,7 @@ import PlanMap from './PlanMap'
 import PlanEditor from './PlanEditor'
 import SafetyCard from './SafetyCard'
 import RelayPanel from './RelayPanel'
+import AskCard from './AskCard'
 import './phone.css'
 
 // Stable fallback: zustand selectors must not return a new [] on every call.
@@ -195,6 +196,8 @@ function Shell({ role }) {
 
       {role === 'planner' && <PlanEditor />}
       {role === 'planner' && <SafetyCard />}
+
+      <AskCard />
 
 
       <h2 className="section-title">Robots</h2>
