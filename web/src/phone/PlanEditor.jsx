@@ -1,5 +1,5 @@
 import { usePhone } from './store'
-import { removeRegion, setBudget, updateZone } from './plan'
+import { flush, removeRegion, setBudget, updateZone } from './plan'
 
 const NONE = []
 
@@ -46,6 +46,9 @@ function ZoneEditor({ zone, robots }) {
 
 export default function PlanEditor() {
   const draft = usePhone((s) => s.draft)
+  const pending = usePhone((s) => s.pending)
+  const connected = usePhone((s) => s.connected)
+  const error = usePhone((s) => s.error)
   const mode = usePhone((s) => s.mode)
   const selected = usePhone((s) => s.selected)
   const robots = usePhone((s) => s.hello?.robots ?? NONE)
@@ -64,6 +67,11 @@ export default function PlanEditor() {
         {draft?.author && draft.author !== me && <span className="muted small">edited by {draft.author}</span>}
       </div>
 
+      {draft && <p className="hint" role="status">{pending
+        ? !connected ? 'Offline · changes waiting to sync' : error ? 'Changes are not saved. Retry to share them.' : 'Saving your changes…'
+        : 'Shared with the main screen and other phones. Check and dispatch to send it to robots.'}</p>}
+      {pending && connected && error && <button className="text-btn" onClick={flush}>Retry saving changes</button>}
+
       <div className="tools">
         <button className={`tool${mode === 'zone' ? ' on' : ''}`} onClick={() => toggle('zone')}>
           <i className="tool-zone" />Add zone
@@ -79,7 +87,7 @@ export default function PlanEditor() {
         <p className="hint">Draw a search zone on the map and assign a robot to it.</p>
       )}
       {mode === 'view' && !zones.length && noGo.length > 0 && (
-        <p className="hint">Add at least one search zone to share the plan.</p>
+        <p className="hint">No-go areas are shared. Add a search zone to check and dispatch the plan.</p>
       )}
 
       {[...zones].sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id)).map((z) => (

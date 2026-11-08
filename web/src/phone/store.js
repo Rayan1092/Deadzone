@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { decodeMap } from '../store'
+import { phoneHelloState } from './sync'
 
 // Phone state. Phones only ever receive the Command view, never Reality.
 export const usePhone = create((set) => ({
@@ -9,7 +10,7 @@ export const usePhone = create((set) => ({
   map: null,         // Command occupancy grid (Uint8Array, row-major, row = y)
   mapVersion: 0,
   draft: null,       // shared search plan being edited (server plan_state, or local edits)
-  pending: false,    // local edits not sent yet, so our own plan_state echoes are ignored
+  pending: false,    // edits waiting for a save acknowledgment; keep them across reconnects
   selected: null,    // zone or no-go id open in the editor
   mode: 'view',      // 'view' | 'zone' | 'nogo' (drawing on the map) | 'place' (moving my relay)
   relay: null,       // relay role: my node's relay_state { id, on, pos, queue, neighbors }
@@ -27,8 +28,7 @@ export function handlePhoneMessage(msg) {
   const s = usePhone.getState()
   switch (t) {
     case 'hello':
-      s.set({ hello: data, draft: data.plan, selected: null, mode: 'view', safety: null, relay: null, relayPending: null,
-              checking: false, error: null, time, ...(time < s.time ? { dispatched: [] } : {}) })
+      s.set(phoneHelloState(s, data, time))
       break
     case 'cmd_view': {
       const { map, ...view } = data
@@ -36,8 +36,8 @@ export function handlePhoneMessage(msg) {
       break
     }
     case 'plan_state': {
-      // Our own edit echoing back while newer local edits wait to be sent: keep local.
-      if (s.pending && data?.author === s.hello?.client) break
+      // Keep the local edit until its save is acknowledged (whole-draft last write wins).
+      if (s.pending) break
       const theirs = data?.author !== s.hello?.client
       s.set({ draft: data, ...(theirs ? { safety: null } : {}) })
       break
@@ -46,10 +46,12 @@ export function handlePhoneMessage(msg) {
       s.set({ relay: data, relayPending: s.relayPending === data.on ? null : s.relayPending })
       break
     case 'safety':
-      // Only answer a check this phone asked for: a laptop preload (POST /api/plan) or
-      // another phone's check would otherwise show a rejection before anyone tapped.
-      if (!s.checking) break
-      s.set({ safety: data, checking: false })
+      // Our check uses its HTTP response so another phone cannot answer it.
+      break
+    case 'event':
+      if (data.kind === 'plan_dispatched') {
+        s.set({ dispatched: [...new Set([...s.dispatched, data.plan_id])] })
+      }
       break
     case 'error':
       s.set({ error: { ...data, at: Date.now() }, checking: false, relayPending: null })
