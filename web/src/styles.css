@@ -474,3 +474,18 @@ button:hover { border-color: var(--teal); }
 .split:not(.single) .rescue-status { right: calc(50% + 6px); }
 .det-caption { display: block; font-size: 10px; line-height: 1.3; color: rgba(230,237,243,.55); margin-top: 4px; }
 .lab p.det-caption { margin: 0 0 8px; font-size: 11px; }
+
+/* big announcements: AFTERSHOCK, NEW SCENARIO */
+.banner { position: absolute; z-index: 7; left: 50%; top: 34%; transform: translate(-50%, -50%); display: flex; flex-direction: column;
+  align-items: center; gap: 8px; padding: 18px 40px; border-radius: 18px; text-align: center; pointer-events: none;
+  background: var(--glass-strong); border: 1px solid var(--glass-edge); box-shadow: 0 24px 60px rgba(0,0,0,.6), var(--glass-hi);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); animation: banner-in .25s ease-out, banner-out .6s ease-in 4.9s forwards; }
+.banner b { font-size: 48px; line-height: 1; letter-spacing: .14em; font-weight: 800; }
+.banner span { font-size: 15px; color: rgba(230,237,243,.85); }
+.banner.alert { border-color: rgba(239,68,68,.55); box-shadow: 0 24px 60px rgba(0,0,0,.6), 0 0 48px rgba(239,68,68,.35); }
+.banner.alert b { color: #fecaca; text-shadow: 0 0 24px rgba(239,68,68,.8); animation: banner-flash .18s steps(2) 8; }
+.banner.info { border-color: rgba(45,212,191,.5); }
+.banner.info b { color: #99f6e4; }
+@keyframes banner-in { from { opacity: 0; transform: translate(-50%, -50%) scale(1.12); } }
+@keyframes banner-out { to { opacity: 0; } }
+@keyframes banner-flash { 50% { opacity: .35; } }

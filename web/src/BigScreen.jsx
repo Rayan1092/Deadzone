@@ -9,6 +9,7 @@ import ReportPanel from './panels/ReportPanel'
 import AILab from './panels/AILab'
 import Intro from './panels/Intro'
 import { DirectorChip, useDirector } from './panels/Director'
+import Banner from './panels/Banner'
 import { ReplayLoader } from './panels/ReplayPanel'
 import { REPLAY } from './net/replay'
 import { useSim } from './store'
@@ -31,6 +32,7 @@ export default function BigScreen() {
           </>
         )}
         <RescueStatus />
+        <Banner />
         <Toasts />
         <DirectorChip />
         <ReportPanel />

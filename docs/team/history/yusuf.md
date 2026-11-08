@@ -17,6 +17,16 @@ Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Log
 
+### 2026-11-08 11:50 · p3/collapse-geometry · Earthquake v2 visuals, banners, rumble; generic furnishing for any floor plan
+- **Did:**
+  - **Earthquake v2 (key A, Aziz's strength setting feeds it as more `aftershock` events):** 5.2 s of shake with a hard first half second and a long decay; four ceiling slabs and fourteen chunks fall from roof height onto the collapse footprint, bounce once and stay as debris; a bigger, longer dust cloud; the scene lights stutter for the length of the shake (power flicker) and recover; a synthesized rumble (sub-bass thud plus a low swell, Web Audio, only after a user gesture such as the A key); an "AFTERSHOCK" banner over the main view ("Part of the building came down · relay RL2 crushed · robots rerouting").
+  - **"NEW SCENARIO" banner:** fires when `hello` brings a different building, or the same building with the survivors moved after a reset (key N variants), with the building's name. The N key itself waits for Aziz's reset-into-floorplan control name.
+  - **Props on random floor plans:** every room is furnished from its name (office, storage, break, plant, corridor) with a default for rooms we can't classify; items hug walls (centre <= 0.5 m), stay 1.2 m from doors and 0.8 m from corners. `?generic=1` shows it on the demo building to compare; the demo building keeps its hand layout.
+  - `window.__dz` exposes the store for testing (the aftershock visuals were checked by setting `aftershock` by hand; the user's server runs without `DZ_AFTERSHOCK=1`).
+- **Contract changes:** none.
+- **Heads-up for others:** Aziz: when your strength setting sends a second `aftershock` ~10 s later, the shake, slabs and banner play again from that event's `at`. Rayan: the banner copy is judge language; tell me if you want other words.
+- **Next:** exterior shell (upper-floor remnant, street), then the PR.
+
 ### 2026-11-08 11:25 · p3/collapse-geometry · Captions on every AI image, judge-first labels, Rescue Status strip; OK for Aziz on J and I
 - **Did (PLAN.md "Purpose, trust and visibility", in its priority order):**
   - **Caption every AI image:** "Real thermal camera image, Teledyne FLIR dataset: the same input a thermal camera on a rescue robot produces." on the AI cards, the robot camera's thermal view and the AI Lab (live crop, examples grid, in-building crops). `AI_CAPTION` in `format.js`.
