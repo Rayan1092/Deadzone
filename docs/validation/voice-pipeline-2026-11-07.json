@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "synced_main": "4b210ab",
+  "backend_passed": 354,
+  "backend_skipped": 1,
+  "skip_reason": "opt-in soak separately validated earlier",
+  "backend_wall_s": 86.41,
+  "frontend_build": "passed; 733 modules",
+  "providers": "mocked transports only; no real Gemini or ElevenLabs call/key",
+  "phone_mic": "user confirmed on venue Wi-Fi",
+  "live_http_ws": "passed; raw result voice-live-2026-11-07.json",
+  "ai_lab_images_served": 46,
+  "ai_lab_examples_split": "held-out FLIR validation",
+  "training_curve": "pending logged retrain",
+  "remaining_acceptance": [
+    "Yusuf lease/PTT/playback UI",
+    "real keyed provider-source dry run on testing laptop",
+    "logged training curve",
+    "GPU visual dry run"
+  ],
+  "flags": "DZ_VOICE / DZ_AI_LAB opt-in; tunnel voice/Gemini default off"
+}

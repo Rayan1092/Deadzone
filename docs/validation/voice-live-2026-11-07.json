@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "url": "http://127.0.0.1:8021",
+  "detector": "model",
+  "providers": "keys blank; no real Gemini/ElevenLabs calls",
+  "checks": [
+    "idempotent HTTP command, no early speech, missing-provider errors without fabricated commands",
+    "actual command radio delivery, robot decision, delivered ack to phone, honest browser TTS fallback",
+    "R2 command issued dark at 125 sim seconds; acknowledgement delivered more than 10 sim seconds later"
+  ],
+  "dark_issued_t": 127.0,
+  "dark_ack_t": 143.2,
+  "ack_delay_from_issue_s": 16.2
+}

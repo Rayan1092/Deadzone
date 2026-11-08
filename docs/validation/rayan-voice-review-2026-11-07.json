@@ -1,0 +1,22 @@
+{
+  "ok": true,
+  "main": "4b210ab",
+  "rayan_voice_commit": "22ad945",
+  "rayan_pr": 64,
+  "rayan_pr_state": "merged",
+  "robot_code_matches_main": true,
+  "tests_passed": 40,
+  "test_wall_s": 43.36,
+  "test_files": [
+    "test_voice_commands.py",
+    "test_voice_pipeline.py",
+    "test_control_leases.py",
+    "test_demo_guard.py"
+  ],
+  "backend_implementation_pr": 72,
+  "backend_pr_state": "open",
+  "main_voice_holder_response": "501 voice_not_ready",
+  "real_provider_calls": false,
+  "new_voice_commit_this_fetch": false,
+  "keyed_end_to_end_acceptance": "not established by this audit"
+}
