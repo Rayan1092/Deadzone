@@ -105,6 +105,45 @@ Microphones need `https` or `localhost`: push-to-talk works on the big-screen la
 | Lease API: claim, release, heartbeat, expiry, presenter override; enforced on `/api/voice` and every direct command; lease state broadcast to phones and screens | Aziz |
 | Phone robot picker showing each robot's controller, take and release buttons, locked state; presenter override on the big screen | Yusuf |
 
+### Hyper-realism, honest scout camera and judge-first UI (9:50 PM update, Yusuf)
+
+Yusuf asked for the most realistic look we can ship, a scout camera that matches what the robot really sees, every object classified, realistic people that robots never run over, realistic beacons, and a screen a judge understands at first glance. Where each part lives:
+
+**Branches, merge in this order:**
+1. `p3/collapse` (#70): collapse look, AI Lab (L), night lighting (K), auto-director (D).
+2. `p3/disaster`: the whole site as a disaster zone, one rover model for map and camera, scheduler redesign.
+3. `p3/hyperreal`: photo-scanned materials and sky, honest scout camera, true-scale people, rugged relays, first-glance explainer. Also one small robot commit for Rayan to review.
+4. `p3/clinic-map` (from `p3/disaster`): second building `clinic_02` and the `DZ_FLOORPLAN` switch, for Rayan and Aziz to review.
+
+**Done:**
+- **Photo-scanned world:** seven CC0 Poly Haven texture sets (concrete floor and walls, brick, cracked concrete, asphalt, rusty metal, plaster) and a CC0 HDRI sky, 14 MB in `web/public/assets/` with `CREDITS.md`. Every surface falls back to the procedural texture if a file is missing.
+- **Disaster site:** debris on every floor and against every wall, a collapse mound in the no-go hazard room, collapsed neighbouring buildings with smoke and fire, a cracked lot, crushed cars, a downed pole. Visual only: the truth grid, radio and robots are unchanged, and nothing sits on a robot's path.
+- **Scout camera = the robot's real view:**
+  - Chassis-mounted, always facing the robot's heading. It no longer swings to a survivor behind the robot.
+  - Every warm object in view gets a box with the onboard classifier's score for that object's real FLIR crop (the same crops and model output the robot uses, `/crops/manifest.json`). Within the 5 m thermal range it is judged; farther away it is marked "warm · come closer".
+  - **Rule:** cold objects are never given a score. They never reach the classifier, and a number for them would be fake. To show more objects with real scores, add more real FLIR crops as decoys (Rayan).
+- **People:** sculpted at true scale (1.72 m), pinned under debris. The "run over" look was drawing scale (people were 1.35×). Measured: robots never came closer than 1.96 m to a survivor on seed 7. Robots now also keep 0.5 m off confirmed survivors in motion planning (Rayan's code, separate commit; the demo guard passes).
+- **Robots:** one detailed tracked rover model used everywhere, including through other robots' cameras.
+- **Relays and beacons:** rugged yellow hard cases with antenna mast and blinking LED; phone relays as a phone on a stand.
+- **First glance:**
+  - A three-line "How to read this screen" card once per session and from the `?` overlay.
+  - Plain pane titles ("Inside the building", "What's really happening", "What the command post knows").
+  - "Survivors: N found · M at command" in the top bar.
+  - Scheduler collapsed to one line unless a robot is overloaded or misses a deadline.
+
+**Asks:**
+- **Rayan:**
+  - Review the 0.5 m survivor clearance (`SURVIVOR_CLEAR_M`) and the `clinic_02` map.
+  - A CC0/CC-BY photo-scanned human GLB in a lying pose if your asset pack can include one (no free CC0 scan exists without an account); it drops into `web/src/three/Human.jsx`.
+  - More real FLIR crops as decoys, so the scout camera has more real objects to score.
+- **Aziz:**
+  - Review the one-line `DZ_FLOORPLAN` switch.
+  - Run the demo server with `DZ_AI_LAB=1` (and `DZ_AFTERSHOCK=1` if A is in the demo).
+
+**Still to do (Yusuf), in cut order (first cut first):** scheduler polish done; multi-story shell; more scanned props (furniture, cars); phone take/release robot picker (Aziz's lease API is merged); voice push-to-talk UI.
+
+**Limits:** 30 fps on the testing laptop with P as the fallback, CC0/CC-BY only and credited, new looks behind keys (K night, D director, L AI Lab) until a dry run passes.
+
 ### Owners and priorities
 
 | Priority | Item | Owner | Prize it serves |

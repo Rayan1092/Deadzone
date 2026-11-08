@@ -1,0 +1,163 @@
+[
+  {
+    "enabled": false,
+    "assigned": false,
+    "seed": 7,
+    "simulated_s": 240,
+    "wall_s": 21.0,
+    "camera_coverage_pct": 98.6,
+    "known_command_cells": 15028,
+    "found": {
+      "S1": 19.0,
+      "S3": 111.9,
+      "S2": 161.6
+    },
+    "reported": [
+      "S1",
+      "S2",
+      "S3"
+    ],
+    "fault_events": {},
+    "robots": {
+      "R1": {
+        "planning_calls": 152,
+        "target_changes": 43,
+        "distance_m": 176.2,
+        "room_entries": {
+          "L1": 2,
+          "WA": 2,
+          "C1": 4,
+          "RX": 2,
+          "LB": 1,
+          "WH": 2,
+          "PH": 2
+        },
+        "repeated_exploration_cells": 40,
+        "unique_exploration_cells": 370,
+        "graph_searches": 152,
+        "state": "EXPLORING",
+        "fault": null
+      },
+      "R2": {
+        "planning_calls": 157,
+        "target_changes": 40,
+        "distance_m": 168.2,
+        "room_entries": {
+          "C1": 5,
+          "RX": 2,
+          "LB": 1,
+          "L1": 2,
+          "WA": 2,
+          "PH": 3,
+          "WH": 2,
+          "WB": 1
+        },
+        "repeated_exploration_cells": 36,
+        "unique_exploration_cells": 352,
+        "graph_searches": 157,
+        "state": "EXPLORING",
+        "fault": null
+      },
+      "R3": {
+        "planning_calls": 156,
+        "target_changes": 41,
+        "distance_m": 165.7,
+        "room_entries": {
+          "WA": 1,
+          "C1": 4,
+          "PH": 3,
+          "WH": 1,
+          "WB": 1,
+          "RX": 1,
+          "LB": 1
+        },
+        "repeated_exploration_cells": 21,
+        "unique_exploration_cells": 364,
+        "graph_searches": 156,
+        "state": "EXPLORING",
+        "fault": null
+      }
+    },
+    "floorplan": "clinic_02"
+  },
+  {
+    "enabled": true,
+    "assigned": false,
+    "seed": 7,
+    "simulated_s": 240,
+    "wall_s": 19.14,
+    "camera_coverage_pct": 99.2,
+    "known_command_cells": 15463,
+    "found": {
+      "S1": 23.2,
+      "S3": 85.6,
+      "S2": 158.1
+    },
+    "reported": [
+      "S1",
+      "S2",
+      "S3"
+    ],
+    "fault_events": {},
+    "robots": {
+      "R1": {
+        "planning_calls": 543,
+        "target_changes": 19,
+        "distance_m": 143.5,
+        "room_entries": {
+          "L1": 1,
+          "C1": 5,
+          "RX": 2,
+          "LB": 2,
+          "WA": 1,
+          "WB": 1,
+          "WH": 2
+        },
+        "repeated_exploration_cells": 29,
+        "unique_exploration_cells": 304,
+        "graph_searches": 21,
+        "state": "LOST_LINK_EXPLORING",
+        "fault": null
+      },
+      "R2": {
+        "planning_calls": 563,
+        "target_changes": 20,
+        "distance_m": 140.4,
+        "room_entries": {
+          "WA": 1,
+          "C1": 2,
+          "WH": 2,
+          "PH": 2,
+          "SC": 1,
+          "RX": 1,
+          "LB": 1
+        },
+        "repeated_exploration_cells": 14,
+        "unique_exploration_cells": 318,
+        "graph_searches": 22,
+        "state": "LOST_LINK_EXPLORING",
+        "fault": null
+      },
+      "R3": {
+        "planning_calls": 496,
+        "target_changes": 18,
+        "distance_m": 148.3,
+        "room_entries": {
+          "WA": 2,
+          "C1": 3,
+          "PH": 2,
+          "SC": 1,
+          "WH": 1,
+          "WB": 1,
+          "RX": 1
+        },
+        "repeated_exploration_cells": 23,
+        "unique_exploration_cells": 315,
+        "graph_searches": 21,
+        "state": "EXPLORING",
+        "fault": null
+      }
+    },
+    "floorplan": "clinic_02"
+  }
+]

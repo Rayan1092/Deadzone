@@ -17,6 +17,8 @@ def dilate(mask, r):
     out = mask.copy()
     for dy in range(-r, r + 1):
         for dx in range(-r, r + 1):
+            if abs(dy) >= mask.shape[0] or abs(dx) >= mask.shape[1]:
+                continue
             if dx == 0 and dy == 0:
                 continue
             shifted = np.zeros_like(mask)

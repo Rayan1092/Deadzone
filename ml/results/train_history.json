@@ -1,0 +1,57 @@
+{
+ "arch": "mobilenet_v3_small",
+ "epochs": 5,
+ "batch": 128,
+ "lr": 0.001,
+ "seed": 0,
+ "device": "cuda",
+ "train": 5400,
+ "holdout": 600,
+ "note": "holdout = 10% of the FLIR train crops (val_*); the test metrics use FLIR val",
+ "curve": [
+  {
+   "epoch": 1,
+   "train_loss": 0.3901,
+   "train_acc": 0.7974,
+   "val_loss": 0.6683,
+   "val_acc": 0.815,
+   "seconds": 39.0
+  },
+  {
+   "epoch": 2,
+   "train_loss": 0.1309,
+   "train_acc": 0.9465,
+   "val_loss": 0.247,
+   "val_acc": 0.9183,
+   "seconds": 12.0
+  },
+  {
+   "epoch": 3,
+   "train_loss": 0.0819,
+   "train_acc": 0.9689,
+   "val_loss": 0.1524,
+   "val_acc": 0.945,
+   "seconds": 12.0
+  },
+  {
+   "epoch": 4,
+   "train_loss": 0.0641,
+   "train_acc": 0.9754,
+   "val_loss": 0.1,
+   "val_acc": 0.965,
+   "seconds": 11.9
+  },
+  {
+   "epoch": 5,
+   "train_loss": 0.0522,
+   "train_acc": 0.9787,
+   "val_loss": 0.087,
+   "val_acc": 0.9683,
+   "seconds": 12.0
+  }
+ ],
+ "promoted": true,
+ "shipped_acc": 0.9617,
+ "candidate_acc": 0.9617,
+ "test_n": 1200
+}

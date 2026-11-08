@@ -1,0 +1,306 @@
+[
+  {
+    "enabled": false,
+    "assigned": false,
+    "seed": 7,
+    "simulated_s": 240,
+    "wall_s": 13.81,
+    "camera_coverage_pct": 94.6,
+    "known_command_cells": 16838,
+    "found": {
+      "S3": 18.0,
+      "S1": 176.2,
+      "S2": 200.4
+    },
+    "reported": [
+      "S1",
+      "S2",
+      "S3"
+    ],
+    "fault_events": {},
+    "robots": {
+      "R1": {
+        "planning_calls": 155,
+        "target_changes": 46,
+        "distance_m": 169.1,
+        "room_entries": {
+          "C1": 6,
+          "S1": 1,
+          "N1": 1,
+          "N2": 1,
+          "N3": 1,
+          "E1": 1,
+          "E2": 1
+        },
+        "repeated_exploration_cells": 58,
+        "unique_exploration_cells": 335,
+        "graph_searches": 155,
+        "state": "EXPLORING",
+        "fault": null
+      },
+      "R2": {
+        "planning_calls": 150,
+        "target_changes": 46,
+        "distance_m": 170.2,
+        "room_entries": {
+          "C1": 8,
+          "S1": 1,
+          "N2": 1,
+          "E1": 1,
+          "S3": 1,
+          "N3": 1
+        },
+        "repeated_exploration_cells": 77,
+        "unique_exploration_cells": 328,
+        "graph_searches": 150,
+        "state": "EXPLORING",
+        "fault": null
+      },
+      "R3": {
+        "planning_calls": 148,
+        "target_changes": 52,
+        "distance_m": 172.6,
+        "room_entries": {
+          "N1": 1,
+          "C1": 7,
+          "S1": 1,
+          "N2": 1,
+          "N3": 1,
+          "S3": 1,
+          "E1": 1
+        },
+        "repeated_exploration_cells": 47,
+        "unique_exploration_cells": 365,
+        "graph_searches": 148,
+        "state": "EXPLORING",
+        "fault": null
+      }
+    },
+    "floorplan": "collapse_01"
+  },
+  {
+    "enabled": false,
+    "assigned": true,
+    "seed": 7,
+    "simulated_s": 240,
+    "wall_s": 22.25,
+    "camera_coverage_pct": 90.6,
+    "known_command_cells": 16738,
+    "found": {
+      "S3": 14.4,
+      "S1": 129.0
+    },
+    "reported": [
+      "S1",
+      "S3"
+    ],
+    "fault_events": {},
+    "robots": {
+      "R1": {
+        "planning_calls": 150,
+        "target_changes": 45,
+        "distance_m": 176.7,
+        "room_entries": {
+          "N1": 1,
+          "C1": 5,
+          "N2": 1,
+          "S1": 1,
+          "E1": 1,
+          "E2": 1
+        },
+        "repeated_exploration_cells": 56,
+        "unique_exploration_cells": 358,
+        "graph_searches": 150,
+        "state": "EXPLORING",
+        "fault": null
+      },
+      "R2": {
+        "planning_calls": 141,
+        "target_changes": 41,
+        "distance_m": 173.0,
+        "room_entries": {
+          "C1": 6,
+          "N1": 1,
+          "N2": 1,
+          "E1": 1,
+          "E2": 2,
+          "N3": 1,
+          "S3": 1
+        },
+        "repeated_exploration_cells": 95,
+        "unique_exploration_cells": 296,
+        "graph_searches": 141,
+        "state": "EXPLORING",
+        "fault": null
+      },
+      "R3": {
+        "planning_calls": 154,
+        "target_changes": 49,
+        "distance_m": 168.5,
+        "room_entries": {
+          "N1": 1,
+          "C1": 4,
+          "S1": 1,
+          "N3": 1,
+          "E1": 1,
+          "E2": 1
+        },
+        "repeated_exploration_cells": 46,
+        "unique_exploration_cells": 330,
+        "graph_searches": 154,
+        "state": "EXPLORING",
+        "fault": null
+      }
+    },
+    "floorplan": "collapse_01"
+  },
+  {
+    "enabled": true,
+    "assigned": false,
+    "seed": 7,
+    "simulated_s": 240,
+    "wall_s": 16.47,
+    "camera_coverage_pct": 97.7,
+    "known_command_cells": 16374,
+    "found": {
+      "S3": 18.4,
+      "S2": 164.3,
+      "S1": 223.9
+    },
+    "reported": [
+      "S1",
+      "S2",
+      "S3"
+    ],
+    "fault_events": {},
+    "robots": {
+      "R1": {
+        "planning_calls": 540,
+        "target_changes": 19,
+        "distance_m": 142.6,
+        "room_entries": {
+          "S1": 1,
+          "C1": 5,
+          "N1": 2,
+          "N2": 2,
+          "E1": 1,
+          "E2": 1
+        },
+        "repeated_exploration_cells": 33,
+        "unique_exploration_cells": 296,
+        "graph_searches": 20,
+        "state": "LOST_LINK_EXPLORING",
+        "fault": null
+      },
+      "R2": {
+        "planning_calls": 564,
+        "target_changes": 21,
+        "distance_m": 140.0,
+        "room_entries": {
+          "C1": 5,
+          "N2": 1,
+          "N3": 2,
+          "S3": 1,
+          "E1": 1
+        },
+        "repeated_exploration_cells": 29,
+        "unique_exploration_cells": 293,
+        "graph_searches": 23,
+        "state": "EXPLORING",
+        "fault": null
+      },
+      "R3": {
+        "planning_calls": 476,
+        "target_changes": 17,
+        "distance_m": 148.8,
+        "room_entries": {
+          "N1": 1,
+          "C1": 3,
+          "S1": 2,
+          "N2": 2,
+          "N3": 1
+        },
+        "repeated_exploration_cells": 35,
+        "unique_exploration_cells": 301,
+        "graph_searches": 18,
+        "state": "EXPLORING",
+        "fault": null
+      }
+    },
+    "floorplan": "collapse_01"
+  },
+  {
+    "enabled": true,
+    "assigned": true,
+    "seed": 7,
+    "simulated_s": 240,
+    "wall_s": 15.95,
+    "camera_coverage_pct": 98.3,
+    "known_command_cells": 16930,
+    "found": {
+      "S3": 23.8,
+      "S2": 106.4,
+      "S1": 119.0
+    },
+    "reported": [
+      "S1",
+      "S2",
+      "S3"
+    ],
+    "fault_events": {},
+    "robots": {
+      "R1": {
+        "planning_calls": 519,
+        "target_changes": 16,
+        "distance_m": 149.0,
+        "room_entries": {
+          "N2": 2,
+          "C1": 3,
+          "N1": 1,
+          "S1": 3
+        },
+        "repeated_exploration_cells": 44,
+        "unique_exploration_cells": 292,
+        "graph_searches": 17,
+        "state": "EXPLORING",
+        "fault": null
+      },
+      "R2": {
+        "planning_calls": 470,
+        "target_changes": 16,
+        "distance_m": 149.4,
+        "room_entries": {
+          "N1": 1,
+          "C1": 6,
+          "E1": 2,
+          "E2": 1,
+          "S3": 1,
+          "N3": 1
+        },
+        "repeated_exploration_cells": 46,
+        "unique_exploration_cells": 278,
+        "graph_searches": 17,
+        "state": "LOST_LINK_EXPLORING",
+        "fault": null
+      },
+      "R3": {
+        "planning_calls": 571,
+        "target_changes": 21,
+        "distance_m": 138.0,
+        "room_entries": {
+          "C1": 4,
+          "N3": 1,
+          "S3": 1,
+          "E1": 1,
+          "E2": 1
+        },
+        "repeated_exploration_cells": 26,
+        "unique_exploration_cells": 268,
+        "graph_searches": 24,
+        "state": "LOST_LINK_EXPLORING",
+        "fault": null
+      }
+    },
+    "floorplan": "collapse_01"
+  }
+]
