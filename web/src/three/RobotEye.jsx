@@ -83,9 +83,7 @@ function HotSpots({ thermal }) {
             <ThermalCrop name={d.thermal} fallback={(
               <mesh position={[0, 0.45, 0]}><boxGeometry args={[0.6, 0.9, 0.35]} /><meshBasicMaterial color="#ffb347" /></mesh>
             )} />
-          ) : (
-            <mesh position={[0, 0.45, 0]}><boxGeometry args={[0.6, 0.9, 0.35]} /><meshStandardMaterial color="#6b7280" roughness={0.6} /></mesh>
-          )}
+          ) : null /* the real object is part of the building's props */}
         </group>
       ))}
     </group>

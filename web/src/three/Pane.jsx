@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
-import { Bloom, EffectComposer } from '@react-three/postprocessing'
+import { Environment, Lightformer, OrbitControls } from '@react-three/drei'
+import { Bloom, EffectComposer, N8AO, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { ToneMappingMode } from 'postprocessing'
 import * as THREE from 'three'
 import Building from './Building'
 import Fog from './Fog'
@@ -17,25 +18,50 @@ import CommandInset from './CommandInset'
 
 const GAP_COLUMN_PX = 330 // Command inset (300) + margins
 
-// Warm key light from the entrance side (west), cool sky fill. The shadow frustum covers
-// the whole building (the default ±5 m only shaded one corner).
+// Late-afternoon sun from the south-west so every wall throws a readable shadow, a cool
+// sky fill, and image-based light from a few soft panels (no HDR download) so metal,
+// glass and polished concrete have something to reflect. The shadow frustum covers the
+// whole site.
 function Lights({ perf }) {
   const target = useMemo(() => {
     const t = new THREE.Object3D()
-    t.position.set(20, 0, -15)
+    t.position.set(19.5, 0, -15)
     return t
   }, [])
   return (
     <>
-      <ambientLight intensity={0.28} />
-      <hemisphereLight args={['#a9bfd6', '#0b0d10', 0.45]} />
+      <ambientLight intensity={0.08} />
+      <hemisphereLight args={['#c4d3e6', '#2b2622', 0.35]} />
       <primitive object={target} />
-      <directionalLight position={[-6, 30, -4]} target={target} intensity={1.15} color="#ffe6c4"
-                        castShadow={!perf} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0005}
-                        shadow-camera-left={-30} shadow-camera-right={30}
-                        shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-far={90} />
+      <directionalLight position={[2, 32, 0]} target={target} intensity={2.6} color="#ffe0b5"
+                        castShadow={!perf} shadow-mapSize={[4096, 4096]} shadow-bias={-0.0004} shadow-normalBias={0.03}
+                        shadow-camera-left={-34} shadow-camera-right={34}
+                        shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-far={100} />
+      <Environment resolution={128} frames={1} environmentIntensity={0.55}>
+        <Lightformer form="rect" intensity={1.6} color="#e6eefb" scale={[40, 40]} position={[0, 20, 0]} rotation-x={Math.PI / 2} />
+        <Lightformer form="rect" intensity={2.2} color="#ffd2a1" scale={[30, 8]} position={[-25, 6, 10]} rotation-y={Math.PI / 2} />
+        <Lightformer form="rect" intensity={0.8} color="#9cc3ff" scale={[30, 8]} position={[25, 6, -10]} rotation-y={-Math.PI / 2} />
+        <Lightformer form="ring" intensity={1.2} color="#ffffff" scale={6} position={[0, 8, 25]} />
+      </Environment>
     </>
   )
+}
+
+// The building never moves, so render the shadow map only while the scene settles
+// (props, debris, textures) and when the floorplan changes, not every frame.
+function StaticShadows() {
+  const gl = useThree((s) => s.gl)
+  const fp = useSim((s) => s.floorplan)
+  const perf = useSim((s) => s.perf)
+  const frames = useRef(0)
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false
+    frames.current = 0
+  }, [gl, fp, perf])
+  useFrame(() => {
+    if (frames.current < 30) { gl.shadowMap.needsUpdate = true; frames.current++ }
+  })
+  return null
 }
 
 function SyncedControls({ id }) {
@@ -153,20 +179,27 @@ export default function Pane({ which, title, subtitle }) {
       <DetectionCards side={which} sides={which === 'gap' ? ['command', 'reality'] : undefined} />
       {which !== 'command' && <RobotEye />}
       {which === 'gap' && <CommandInset />}
-      <Canvas shadows={!perf} dpr={perf ? 1 : [1, 1.5]} camera={{ fov: 50, near: 0.1, far: 300 }}>
+      <Canvas shadows={!perf} dpr={perf ? 1 : [1, 1.5]} camera={{ fov: 50, near: 0.1, far: 300 }}
+              gl={{ toneMapping: THREE.AgXToneMapping, toneMappingExposure: 1.1 }}>
         <color attach="background" args={[COLORS.bg]} />
-        <fog attach="fog" args={[COLORS.bg, 90, 170]} />
+        <fog attach="fog" args={[COLORS.bg, 80, 160]} />
         <Lights perf={perf} />
-        <Building />
+        <StaticShadows />
+        <Building props={which !== 'command'} />
         <Fog which={which} />
         <AntennaPulse />
         <PlanZones />
         {which === 'command' ? <CommandActors /> : <RealityActors gap={which === 'gap'} />}
         <SyncedControls id={which} />
-        {which !== 'command' && !perf && (
-          // only materials pushed past the threshold bloom: robot LEDs, survivors, antenna
-          <EffectComposer multisampling={4}>
-            <Bloom mipmapBlur luminanceThreshold={0.9} luminanceSmoothing={0.25} intensity={0.9} />
+        {!perf && (
+          // contact shadows where walls, props and debris meet the floor; then only
+          // materials pushed past the threshold bloom (robot LEDs, survivors, beacons)
+          <EffectComposer multisampling={0}>
+            <N8AO halfRes quality="performance" aoRadius={1.4} distanceFalloff={1} intensity={2.6} color="#0b0d10" />
+            <Bloom mipmapBlur luminanceThreshold={0.95} luminanceSmoothing={0.25} intensity={which === 'command' ? 0.5 : 0.85} />
+            <ToneMapping mode={ToneMappingMode.AGX} />
+            <Vignette offset={0.32} darkness={0.5} />
+            <SMAA />
           </EffectComposer>
         )}
       </Canvas>
