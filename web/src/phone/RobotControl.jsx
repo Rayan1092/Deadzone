@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { fieldUnitName, fmtClock, unitName } from '../format'
+import { fieldUnitName, fmtClock } from '../format'
 import { usePhone } from './store'
 import { publicText, robotName } from './labels'
-import { DARK_S, HEARTBEAT_MS, ackFor, claim, command, heartbeat, holder, isDark, lastFrame, leaseOf, release } from './control'
+import { DARK_S, HEARTBEAT_MS, ackFor, claim, command, heartbeat, holder, isDark, lastFrame, release } from './control'
 
 const NONE = []
 const ACTION_LABEL = { hold: 'Hold', resume: 'Resume', return_home: 'Return home', explore_zone: 'Explore' }
@@ -59,7 +59,6 @@ export function ControlPanel({ meta }) {
   if (who === 'off') {
     return <div className="control muted small" onClick={(e) => e.stopPropagation()}>Direct control is unavailable for this session. You can still view reports and send search plans.</div>
   }
-  const lease = leaseOf(leases, meta.id)
   const run = async (fn, message) => {
     const epoch = usePhone.getState().hello?.plan_epoch
     setBusy(true)
@@ -82,7 +81,7 @@ export function ControlPanel({ meta }) {
     <div className="control" onClick={(e) => e.stopPropagation()}>
       <div className="control-row">
         {who === 'free' && <span className="muted small">No one is controlling {meta.name}</span>}
-        {who === 'other' && <span className="chip bad">Locked · {unitName(lease.controller.name)} has control</span>}
+        {who === 'other' && <span className="chip bad">Another operator has control</span>}
         {who === 'me' && <span className="chip ok">You have control</span>}
         {who === 'free' && (
           <button className="filled small" disabled={off || !token} onClick={() => run(() => claim(meta.id, fieldUnitName(leases, client), token), `You now control ${meta.name}.`)}>Take control</button>

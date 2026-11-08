@@ -1,6 +1,5 @@
 import { usePhone } from './store'
 import { clearAll, flush, removeRegion, setBudget, updateZone } from './plan'
-import { unitName } from '../format'
 import { regionName, robotName } from './labels'
 
 const NONE = []
@@ -68,7 +67,7 @@ export default function PlanEditor({ children }) {
     <section className="m3-card plan-card">
       <div className="card-head">
         <b>Search plan</b>
-        {draft?.author && draft.author !== me && <span className="muted small">Edited by {unitName(draft.author)}</span>}
+        {draft?.author && draft.author !== me && <span className="muted small">Edited by another field unit</span>}
       </div>
 
       {draft && <p className="hint" role="status">{pending

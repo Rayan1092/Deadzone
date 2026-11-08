@@ -150,7 +150,7 @@ function Shell({ role, initialPage, onJoin }) {
   const meta = hello?.robots?.find((r) => r.id === selected)
   const changePage = (next) => { setSelected(null); setPage(next); usePhone.getState().set({ mode: 'view', selected: null }) }
   return <div className="phone-app">
-    <Header title={meta ? 'Control' : page === 'robots' ? 'Pick a robot' : page === 'plan' ? 'Plan' : 'Radio relay'} status={connection}><button className="text-btn" onClick={onJoin}>Join</button></Header>
+    <Header title={meta ? (role === 'planner' ? 'Control' : 'Robot report') : page === 'robots' ? 'Pick a robot' : page === 'plan' ? 'Plan' : 'Radio relay'} status={connection}><button className="text-btn" onClick={onJoin}>Join</button></Header>
     <ConnectionBanner status={connection} />
     <nav className="phone-nav" aria-label="Phone screens">{(role === 'planner' ? [['robots', 'Robots'], ['plan', 'Plan']] : [['relay', 'Radio relay'], ['robots', 'Robots']]).map(([key, name]) => <button key={key} aria-current={page === key ? 'page' : undefined} onClick={() => changePage(key)}>{name}</button>)}</nav>
     <Feedback />
