@@ -6,6 +6,7 @@ import os
 import random
 import re
 from copy import deepcopy
+from itertools import combinations
 from pathlib import Path
 
 import numpy as np
@@ -23,6 +24,7 @@ from .robot.robot import BATTERY_TIME_SCALE, PEER_FRESH_S, Robot
 from .sensors import THERMAL_FOV, THERMAL_RANGE, camera_config
 
 DT = 0.1
+ROBOT_RADIUS_M = 0.30
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PLAN = ROOT / "data" / "floorplans" / "collapse_01.json"
 
@@ -74,7 +76,8 @@ class RobotIO:
     def odometry(self):
         b = self.sim.bodies[self.rid]
         return {"pose": (b["x"], b["y"], b["th"]), "v": b["v"], "blocked": b["blocked"],
-                "wheel_current": self.motor_current()}
+                "wheel_current": self.motor_current(),
+                **({"blocked_by": list(b.get("blocked_by", []))} if self.sim.robot_collisions else {})}
 
     def motor_current(self):
         if self.sim.time < self.sim.overcurrent_until.get(self.rid, -1):
@@ -124,6 +127,8 @@ class Sim:
 
     def reset(self):
         self.sensor_view = os.environ.get("DZ_SENSOR_VIEW") == "1"
+        self.robot_collisions = os.environ.get("DZ_ROBOT_COLLISIONS") == "1"
+        self._robot_contacts = set()
         random.seed(self.seed)
         np.random.seed(self.seed)
         self.fp = FloorPlan.load(self.plan_path)
@@ -185,6 +190,51 @@ class Sim:
             b["x"], b["y"] = nx, ny
         else:
             b["v"] = 0.0
+
+    @staticmethod
+    def _robot_contact(a, pa, b, pb):
+        """Closest simultaneous approach of two swept discs over one tick."""
+        rx, ry = a["x"] - b["x"], a["y"] - b["y"]
+        vx = (pa["x"] - a["x"]) - (pb["x"] - b["x"])
+        vy = (pa["y"] - a["y"]) - (pb["y"] - b["y"])
+        speed2 = vx * vx + vy * vy
+        t = min(1.0, max(0.0, -(rx * vx + ry * vy) / speed2)) if speed2 > 0 else 0.0
+        return (rx + t * vx) ** 2 + (ry + t * vy) ** 2 < (2 * ROBOT_RADIUS_M - 1e-9) ** 2
+
+    def _integrate_bodies(self, dt):
+        if not self.robot_collisions:
+            for body in self.bodies.values():
+                self._integrate(body, dt)
+            return
+        # Propose every move before accepting any. Frozen moves can block a trailing
+        # robot, so repeat until all remaining trajectories are pairwise clear.
+        proposed = {rid: dict(body, blocked_by=[]) for rid, body in self.bodies.items()}
+        contacts = set()
+        for body in proposed.values():
+            self._integrate(body, dt)
+        while True:
+            stops = {}
+            for a, b in combinations(sorted(self.bodies), 2):
+                if not self._robot_contact(self.bodies[a], proposed[a], self.bodies[b], proposed[b]):
+                    continue
+                for rid, other in ((a, b), (b, a)):
+                    original, move = self.bodies[rid], proposed[rid]
+                    if (move["x"], move["y"]) != (original["x"], original["y"]):
+                        stops.setdefault(rid, set()).add(other)
+                        contacts.add((a, b))
+            if not stops:
+                break
+            for rid, others in stops.items():
+                original, move = self.bodies[rid], proposed[rid]
+                move.update(x=original["x"], y=original["y"], v=0.0, blocked=True,
+                            blocked_by=sorted(others))
+        for rid, move in proposed.items():
+            self.bodies[rid].update(move)
+        for a, b in sorted(contacts - self._robot_contacts):
+            pa, pb = self.bodies[a], self.bodies[b]
+            self.events.append({"kind": "robot_contact", "a": a, "b": b,
+                                "pos": [round((pa[axis] + pb[axis]) / 2, 3) for axis in ("x", "y")]})
+        self._robot_contacts = contacts
 
     def _nodes(self):
         nodes = {"CMD": (*self.fp.cmd_pos, self.fp.cmd_tx, True)}
@@ -297,8 +347,7 @@ class Sim:
                     self.counters[key] += 1
             self.events.extend(robot.events)
             robot.events.clear()
-        for b in self.bodies.values():
-            self._integrate(b, dt)
+        self._integrate_bodies(dt)
         self._update_links()
         self._queue_peer_telemetry(fresh)
         self._move_bundles(dt)
@@ -353,6 +402,10 @@ class Sim:
             link = {"up": path is not None, "via": via, "rssi": round(rssi, 1),
                     "to_cmd_hops": len(path) - 1 if path else None}
             robot = r.telemetry(link)
+            if self.robot_collisions:
+                body = self.bodies[rid]
+                robot.update(blocked=body["blocked"], blocked_by=list(body.get("blocked_by", [])),
+                             body_radius_m=ROBOT_RADIUS_M)
             if self.sensor_view and r.camera_frame is not None:
                 # Local instrument view only. Never put this in a radio bundle,
                 # CommandPost, phone state or the Gemini tool surface.
