@@ -149,7 +149,7 @@ function Live({ crops }) {
         {heat && heatmap && <img className="lab-heat" src={`/crops/${heatmap}`} alt="Grad-CAM: where the model looked" />}
       </div>
       <div className="lab-live-text">
-        <span className="muted small">Just classified onboard · {last.robot} · T+{fmtClock(last.time ?? 0)}</span>
+        <span className="muted small">Just classified onboard · {last.robot} · at {fmtClock(last.time ?? 0)}</span>
         {entry?.shows && <span className="det-shows">{entry.shows}</span>}
         <span className="det-caption">{cropCaption(crops, entry)}</span>
         <b className={person ? 'yes' : unsure ? 'unsure' : 'no'}>

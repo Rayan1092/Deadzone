@@ -256,7 +256,9 @@ def test_report_contains_only_delivered_command_facts_and_is_broadcast(session, 
     arrived = make_bundle("R1", "CMD", "fault", payload, hub.sim.time, 120)
     arrived["custodian"] = "CMD"
     hub.sim.post.receive(arrived, hub.sim.time)
-    assert "TRAPPED" in client.get("/api/report").json()["text"]
+    public_report = client.get("/api/report").json()["text"]
+    assert "trapped" in public_report and "Scout 1" in public_report
+    assert "TRAPPED" not in public_report and "R1" not in public_report
     assert hub.phone_view()["faults"][0]["fault"] == "TRAPPED"
 
 

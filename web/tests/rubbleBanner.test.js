@@ -6,7 +6,7 @@ const poly = [[10, 10], [11.4, 10], [11.4, 11.4], [10, 11.4]]
 
 test('the scripted secondary collapse gets the big banner naming the blocked robot', () => {
   const b = rubbleBanner({ kind: 'rubble_fall', poly, cause: 'collapse', robot: 'R1' })
-  assert.deepEqual(b, { title: 'SECONDARY COLLAPSE', sub: 'Scenario event · R1 blocked', tone: 'alert', size: 'major' })
+  assert.deepEqual(b, { title: 'Secondary collapse', sub: 'Scenario event · R1 blocked', tone: 'alert', size: 'major' })
   assert.equal(describeEvent({ kind: 'rubble_fall', cause: 'collapse', robot: 'R1' }), "Secondary collapse: rubble across R1's path")
 })
 

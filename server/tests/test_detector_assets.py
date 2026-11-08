@@ -49,7 +49,7 @@ def test_screen_and_phone_hello_report_same_detector_on_connect_and_reset(sessio
             assert a["detector"] == b["detector"] == mode
             assert "survivors" not in b["floorplan"] and "decoys" not in b["floorplan"]
             if mode == "sim":
-                assert a["detector_reason"] == b["detector_reason"] == "DETECTOR=sim"
+                assert a["detector_reason"] == b["detector_reason"] == "The simulated detector is selected."
             else:
                 assert "detector_reason" not in a and "detector_reason" not in b
             session.post("/api/control", json={"action": "reset"})

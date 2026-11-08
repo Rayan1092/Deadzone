@@ -173,7 +173,7 @@ export function handleMessage(msg) {
       const prev = s.floorplan
       const changed = prev && data.floorplan && (prev.id !== data.floorplan.id || prev.name !== data.floorplan.name ||
         (reset && JSON.stringify(prev.survivors?.map((x) => x.pos)) !== JSON.stringify(data.floorplan.survivors?.map((x) => x.pos))))
-      if (changed) s.set({ banner: { title: 'NEW SCENARIO', tone: 'info', at: Date.now(),
+      if (changed) s.set({ banner: { title: 'New scenario', tone: 'info', at: Date.now(),
         sub: prev.id !== data.floorplan.id || prev.name !== data.floorplan.name ? data.floorplan.name : `${data.floorplan.name} · survivors and decoys shuffled, new seed` } })
       s.set({ floorplan: data.floorplan, grid: data.grid, robotsMeta: data.robots,
               running: data.running, speed: data.speed, mode: data.mode ?? null, time,
@@ -241,7 +241,7 @@ export function handleMessage(msg) {
       const aimed = s.rubbleAimed && Date.now() - s.rubbleAimed.at < 5000 ? s.rubbleAimed.robot : null
       if (ev.kind === 'rubble_fall' && ev.cause === 'key' && !ev.robot && aimed) ev.robot = aimed
       if (ev.kind === 'rubble_pressed') {
-        if (ev.robot && s.banner?.title === 'RUBBLE' && Date.now() - s.banner.at < 2000 && s.banner.sub !== `Dropped ahead of ${ev.robot}`) {
+        if (ev.robot && s.banner?.title === 'Rubble' && Date.now() - s.banner.at < 2000 && s.banner.sub !== `Dropped ahead of ${ev.robot}`) {
           s.set({ banner: { ...s.banner, sub: `Dropped ahead of ${ev.robot}${ev.smart ? ', on its path' : ''}` } })
         }
         break // the rubble_fall line already says it
@@ -268,7 +268,7 @@ export function handleMessage(msg) {
       if (ev.kind === 'aftershock') {
         const what = ev.destroyed_relay ? `Part of the building came down · relay ${ev.destroyed_relay} crushed · robots rerouting` : 'Part of the building came down · robots rerouting'
         s.set({ aftershock: { at: ev.at, born: performance.now(), rubble: ev.rubble ?? [] },
-          banner: { title: 'AFTERSHOCK', tone: 'alert', at: Date.now(), sub: scenario ? `${SCENARIO_TAG} · ${what}` : what } })
+          banner: { title: 'Aftershock', tone: 'alert', at: Date.now(), sub: scenario ? `${SCENARIO_TAG} · ${what}` : what } })
         rumble(5) // only audible after a user gesture (the A key counts)
       }
       // Rayan's secondary collapse (no key) and R presses: a banner naming the robot; the collapse

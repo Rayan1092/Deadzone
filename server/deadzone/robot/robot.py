@@ -1653,4 +1653,12 @@ class Robot:
             "lights": self.lights,
             "outbox": len(self.outbox),
             "last_link_t": round(self.last_link_t, 1),
+            # cumulative since deploy, for the counters panel (AUDIT #38). deadlines_* are the
+            # scheduler's met / missed jobs; the scheduler_ / detector_rejections keys are the ones
+            # Sim.snapshot() already sums into tick.stats.
+            "counters": {"detector_calls": self.counters["detector_calls"],
+                         "detector_rejections": self.counters["detector_rejections"],
+                         "deadlines_met": self.counters["scheduler_deadlines_met"],
+                         "deadlines_missed": self.counters["scheduler_deadlines_missed"],
+                         "scheduler_deadlines_met": self.counters["scheduler_deadlines_met"]},
         }

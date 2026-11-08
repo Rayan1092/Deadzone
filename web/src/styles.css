@@ -564,7 +564,7 @@ button:hover { border-color: var(--teal); }
   align-items: center; gap: 8px; padding: 18px 40px; border-radius: 18px; text-align: center; pointer-events: none;
   background: var(--glass-strong); border: 1px solid var(--glass-edge); box-shadow: 0 24px 60px rgba(0,0,0,.6), var(--glass-hi);
   backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); animation: banner-in .25s ease-out, banner-out .6s ease-in 4.9s forwards; }
-.banner b { font-size: 48px; line-height: 1; letter-spacing: .14em; font-weight: 800; }
+.banner b { font-size: 48px; line-height: 1; letter-spacing: .02em; font-weight: 800; }
 .banner span { font-size: 15px; color: rgba(230,237,243,.85); }
 .banner.alert { border-color: rgba(239,68,68,.55); box-shadow: 0 24px 60px rgba(0,0,0,.6), 0 0 48px rgba(239,68,68,.35); }
 .banner.alert b { color: #fecaca; text-shadow: 0 0 24px rgba(239,68,68,.8); animation: banner-flash .18s steps(2) 8; }
@@ -575,7 +575,7 @@ button:hover { border-color: var(--teal); }
 .banner.major b { font-size: 60px; white-space: nowrap; }
 .banner.major span { font-size: 22px; font-weight: 600; color: #fecaca; }
 .banner.minor { padding: 12px 22px; gap: 4px; top: 30%; }
-.banner.minor b { font-size: 28px; letter-spacing: .12em; }
+.banner.minor b { font-size: 28px; letter-spacing: .02em; }
 .banner.minor span { font-size: 15px; }
 .banner.warn { border-color: rgba(245,158,11,.55); }
 .banner.warn b { color: #fde68a; }
@@ -761,3 +761,23 @@ button:hover { border-color: var(--teal); }
 .help-pop kbd { justify-self: start; font: 600 11px 'JetBrains Mono', ui-monospace, monospace; color: var(--text); background: #232a31;
   border: 1px solid #3a434d; border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
 .help-pop span { color: rgba(230,237,243,.86); line-height: 1.35; }
+
+/* connecting / reconnecting: says what is happening and, after a few seconds, what to check */
+.conn-card { position: absolute; z-index: 8; left: 50%; top: 42%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px;
+  max-width: 520px; padding: 18px 26px; border-radius: 14px; text-align: center; background: rgba(14,18,24,.9); border: 1px solid rgba(245,158,11,.45);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 18px 40px rgba(0,0,0,.5); }
+.conn-card i { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid rgba(245,158,11,.3); border-top-color: #f59e0b; animation: conn-spin 1s linear infinite; }
+@keyframes conn-spin { to { transform: rotate(360deg); } }
+.conn-card b { font-size: 18px; color: #fde68a; }
+.conn-card span { font-size: 14px; color: rgba(230,237,243,.85); line-height: 1.4; }
+
+/* intro card: three lines and a way out */
+.intro-card .intro-line { margin: 10px 0 0; font-size: 16px; line-height: 1.5; color: rgba(230,237,243,.86); }
+.intro-card .intro-line.lead { margin-top: 8px; font-size: 20px; line-height: 1.35; font-weight: 600; color: #f1f5f9; }
+.intro-card .intro-line.go { font-weight: 600; color: #99f6e4; }
+.intro-card .intro-line kbd { font: 600 13px 'JetBrains Mono', ui-monospace, monospace; padding: 1px 8px; border-radius: 6px; background: #232a31; border: 1px solid #3a434d; border-bottom-width: 2px; color: #e6edf3; }
+.intro-foot { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
+.intro-foot .intro-go { margin: 0 0 0 auto; }
+.intro-foot .intro-hint { margin: 0; }
+.intro-never { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: rgba(230,237,243,.8); cursor: pointer; }
+.intro-never input { accent-color: #2dd4bf; width: 15px; height: 15px; }
