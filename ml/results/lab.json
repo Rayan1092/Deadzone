@@ -1,0 +1,260 @@
+{
+ "model": {
+  "name": "MobileNetV3-Small",
+  "input_px": 96,
+  "params": 1519906,
+  "onboard_ms": 6.6,
+  "size_mb": 6.2,
+  "threshold": 0.6,
+  "trained_on": "FLIR ADAS v2 thermal, person vs not-person 96 px crops"
+ },
+ "metrics": {
+  "accuracy": 0.9617,
+  "precision": 0.9632,
+  "recall": 0.96,
+  "f1": 0.9616,
+  "n_test": 1200
+ },
+ "confusion": {
+  "labels": [
+   "person",
+   "not person"
+  ],
+  "matrix": [
+   [
+    576,
+    24
+   ],
+   [
+    22,
+    578
+   ]
+  ]
+ },
+ "curve": [],
+ "curve_note": "Training curve pending: logged retrain not run yet.",
+ "examples": [
+  {
+   "file": "lab/pos_01.png",
+   "label": "person",
+   "predicted": "person",
+   "conf": 1.0
+  },
+  {
+   "file": "lab/pos_02.png",
+   "label": "person",
+   "predicted": "person",
+   "conf": 0.99
+  },
+  {
+   "file": "lab/pos_03.png",
+   "label": "person",
+   "predicted": "person",
+   "conf": 1.0
+  },
+  {
+   "file": "lab/pos_04.png",
+   "label": "person",
+   "predicted": "not person",
+   "conf": 0.0
+  },
+  {
+   "file": "lab/pos_05.png",
+   "label": "person",
+   "predicted": "person",
+   "conf": 1.0
+  },
+  {
+   "file": "lab/pos_06.png",
+   "label": "person",
+   "predicted": "not person",
+   "conf": 0.333
+  },
+  {
+   "file": "lab/pos_07.png",
+   "label": "person",
+   "predicted": "person",
+   "conf": 1.0
+  },
+  {
+   "file": "lab/pos_08.png",
+   "label": "person",
+   "predicted": "person",
+   "conf": 1.0
+  },
+  {
+   "file": "lab/pos_09.png",
+   "label": "person",
+   "predicted": "person",
+   "conf": 1.0
+  },
+  {
+   "file": "lab/pos_10.png",
+   "label": "person",
+   "predicted": "person",
+   "conf": 1.0
+  },
+  {
+   "file": "lab/pos_11.png",
+   "label": "person",
+   "predicted": "person",
+   "conf": 0.998
+  },
+  {
+   "file": "lab/pos_12.png",
+   "label": "person",
+   "predicted": "person",
+   "conf": 0.996
+  },
+  {
+   "file": "lab/neg_01.png",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.001
+  },
+  {
+   "file": "lab/neg_02.png",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.002
+  },
+  {
+   "file": "lab/neg_03.png",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.0
+  },
+  {
+   "file": "lab/neg_04.png",
+   "label": "not person",
+   "predicted": "person",
+   "conf": 0.967
+  },
+  {
+   "file": "lab/neg_05.png",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.001
+  },
+  {
+   "file": "lab/neg_06.png",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.067
+  },
+  {
+   "file": "lab/neg_07.png",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.004
+  },
+  {
+   "file": "lab/neg_08.png",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.0
+  },
+  {
+   "file": "lab/neg_09.png",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.02
+  },
+  {
+   "file": "lab/neg_10.png",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.0
+  },
+  {
+   "file": "lab/neg_11.png",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.028
+  },
+  {
+   "file": "lab/neg_12.png",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.0
+  }
+ ],
+ "runtime": [
+  {
+   "id": "D1",
+   "role": "decoy",
+   "object": "radiator",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.0,
+   "file": "/crops/neg_0001.png",
+   "heatmap": "/crops/heatmaps/neg_0001.png",
+   "heatmap_alpha": "/crops/heatmaps/neg_0001_alpha.png"
+  },
+  {
+   "id": "D2",
+   "role": "decoy",
+   "object": "engine",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.0,
+   "file": "/crops/neg_0002.png",
+   "heatmap": "/crops/heatmaps/neg_0002.png",
+   "heatmap_alpha": "/crops/heatmaps/neg_0002_alpha.png"
+  },
+  {
+   "id": "D3",
+   "role": "decoy",
+   "object": "coffee machine",
+   "label": "not person",
+   "predicted": "not person",
+   "conf": 0.003,
+   "file": "/crops/neg_0003.png",
+   "heatmap": "/crops/heatmaps/neg_0003.png",
+   "heatmap_alpha": "/crops/heatmaps/neg_0003_alpha.png"
+  },
+  {
+   "id": "S1",
+   "role": "survivor",
+   "object": null,
+   "label": "person",
+   "predicted": "person",
+   "conf": 1.0,
+   "file": "/crops/pos_0001.png",
+   "heatmap": "/crops/heatmaps/pos_0001.png",
+   "heatmap_alpha": "/crops/heatmaps/pos_0001_alpha.png"
+  },
+  {
+   "id": "S2",
+   "role": "survivor",
+   "object": null,
+   "label": "person",
+   "predicted": "person",
+   "conf": 0.889,
+   "file": "/crops/pos_0002.png",
+   "heatmap": "/crops/heatmaps/pos_0002.png",
+   "heatmap_alpha": "/crops/heatmaps/pos_0002_alpha.png"
+  },
+  {
+   "id": "S3",
+   "role": "survivor",
+   "object": null,
+   "label": "person",
+   "predicted": "person",
+   "conf": 0.999,
+   "file": "/crops/pos_0003.png",
+   "heatmap": "/crops/heatmaps/pos_0003.png",
+   "heatmap_alpha": "/crops/heatmaps/pos_0003_alpha.png"
+  }
+ ],
+ "assets": {
+  "confusion_png": "confusion_matrix.png",
+  "slides": [
+   "/ai-lab/slides/pipeline.png",
+   "/ai-lab/slides/crops_grid.png",
+   "/ai-lab/slides/stats_card.png"
+  ]
+ },
+ "paths": "file paths are relative to /ai-lab/results/ (DZ_AI_LAB=1); runtime paths start with /crops/",
+ "note": "Examples and metrics are held-out FLIR val images, never used in training."
+}
