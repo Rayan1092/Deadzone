@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import Line from './FastLine' // drei's Line relinks its shader on every new points array
 import * as THREE from 'three'
-import { useSim } from '../store'
+import { useSim, useStable } from '../store'
 import { w2t } from './util'
 import { latestRoutes } from '../format'
 
@@ -89,7 +89,7 @@ export function RealityRoutes({ gap = false }) {
 }
 
 export function CommandRoutes() {
-  const routes = latestRoutes(useSim((s) => s.tick?.command.routes) ?? NONE)
-  const relays = useSim((s) => s.tick?.command.relays) ?? NONE
+  const routes = latestRoutes(useStable((s) => s.tick?.command.routes) ?? NONE)
+  const relays = useStable((s) => s.tick?.command.relays) ?? NONE
   return routes.map((r) => <Route key={r.survivor} route={r} relays={relays} />)
 }

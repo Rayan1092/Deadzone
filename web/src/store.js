@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useRef } from 'react'
 import { alarm, chime, confirm, ping, rumble } from './audio'
 import { lostFleet, newerTable } from './net/leaseState'
 
@@ -70,7 +71,7 @@ export const useSim = create((set) => ({
   robotsMeta: [],
   time: 0,
   tick: null,          // { reality, command, stats }
-  maps: { reality: null, command: null, version: 0 },
+  maps: { reality: null, command: null, version: 0, commandVersion: 0 }, // commandVersion: only when Command's map changed
   events: [],          // newest first, capped
   toasts: [],          // { id, kind, ... } oldest first, removed by Toasts after a few seconds
   joinOpen: false,     // full screen QR overlay (Q key)
@@ -133,6 +134,16 @@ function detectionCard(ev, repeat, tick) {
   return null
 }
 
+// A store value that keeps its identity while its content is unchanged: every tick brings new
+// arrays, and a new array in a canvas component re-renders it, which redraws the whole canvas.
+// The component re-renders only when keyOf(value) changes (JSON by default; keep values small).
+export function useStable(selector, keyOf = JSON.stringify) {
+  const memo = useRef({ key: undefined, value: undefined })
+  const key = useSim((s) => keyOf(selector(s)))
+  if (memo.current.key !== key) memo.current = { key, value: selector(useSim.getState()) }
+  return memo.current.value
+}
+
 export function decodeMap(b64) {
   if (b64 instanceof Uint8Array) return b64
   const bin = atob(b64)
@@ -176,10 +187,15 @@ export function handleMessage(msg) {
         events: [...flips, ...s.events].slice(0, 40), toasts: [...s.toasts, ...flips].slice(-5) } : {}) })
       break
     }
-    case 'maps':
-      s.set({ maps: { reality: decodeMap(data.reality), command: decodeMap(data.command),
-                      version: s.maps.version + 1 } })
+    case 'maps': {
+      // the Command pane redraws only when its own map changed (maps arrive several times a second)
+      const command = decodeMap(data.command)
+      const old = s.maps.command
+      const same = old && old.length === command.length && old.every((v, i) => v === command[i])
+      s.set({ maps: { reality: decodeMap(data.reality), command, version: s.maps.version + 1,
+                      commandVersion: same ? s.maps.commandVersion : s.maps.commandVersion + 1 } })
       break
+    }
     case 'event': {
       if (data.kind === 'bundle_delivered' && BIG_DELIVERIES.has(data.bundle_kind)) {
         s.set({ bigDeliveries: s.bigDeliveries + 1 })
