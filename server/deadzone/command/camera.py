@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .plan import Identifier, Number, Point
+from ..thermal import thermal_metadata
 
 Crop = Annotated[str, Field(strict=True, max_length=128, pattern=r"^[A-Za-z0-9_-][A-Za-z0-9_.-]*\.png$")]
 
@@ -23,7 +24,7 @@ class CameraFrame(BaseModel):
     hits: list[CameraHit] = Field(max_length=64)
 
 
-def delivered_frame(raw, created, arrived, size):
+def delivered_frame(raw, created, arrived, size, *, heat_sources=False):
     try:
         frame = CameraFrame.model_validate(raw)
     except ValidationError:
@@ -32,4 +33,8 @@ def delivered_frame(raw, created, arrived, size):
         return None
     if any(not (0 <= x <= size[0] and 0 <= y <= size[1]) for x, y in (hit.pos for hit in frame.hits)):
         return None
-    return frame.model_dump(mode="json") | {"delivered_t": created, "reported_t": arrived}
+    result = frame.model_dump(mode="json") | {"delivered_t": created, "reported_t": arrived}
+    if heat_sources and isinstance(raw, dict):
+        for hit, original in zip(result["hits"], raw.get("hits", [])):
+            hit.update(thermal_metadata(original))
+    return result

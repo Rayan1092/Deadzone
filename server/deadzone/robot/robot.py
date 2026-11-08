@@ -9,6 +9,7 @@ stops and waits when its link drops and carries no relays, like a tethered or te
 robot). Set at start with DZ_MODE=baseline or live with Robot.set_mode().
 """
 import math
+import json
 import os
 import re
 
@@ -16,6 +17,7 @@ import numpy as np
 
 from ..floorplan import FREE, OCC, UNKNOWN
 from ..geometry import points_in_poly, wrap_angle
+from ..thermal import thermal_metadata
 from ..network.dtn import PRIO, make_bundle
 from . import planning
 from .exploration import ProgressExplorer, line_clear
@@ -295,7 +297,8 @@ class Robot:
         self.camera_frame = None
         # DZ_CAMERA_TELEMETRY=1: the same camera observations ride inside the telemetry bundle
         # (`camera: {t, hits}`), so Command and the phone see them once the bundle is delivered
-        self.camera_telemetry = os.environ.get("DZ_CAMERA_TELEMETRY") == "1"
+        self.heat_sources = os.environ.get("DZ_HEAT_SOURCES") == "1"
+        self.camera_telemetry = os.environ.get("DZ_CAMERA_TELEMETRY") == "1" or self.heat_sources
         self.camera_hits = []
 
     # ------------------------------------------------------------------ mode toggle
@@ -621,10 +624,24 @@ class Robot:
         return out
 
     # ------------------------------------------------------------------ sensing
+    def _thermal_metadata(self, hit, event=False):
+        if not self.heat_sources:
+            return {}
+        meta = thermal_metadata(hit)
+        if event and "kind" in meta:
+            meta["hit_kind"] = meta.pop("kind")  # event.kind remains the event name
+        return meta
+
     def _perceive(self, io):
         # every hot spot goes through the trained detector (sim sensor fallback if no model)
         hits = io.thermal()
         all_hits = hits                                   # everything in the camera cone, for the camera views
+        # New decoy observations without an available model score are unclassified.
+        # Preserve legacy survivor passthrough, but never invent a heat-source rescue.
+        unscored_heat = {h["id"] for h in hits if self.heat_sources and h.get("kind") == "decoy"
+                         and get_detector().score(h.get("crop")) is None}
+        if unscored_heat:
+            hits = [h for h in hits if h["id"] not in unscored_heat]
         if self.t - self.belief_t >= BELIEF_PERIOD_S:     # the camera looked: lower the belief where it saw nobody
             self.belief_t = self.t
             self.belief.observe(self.pose, self.map.grid == OCC, exclude=[h["pos"] for h in all_hits])
@@ -637,10 +654,12 @@ class Robot:
             observations = []
             for hit in all_hits:
                 score = detector.score(hit.get("crop"))
-                verdict = "unsure" if hit["id"] in self.unsure else ("person" if hit["id"] in kept_ids else "rejected")
+                verdict = "unsure" if hit["id"] in self.unsure or hit["id"] in unscored_heat else (
+                    "person" if hit["id"] in kept_ids else "rejected")
                 observations.append({
                     "id": hit["id"], "pos": [round(hit["pos"][0], 2), round(hit["pos"][1], 2)], "crop": hit.get("crop"),
-                    "verdict": verdict, "conf": score, "source": "model" if score is not None else "sim"})
+                    "verdict": verdict, "conf": score, "source": "model" if score is not None else "sim",
+                    **self._thermal_metadata(hit)})
             if self.sensor_view:
                 self.camera_frame = {"t": self.t, "pose": list(self.pose), "hits": observations}
             self.camera_hits = observations
@@ -655,6 +674,7 @@ class Robot:
                                 "pos": [round(h["pos"][0], 2), round(h["pos"][1], 2)],
                                 "crop": h.get("crop"), "conf": get_detector().score(h.get("crop")),
                                 "heatmap": get_detector().heatmap(h.get("crop")),
+                                **self._thermal_metadata(h, event=True),
                                 **{k: h[k] for k in ("conf_far", "looked_closer") if k in h}})
         for s in kept:
             if s["id"] in self.found:
@@ -662,6 +682,7 @@ class Robot:
             rec = {"id": s["id"], "pos": [round(s["pos"][0], 2), round(s["pos"][1], 2)],
                    "by": self.id, "t": round(self.t, 1), "conf": s.get("conf", 0.99), "crop": s.get("crop"),
                    "heatmap": get_detector().heatmap(s.get("crop"))}
+            rec.update(self._thermal_metadata(s))
             self.found[s["id"]] = rec
             self.belief.confirm(s["id"], rec["pos"])
             self.counters["detector_calls"] += 1
@@ -672,6 +693,7 @@ class Robot:
             self.events.append({"kind": "survivor_found", "robot": self.id, "survivor": s["id"],
                                 "pos": rec["pos"], "linked": self.linked,
                                 "crop": rec["crop"], "conf": rec["conf"], "heatmap": rec["heatmap"],
+                                **self._thermal_metadata(s, event=True),
                                 **{k: s[k] for k in ("conf_far", "looked_closer") if k in s}})
             self._on_survivor_confirmed(io, rec)
 
@@ -703,6 +725,7 @@ class Robot:
                 self.events.append({"kind": "hotspot_unsure", "robot": self.id, "id": hid,
                                     "pos": [round(h["pos"][0], 2), round(h["pos"][1], 2)], "crop": h.get("crop"),
                                     "conf": s, "heatmap": det.heatmap(h.get("crop")),
+                                    **self._thermal_metadata(h, event=True),
                                     "say": f"AI unsure {s * 100:.0f}%, moving closer"})
                 if self.look_at is None:
                     self.look_at = hid
@@ -1521,9 +1544,13 @@ class Robot:
         size = 120
         if self.camera_telemetry:                         # contract B: what the camera sees, for the phone
             payload["camera"] = {"t": round(self.t, 1), "hits": [
-                {"id": h["id"], "pos": h["pos"], "verdict": h["verdict"], "conf": h["conf"], "crop": h["crop"]}
+                {"id": h["id"], "pos": h["pos"], "verdict": h["verdict"], "conf": h["conf"], "crop": h["crop"],
+                 **self._thermal_metadata(h)}
                 for h in self.camera_hits]}
             size += 40 * len(self.camera_hits)
+            if self.heat_sources:
+                size += sum(len(json.dumps(self._thermal_metadata(h), separators=(",", ":")).encode())
+                            for h in self.camera_hits)
         self.outbox.append(make_bundle(self.id, "CMD", "telemetry", payload, self.t, size))
         ix, iy, vals = self.map.take_patch()
         if len(vals):
