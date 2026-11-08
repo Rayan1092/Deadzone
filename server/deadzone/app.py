@@ -66,6 +66,41 @@ def detector_status():
     return status
 
 
+def phone_join_url(base_url="http://localhost:8000", peer=None):
+    configured = os.environ.get("DZ_PUBLIC_URL")
+    try:
+        parts = urlsplit(configured or base_url)
+        port = parts.port
+    except ValueError:
+        raise HTTPException(503, "Set DZ_PUBLIC_URL to a valid HTTP(S) frontend origin") from None
+    if (parts.scheme not in ("http", "https") or not parts.hostname or parts.username or parts.password
+            or (configured and (parts.path not in ("", "/") or parts.query or parts.fragment))):
+        raise HTTPException(503, "Set DZ_PUBLIC_URL to the public HTTP(S) frontend address")
+    local_host = parts.hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "::")
+    local_host |= parts.hostname.endswith((".localhost", ".local")) or "." not in parts.hostname
+    try:
+        local_host |= ipaddress.ip_address(parts.hostname).is_loopback
+    except ValueError:
+        pass
+    if local_host:
+        address = lan_ipv4(peer)
+        if address is None:
+            raise HTTPException(503, "Connect the laptop to Wi-Fi or use the HTTPS tunnel; no LAN address is available")
+        parts = parts._replace(netloc=f"{address}:{port or (443 if parts.scheme == 'https' else 80)}")
+    url = urlunsplit((parts.scheme, parts.netloc, parts.path.rstrip("/") + "/phone", "", ""))
+    return url
+
+
+def public_links():
+    if not os.environ.get("DZ_PUBLIC_URL"):
+        return {}
+    try:
+        phone = phone_join_url()
+    except HTTPException:
+        return {}  # /api/join reports invalid configuration; never advertise a bad URL.
+    return {"public_url": phone.removesuffix("/phone"), "phone_url": phone}
+
+
 class Hub:
     def __init__(self):
         count = int(os.environ.get("DZ_ROBOTS", "1"))
@@ -345,7 +380,7 @@ class Hub:
                              | ({"stream": stream_profile()} if self.stream.enabled else {})
                              | {"scenario": {"id": self.scenario_id, "timeline": self.timeline_enabled}}
                              | detector_status() | {"leases": self.lease_state(), "voice":{"enabled":os.environ.get("DZ_VOICE") == "1"}}
-                             | self.controller_hello(ws) | self.phone_frames.capabilities())
+                             | self.controller_hello(ws) | self.phone_frames.capabilities() | public_links())
 
     def control_state(self):
         modes = {r.mode for r in self.sim.robots.values()}
@@ -366,7 +401,7 @@ class Hub:
                 "voice": {"enabled":os.environ.get("DZ_VOICE") == "1"},
                 **({"stream": stream_profile()} if self.stream.enabled else {}),
                 **self.phone_frames.capabilities(),
-                **detector_status()}
+                **detector_status(), **public_links()}
 
     def attach_relay(self, client):
         if client not in self.relay_clients:
@@ -913,28 +948,7 @@ async def report():
 
 @app.get("/api/join")
 def join(request: Request):
-    configured = os.environ.get("DZ_PUBLIC_URL")
-    try:
-        parts = urlsplit(configured or str(request.base_url))
-        port = parts.port
-    except ValueError:
-        raise HTTPException(503, "Set DZ_PUBLIC_URL to a valid HTTP(S) frontend origin") from None
-    if (parts.scheme not in ("http", "https") or not parts.hostname or parts.username or parts.password
-            or (configured and (parts.path not in ("", "/") or parts.query or parts.fragment))):
-        raise HTTPException(503, "Set DZ_PUBLIC_URL to the public HTTP(S) frontend address")
-    local_host = parts.hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "::")
-    local_host |= parts.hostname.endswith((".localhost", ".local")) or "." not in parts.hostname
-    try:
-        local_host |= ipaddress.ip_address(parts.hostname).is_loopback
-    except ValueError:
-        pass
-    if local_host:
-        address = lan_ipv4(request.client.host if request.client else None)
-        if address is None:
-            raise HTTPException(503, "Connect the laptop to Wi-Fi or use the HTTPS tunnel; no LAN address is available")
-        parts = parts._replace(netloc=f"{address}:{port or (443 if parts.scheme == 'https' else 80)}")
-    url = urlunsplit((parts.scheme, parts.netloc, parts.path.rstrip("/") + "/phone", "", ""))
-    return {"url": url}
+    return {"url": phone_join_url(str(request.base_url), request.client.host if request.client else None)}
 
 
 @app.post("/api/ask")

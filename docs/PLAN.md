@@ -569,6 +569,18 @@ and private LAN addresses. Page `?lite` forces it; page `?lite=0` overrides the
 automatic selection. Reconnects retain the page's choice. Full local rendering
 keeps the same map cells and drawn lidar endpoints with compact streaming on.
 
+#### Advertised public origin (`DZ_PUBLIC_URL`)
+
+When configured with a valid HTTP(S) origin, both screen and phone `hello.data`
+add `public_url` (normalized origin without a trailing slash) and `phone_url`
+(the same origin plus `/phone`). `/api/join.data` retains its existing
+`{url: phone_url}` shape, so the phone button and Q/QR advertise the same address
+regardless of whether the laptop screen uses localhost. When unset, these hello
+fields are absent and `/api/join` uses its existing LAN discovery/request origin.
+Invalid origins are not advertised in hello; `/api/join` retains its 503 error.
+The tunnel script prints a PowerShell assignment to copy to the server terminal:
+start tunnel, set its origin, then start server. Restart when that origin changes.
+
 #### Production HTTP delivery
 
 The server serves `web/dist` at `/`; Vite is for local development only.

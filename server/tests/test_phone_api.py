@@ -288,12 +288,26 @@ def test_join_url_uses_configured_public_frontend_or_request_lan_host(session, m
     client, _ = session
     monkeypatch.setenv("DZ_PUBLIC_URL", "https://deadzone.example/")
     assert client.get("/api/join").json() == {"url": "https://deadzone.example/phone"}
+    for path in ("/ws/screen", "/ws/phone?role=spectator"):
+        with client.websocket_connect(path) as ws:
+            hello = ws.receive_json()["data"]
+            assert hello["public_url"] == "https://deadzone.example"
+            assert hello["phone_url"] == client.get("/api/join").json()["url"]
     monkeypatch.delenv("DZ_PUBLIC_URL")
     assert client.get("/api/join", headers={"Host": "192.168.1.8:5173"}).json() == {
         "url": "http://192.168.1.8:5173/phone"}
     monkeypatch.setattr(api, "lan_ipv4", lambda *args: "192.168.1.9")
     assert client.get("/api/join", headers={"Host": "localhost:5173"}).json() == {
         "url": "http://192.168.1.9:5173/phone"}
+
+
+def test_hello_does_not_advertise_unset_or_invalid_public_origin(session, monkeypatch):
+    _, hub = session
+    assert "phone_url" not in json.loads(hub.hello())["data"]
+    for invalid in ("ftp://wrong", "https://person:password@example.com", "https://example.com/path"):
+        monkeypatch.setenv("DZ_PUBLIC_URL", invalid)
+        assert "phone_url" not in json.loads(hub.hello())["data"]
+        assert "public_url" not in hub.phone_hello("viewer", "spectator")
 
 
 def test_join_without_lan_address_returns_actionable_error(session, monkeypatch):

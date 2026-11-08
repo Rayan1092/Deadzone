@@ -26,6 +26,7 @@ def test_prints_origin_phone_once_and_uses_exact_requested_arguments():
     assert result.returncode == 0, result.stderr
     assert result.stdout.count("HTTPS URL: https://example-d2.trycloudflare.com") == 1
     assert "Phone URL: https://example-d2.trycloudflare.com/phone" in result.stdout
+    assert '$env:DZ_PUBLIC_URL = "https://example-d2.trycloudflare.com"' in result.stdout
 
 
 def test_missing_cloudflared_fails_without_starting_any_process():
