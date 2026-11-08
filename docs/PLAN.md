@@ -49,6 +49,27 @@ Version 1 works end to end (every demo beat verified on the testing laptop), so 
 - **Less clutter:** labels only on hover or for the followed robot, the event feed trimmed to the important events, and a clear legend.
 - **The AI visible in the world:** survivors and decoys in the 3D scene use the exact thermal crops the detector judges, so the robot's-eye view (thermal mode) shows the same image that the AI card shows. Rendered frames are not fed to the model (that would be a domain gap; the trained model judges real thermal images).
 
+### Visual direction: realistic (8:30 PM update)
+
+The team chose a realistic look over the stylized one. Yusuf owns it. The **simulation stays on the single ground floor** that the demo guard verifies; the multi-story building is visual only, so no robot, radio or test changes are needed.
+
+- **Multi-story shell:** upper floors, a broken facade, a partly collapsed slab and sagging beams around the simulated ground floor. A cutaway or x-ray toggle shows the active floor inside.
+- **Materials and light:** free photo-scanned PBR textures (cracked concrete, dusty tiles, rusted metal, rebar) from Poly Haven or ambientCG; a dark interior lit mainly by robot headlights; soft shadows; floating dust; post-processing (ambient occlusion, bloom, light depth of field, film grain).
+- **Set dressing:** knocked-over furniture, hanging cables, broken doorframes, dust bursts on rubble falls and aftershocks.
+- **Robots:** tracked rescue robots with a mast-mounted spinning lidar, headlights, status LEDs and an antenna. Relays and beacons are rugged boxes with a blinking LED.
+- **Survivors:** a realistic person partly under debris that glows white-hot in thermal view, wearing the real crop and heatmap from `ml/` on the AI card.
+- **Rules:** clarity first (ghosts, "Not reported yet" tags and routes stay readable over the scene); 60 fps on the RTX 3060 testing laptop with P as the fallback; only CC0 or CC-BY assets, credited in the README.
+
+### AI showcase and scenario generator (8:35 PM update)
+
+**Judges must see the AI recognize a human, and see how it was trained.**
+
+- **Live detection in the robot's-eye view:** a realistic human under debris with a red box and "PERSON 97%, onboard AI" (the real model confidence), followed by the robot's action steps: person detected, marking location, planning rescue route, dropping beacon if there's no signal. Decoys get a box with "NOT A PERSON 0.3%, rejected". The model is a classifier, so the box marks the object it judged; never claim it drew the box itself.
+- **AI Lab overlay (key L):** training examples (person and not-a-person thermal crops), the training curve per epoch, the confusion matrix and held-out metrics, and live: the crop the robot just judged with its Grad-CAM heatmap. Rayan exports the assets, Aziz serves them read-only (or Yusuf bundles them), Yusuf builds the overlay.
+- **Collapse look:** fallen ceiling slabs at an angle, jagged wall holes, partly missing roof, sagging beams, dangling rebar and cables, broken windows, cracks, debris against walls, overturned furniture, airborne dust. Real photo-scanned textures, a detailed tracked rescue robot model and realistic human survivors (Yusuf).
+
+**Scenario generator (Rayan):** any seed produces a random collapsed building: layout, wall materials, steel dead zones, hazards (gas, fire, flooding, unstable floor), reachable survivors and decoys, plus a disaster timeline built from existing director actions (aftershock, rubble, relay destroyed). New event types such as spreading fire need Aziz (sim) and Yusuf (visuals) and come second. Every generated building is checked for connectivity and reachable survivors. The demo building (seed 7, `collapse_01`) never changes; the generator is for Q&A.
+
 ### Owners and priorities
 
 | Priority | Item | Owner | Prize it serves |
