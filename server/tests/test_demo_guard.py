@@ -1,9 +1,11 @@
 """Demo guard: replays the docs/DEMO.md demo and fails if any beat moves.
 
-Seed 7, 3 robots, plan P-1 (rejected: R2's north-east zone is a dead zone) then fixed to
-lost_link_ok and dispatched after the startup tick, exactly like the phone beat. Director
-presses at the DEMO.md times: R (rubble ahead of R1) at 150 s, F (overcurrent on R3) at 165 s,
-O (perception overload on R1) at 175 s.
+Seed 7, 3 robots, solid furniture on (DZ_OBSTACLES=1, the main-run setting since the
+2026-11-08 20:30 re-baseline), plan P-1 (rejected: R2's north-east zone is a dead zone) then
+fixed to lost_link_ok and dispatched after the startup tick, exactly like the phone beat.
+Director presses at the DEMO.md times: R (rubble ahead of R1) at 162.5 s, when R1 is on S1's
+rescue corridor and R2 is 4 m away, F (overcurrent on R3) at 177.5 s, O (perception overload
+on R1) at 187.5 s.
 
 If you change robot, network or floor plan behavior and a beat moves, this fails on purpose.
 Re-measure, update the BEATS table below AND docs/DEMO.md together, and tell the team.
@@ -25,17 +27,18 @@ TOL = 0.25            # seconds of sim time (2 ticks); any real change moves a b
 
 # Sim-time beats from docs/DEMO.md (keep both in sync)
 BEATS = {
-    "S3_found": 14.4,       # R1, linked
-    "D1_rejected": 56.7,    # R1, trained model only (decoys are off in sim fallback)
-    "RL1_dropped": 57.1,    # R3
-    "R2_dark": 119.1,       # R2 enters the steel cage
-    "S1_found": 129.0,      # R2, dark, beacon next to the survivor
-    "S1_reported": 143.1,   # S1 + rescue route reach Command
-    "S1_rerouted": 177.0,   # R2 sees the R-key rubble on S1's rescue route and resends it
-    "S2_found": 246.0,      # bonus, only with R/F/O on time
+    "S3_found": 14.1,       # R1, linked
+    "D1_rejected": 57.9,    # R1, trained model only (decoys are off in sim fallback)
+    "RL1_dropped": 67.5,    # R3
+    "R2_dark": 91.3,        # R2 enters the steel cage
+    "S1_found": 102.7,      # R2, dark, beacon next to the survivor
+    "S1_reported": 118.5,   # S1 + rescue route reach Command
+    "S1_rerouted": 162.8,   # R2 sees the R-key rubble on S1's rescue route and resends it
+    "S2_found": 219.4,      # the finale, only with R/F/O on time
 }
-DIRECTOR = {150.0: ("rubble", "R1"), 165.0: ("overcurrent", "R3"), 175.0: ("overload", "R1")}
-END = 250.0
+DIRECTOR = {162.5: ("rubble", "R1"), 177.5: ("overcurrent", "R3"), 187.5: ("overload", "R1")}
+END = 230.0
+FLAGS = {"DZ_OBSTACLES": "1"}   # the main run's environment (docs/DEMO.md pre-flight step 3)
 
 ZW = [[0, 17], [20, 17], [20, 30], [0, 30]]
 ZB = [[20, 17], [32, 17], [32, 30], [20, 30]]
@@ -51,6 +54,13 @@ def demo_plan(plan_id, ne_comms):
 
 @pytest.fixture(scope="module")
 def run():
+    with pytest.MonkeyPatch.context() as env:
+        for k, v in FLAGS.items():
+            env.setenv(k, v)
+        return _run()
+
+
+def _run():
     perception.reset_detector()
     sim = Sim(n_robots=3, seed=7)
     sim.tick()                                     # startup tick: Command hears the robots
@@ -143,16 +153,16 @@ def test_s1_reaches_command_late(run):
 
 def test_director_beats(run):
     log = run["log"]
-    t = next((t for t, e in log if t >= 150.0 and e["kind"] == "replan" and e["robot"] == "R1"), None)
-    assert t is not None and t <= 151.0, f"R key: R1 replan at {t}"
+    t = next((t for t, e in log if t >= 162.5 and e["kind"] == "replan" and e["robot"] == "R1"), None)
+    assert t is not None and t <= 163.5, f"R key: R1 replan at {t}"
     t, e = first(log, lambda e: e["kind"] == "fault" and e["robot"] == "R3")
-    assert t is not None and 165.0 <= t <= 166.0 and e["fault"] == "OVERCURRENT", f"F key: {t} {e}"
+    assert t is not None and 177.5 <= t <= 178.5 and e["fault"] == "OVERCURRENT", f"F key: {t} {e}"
     misses = [t for t, e in log if e["kind"] == "deadline_miss" and e["robot"] == "R1"]
-    assert misses and all(175.0 <= t <= 179.0 for t in misses), f"O key: misses at {misses}"
+    assert misses and all(187.5 <= t <= 191.5 for t in misses), f"O key: misses at {misses}"
     assert not any(e["kind"] == "deadline_miss" and e["task"] == "safety" for _, e in log)
 
 
-def test_s2_bonus(run):
+def test_s2_finale(run):
     t, e = first(run["log"], lambda e: e["kind"] == "survivor_found" and e["survivor"] == "S2")
     at("S2_found", t)
     assert e["linked"]
@@ -164,12 +174,12 @@ def test_no_decoy_ever_reported(run):
 
 
 def test_rescue_routes_in_the_demo(run):
-    """The R-key rubble (150 s) lands on S1's rescue corridor. When R2 passes it, R2 reroutes
-    S1's route and resends it (Command replaces the old one); nothing else is resent."""
+    """The R-key rubble (162.5 s) lands on S1's rescue corridor with R2 4 m away. R2's lidar
+    sees it, R2 reroutes S1's route and resends it (Command replaces the old one); nothing else
+    is resent."""
     log = run["log"]
     routes = [(e["survivor"], e.get("reason")) for _, e in log if e["kind"] == "rescue_route"]
-    assert routes == [("S3", "found"), ("S1", "found"), ("S1", "blocked"), ("S1", "blocked"),
-                      ("S2", "found")], routes
+    assert routes == [("S3", "found"), ("S1", "found"), ("S1", "blocked"), ("S2", "found")], routes
     t, e = first(log, lambda e: e["kind"] == "rescue_route" and e.get("reason") == "blocked")
     at("S1_rerouted", t)
     assert e["robot"] == "R2" and 50 < e["length_m"] < 56
