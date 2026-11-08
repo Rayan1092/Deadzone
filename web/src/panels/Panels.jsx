@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useState } from 'react'
-import { setLayout, setNight, setPerf, setView, useSim } from '../store'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { setLayout, setPerf, setView, useSim } from '../store'
 import { control } from '../net/socket'
 import { FAULT_LABEL, describeEvent, fmtClock as fmt, latestRoutes, planCaption, robotStateLabel, unitName } from '../format'
 import { lastContact, linkQuality, linkText } from './robotCard'
@@ -7,7 +7,8 @@ import { FILTERS, eventCategory, feedParts, readFilters, robotIds, saveFilters, 
 import { JoinButton } from './JoinPanel'
 import { requestReport } from './ReportPanel'
 import { ReplayChip } from './ReplayPanel'
-import { RECORDING, REPLAY, saveRecording } from '../net/replay'
+import { REPLAY } from '../net/replay'
+import { KEY_GROUPS } from './keys'
 import { followRobot, frameCommandPost, overview, resetOverview } from '../three/camera'
 import { pickAftershock } from '../quake'
 import { lock, presenterLocked, unlock } from '../net/presenter'
@@ -15,14 +16,6 @@ import { heldByOthers } from '../net/leaseState'
 import { missingPeople, missingText } from '../three/beliefRamp'
 import { ping, setSound, soundOn } from '../audio'
 
-export const KEYS = [
-  ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
-  ['R', 'rubble ahead of the followed robot (R1 on the overview)'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
-  ['U', 'resume after safe stop'], ['A', 'aftershock at a random spot (server needs DZ_AFTERSHOCK=1)'], ['⇧A', 'strong aftershock: three areas, two relays'], ['N', 'new random building (Q&A)'], ['⇧N', 'back to the main building'], ['B', 'baseline: robots without Deadzone (with control leases on: Unlock first)'], ['L', 'Model Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
-  ['M', 'one view / split view'], ['C', 'one view: swap the Command post inset and the main view · split view: top-down on the command post'], ['Y', 'belief map: where survivors may still be'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save the mission recording (open with ?record)'],
-  ['J', 'Model test: a held-out sample (Q&A)'], ['I', 'under the hood (Q&A)'], ['?replay', 'mission replay: plays a saved mission recording, no server'],
-  ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
-]
 
 function toggleView() {
   resetOverview()
@@ -134,7 +127,6 @@ export function TopBar() {
   const set = useSim((s) => s.set)
   const view = useSim((s) => s.view)
   const mode = useSim((s) => s.mode)
-  const night = useSim((s) => s.night)
   const layout = useSim((s) => s.layout)
   const robots = useSim((s) => s.tick?.reality.robots) ?? NONE_LIST
   const full = layout !== 'judge' // 'judge' is the stored id of the Operator view
@@ -157,14 +149,13 @@ export function TopBar() {
           </span>
         )}
         {perf && <span className="perf-chip" title="Press P to turn off">Performance mode</span>}
-        {night && <span className="perf-chip">Night</span>}
         <button onClick={() => control(running ? 'pause' : 'start')} title="Start or pause the run (Space)">{running ? 'Pause' : 'Start'}</button>
         <button onClick={() => control('speed', speed / 2)} title="Slower (−)">−</button>
         <span className="mono" title="Simulation speed">{speed}×</span>
         <button onClick={() => control('speed', speed * 2)} title="Faster (+)">+</button>
         <button onClick={() => control('reset')} title="Back to the start of this scenario (Backspace)">Reset</button>
         <button className="view-btn" title="One view or split view (M)" onClick={toggleView}>{view === 'gap' ? 'One view' : 'Split view'}</button>
-        <button className="icon-btn" title="Keys (?)" onClick={() => set({ helpOpen: true })}>?</button>
+        <button className="help-btn" title="Keys (H)" onClick={() => set({ helpOpen: !useSim.getState().helpOpen })}>Help</button>
         <button title="Model test on a held-out thermal sample (J)" onClick={() => set({ judgeOpen: true, hoodOpen: false, labOpen: false })}>Model test</button>
         <button title="Live counters (I)" onClick={() => set({ hoodOpen: true, judgeOpen: false, labOpen: false })}>Counters</button>
       </div>
@@ -321,20 +312,33 @@ function EventFeed({ events }) {
   )
 }
 
+// H: a compact help popup under the top bar's right end. Esc, H or a click outside closes it.
 export function HelpOverlay() {
   const open = useSim((s) => s.helpOpen)
   const set = useSim((s) => s.set)
+  const box = useRef(null)
+  useEffect(() => {
+    if (!open) return undefined
+    const away = (e) => { if (box.current && !box.current.contains(e.target) && !e.target.closest?.('.help-btn')) set({ helpOpen: false }) }
+    window.addEventListener('pointerdown', away)
+    return () => window.removeEventListener('pointerdown', away)
+  }, [open, set])
   if (!open) return null
   return (
-    <div className="help-overlay" onClick={() => set({ helpOpen: false })}>
-      <div className="help-box">
+    <div className="help-pop" ref={box} role="dialog" aria-label="Keys">
+      <div className="help-pop-head">
         <b>Keys</b>
-        <div className="keys">
-          {KEYS.map(([k, what]) => <Fragment key={k}><kbd>{k}</kbd><span>{what}</span></Fragment>)}
-        </div>
-        <button className="text-link" onClick={(e) => { e.stopPropagation(); set({ helpOpen: false, introOpen: true }) }}>How to read this screen</button>
-        <span className="muted small">Click anywhere or press Esc to close</span>
+        <button className="text-link" onClick={() => set({ helpOpen: false, introOpen: true })}>What am I looking at?</button>
+        <button className="eye-close" aria-label="Close help" onClick={() => set({ helpOpen: false })}>×</button>
       </div>
+      {KEY_GROUPS.map((g) => (
+        <section key={g.title}>
+          <h4>{g.title}</h4>
+          <div className="keys">
+            {g.keys.map(([k, what]) => <Fragment key={k}><kbd>{k}</kbd><span>{what}</span></Fragment>)}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }
@@ -390,9 +394,8 @@ export function useKeyboard() {
       if (key === 'l') s.set({ labOpen: !s.labOpen, judgeOpen: false, hoodOpen: false })
       if (key === 'j' && !e.repeat) s.set({ judgeOpen: !s.judgeOpen, hoodOpen: false, labOpen: false })
       if (key === 'i' && !e.repeat) s.set({ hoodOpen: !s.hoodOpen, judgeOpen: false, labOpen: false })
-      if (key === 'k') setNight(!s.night)
       if (key === 'd') { if (s.director) overview(); s.set({ director: !s.director, shot: null }) }
-      if (e.key === '?' || key === 'h') s.set({ helpOpen: !s.helpOpen })
+      if (key === 'h') s.set({ helpOpen: !s.helpOpen })
       if (key === 'v' && target) s.set({ eyeRobot: s.eyeRobot === target.id ? null : target.id })
       if (key === 'p') setPerf(!s.perf)
       if (key === 'm') toggleView()
@@ -406,8 +409,6 @@ export function useKeyboard() {
         s.set({ toasts: [...s.toasts, { kind: 'note', msg: soundOn() ? 'Sound cues on' : 'Sound cues off', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
         if (soundOn()) ping()
       }
-      if (key === 's' && RECORDING) saveRecording()
-      if (key === 't') s.set({ showTruth: !s.showTruth })
       if (e.code === 'Space') { e.preventDefault(); control('toggle') }
       if (e.code === 'Backspace') control('reset')
       if (e.key === '+' || e.key === '=') control('speed', s.speed * 2)
