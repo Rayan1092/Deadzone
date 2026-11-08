@@ -3,10 +3,10 @@
 Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on the testing laptop edits this file. Rayan's robot session writes `history/rayan.md`.
 
 ## Now
-- **Working on:** test-station duty on every merge (pull, full suite, seed-7 beats vs DEMO.md, web build + tests, report); the practice server runs on this laptop with the DEMO.md pre-flight flags, paused at sim 0. Frontend asks in `web/src/panels/` + `web/src/styles.css` as they come.
+- **Working on:** fixing every `web/src/panels/` item in `docs/team/AUDIT.md` (one PR), then the S2 no-go reproduction once laptop 1's and Yusuf's fixes merge. Test-station duty on every merge.
 - **Works on main:** trained survivor detector + `perception.filter_hits()` with sim fallback (PR #14), runtime crops, robot hookup and decoys (PR #17), Grad-CAM heatmaps (PR #49), AI Lab export (PR #68), logged retrain (PR #71), judge pool `ml/results/judge_pool/` (PR #96), benchmark v2 radio sweep (PR #97), fused Grad-CAM + 96.7% docs (PR #100), confidence calibration (PR #103), phone bug diagnosis (PR #107), big-screen performance profile (PR #110), benchmark at published radio values (PR #113), refresh of 8797183 (PR #125), phone by-eye test (PR #136), detector in ONNX (PR #147), robot cards (PR #149), event feed (PR #153), real-scene crops + detector fine-tuned on indoor thermal people, FLIR 96.7% / indoor 99.6% (PR #95).
 - **In flight (not merged):** none.
-- **Blocked on / need from others:** **Yusuf:** `web/tests/rename.test.js` fails on Windows checkouts (fix below, 01:20 entry). **Aziz:** the ElevenLabs keyed dry run is still open on this laptop.
+- **Blocked on / need from others:** **Aziz, Yusuf, Rayan:** your open items in `docs/team/AUDIT.md` (each line has file:line). **Aziz:** the ElevenLabs keyed dry run is still open on this laptop.
 - **Promises to others:**
   - `filter_hits(hits)` keeps the `io.thermal()` hit shape `{id,pos,crop,conf}`. Kept hits get `conf` = model P(person) and `detector:"model"`; rejected hits are dropped.
   - It falls back to passthrough (sim sensor) when `DETECTOR=sim` is set, when no model file exists, or when torch is missing.
@@ -15,6 +15,12 @@ Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on
   - Judge pool manifest format below (judge-test entry), readable by Aziz's `readJudgePool`.
 
 ## Log
+
+### 2026-11-09 02:30 · rayan-ml/audit · Deployment audit of every user-facing screen: 40 items in docs/team/AUDIT.md
+- **Did:** walked the big screen (Operator and Engineering view, one view and split view, help list, intro card, Join, Model Lab, Model test, Under the hood, briefing, B and A toasts and banners), the phone landing page, both again with the server stopped, and every error text the server can send (`PlanError` / `HTTPException`), on main `292fdb7` with the DEMO.md required flags plus AI Lab, aftershock, sensor view and control leases; headless Chrome at 1920 x 1080 and 390 x 844. **40 items** in `docs/team/AUDIT.md`, one line each with file:line and owner: 20 internal names shown to users (DZ_ flags in the help list, toasts, phone and server errors; "Q&A"; "presenter"; raw client labels; an API path), 15 wording / consistency items, 5 missing or confusing states. Biggest: with the server down the big screen keeps every control enabled and only a small "offline" chip says so (#36, mine); the phone landing page shows no offline state (#37, Aziz); "Detector calls" / "Deadlines met" always read "Awaiting counter" because `sim.py:497` sums counters from robot telemetry that `robot.py:276-280` keeps off telemetry (#38, Aziz / Rayan).
+- **Contract changes:** none.
+- **Heads-up for others:** **Yusuf:** #13 (`format.js:80`). **Aziz:** #14-20, #33-35, #37, #38. **Rayan (robot session):** #38 with Aziz. I'm fixing every `panels/` item (#1-12, #21-32, #36, #39, #40) in one PR next.
+- **Next:** the panels fixes.
 
 ### 2026-11-09 01:20 · rayan-ml/test-station · Testing laptop fully preflighted (15 / 15); main 34425e1 green except a Windows-only web test
 - **Did (laptop setup, Rayan's ask):** `winget install Cloudflare.cloudflared` installed **cloudflared 2026.10.7** (`C:\Program Files (x86)\cloudflared\cloudflared.exe`, installer hash verified; new terminals have it on PATH). Repo `.venv` created (ignored by `.gitignore:4`): Python 3.13.17, `server/requirements.txt`, then CPU torch 2.15.0 / torchvision 0.29.2 from the PyTorch CPU index (two installs: one `--index-url` line would look for fastapi etc. on the PyTorch index). **`scripts/preflight.ps1` with the DEMO.md flags: all 15 PASS, exit 0** (.venv active, torch CPU import, detector.pt present and loads, server/.env present, GEMINI_API_KEY set, ELEVENLABS_API_KEY set, DEMO flags match, no extra DZ_ flags, ports 8000 and 5173 free, cloudflared found, node v24.21.0, py 3.13.17, server hello detector=model). The practice server was stopped for the preflight only (its server-hello check needs port 8000) and restarted with the same flags.

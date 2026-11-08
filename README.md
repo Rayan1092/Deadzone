@@ -62,12 +62,14 @@ Start it (PowerShell):
 ```
 cd server
 $env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=2
-python -m uvicorn deadzone.app:app --host 0.0.0.0 --port 8000
+python -m deadzone
 ```
 
-On macOS or Linux: `DZ_ROBOTS=3 DZ_SEED=7 DZ_SPEED=2 python -m uvicorn deadzone.app:app --host 0.0.0.0 --port 8000`.
+On macOS or Linux: `DZ_ROBOTS=3 DZ_SEED=7 DZ_SPEED=2 python -m deadzone`.
 
-Open http://localhost:8000. Press **Q** for the phone QR code. Phones need to be on the same Wi-Fi.
+The default launcher binds `0.0.0.0:8000` (all IPv4 interfaces); `--port` and `--reload` are supported.
+
+Open http://localhost:8000. Press **Q** for the phone QR code, which uses the laptop's LAN IP instead of localhost. **Phones must be on the same Wi-Fi, or use the tunnel** (`scripts/tunnel.ps1`, started manually; see [DEMO.md](docs/DEMO.md)). Open the tunnel's HTTPS origin on the screen to share its phone URL. Preflight checks HTTP access through the LAN IP; if it fails, it prints the Windows Firewall command to allow inbound TCP 8000. Guest Wi-Fi/client isolation may still require a hotspot or tunnel.
 
 For web development, run `npm run dev` in `web/` and open http://localhost:5173.
 
