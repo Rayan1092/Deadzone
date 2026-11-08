@@ -1,0 +1,260 @@
+diff --git a/server/deadzone/robot/robot.py b/server/deadzone/robot/robot.py
+--- a/server/deadzone/robot/robot.py
++++ b/server/deadzone/robot/robot.py
+@@ -17,7 +17,7 @@
+ from ..geometry import points_in_poly, wrap_angle
+ from ..network.dtn import PRIO, make_bundle
+ from . import planning
+-from .exploration import ProgressExplorer, line_clear
++from .exploration import ProgressExplorer, fit_visible_route, line_clear, segment_cells
+ from .mapping import OccupancyMap
+ from .perception import filter_hits, get_detector
+ from .power import Battery, RESERVE_PCT, wheel_current
+@@ -123,14 +123,17 @@
+     return out
+ 
+ 
+-def fit_route(pts, cap=ROUTE_MAX_POINTS, tol=0.15):
++def fit_route(pts, cap=ROUTE_MAX_POINTS, tol=0.15, *, trav=None, cell=0.25):
+     """Rescue route points, rounded to cm, that Command will accept (at most `cap` after its
+     compaction). Routes that already fit are returned unchanged, so nothing about normal routes
+     (the demo's included) changes. Longer ones (big generated buildings) are simplified with
+-    Douglas-Peucker at `tol` m, then thinned evenly, always keeping both ends."""
++    with visibility checks when the onboard traversability mask is supplied.
++    The geometry-only fallback is retained for callers without a map."""
+     pts = [[round(px, 2), round(py, 2)] for px, py in pts]
+     if len(pts) <= cap or len(_collinear_compact(pts)) <= cap:
+         return pts
++    if trav is not None:
++        return fit_visible_route(pts, trav, cell, cap)
+ 
+     def dp(seg):
+         if len(seg) < 3:
+@@ -668,6 +671,7 @@
+         trav = planning.traversable(grid, self.nogo)
+         start, end = self._cell(*self.entry), self._cell(*goal)
+         cells = None
++        route_trav = trav
+         if self.map.collapsed.any():
+             # keep responders away from fresh collapse: the part we saw fall may be only the
+             # edge of it, so stay as far clear as the corridors allow (1 m, then 0.5 m)
+@@ -675,6 +679,7 @@
+                 safe = trav & ~planning.dilate(self.map.collapsed, margin)
+                 cells = planning.astar(safe, start, end, cost)
+                 if cells:
++                    route_trav = safe
+                     break
+         if not cells:
+             cells = planning.astar(trav, start, end, cost)
+@@ -683,9 +688,25 @@
+         watch = [(cx, cy) for cx, cy in cells if trav[cy, cx]]
+         centers = [((cx + 0.5) * self.cell, (cy + 0.5) * self.cell) for cx, cy in cells]
+         pts = [list(self.entry)] + [list(p) for p in planning.simplify(cells, self.cell)] + [list(goal)]
+-        pts = fit_route(pts)
++        if self.explorer is not None:
++            # Striding over every other cell can itself delete a doorway turn.
++            # The opted-in policy fits the full ordered cell path instead.
++            full = [list(self.entry)] + [list(p) for p in centers] + [list(goal)]
++            full = [[round(x, 2), round(y, 2)] for x, y in full]
++            fitted = fit_visible_route(full, route_trav, self.cell, ROUTE_MAX_POINTS)
++        else:
++            fitted = fit_route(pts, trav=route_trav, cell=self.cell)
++        if fitted is None:
++            return None  # cannot advertise a safe route within Command's point cap
+         length = math.dist(self.entry, centers[0]) + planning.path_length(centers) + math.dist(centers[-1], goal)
+-        return watch, pts, round(length, 1), planning.INFLATE_CELLS * self.cell
++        original = [[round(x, 2), round(y, 2)] for x, y in pts]
++        if self.explorer is not None or fitted != original:
++            # Watch the path actually sent, including the new shortcut cells.
++            # An aftershock on a shortcut must trigger the normal recompute.
++            watch = sorted({p for a, b in zip(fitted, fitted[1:])
++                            for p in segment_cells(a, b, self.cell)})
++            length = planning.path_length(fitted)
++        return watch, fitted, round(length, 1), planning.INFLATE_CELLS * self.cell
+ 
+     def _bundle(self, kind, payload, size):
+         """Bundle to CMD. `rescue_route` is priority 1; until network/dtn.py lists the kind in
+diff --git a/server/deadzone/robot/exploration.py b/server/deadzone/robot/exploration.py
+index ebea20d..070563f 100644
+--- a/server/deadzone/robot/exploration.py
++++ b/server/deadzone/robot/exploration.py
+@@ -2,29 +2,65 @@
+ 
+ import heapq
+ import math
++from collections import deque
+ 
+ import numpy as np
+ 
+ from ..floorplan import FREE, OCC, UNKNOWN
+ from ..geometry import wrap_angle
++from ..sensors import THERMAL_FOV, THERMAL_RANGE
+ from . import planning
+ 
+ 
+-def line_clear(trav, a, b, cell):
+-    """Conservative segment check, including the two sides of diagonal corners."""
++def segment_cells(a, b, cell):
++    """Cells touched by a segment, including both sides of diagonal corners."""
+     n = max(1, math.ceil(math.dist(a, b) / (cell / 3)))
+     previous = None
+-    h, w = trav.shape
+     for k in range(n + 1):
+         x, y = (math.floor((a[i] + (b[i] - a[i]) * k / n) / cell) for i in (0, 1))
+-        if not (0 <= x < w and 0 <= y < h and trav[y, x]):
+-            return False
++        yield x, y
+         if previous is not None:
+             px, py = previous
+-            if x != px and y != py and not (trav[py, x] and trav[y, px]):
+-                return False
++            if x != px and y != py:
++                yield x, py
++                yield px, y
+         previous = x, y
+-    return True
++
++
++def line_clear(trav, a, b, cell):
++    """Conservative segment check, including the two sides of diagonal corners."""
++    h, w = trav.shape
++    return all(
++        0 <= x < w and 0 <= y < h and trav[y, x] for x, y in segment_cells(a, b, cell)
++    )
++
++
++def fit_visible_route(points, trav, cell, cap):
++    """Fewest visible links in the ordered route; never discard a required bend.
++
++    Breadth-first search guarantees the point cap is met whenever a safe ordered
++    subsequence can meet it. None means the cap cannot represent this route.
++    """
++    if not points or cap < 2:
++        return None
++    parent = {0: None}
++    queue = deque([(0, 1)])
++    while queue:
++        i, count = queue.popleft()
++        if count >= cap:
++            continue
++        for j in range(len(points) - 1, i, -1):
++            if j in parent or not line_clear(trav, points[i], points[j], cell):
++                continue
++            parent[j] = i
++            if j == len(points) - 1:
++                result = [points[j]]
++                while parent[j] is not None:
++                    j = parent[j]
++                    result.append(points[j])
++                return result[::-1]
++            queue.append((j, count + 1))
++    return None
+ 
+ 
+ def safe_waypoints(cells, trav, cell):
+@@ -98,7 +134,7 @@ class ProgressExplorer:
+         self.searches = 0
+         # Thermal camera contract: 5m range, 120-degree forward cone. Occupancy
+         # comes from lidar, so mapped floor is not automatically camera-searched.
+-        self.ranges = np.arange(cell / 2, 5.0 + cell / 2, cell / 2)
++        self.ranges = np.arange(cell / 2, THERMAL_RANGE + cell / 2, cell / 2)
+ 
+     def reset_goal(self):
+         """A new operator task cancels commitment, but keeps learned coverage."""
+@@ -110,7 +146,7 @@ class ProgressExplorer:
+         angles = (
+             np.linspace(-math.pi, math.pi, 48, endpoint=False)
+             if full
+-            else pose[2] + np.linspace(-math.pi / 3, math.pi / 3, 32)
++            else pose[2] + np.linspace(-THERMAL_FOV / 2, THERMAL_FOV / 2, 32)
+         )
+         ix = np.floor(
+             (pose[0] + np.cos(angles)[:, None] * self.ranges) / self.cell
+diff --git a/server/tests/test_safe_route_fit.py b/server/tests/test_safe_route_fit.py
+new file mode 100644
+--- /dev/null
++++ b/server/tests/test_safe_route_fit.py
+@@ -0,0 +1,83 @@
++"""Large rescue routes may lose redundant vertices, never required wall turns."""
++
++import math
++import sys
++from itertools import pairwise
++from pathlib import Path
++
++import numpy as np
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
++
++from deadzone.floorplan import FREE
++from deadzone.robot import planning
++from deadzone.robot.exploration import fit_visible_route, line_clear
++from deadzone.robot.robot import Robot, fit_route
++
++
++def winding_corridor():
++    points = [[0.5, 0.5]]
++    trav = np.zeros((100, 12), dtype=bool)
++    for row in range(33):
++        y = row * 3
++        a, b = (0.5, 10.5) if row % 2 == 0 else (10.5, 0.5)
++        if points[-1] != [a, y + 0.5]:
++            points.append([a, y + 0.5])
++        points.append([b, y + 0.5])
++        trav[y, :11] = True
++        if row < 32:
++            trav[y : y + 4, int(b)] = True
++    return points, trav
++
++
++def test_point_cap_cannot_delete_a_required_corridor_bend():
++    points, trav = winding_corridor()
++    assert len(points) > 60
++    assert all(line_clear(trav, a, b, 1) for a, b in pairwise(points))
++    # This winding corridor genuinely needs >60 vertices. Refuse instead of
++    # advertising the former evenly thinned route, which crosses six walls.
++    assert fit_route(points, trav=trav, cell=1) is None
++
++
++def test_redundant_long_route_gets_shorter_without_cutting_obstacles():
++    points = [[0.625 + i * 0.25, 0.625 + (i % 2) * 0.25] for i in range(66)]
++    trav = np.ones((16, 80), dtype=bool)
++    route = fit_route(points, trav=trav, cell=0.25)
++    assert route == [[round(v, 2) for v in p] for p in (points[0], points[-1])]
++    assert line_clear(trav, *route, 0.25)
++
++
++def test_visibility_search_obeys_the_minimum_number_of_required_links():
++    trav = np.ones((10, 10), dtype=bool)
++    trav[:8, 4] = False
++    points = [[1.5, 1.5], [1.5, 8.5], [6.5, 8.5], [6.5, 1.5]]
++    assert fit_visible_route(points, trav, 1, 3) is None
++    assert fit_visible_route(points, trav, 1, 4) == points
++
++
++def test_published_shortcuts_are_watched_for_aftershock_and_length_is_updated(
++    monkeypatch,
++):
++    monkeypatch.setenv("DZ_EXPLORATION_V2", "1")
++    robot = Robot(
++        "R1", "test", "#fff", (0.625, 0.625, 0), (16, 80), 0.25, (0.625, 0.625)
++    )
++    robot.map.grid[:] = FREE
++    cells = [(i + 2, 2 + i % 2) for i in range(66)]
++    monkeypatch.setattr(planning, "astar", lambda *args: cells)
++    goal = ((cells[-1][0] + 0.5) * 0.25, (cells[-1][1] + 0.5) * 0.25)
++    watched, points, length, _ = robot._rescue_route_cells(goal)
++    assert len(points) == 2
++    assert (3, 2) in watched and (3, 2) not in cells
++    assert length == round(math.dist(points[0], points[-1]), 1)
++    robot.routes["S1"] = {
++        "goal": goal,
++        "beacon": None,
++        "cells": watched,
++        "blocked": False,
++    }
++    robot.t = 10
++    robot.map.mark_occupied(3, 2)
++    robot._check_routes()
++    assert robot.routes["S1"]["blocked"]
++    assert any(e["kind"] == "rescue_route_blocked" for e in robot.events)
