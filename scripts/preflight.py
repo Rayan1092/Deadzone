@@ -12,9 +12,13 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "server"))
+from deadzone.lan import lan_ipv4
 KEYS = ("GEMINI_API_KEY", "ELEVENLABS_API_KEY")
+FIREWALL_COMMAND = "New-NetFirewallRule -DisplayName Deadzone -Direction Inbound -LocalPort 8000 -Protocol TCP -Action Allow"
 
 
 class SafeParser(argparse.ArgumentParser):
@@ -191,39 +195,52 @@ def listener_gone(port, timeout=3):
         time.sleep(.05)
 
 
-def server_probe(root, python, environ, *, port=8000, seconds=10):
+def lan_health(address, port=8000):
+    if not address:
+        return False
+    try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(f"http://{address}:{port}/api/health", timeout=1) as response:
+            return response.status == 200 and json.load(response).get("ok") is True
+    except (OSError, ValueError):
+        return False
+
+
+def server_probe(root, python, environ, *, port=8000, seconds=10, lan_address=None):
     """Own only this paused probe child, and always stop it, even on Ctrl+C."""
-    process, success, cleaned = None, False, True
+    process, success, cleaned, lan_ready = None, False, True, False
     try:
         from websockets.sync.client import connect
         child_env = dict(environ, DZ_AUTOSTART="0")
-        process = subprocess.Popen([str(python), "-m", "uvicorn", "deadzone.app:app", "--host",
-            "127.0.0.1", "--port", str(port)], cwd=root / "server", env=child_env,
+        process = subprocess.Popen([str(python), "-m", "deadzone", "--port", str(port)], cwd=root / "server", env=child_env,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        deadline, observed = time.monotonic() + seconds, False
+        deadline, observed, received = time.monotonic() + seconds, False, False
         while time.monotonic() < deadline:
             if process.poll() is not None:
-                return False
+                break
             remaining = deadline - time.monotonic()
-            if not observed:
+            if not received:
                 try:
                     with connect(f"ws://127.0.0.1:{port}/ws/screen", proxy=None,
                                  open_timeout=min(1, remaining), max_size=8_000_000) as ws:
                         hello = json.loads(ws.recv(timeout=min(1, remaining)))
-                        if hello.get("t") != "hello" or hello.get("data", {}).get("detector") != "model":
-                            return False
-                        observed = True
+                        received = True
+                        observed = hello.get("t") == "hello" and hello.get("data", {}).get("detector") == "model"
                 except (OSError, TimeoutError):
                     pass
+            if not lan_ready:
+                lan_ready = lan_health(lan_address, port)
+            if received and not observed:
+                break
             time.sleep(min(.1, max(0, deadline - time.monotonic())))
         success = observed and process.poll() is None
     except Exception:
-        return False  # never print server output, credentials, payloads or exception text
+        pass  # never print server output, credentials, payloads or exception text
     finally:
         if process is not None:
             cleaned = stop_process(process) and listener_gone(port)
-    return success and cleaned
+    return {"model": success and cleaned, "lan": lan_ready and cleaned}
 
 
 def run_checks(root=ROOT, *, activation="failed", environ=None):
@@ -284,13 +301,22 @@ def run_checks(root=ROOT, *, activation="failed", environ=None):
     launcher = "py" if os.name == "nt" or shutil.which("py") else "python3"
     py = version(launcher, r"Python \d+\.\d+\.\d+(?:[A-Za-z0-9.+-]*)")
     report.check("py version" if launcher == "py" else "python3 version", py is not None, py or "missing/unavailable")
+    address = lan_ipv4()
+    lan_ready = False
     if not ports[8000]:
         report.check("server hello (10 s)", False, "not run: port 8000 busy/unavailable")
+        lan_ready = lan_health(address)  # read-only check of an already-running server
     elif not python.is_file():
         report.check("server hello (10 s)", False, "not run: .venv Python missing")
     else:
-        hello = server_probe(root, python, effective)
-        report.check("server hello (10 s)", hello, "detector=model" if hello else "real model not confirmed")
+        probe = server_probe(root, python, effective, lan_address=address)
+        report.check("server hello (10 s)", probe["model"], "detector=model" if probe["model"] else "real model not confirmed")
+        lan_ready = probe["lan"]
+    detail = f"http://{address}:8000/phone answers" if lan_ready else (
+        "LAN address unavailable" if address is None else f"http://{address}:8000 is unreachable")
+    if not lan_ready:
+        detail += "; start python -m deadzone; if needed, run as Windows administrator: " + FIREWALL_COMMAND
+    report.check("server LAN", lan_ready, detail)
     return int(report.failed)
 
 

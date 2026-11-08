@@ -41,6 +41,7 @@ from .command.safety import SafetyChecker
 from .robot.robot import resume_command
 from .robot.perception import CROP_DIR, get_detector
 from .sim import DT, ROBOT_DEFS, Sim
+from .lan import lan_ipv4
 from .network.dtn import make_bundle
 from .network.stream import StreamState, compact_message, stream_profile, thin_tick
 from .network.map_delta import DRAWN_LIDAR_POINTS, MapDeltaState
@@ -885,14 +886,16 @@ def join(request: Request):
     if (parts.scheme not in ("http", "https") or not parts.hostname or parts.username or parts.password
             or (configured and (parts.path not in ("", "/") or parts.query or parts.fragment))):
         raise HTTPException(503, "Set DZ_PUBLIC_URL to the public HTTP(S) frontend address")
-    if not configured and parts.hostname in ("localhost", "127.0.0.1", "::1"):
-        try:
-            addresses = socket.gethostbyname_ex(socket.gethostname())[2]
-            address = next(a for a in sorted(addresses)
-                           if ipaddress.ip_address(a).is_private and not ipaddress.ip_address(a).is_loopback
-                           and not ipaddress.ip_address(a).is_link_local)
-        except (OSError, StopIteration):
-            raise HTTPException(503, "Set DZ_PUBLIC_URL to the laptop's LAN frontend address") from None
+    local_host = parts.hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0", "::")
+    local_host |= parts.hostname.endswith((".localhost", ".local")) or "." not in parts.hostname
+    try:
+        local_host |= ipaddress.ip_address(parts.hostname).is_loopback
+    except ValueError:
+        pass
+    if local_host:
+        address = lan_ipv4(request.client.host if request.client else None)
+        if address is None:
+            raise HTTPException(503, "Connect the laptop to Wi-Fi or use the HTTPS tunnel; no LAN address is available")
         parts = parts._replace(netloc=f"{address}:{port or (443 if parts.scheme == 'https' else 80)}")
     url = urlunsplit((parts.scheme, parts.netloc, parts.path.rstrip("/") + "/phone", "", ""))
     return {"url": url}
