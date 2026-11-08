@@ -27,7 +27,7 @@ def phone_initial(ws):
     return hello["data"], view["data"]
 
 
-def run(url):
+def run(url, ai_lab=False):
     ws_url = url.replace("http://", "ws://", 1)
     checks = []
     with httpx.Client(base_url=url, timeout=20, trust_env=False) as http, ExitStack() as stack:
@@ -51,6 +51,20 @@ def run(url):
             for asset in re.findall(r'(?:src|href)="(/assets/[^\"]+)"',page.text):
                 assert request("GET",asset).content
         checks.append("built screen/phone HTML and referenced assets served")
+        if ai_lab:
+            root = Path(__file__).resolve().parents[1]
+            for group, directory, asset in (
+                ("results", "ml/results", "metrics.json"),
+                ("results", "ml/results", "confusion_matrix.png"),
+                ("slides", "docs/assets", "pipeline.png"),
+            ):
+                url_path = f"/ai-lab/{group}/{asset}"
+                response = request("GET", url_path)
+                assert response.content == (root / directory / asset).read_bytes()
+                assert request("HEAD", url_path).headers["content-length"] == response.headers["content-length"]
+                assert http.post(url_path, content=b"overwrite").status_code == 405
+            assert http.get("/ai-lab/results/missing.png").status_code == 404
+            checks.append("AI Lab GET/HEAD matches exported bytes; mutations/missing assets rejected")
         screen = socket("/ws/screen")
         frames = [json.loads(screen.recv(timeout=15)) for _ in range(4)]
         assert [f["t"] for f in frames] == ["hello","maps","tick","plan_state"]
@@ -145,11 +159,12 @@ if __name__ == "__main__":
     parser.add_argument("--url",default="http://127.0.0.1:8017")
     parser.add_argument("--allow-reset",action="store_true",help="explicitly allow resetting the disposable local sim")
     parser.add_argument("--output",type=Path)
+    parser.add_argument("--ai-lab",action="store_true",help="also check optional DZ_AI_LAB=1 exports")
     args = parser.parse_args()
     parts = urlsplit(args.url)
     if not args.allow_reset or parts.scheme != "http" or parts.hostname not in ("127.0.0.1","localhost","::1"):
         parser.error("Use a disposable loopback HTTP server and --allow-reset")
-    result = run(args.url.rstrip("/"))
+    result = run(args.url.rstrip("/"), ai_lab=args.ai_lab)
     if args.output:
         args.output.parent.mkdir(parents=True,exist_ok=True)
         args.output.write_text(json.dumps(result,indent=2)+"\n",encoding="utf-8")

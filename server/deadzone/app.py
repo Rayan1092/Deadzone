@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
+from .ai_lab import AILabAssets
 from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
 from .command.crdt import MergeBatch, PlanSync
 from .command.controls import AskQuestion, FaultRequest, RelayPlace, RelayPower, director_adapter
@@ -573,6 +574,10 @@ def phone_page():
 
 
 app.mount("/crops", StaticFiles(directory=CROP_DIR), name="crops")
+
+REPO_DIR = Path(__file__).resolve().parents[2]
+app.mount("/ai-lab/results", AILabAssets(directory=REPO_DIR / "ml" / "results"), name="ai-lab-results")
+app.mount("/ai-lab/slides", AILabAssets(directory=REPO_DIR / "docs" / "assets"), name="ai-lab-slides")
 
 
 if WEB_DIST.exists():
