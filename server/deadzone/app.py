@@ -8,6 +8,7 @@ import ipaddress
 import json
 import math
 import os
+import secrets
 import socket
 import time
 from contextlib import asynccontextmanager, suppress
@@ -27,6 +28,7 @@ from pydantic import ValidationError
 from .ai_lab import AILabAssets
 from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
 from .command.crdt import MergeBatch, PlanSync
+from .command.leases import LeaseClaim, LeaseTable, PresenterRelease, RobotRef, VoiceRequest
 from .command.controls import AskQuestion, FaultRequest, RelayPlace, RelayPower, director_adapter
 from .command.reports import command_report
 from .command.rescue_order import rescue_order
@@ -63,6 +65,9 @@ class Hub:
         self.next_phone_id = 1
         self.seq = 0
         self.plan_lock = asyncio.Lock()  # survives reset: old publications finish first
+        self.lease_lock = asyncio.Lock()
+        self.leases = LeaseTable(self.sim.robots)
+        self.controller_sockets = {}
         self._init_plans()
 
     def _init_plans(self):
@@ -85,9 +90,67 @@ class Hub:
         for ws in dead:
             clients.discard(ws)
 
-    def hello(self):
+    def leases_enabled(self):
+        return os.environ.get("DZ_CONTROL_LEASES") == "1" or os.environ.get("DZ_VOICE") == "1"
+
+    def require_leases(self):
+        if not self.leases_enabled():
+            raise PlanError("feature_disabled", "Enable DZ_CONTROL_LEASES=1 for control leases", 409)
+
+    def register_controller(self, ws, client):
+        if self.leases_enabled():
+            self.controller_sockets[ws] = self.leases.register(client)
+
+    def controller_hello(self, ws):
+        token = self.controller_sockets.get(ws)
+        return {"controller_token": token} if token else {}
+
+    def lease_state(self):
+        return self.leases.snapshot(self.leases_enabled())
+
+    async def broadcast_leases(self):
+        if not self.leases_enabled():
+            return
+        message = self.envelope("leases", self.lease_state())
+        await self.send_all(self.phones, message)
+        await self.send_all(self.screens, message)
+
+    async def sweep_leases(self):
+        async with self.lease_lock:
+            if self.leases.expire():
+                await self.broadcast_leases()
+
+    async def disconnect_controller(self, ws):
+        async with self.lease_lock:
+            token = self.controller_sockets.pop(ws, None)
+            if token and self.leases.disconnect(token):
+                await self.broadcast_leases()
+
+    async def change_lease(self, action, body, token=None):
+        self.require_leases()
+        async with self.lease_lock:
+            if self.leases.expire():
+                await self.broadcast_leases()
+            if action == "override":
+                expected = os.environ.get("DZ_PRESENTER_TOKEN", "")
+                if not expected or not secrets.compare_digest(expected.encode(), body.presenter_token.encode()):
+                    raise PlanError("presenter_required", "Presenter credential required", 403)
+                self.leases.override(body.robot)
+            elif action == "claim":
+                self.leases.claim(body.robot, token, body.name)
+            else:
+                getattr(self.leases, action)(body.robot, token)
+            await self.broadcast_leases()
+            return self.lease_state()
+
+    def authorize_robot(self, robot, token):
+        if self.leases_enabled():
+            self.leases.require(robot, token)
+
+    def hello(self, ws=None):
         return self.envelope("hello", self.sim.hello() | self.control_state()
-                             | detector_status())
+                             | detector_status() | {"leases": self.lease_state()}
+                             | self.controller_hello(ws))
 
     def control_state(self):
         modes = {r.mode for r in self.sim.robots.values()}
@@ -103,6 +166,7 @@ class Hub:
                 "grid": {"w": self.sim.prior.w, "h": self.sim.prior.h, "cell": self.sim.prior.cell},
                 "robots": robots, "plan": self.plans.current(), "client": client, "role": role,
                 "relay_id": self.relay_clients.get(client) if role == "relay" else None,
+                "leases": self.lease_state(),
                 **detector_status()}
 
     def attach_relay(self, client):
@@ -135,6 +199,7 @@ class Hub:
     async def disconnect_phone(self, ws, notify=True):
         session = self.phone_sessions.pop(ws, None)
         self.phones.discard(ws)
+        await self.disconnect_controller(ws)
         if session is not None:
             client, role = session
             if role == "relay" and client in self.relay_clients and (client, role) not in self.phone_sessions.values():
@@ -234,10 +299,13 @@ class Hub:
 
     async def reset(self):
         async with self.plan_lock:
-            self.running = False
-            self.sim.reset()
-            self.sim.tick()
-            self._init_plans()
+            async with self.lease_lock:
+                self.running = False
+                self.sim.reset()
+                self.sim.tick()
+                self._init_plans()
+                self.leases.reset()
+                await self.broadcast_leases()
             self.relay_clients.clear()
             self.relay_power_requests.clear()
             for client, role in sorted(set(self.phone_sessions.values())):
@@ -248,7 +316,7 @@ class Hub:
             await self.send_all(self.screens, self.envelope("plan_state", None))
             for ws, (client, role) in list(self.phone_sessions.items()):
                 try:
-                    await ws.send_text(self.envelope("hello", self.phone_hello(client, role)))
+                    await ws.send_text(self.envelope("hello", self.phone_hello(client, role) | self.controller_hello(ws)))
                 except (RuntimeError, WebSocketDisconnect):
                     await self.disconnect_phone(ws, notify=False)
             await self.broadcast_tick(force_maps=True)
@@ -261,9 +329,9 @@ class Hub:
             if "value" in data and value != data["mode"]:
                 raise PlanError("invalid_mode", "mode and value must agree", 422)
             value = data["mode"]
-        await self.control(data.get("action"), value)
+        await self.control(data.get("action"), value, controller_token=data.get("controller_token"))
 
-    async def control(self, action, value=None):
+    async def control(self, action, value=None, *, controller_token=None):
         if action == "start":
             self.running = True
         elif action == "pause":
@@ -280,6 +348,8 @@ class Hub:
         elif action == "mode":
             if value not in ("baseline", "deadzone"):
                 raise PlanError("invalid_mode", "Mode must be baseline or deadzone", 422)
+            for rid in self.sim.robots:
+                self.authorize_robot(rid, controller_token)
             for robot in self.sim.robots.values():
                 robot.set_mode(value)
         elif action == "director":
@@ -302,6 +372,7 @@ class Hub:
                 if request.type == "overload":
                     self.sim.robots[request.robot].inject_perception_overload()
                 else:
+                    self.authorize_robot(request.robot, controller_token)
                     self.sim.network.queues["CMD"].append(resume_command(request.robot, self.sim.time))
             else:
                 await self.inject_fault(request)
@@ -328,6 +399,7 @@ class Hub:
     async def loop(self):
         next_t = time.perf_counter()
         while True:
+            await self.sweep_leases()
             if self.running:
                 self.sim.tick()
                 await self.broadcast_tick()
@@ -382,6 +454,54 @@ async def control_validation_error(request, error):
 @app.get("/api/health")
 def health():
     return {"ok": True, "tick": hub.sim.tick_n, "time": hub.sim.time, "running": hub.running}
+
+
+@app.get("/api/leases")
+async def lease_state():
+    await hub.sweep_leases()
+    return hub.lease_state()
+
+
+@app.post("/api/leases/claim")
+async def claim_lease(body: LeaseClaim, request: Request):
+    return await hub.change_lease("claim", body, request.headers.get("x-controller-token"))
+
+
+@app.post("/api/leases/heartbeat")
+async def heartbeat_lease(body: RobotRef, request: Request):
+    return await hub.change_lease("heartbeat", body, request.headers.get("x-controller-token"))
+
+
+@app.post("/api/leases/release")
+async def release_lease(body: RobotRef, request: Request):
+    return await hub.change_lease("release", body, request.headers.get("x-controller-token"))
+
+
+@app.post("/api/leases/override")
+async def override_lease(body: PresenterRelease):
+    return await hub.change_lease("override", body)
+
+
+@app.post("/api/robot-command")
+async def robot_command(body: dict, request: Request):
+    hub.require_leases()
+    # Only the existing radio-delivered resume action is implemented here.
+    ref = RobotRef.model_validate({"robot": body.get("robot")})
+    if body.get("action") != "resume" or set(body) != {"robot", "action"}:
+        raise PlanError("unsupported_command", "Only resume is available until the robot command contract lands", 422)
+    await hub.control("director", {"do": "resume", "robot": ref.robot},
+                      controller_token=request.headers.get("x-controller-token"))
+    return {"queued": True, "robot": ref.robot, "action": "resume"}
+
+
+@app.post("/api/voice")
+async def voice(body: VoiceRequest, request: Request):
+    # Fail closed until speech/intent and Rayan's action/ack contract are wired.
+    hub.require_leases()
+    hub.leases.require(body.robot, request.headers.get("x-controller-token"))
+    if os.environ.get("DZ_VOICE") != "1":
+        raise PlanError("feature_disabled", "Enable DZ_VOICE=1 for voice control", 409)
+    raise PlanError("voice_not_ready", "Speech/intent and robot action acknowledgements are not wired yet", 501)
 
 
 @app.get("/api/floorplan")
@@ -489,7 +609,8 @@ async def ordered_rescues():
 
 
 @app.post("/api/control")
-async def control(body: dict):
+async def control(body: dict, request: Request):
+    body = {**body, "controller_token": request.headers.get("x-controller-token")}
     await hub.control_message(body)
     return {"ok": True, **hub.control_state()}
 
@@ -498,11 +619,12 @@ async def control(body: dict):
 async def ws_screen(ws: WebSocket):
     await ws.accept()
     hub.screens.add(ws)
-    await ws.send_text(hub.hello())
-    await ws.send_text(hub.envelope("maps", hub.sim.maps()))
-    await ws.send_text(hub.envelope("tick", hub.sim.snapshot()))
-    await ws.send_text(hub.envelope("plan_state", hub.plans.current()))
+    hub.register_controller(ws, "screen")
     try:
+        await ws.send_text(hub.hello(ws))
+        await ws.send_text(hub.envelope("maps", hub.sim.maps()))
+        await ws.send_text(hub.envelope("tick", hub.sim.snapshot()))
+        await ws.send_text(hub.envelope("plan_state", hub.plans.current()))
         while True:
             try:
                 msg = json.loads(await ws.receive_text())
@@ -511,6 +633,8 @@ async def ws_screen(ws: WebSocket):
                 if msg.get("t") == "control":
                     d = msg["data"]
                     await hub.control_message(d)
+                elif msg.get("t") == "lease_override":
+                    await hub.change_lease("override", PresenterRelease.model_validate(msg["data"]))
             except (PlanError, ValidationError, json.JSONDecodeError) as error:
                 data = {"code": "invalid_message", "msg": "Invalid screen control"}
                 if isinstance(error, PlanError):
@@ -522,12 +646,13 @@ async def ws_screen(ws: WebSocket):
         pass
     finally:
         hub.screens.discard(ws)
+        await hub.disconnect_controller(ws)
 
 
 @app.websocket("/ws/phone")
 async def ws_phone(ws: WebSocket,
                    client: str | None = Query(default=None, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.-]+$"),
-                   role: Literal["planner", "relay"] = "planner"):
+                   role: Literal["planner", "relay", "spectator"] = "planner"):
     """Phone planning session; only prior geometry and delivered Command data."""
     await ws.accept()
     if client is None:
@@ -535,10 +660,12 @@ async def ws_phone(ws: WebSocket,
         hub.next_phone_id += 1
     hub.phones.add(ws)
     hub.phone_sessions[ws] = client, role
+    if role == "planner":
+        hub.register_controller(ws, client)
     try:
         if role == "relay":
             hub.attach_relay(client)
-        await ws.send_text(hub.envelope("hello", hub.phone_hello(client, role)))
+        await ws.send_text(hub.envelope("hello", hub.phone_hello(client, role) | hub.controller_hello(ws)))
         await ws.send_text(hub.envelope("cmd_view", hub.phone_view()))
         if role == "relay":
             await ws.send_text(hub.envelope("relay_state", hub.relay_state(client)))
@@ -571,6 +698,13 @@ def phone_page():
     if not index.exists():
         raise HTTPException(503, "Build the frontend or use the Vite frontend address")
     return FileResponse(index)
+
+
+@app.get("/mic-check", include_in_schema=False)
+def microphone_check():
+    if not hub.leases_enabled():
+        raise HTTPException(404)
+    return FileResponse(Path(__file__).resolve().parent / "static" / "mic-check.html")
 
 
 app.mount("/crops", StaticFiles(directory=CROP_DIR), name="crops")
