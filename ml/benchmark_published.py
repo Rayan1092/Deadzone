@@ -21,6 +21,7 @@ Published values (sources in docs/assets/benchmark_published.md):
 import argparse
 import json
 import os
+os.environ.setdefault("DZ_SCENARIO_EVENTS", "0")  # results predate scenario events (collapse_01's 162.5 s collapse)
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed

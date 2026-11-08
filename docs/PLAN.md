@@ -338,6 +338,22 @@ Walls are line segments and doors are simply gaps between segments. Rubble and h
 
 The door `state` is visual only (`open`, `broken`, `blocked`). A blocked door must also have a rubble polygon so physics agrees with visuals.
 
+#### Scenario events (`events`, optional)
+
+A building's scripted disasters. The sim runs them **every run, deterministically**, in time order, at the start of the tick whose sim time reaches `t` (before the robots step, like a key press). No flag needed; `DZ_SCENARIO_EVENTS=0` switches them off (the benchmarks do, so their published numbers stay reproducible). A failed event (for example `radio_fail` before any relay exists) emits `scenario_event_failed` once and the run carries on. Separate from the opt-in `timeline` player (`DZ_SCENARIO_TIMELINE`). Not part of the planning prior, so the safety checker never sees them.
+
+```json
+"events": [{"t": 162.5, "type": "collapse", "near": "R1"}]
+```
+
+| type | fields | what happens | events emitted |
+|---|---|---|---|
+| `collapse` | `near` (robot id, default R1) or `at` [x, y]; `size` m (default 1.4, 0.25–4) | a rubble square at `at`, or 1.5 m ahead of `near`; if that spot would cut any robot off from space it could reach, the nearest safe spot on that robot's planned path; if none, refused | `rubble_fall` with `cause: "collapse"`, `robot` |
+| `aftershock` | `at` [x, y] (default the first powered relay's position), `destroy_relay` (default true) | the A-key aftershock: 2 x 2 m rubble, a concrete wall segment, optionally the nearest relay destroyed | `rubble_fall`, `aftershock`, `relay_destroyed` |
+| `radio_fail` | `relay` (default the first powered, non-phone relay) | that relay's radio dies; its stored bundles are lost; no rubble | `relay_destroyed` with `cause: "radio_fail"`, `radio_fail` |
+
+Every entry needs `t` (sim seconds, 0–86400) and `type`; `label` is free text. At most 64 events. `collapse_01` carries one: `{"t": 162.5, "type": "collapse", "near": "R1"}`, the demo's secondary collapse on S1's rescue corridor. Variants (`variant_of`) drop the base's events.
+
 ### Occupancy grid
 
 Row-major `uint8` array of `w * h` cells, row index = y. Values: `0` unknown, `1` free, `2` occupied, `3` no-go (hazard). Sent as base64 so a 160 x 120 map is 25.6 KB raw. Cell `(ix, iy)` covers `[ix*cell, (ix+1)*cell)` in x.

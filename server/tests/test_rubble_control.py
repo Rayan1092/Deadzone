@@ -18,7 +18,7 @@ def session(monkeypatch):
     monkeypatch.setenv("DZ_ROBOTS", "3")
     monkeypatch.setenv("DETECTOR", "sim")
     monkeypatch.setenv("DZ_SMART_RUBBLE", "1")
-    monkeypatch.setenv("DZ_COLLAPSE_AT", "0")
+    monkeypatch.setenv("DZ_SCENARIO_EVENTS", "0")
     monkeypatch.setattr(api, "hub", api.Hub())
     with TestClient(api.app) as client:
         hub = api.hub

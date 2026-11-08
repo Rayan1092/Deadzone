@@ -119,6 +119,38 @@ class RobotIO:
         return out
 
 
+SCENARIO_EVENT_TYPES = ("collapse", "aftershock", "radio_fail")
+
+
+def parse_scenario_events(data):
+    """Validated, time-ordered scenario events from a floor plan's `events` list (docs/PLAN.md,
+    "Scenario events"). Raises ValueError on a malformed entry."""
+    raw = data.get("events", [])
+    if not isinstance(raw, list) or len(raw) > 64:
+        raise ValueError("events must be a list of at most 64 scenario events")
+    out = []
+    W, H = data["size"]
+    for i, ev in enumerate(raw):
+        if not isinstance(ev, dict) or ev.get("type") not in SCENARIO_EVENT_TYPES:
+            raise ValueError(f"event {i}: type must be one of {SCENARIO_EVENT_TYPES}")
+        t = ev.get("t")
+        if isinstance(t, bool) or not isinstance(t, (int, float)) or not math.isfinite(t) or not 0 <= t <= 86400:
+            raise ValueError(f"event {i}: t must be sim seconds from 0 to 86400")
+        at = ev.get("at")
+        if at is not None and not (isinstance(at, list) and len(at) == 2
+                                   and all(isinstance(v, (int, float)) and math.isfinite(v) for v in at)
+                                   and 0 <= at[0] < W and 0 <= at[1] < H):
+            raise ValueError(f"event {i}: at must be [x, y] inside the building")
+        if "near" in ev and not isinstance(ev["near"], str):
+            raise ValueError(f"event {i}: near must be a robot id")
+        size = ev.get("size", 1.4)
+        if isinstance(size, bool) or not isinstance(size, (int, float)) or not 0.25 <= size <= 4:
+            raise ValueError(f"event {i}: size must be 0.25 to 4 m")
+        out.append(dict(ev, t=float(t), _i=i))
+    out.sort(key=lambda e: (e["t"], e["_i"]))
+    return out
+
+
 class Sim:
     def __init__(self, plan_path=DEFAULT_PLAN, n_robots=1, seed=7):
         self.plan_path = plan_path
@@ -130,23 +162,20 @@ class Sim:
         self.sensor_view = os.environ.get("DZ_SENSOR_VIEW") == "1"
         self.robot_collisions = os.environ.get("DZ_ROBOT_COLLISIONS") == "1"
         self._robot_contacts = set()
-        # DZ_SMART_RUBBLE=1 (Rayan, demo robustness; sim-side edit authorized):
-        # - the R key drops its rubble on the followed robot's planned path 3-4 m ahead, at the
-        #   nearest spot that walls nobody in (press_rubble), for any robot at any time (Q&A);
-        # - a scripted "secondary collapse" drops rubble 1.5 m ahead of R1 at DZ_COLLAPSE_AT sim
-        #   seconds (default 162.5 on collapse_01, the demo's reroute beat; 0 disables), whatever
-        #   anyone pressed. It is not a key press: event rubble_fall with cause "collapse".
+        # DZ_SMART_RUBBLE=1 (Rayan, sim-side edit authorized): the R key drops its rubble on the
+        # followed robot's planned path 3-4 m ahead, at the nearest spot that walls nobody in
+        # (press_rubble), for any robot at any time. Scripted disasters are scenario events in the
+        # floor plan JSON (`events`, run_scenario_events), not this flag.
         self.smart_rubble_on = os.environ.get("DZ_SMART_RUBBLE") == "1"
-        self.collapse_at = None
-        self.collapse_done = False
         random.seed(self.seed)
         np.random.seed(self.seed)
         self.fp = FloorPlan.load(self.plan_path)
         self.prior = FloorPlan(self.fp.planning_data())
-        if self.smart_rubble_on:
-            default = "162.5" if self.fp.data.get("id") == "collapse_01" else "0"
-            at = float(os.environ.get("DZ_COLLAPSE_AT", default).strip() or "0")
-            self.collapse_at = at if at > 0 else None
+        # Scenario events (floor plan `events`): run deterministically every run, in time order;
+        # DZ_SCENARIO_EVENTS=0 switches them off (benchmarks that predate them).
+        self.scenario_events = parse_scenario_events(self.fp.data) \
+            if os.environ.get("DZ_SCENARIO_EVENTS", "1") != "0" else []
+        self.scenario_next = 0
         self.robot_specs = {rid: RobotSpec() for rid, _, _ in ROBOT_DEFS[:self.n_robots]}
         self.energy_time_scale = BATTERY_TIME_SCALE
         self.time = 0.0
@@ -341,8 +370,7 @@ class Sim:
 
     # ------------------------------------------------------------------ tick
     def tick(self):
-        if self.collapse_at is not None and not self.collapse_done and self.time + 1e-6 >= self.collapse_at:
-            self.secondary_collapse()
+        self.run_scenario_events()
         dt = DT
         self.time = round(self.time + dt, 3)
         self.tick_n += 1
@@ -658,18 +686,59 @@ class Sim:
                 return reach
             reach = grown
 
-    def secondary_collapse(self, robot="R1", size=1.4):
-        """The scripted collapse: rubble 1.5 m ahead of `robot` (the old R-key spot), once."""
-        self.collapse_done = True
+    def run_scenario_events(self):
+        """Play every scenario event due at this tick (before the robots step, like a key press).
+        A failed event is reported once and the run carries on."""
+        while self.scenario_next < len(self.scenario_events) and \
+                self.scenario_events[self.scenario_next]["t"] <= self.time + 1e-6:
+            ev = self.scenario_events[self.scenario_next]
+            self.scenario_next += 1
+            try:
+                if ev["type"] == "collapse":
+                    self.secondary_collapse(ev.get("near", "R1"), ev.get("size", 1.4), at=ev.get("at"))
+                elif ev["type"] == "aftershock":
+                    self.aftershock(ev.get("at"), destroy_relay=ev.get("destroy_relay", True))
+                else:
+                    self.radio_fail(ev.get("relay"))
+            except ValueError as error:
+                self.events.append({"kind": "scenario_event_failed", "type": ev["type"],
+                                    "scheduled_t": ev["t"], "reason": str(error)})
+
+    def secondary_collapse(self, robot="R1", size=1.4, at=None):
+        """Scenario event `collapse`: rubble at `at`, or 1.5 m ahead of `robot`. When that spot
+        would wall a robot in, the nearest safe spot on the robot's planned path; none: refused."""
         rid = robot if robot in self.robots else next(iter(self.robots), None)
-        if rid is None:
-            return None
-        x, y, th = self.robots[rid].pose
-        at = (x + math.cos(th) * 1.5, y + math.sin(th) * 1.5)
+        if at is None:
+            if rid is None:
+                raise ValueError("No robot to collapse near")
+            x, y, th = self.robots[rid].pose
+            at = (x + math.cos(th) * 1.5, y + math.sin(th) * 1.5)
         s = size / 2
         at = (min(max(at[0], s), self.fp.W - s), min(max(at[1], s), self.fp.H - s))
+        if not self._rubble_is_safe(at, size):
+            spot = self._smart_rubble_spot(rid, size) if rid is not None else None
+            if spot is None:
+                raise ValueError("No collapse spot that keeps every robot's space connected")
+            at = spot
         self.drop_rubble(at, size, cause="collapse", robot=rid)
         return list(at)
+
+    def radio_fail(self, relay=None):
+        """Scenario event `radio_fail`: a relay's radio dies (default the first powered, non-phone
+        relay). Its stored bundles are lost like a destroyed relay's; no rubble falls."""
+        if relay is None:
+            relay = next((rid for rid, r in self.relays.items()
+                          if r["on"] and not r["phone"] and not r.get("destroyed")), None)
+        if relay is None or relay not in self.relays or self.relays[relay].get("destroyed"):
+            raise ValueError("No powered relay to fail")
+        node = self.relays[relay]
+        node.update(on=False, destroyed=True)
+        lost = self.network.destroy(relay)
+        self.events.append({"kind": "relay_destroyed", "id": relay, "pos": list(node["pos"]),
+                            "lost_bundles": lost, "cause": "radio_fail"})
+        self.events.append({"kind": "radio_fail", "relay": relay, "lost_bundles": lost})
+        self._update_links()
+        return relay
 
     def drop_rubble(self, at, size=1.4, cause=None, robot=None):
         x, y = at
