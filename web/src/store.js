@@ -39,11 +39,11 @@ export function setView(view) {
 
 // K key: night operations lighting (dark interior, headlights, emergency lights). Off by
 // default until a dry run passes; remembered per browser.
+// Night operations lighting is the scene (the K toggle is gone; an old stored choice is ignored).
 function readNight() {
-  try { return localStorage.getItem('dz-night') !== '0' } catch { return true }
+  return true
 }
 export function setNight(on) {
-  try { localStorage.setItem('dz-night', on ? '1' : '0') } catch { /* storage blocked: session only */ }
   useSim.getState().set({ night: on })
 }
 
@@ -80,7 +80,6 @@ export const useSim = create((set) => ({
   joinOpen: false,     // full screen QR overlay (Q key)
   helpOpen: false,     // key list overlay (? key)
   joinUrl: null,       // phone join URL from /api/join
-  showTruth: false,    // T key: faint truth survivors on the Reality pane only
   plan: null,          // shared search plan from plan_state (null when none)
   dispatchedPlans: [], // plan IDs with an accepted dispatch (plan_dispatched events)
   follow: null,        // robot id the cameras follow (keys 1-3), null = overview
@@ -108,7 +107,7 @@ export const useSim = create((set) => ({
   bigDeliveries: 0,    // count of survivor / route / fault reports delivered to CMD (antenna pulse)
   director: false,     // D key: auto-director camera
   shot: null,          // { caption, at } of the director's current shot
-  night: readNight(),  // night operations lighting is the default scene; K switches to day
+  night: readNight(),  // night operations lighting: the scene
   perf: readPerf(),    // P key: lighter rendering for a slow demo laptop (remembered per browser)
   insetSwap: false,   // C key, one view only: the Command post inset and the main view swap places
   view: readView(),    // M key: 'split' (two panes) or 'gap' (one view + Command gap), remembered
