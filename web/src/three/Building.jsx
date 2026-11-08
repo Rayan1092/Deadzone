@@ -227,6 +227,8 @@ export default function Building({ thermal = false, blueprint = false, props = t
       {mode === 'plain' && <Slab W={W} H={H} />}
       {mode === 'plain' && fp.rooms.map((r) => <RoomFloor key={r.id} room={r} />)}
       <Walls walls={fp.walls} mode={mode} />
+      {/* aftershock walls are truth geometry: Reality panes only, never Command or the inset */}
+      {props && fp.dynamic_walls?.length > 0 && <Walls walls={fp.dynamic_walls} mode={mode} />}
       <Baked deps={[fp, mode, props]}>
         {mode === 'plain' && (fp.doors ?? []).map((d, i) => <Door key={i} door={d} walls={fp.walls} />)}
         {!blueprint && <Debris rubble={fp.rubble || []} cold={thermal} />}

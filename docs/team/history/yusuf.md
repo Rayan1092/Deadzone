@@ -29,7 +29,7 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Fog no longer paints black slabs over walls or (Reality only) rubble piles. Reality panes drop the teal scan tint; Command keeps it.
   - Performance: static props merged per material (`Baked.jsx`), and the shadow map renders only while the scene settles. Measured in this browser: about 25 fps full quality, 28 in P mode, against a 30 fps cap.
 - **Contract changes:** none (frontend only; the DEMO.md beats are unaffected).
-- **Heads-up for others:** the overview camera is pulled back slightly to fit the truck west of the wall. Press P on a weak laptop.
+- **Heads-up for others:** the overview camera is pulled back slightly to fit the truck west of the wall. Press P on a weak laptop. Aziz: merged main; aftershock `floorplan.dynamic_walls` now draw on Reality panes only (not Command, not the inset). Key A comes next.
 - **Next:** Step 4 collapsed scheduler strip, Step 5 auto-director camera.
 
 ### 2026-11-08 00:50 · p3/realism · Step 3: 3D realism pass
