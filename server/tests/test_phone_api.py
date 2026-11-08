@@ -75,6 +75,43 @@ def test_dispatch_uses_latest_delivered_battery_not_old_approval(session):
     assert not hub.sim.network.queues["CMD"]
 
 
+def test_quiet_preload_sends_only_plan_state_then_explicit_check_and_dispatch_reject(session):
+    client, hub = session
+    # A deliberately unsafe draft must save quietly without granting approval.
+    hub.sim.post.robots["R1"]["battery_pct"] = 1
+    hub.sim.drain_events()  # startup link/delivery events are unrelated to preload
+    with client.websocket_connect("/ws/screen") as screen:
+        assert [screen.receive_json()["t"] for _ in range(4)] == ["hello", "maps", "tick", "plan_state"]
+        with client.websocket_connect("/ws/phone?client=phone-a") as phone:
+            initial(phone)
+            response = client.post("/api/plan?check=false", json=draft())
+            assert response.json() == {"saved": True, "plan_id": "P-1", "checked": False}
+            assert screen.receive_json()["t"] == phone.receive_json()["t"] == "plan_state"
+            # Following sentinel frames prove no safety/event frames were queued.
+            client.portal.call(hub.broadcast_tick, True)
+            assert screen.receive_json()["t"] == "tick"
+            assert screen.receive_json()["t"] == "maps"
+            assert phone.receive_json()["t"] == "cmd_view"
+            phone.send_json({"t": "plan_submit", "data": {"plan_id": "P-1"}})
+            result = phone.receive_json()
+            assert result["t"] == "safety" and not result["data"]["ok"]
+            assert screen.receive_json()["data"]["kind"] == "safety_reject"
+    assert not client.post("/api/dispatch", json={"plan_id": "P-1"}).json()["ok"]
+    assert not hub.sim.network.queues["CMD"]
+
+
+def test_quiet_save_still_validates_geometry_and_dispatched_id(session):
+    client, hub = session
+    data = draft()
+    data["zones"][0]["poly"][0][0] = -1
+    assert client.post("/api/plan?check=false", json=data).status_code == 422
+    assert hub.plans.current() is None
+    assert client.post("/api/plan?check=false", json=draft()).json()["saved"]
+    assert client.post("/api/dispatch", json={"plan_id": "P-1"}).json()["ok"]
+    data = draft() | {"lost_link_budget_s": 90}
+    assert client.post("/api/plan?check=false", json=data).status_code == 409
+
+
 def test_two_planner_phones_share_draft_and_receive_safety_result(session):
     client, hub = session
     with client.websocket_connect("/ws/phone?client=phone-a") as a:
