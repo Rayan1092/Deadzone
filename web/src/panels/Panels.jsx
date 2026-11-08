@@ -17,7 +17,7 @@ import { ping, setSound, soundOn } from '../audio'
 
 export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
-  ['R', 'rubble ahead of the robot'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
+  ['R', 'rubble ahead of the followed robot (R1 on the overview)'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
   ['U', 'resume after safe stop'], ['A', 'aftershock at a random spot (server needs DZ_AFTERSHOCK=1)'], ['⇧A', 'strong aftershock: three areas, two relays'], ['N', 'new random building (Q&A)'], ['⇧N', 'back to the main building'], ['B', 'baseline: robots without Deadzone (with control leases on: Unlock first)'], ['L', 'AI Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
   ['M', 'one view / split view'], ['C', 'one view: swap the Command post inset and the main view'], ['Y', 'belief map: where survivors may still be'], ['E', 'judge layout / all panels (sidebar, scheduler, legends)'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
   ['J', 'judge test (Q&A)'], ['I', 'under the hood (Q&A)'],
@@ -360,10 +360,17 @@ export function useKeyboard() {
       if (e.key === '-') control('speed', s.speed / 2)
       if (/^[1-9]$/.test(e.key) && robots[Number(e.key) - 1]) followRobot(robots[Number(e.key) - 1].id)
       if (e.key === '0') overview()
-      if (key === 'r' && target) {
-        // drop rubble 1.5 m ahead of the robot
-        const [x, y, th] = target.pose
-        control('director', { do: 'rubble', at: [x + Math.cos(th) * 1.5, y + Math.sin(th) * 1.5] })
+      if (key === 'r' && !e.repeat) {
+        // rubble ahead of the robot the camera follows (1-3), R1 on the overview. The control
+        // contract (PLAN.md director keys; RubbleFault takes `at` only) has no robot field: the
+        // spot 1.5 m ahead of it makes the server credit that robot (nearest), and with
+        // DZ_SMART_RUBBLE=1 move the drop onto its planned path. The banner names the server's robot.
+        const aim = robots.find((r) => r.id === s.follow) ?? robots.find((r) => r.id === 'R1') ?? robots[0]
+        if (aim) {
+          const [x, y, th] = aim.pose
+          s.set({ rubbleAimed: { robot: aim.id, at: Date.now() } })
+          control('director', { do: 'rubble', at: [x + Math.cos(th) * 1.5, y + Math.sin(th) * 1.5] })
+        }
       }
       if (key === 'f' && target) control('director', { do: 'overcurrent', robot: target.id })
       if (key === 'o' && target) control('director', { do: 'overload', robot: target.id })
