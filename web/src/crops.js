@@ -9,7 +9,14 @@ const ready = fetch('/crops/manifest.json').then((r) => (r.ok ? r.json() : null)
 
 export function useCropManifest() {
   const [m, setM] = useState(manifest)
-  useEffect(() => { if (!manifest) ready.then(setM) }, [])
+  // always subscribe: the fetch can finish between the first render and this effect (the
+  // 3D panes compile their shaders in between), and a skipped update left the cards on the
+  // fallback caption with no Grad-CAM for the whole run
+  useEffect(() => {
+    let live = true
+    ready.then((j) => { if (live) setM(j) })
+    return () => { live = false }
+  }, [])
   return m
 }
 
