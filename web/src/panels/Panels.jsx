@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { setLayout, setNight, setPerf, setView, useSim } from '../store'
 import { control } from '../net/socket'
-import { FAULT_LABEL, describeEvent, fmtClock as fmt, latestRoutes, robotStateLabel } from '../format'
+import { FAULT_LABEL, describeEvent, fmtClock as fmt, latestRoutes, robotStateLabel, unitName } from '../format'
 import { lastContact, linkQuality, linkText } from './robotCard'
 import { FILTERS, eventCategory, feedParts, readFilters, robotIds, saveFilters, visibleEvents } from './eventFeed'
 import { JoinButton } from './JoinPanel'
@@ -18,9 +18,9 @@ import { ping, setSound, soundOn } from '../audio'
 export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
   ['R', 'rubble ahead of the followed robot (R1 on the overview)'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
-  ['U', 'resume after safe stop'], ['A', 'aftershock at a random spot (server needs DZ_AFTERSHOCK=1)'], ['⇧A', 'strong aftershock: three areas, two relays'], ['N', 'new random building (Q&A)'], ['⇧N', 'back to the main building'], ['B', 'baseline: robots without Deadzone (with control leases on: Unlock first)'], ['L', 'AI Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
-  ['M', 'one view / split view'], ['C', 'one view: swap the Command post inset and the main view'], ['Y', 'belief map: where survivors may still be'], ['E', 'judge layout / all panels (sidebar, scheduler, legends)'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
-  ['J', 'judge test (Q&A)'], ['I', 'under the hood (Q&A)'],
+  ['U', 'resume after safe stop'], ['A', 'aftershock at a random spot (server needs DZ_AFTERSHOCK=1)'], ['⇧A', 'strong aftershock: three areas, two relays'], ['N', 'new random building (Q&A)'], ['⇧N', 'back to the main building'], ['B', 'baseline: robots without Deadzone (with control leases on: Unlock first)'], ['L', 'Model Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
+  ['M', 'one view / split view'], ['C', 'one view: swap the Command post inset and the main view'], ['Y', 'belief map: where survivors may still be'], ['E', 'Operator view / Engineering view (sidebar, scheduler, legends)'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save the mission recording (open with ?record)'],
+  ['J', 'Model test: a held-out sample (Q&A)'], ['I', 'under the hood (Q&A)'], ['?replay', 'mission replay: plays a saved mission recording, no server'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
 ]
 
@@ -60,8 +60,9 @@ export function RescueStatus() {
   )
 }
 
-// Presenter lock (control leases on): locked until the presenter takes the fleet; while it holds
-// it, phones see every robot locked. Shows who else holds a robot. Hidden when leases are off.
+// Operator lock (control leases on): locked until this console takes the fleet; while it holds
+// it, phones see every robot locked ("Console has control"). Shows who else holds a robot.
+// Hidden when leases are off.
 function PresenterLock() {
   const leases = useSim((s) => s.leases)
   const p = useSim((s) => s.presenter)
@@ -70,11 +71,11 @@ function PresenterLock() {
   return (
     <span className={`lock-chip ${p.held ? 'open' : 'locked'}`} role="status">
       <i />
-      {p.held ? 'Presenter controls on · phones locked out' : 'Presenter controls locked'}
-      {others.length > 0 && <small>{others.map((r) => `${r.robot}: ${r.controller.name}`).join(' · ')}</small>}
+      {p.held ? 'Console has control · field units locked out' : 'Operator lock'}
+      {others.length > 0 && <small>{others.map((r) => `${r.robot}: ${unitName(r.controller.name)}`).join(' · ')}</small>}
       {!REPLAY && (
         <button disabled={p.pending} onClick={p.held ? lock : unlock}
-                title={p.held ? 'Release the robots so phones can take them' : 'Take every robot for the presenter (B and U need it)'}>
+                title={p.held ? 'Release the robots so field units can take them' : 'Take every robot for this console (B and U need it)'}>
           {p.pending ? '…' : p.held ? 'Lock' : 'Unlock'}
         </button>
       )}
@@ -121,7 +122,7 @@ export function TopBar() {
         </button>
         {!REPLAY && <JoinButton />}
         <button className="icon-btn" title="Keys (?)" onClick={() => set({ helpOpen: true })}>?</button>
-        <button title="Held-out thermal judge test (J)" onClick={() => set({ judgeOpen: true, hoodOpen: false, labOpen: false })}>J · Test</button>
+        <button title="Model test on a held-out thermal sample (J)" onClick={() => set({ judgeOpen: true, hoodOpen: false, labOpen: false })}>J · Model test</button>
         <button title="Live diagnostic counters (I)" onClick={() => set({ hoodOpen: true, judgeOpen: false, labOpen: false })}>I · Counters</button>
         {!REPLAY && <span className={connected ? 'conn ok' : 'conn bad'}>{connected ? 'live' : 'offline'}</span>}
       </div>
@@ -155,7 +156,7 @@ export function Sidebar() {
   const robots = tick?.reality.robots ?? []
   const cmdRobots = Object.fromEntries((tick?.command.robots ?? []).map((r) => [r.id, r]))
   const leases = useSim((s) => s.leases)
-  const leaseHolder = Object.fromEntries((leases?.enabled ? leases.robots : []).filter((l) => l.controller).map((l) => [l.robot, l.controller.name]))
+  const leaseHolder = Object.fromEntries((leases?.enabled ? leases.robots : []).filter((l) => l.controller).map((l) => [l.robot, unitName(l.controller.name)]))
   return (
     <aside className="sidebar">
       <h3>Robots</h3>
@@ -346,7 +347,11 @@ export function useKeyboard() {
         else s.set({ toasts: [...s.toasts, { kind: 'note', msg: 'C swaps the Command post inset in one view: press M first', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
       }
       if (key === 'y') { const on = !s.beliefOn; try { localStorage.setItem('dz-belief', on ? '1' : '0') } catch { /* session only */ } s.set({ beliefOn: on }) }
-      if (key === 'e') setLayout(s.layout === 'judge' ? 'full' : 'judge')
+      if (key === 'e') {
+        const next = s.layout === 'judge' ? 'full' : 'judge' // 'judge' is the stored id of the Operator view
+        setLayout(next)
+        s.set({ toasts: [...s.toasts, { kind: 'note', msg: next === 'judge' ? 'Operator view: map first, panels on hover' : 'Engineering view: every panel', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
+      }
       if (key === 'x') {
         setSound(!soundOn())
         s.set({ toasts: [...s.toasts, { kind: 'note', msg: soundOn() ? 'Sound cues on' : 'Sound cues off', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
@@ -365,13 +370,14 @@ export function useKeyboard() {
         // robot}; on the overview no robot (the server means R1). With DZ_SMART_RUBBLE=1 it lands on
         // that robot's planned path 3-4 m ahead at a spot that traps nobody.
         const followed = robots.find((r) => r.id === s.follow)
-        s.set({ rubbleAimed: { robot: followed?.id ?? 'R1', at: Date.now() } })
+        s.set({ rubbleAimed: { robot: followed?.id ?? 'R1', at: Date.now() }, pressedAt: { ...s.pressedAt, rubble: Date.now() } })
         control('rubble', undefined, followed ? { robot: followed.id } : {})
       }
       if (key === 'f' && target) control('director', { do: 'overcurrent', robot: target.id })
       if (key === 'o' && target) control('director', { do: 'overload', robot: target.id })
       if (key === 'u' && target && !presenterLocked()) control('director', { do: 'resume', robot: target.id })
       // server picks the spot: the first powered relay (crushing it), else the corridor
+      if (key === 'a') s.set({ pressedAt: { ...s.pressedAt, aftershock: Date.now() } })
       if (key === 'a') control('director', { do: 'aftershock', ...(e.shiftKey ? { strength: 'strong' } : {}), ...pickAftershock(s) })
       if (key === 'n') nextScenario(e.shiftKey)
       // "without Deadzone": robots stop and wait whenever they lose the link

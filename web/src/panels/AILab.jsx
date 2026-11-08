@@ -136,7 +136,7 @@ function Live({ crops }) {
   const events = useSim((s) => s.events)
   const last = events.find((e) => e.kind === 'survivor_found' || e.kind === 'hotspot_rejected' || e.kind === 'hotspot_unsure')
   const [heat, setHeat] = useState(true)
-  if (!last) return <div className="lab-live empty muted">Waiting for a robot to judge a hot spot…</div>
+  if (!last) return <div className="lab-live empty muted">Waiting for a robot to classify a hot spot…</div>
   const person = last.kind === 'survivor_found'
   const unsure = last.kind === 'hotspot_unsure'
   const entry = cropEntry(crops, last.crop)
@@ -145,11 +145,11 @@ function Live({ crops }) {
   return (
     <div className="lab-live">
       <div className="lab-crop">
-        {last.crop ? <img src={`/crops/${last.crop}`} alt="Thermal crop the robot judged" /> : <div className="crop-ph">thermal</div>}
+        {last.crop ? <img src={`/crops/${last.crop}`} alt="Thermal crop the robot classified" /> : <div className="crop-ph">thermal</div>}
         {heat && heatmap && <img className="lab-heat" src={`/crops/${heatmap}`} alt="Grad-CAM: where the model looked" />}
       </div>
       <div className="lab-live-text">
-        <span className="muted small">Just judged onboard · {last.robot} · T+{fmtClock(last.time ?? 0)}</span>
+        <span className="muted small">Just classified onboard · {last.robot} · T+{fmtClock(last.time ?? 0)}</span>
         {entry?.shows && <span className="det-shows">{entry.shows}</span>}
         <span className="det-caption">{cropCaption(crops, entry)}</span>
         <b className={person ? 'yes' : unsure ? 'unsure' : 'no'}>
@@ -158,7 +158,7 @@ function Live({ crops }) {
         <span className="muted small">
           {unsure ? `Hot spot ${last.id}: moving closer for a second look`
             : person ? `Survivor ${last.survivor}` : `Hot spot ${last.id}${entry?.object ? ` (${entry.object})` : ''}, rejected`}
-          {last.looked_closer && last.conf_far != null ? ` · unsure ${pct(last.conf_far, 0)} from afar, judged again up close` : ''}
+          {last.looked_closer && last.conf_far != null ? ` · unsure ${pct(last.conf_far, 0)} from afar, classified again up close` : ''}
         </span>
         {heatmap && (
           <label className="lab-toggle">
@@ -215,15 +215,15 @@ export default function AILab() {
   const curve = lab?.curve?.length > 1 ? lab.curve : null
   return (
     <div className="lab-backdrop" onClick={() => set({ labOpen: false })}>
-      <div className="lab" role="dialog" aria-label="AI Lab" onClick={(e) => e.stopPropagation()}>
+      <div className="lab" role="dialog" aria-label="Model Lab" onClick={(e) => e.stopPropagation()}>
         <header className="lab-head">
           <div>
-            <b>AI Lab</b>
+            <b>Model Lab</b>
             <span className="muted">
-              Onboard person detector{model ? ` · ${model}` : ''} · judges thermal crops on the robot, no signal needed
+              Onboard person detector{model ? ` · ${model}` : ''} · classifies thermal crops on the robot, no signal needed
             </span>
           </div>
-          <button className="report-close" aria-label="Close AI Lab" onClick={() => set({ labOpen: false })}>×</button>
+          <button className="report-close" aria-label="Close Model Lab" onClick={() => set({ labOpen: false })}>×</button>
         </header>
         <div className="lab-body">
           <section className="lab-col">

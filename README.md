@@ -113,7 +113,7 @@ We used AI coding assistants to build this, and we're saying so because MLH asks
 
 **Datasets**
 
-- **Teledyne FLIR ADAS v2 thermal dataset**: street-scene thermal images with person boxes; training data, the held-out test set (1,200 images), the judge test pool and the decoy images. Used under Teledyne's free dataset terms; nothing from it is committed to this repo.
+- **Teledyne FLIR ADAS v2 thermal dataset**: street-scene thermal images with person boxes; training data, the held-out test set (1,200 images), the Model test's held-out set and the decoy images. Used under Teledyne's free dataset terms; nothing from it is committed to this repo.
 - **SDT, Synthetic Depth & Thermal dataset** ([Zenodo 4124309](https://zenodo.org/records/4124309)), **CC BY 4.0** (the record also says non-commercial research use): we use only its real indoor split, FLIR Lepton 3.5 frames of people lying, sitting and standing plus empty rooms. 80% trains, 20% is held out; the sim's three survivors come from the held-out part. Nothing from it is committed either.
 
 **Published numbers we lean on**

@@ -24,8 +24,8 @@ export default function JudgeTest() {
     fetch(POOL_ROOT + 'manifest.json', { signal: controller.signal, cache: 'no-cache' })
       .then((response) => {
         if (!response.ok) throw new Error(response.status === 404
-          ? 'Judge pool is not available yet. Enable AI Lab and wait for the held-out export.'
-          : `Judge pool could not load (${response.status}).`)
+          ? 'The held-out test set is not available yet. Enable the Model Lab and wait for the held-out export.'
+          : `The held-out test set could not load (${response.status}).`)
         return response.json()
       })
       .then((raw) => {
@@ -52,14 +52,14 @@ export default function JudgeTest() {
     setImageReady(false); setImageError(false)
   }
   return (
-    <DataPanel title="Judge test" onClose={() => set({ judgeOpen: false })} className="judge-test">
+    <DataPanel title="Model test · held-out sample" onClose={() => set({ judgeOpen: false })} className="judge-test">
       <p>Can you spot a person in a real thermal image? Make your guess before the model result and label are revealed.</p>
       <div className="judge-tally" aria-live="polite">
         <span>Model <b>{tally.model} of {tally.rounds}</b></span><span>You <b>{tally.judge} of {tally.rounds}</b></span>
       </div>
-      {loading && <p role="status">Loading the held-out judge pool…</p>}
+      {loading && <p role="status">Loading a held-out sample…</p>}
       {error && <p role="alert" className="data-panel-note">{error}</p>}
-      {!loading && error && <button onClick={() => setReload((n) => n + 1)}>Retry pool</button>}
+      {!loading && error && <button onClick={() => setReload((n) => n + 1)}>Retry</button>}
       {pool && current && <>
         <figure><img key={current.id} src={current.url} alt="Thermal crop to classify"
                      onLoad={() => setImageReady(true)} onError={() => setImageError(true)} />

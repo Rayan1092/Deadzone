@@ -273,7 +273,7 @@ function steps(f, events) {
   }
   // decided after a close look: say where the doubt was and what the close-up said
   const second = f.confFar != null
-    ? [{ done: true, text: f.closer ? `Unsure from afar (${pct(f.confFar)}) · judged again up close` : `Unsure from afar (${pct(f.confFar)}) · could not get close` }]
+    ? [{ done: true, text: f.closer ? `Unsure from afar (${pct(f.confFar)}) · classified again up close` : `Unsure from afar (${pct(f.confFar)}) · could not get close` }]
     : []
   if (f.kind === 'decoy') {
     return [

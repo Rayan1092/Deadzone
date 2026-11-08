@@ -60,8 +60,8 @@ export function describeEvent(e) {
     case 'relay_dropped': // owner is a robot id, a relay phone's client label, or null
       if (e.beacon_for) return `Radio beacon left with survivor ${e.beacon_for} (${e.id})`
       if (/^R\d+$/.test(e.owner ?? '')) return `${e.owner} left a radio relay (${e.id})`
-      return e.owner ? `Phone ${e.owner} joined as relay ${e.id}` : `Relay ${e.id} placed`
-    case 'relay_power': return `${e.phone ? `Phone relay ${e.id}` : `Relay ${e.id}`} switched ${e.on ? 'on' : 'off'}`
+      return e.owner ? `${unitName(e.owner)} joined as relay ${e.id}` : `Relay ${e.id} placed`
+    case 'relay_power': return `${e.phone ? `Field unit relay ${e.id}` : `Relay ${e.id}`} switched ${e.on ? 'on' : 'off'}`
     case 'hotspot_rejected': return `${e.robot}'s detector rejected hot spot ${e.id}: not a person${e.looked_closer ? ', after a closer look' : ''}`
     case 'rescue_route': return e.updated
       ? `Route for rescuers to ${e.survivor} redrawn around new rubble · ${Math.round(e.length_m)} m`
@@ -75,7 +75,8 @@ export function describeEvent(e) {
       ? 'Baseline mode: without Deadzone, robots stop and wait when they lose the link'
       : 'Deadzone on: robots keep exploring in the dark'
     case 'aftershock': return `Aftershock: ceiling collapsed${e.destroyed_relay ? `, relay ${e.destroyed_relay} crushed` : ''}`
-    case 'relay_destroyed': return `Relay ${e.id} destroyed${e.lost_bundles ? `, ${e.lost_bundles} bundles lost with it` : ''}`
+    case 'relay_destroyed': return `Relay ${e.id} ${e.cause === 'radio_fail' ? 'lost its radio' : 'destroyed'}${e.lost_bundles ? `, ${e.lost_bundles} bundles lost with it` : ''}`
+    case 'radio_fail': return `Relay ${e.relay}'s radio failed${e.lost_bundles ? ` · ${e.lost_bundles} bundles lost` : ''}`
     case 'control_error': return e.code === 'feature_disabled' ? 'Aftershock is off: start the server with DZ_AFTERSHOCK=1' : e.msg
     case 'note': return e.msg
     case 'robot_shutdown': return `${e.robot} back at command, ${(e.found ?? []).length} survivor${(e.found ?? []).length === 1 ? '' : 's'} found, powered down`
@@ -131,16 +132,66 @@ export function freshDelivery(survivor, now) {
 // collapse_01) gets a big alert banner; an R press a smaller one naming the robot it landed in
 // front of. Other rubble (an aftershock's own) has no cause and its own banner. `robot` is the
 // server's (the robot the drop was aimed at), else the robot the screen aimed it at.
-export function rubbleBanner(ev, aimed) {
-  if (ev?.kind !== 'rubble_fall' || !ev.cause) return null
+export function rubbleBanner(ev, aimed, scenario = false) {
+  if (ev?.kind !== 'rubble_fall') return null
   const robot = ev.robot ?? aimed ?? null
   if (ev.cause === 'collapse') {
-    return { title: 'SECONDARY COLLAPSE', sub: robot ? `${robot} blocked` : 'A robot is blocked', tone: 'alert', size: 'major' }
+    return { title: 'SECONDARY COLLAPSE', sub: `${SCENARIO_TAG} · ${robot ? `${robot} blocked` : 'a robot is blocked'}`, tone: 'alert', size: 'major' }
   }
+  // the floor plan's timeline dropping rubble (no cause): named as the scenario's doing
+  if (!ev.cause) return scenario ? { title: 'RUBBLE', sub: `${SCENARIO_TAG} · part of the ceiling came down`, tone: 'warn', size: 'minor', ms: 3500 } : null
   return { title: 'RUBBLE', sub: robot ? `Dropped ahead of ${robot}` : 'Dropped ahead of the robot', tone: 'warn', size: 'minor', ms: 3500 }
 }
 
 export function polyCenter(poly) {
   if (!poly?.length) return null
   return [poly.reduce((t, p) => t + p[0], 0) / poly.length, poly.reduce((t, p) => t + p[1], 0) / poly.length]
+}
+
+// Field units: phones show as "Field unit N". A phone claims robots under the lowest number no
+// other holder in the shared lease table uses (so every screen shows the same name); a raw client
+// label (phone-4, phone-k3f2) is shown the same way wherever it appears.
+export function unitName(label) {
+  if (typeof label !== 'string' || !label) return 'A field unit'
+  const m = label.match(/^phone-(.+)$/)
+  if (!m) return label
+  return `Field unit ${/^\d+$/.test(m[1]) ? m[1] : m[1].toUpperCase()}`
+}
+export function fieldUnitName(leases, client) {
+  const held = (leases?.robots ?? []).filter((r) => r.controller)
+  const mine = held.find((r) => r.controller.client === client && /^Field unit \d+$/.test(r.controller.name))
+  if (mine) return mine.controller.name
+  const used = new Set(held.filter((r) => r.controller.client !== client).map((r) => r.controller.name))
+  let n = 1
+  while (used.has(`Field unit ${n}`)) n++
+  return `Field unit ${n}`
+}
+
+// Scenario events: what the building's scenario makes happen on its own, not a key on this console.
+// Rayan's floor plan `events` (collapse, aftershock, radio_fail; PLAN.md "Scenario events") fire at
+// their `t`: an event whose type and sim time match a scheduled entry is one (an A-key aftershock
+// looks the same on the wire, so the schedule decides). The secondary collapse and a radio failure
+// always are (no key makes either). With the opt-in `timeline` player on, an aftershock or rubble
+// this screen did not just ask for is one too; so is anything the server marks.
+const SCENARIO_TYPE = (ev) => (ev.kind === 'rubble_fall' ? (ev.cause === 'collapse' ? 'collapse' : ev.cause ? null : 'aftershock')
+  : ev.kind === 'aftershock' ? 'aftershock'
+  : ev.kind === 'radio_fail' || (ev.kind === 'relay_destroyed' && ev.cause === 'radio_fail') ? 'radio_fail'
+  : ev.kind === 'relay_destroyed' ? 'aftershock' : null)
+export function scheduledScenario(ev, time, events) {
+  const type = ev && SCENARIO_TYPE(ev)
+  if (!type || !Array.isArray(events)) return null
+  return events.find((e) => e?.type === type && Math.abs((e.t ?? -1e9) - time) <= 0.6) ?? null
+}
+export function isScenarioEvent(ev, { timeline = false, pressedRecently = false, scheduled = null } = {}) {
+  if (!ev) return false
+  if (scheduled || ev.scenario === true || ev.source === 'timeline' || ev.source === 'scenario') return true
+  if (ev.kind === 'radio_fail' || (ev.kind === 'relay_destroyed' && ev.cause === 'radio_fail')) return true
+  if (ev.kind === 'rubble_fall' && ev.cause === 'collapse') return true
+  if (ev.kind === 'rubble_fall' && ev.cause === 'key') return false
+  return timeline && !pressedRecently && (ev.kind === 'aftershock' || ev.kind === 'rubble_fall' || ev.kind === 'radio_fail')
+}
+export const SCENARIO_TAG = 'Scenario event'
+export function radioFailBanner(ev, label) {
+  const lost = ev.lost_bundles ? ` · ${ev.lost_bundles} bundle${ev.lost_bundles === 1 ? '' : 's'} lost` : ''
+  return { title: 'RADIO FAILURE', sub: `${SCENARIO_TAG} · ${label || `relay ${ev.relay} lost its radio`}${lost}`, tone: 'alert' }
 }
