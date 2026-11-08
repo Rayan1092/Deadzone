@@ -52,13 +52,32 @@ function Lights({ perf, night }) {
     t.position.set(W / 2, 0, -H / 2)
     return t
   }, [W, H])
+  // earthquake: the lights stutter for the length of the shake (power flicker), then recover
+  const amb = useRef()
+  const hemi = useRef()
+  const sun = useRef()
+  const base = useRef(null)
+  useFrame(() => {
+    const a = useSim.getState().aftershock
+    const age = a ? (performance.now() - a.born) / 1000 : Infinity
+    const lights = [amb.current, hemi.current, sun.current]
+    if (!lights.every(Boolean)) return
+    if (age > 5.5) {
+      if (base.current) { lights.forEach((l, i) => { l.intensity = base.current[i] }); base.current = null }
+      return
+    }
+    base.current ??= lights.map((l) => l.intensity)
+    const burst = Math.sin(age * 41) + Math.sin(age * 23.7) + Math.sin(age * 7.1)
+    const f = age < 0.4 ? 0.25 : burst > 1.1 ? 0.3 : 1 - 0.25 * Math.max(0, 1 - age / 5.5)
+    lights.forEach((l, i) => { l.intensity = base.current[i] * f })
+  })
   return (
     <>
-      <ambientLight intensity={night ? 0.06 : 0.08} />
-      <hemisphereLight args={night ? ['#7d92bd', '#1a1512', 0.42] : ['#c4d3e6', '#2b2622', 0.35]} />
+      <ambientLight ref={amb} intensity={night ? 0.06 : 0.08} />
+      <hemisphereLight ref={hemi} args={night ? ['#7d92bd', '#1a1512', 0.42] : ['#c4d3e6', '#2b2622', 0.35]} />
       <primitive object={target} />
       {/* night: a weak cold moon instead of the afternoon sun */}
-      <directionalLight position={[W / 2 - 17.5, 32, -H / 2 + 15]} target={target} intensity={night ? 1.25 : 2.6} color={night ? '#a7bbff' : '#ffe0b5'}
+      <directionalLight ref={sun} position={[W / 2 - 17.5, 32, -H / 2 + 15]} target={target} intensity={night ? 1.25 : 2.6} color={night ? '#a7bbff' : '#ffe0b5'}
                         castShadow={!perf} shadow-mapSize={[4096, 4096]} shadow-bias={-0.0004} shadow-normalBias={0.03}
                         shadow-camera-left={-34} shadow-camera-right={34}
                         shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-far={100} />

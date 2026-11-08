@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/collapse-geometry`: Rayan's "real collapse" list. Step 1 broken walls done; steps 2-4 (ceiling, debris, night atmosphere) being built in parallel worktrees and integrated next; then 5 cinematic camera, 6 robot glTF loader. Before/after shots in `docs/visuals/`.
+- **Working on:** `p3/collapse-geometry`: Rayan's collapse list and the 12:20 AM final-stretch list are built (walls, ceiling, debris, night atmosphere, camera, rover loader, captions, judge labels, Rescue Status strip, earthquake v2, banners, generic props, exterior shell). PR #93 open for all of it after #85. Dropped: multi-story interior, voice UI, clinic map.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,68 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 12:20 · p3/collapse-geometry · Key N wired to Aziz's reset-into-floorplan control; Shift+A strong aftershock
+- **Did:** per `docs/FINAL-STRETCH-BACKEND.md`: **N** reads `GET /api/scenarios`, prefers ids matching `variant` for the current building (Rayan's shuffled-survivor variants, once they exist), else cycles the other registered maps (`generated/gen_1..3` today), and sends `{action:"reset", value:{floorplan:<id>, timeline:false}}`; the following `hello` raises the "NEW SCENARIO" banner. On a server without the endpoint it shows "New scenario needs the latest server". **Shift+A** sends `{do:"aftershock", strength:"strong"}` (three areas, up to two relays); plain A is unchanged.
+- **Contract changes:** none (consumes Aziz's). New keys N and Shift+A.
+- **Heads-up for others:** Rayan: when `data/floorplans/variants/<name>.json` exist and are registered, N picks them before the generated buildings; name them with `variant` in the id. Aziz: thanks, both contracts worked as posted.
+- **Next:** dry-run fixes.
+
+### 2026-11-08 12:05 · p3/collapse-geometry · Exterior shell: storey stubs, floor-slab lip, pancaked corner slab, street
+- **Did:** `web/src/three/Shell.jsx` (visual only, outside the footprint or above WALL_H, derived from `fp.size`): jagged brick and concrete stubs of an upper storey on the outer walls (tall on the far north and east sides and at the corners, low on the near sides so the overview still looks into the rooms), window frames left in the taller stubs, rebar out of the breaks, a thin floor-slab lip where the upper floor sheared off, a pancaked upper slab hanging off the north-west corner onto the ruins, and a street west of the lot (kerbs, dashed centre line). Mounted inside `Baked` on Reality panes only, not in the robot camera's copy. Shots: `docs/visuals/final-a-overview.jpg`, `final-f-street.jpg`. About 30 fps here with two WebGL tabs open; 55-60 with one.
+- **Contract changes:** none.
+- **Heads-up for others:** Rayan: that completes your 12:20 AM list for me. Everything is on PR #93 (after #85). Remaining for me if time allows: wire key N once Aziz posts the control, sound cues.
+- **Next:** PR #93 updated; dry-run fixes.
+
+### 2026-11-08 11:50 · p3/collapse-geometry · Earthquake v2 visuals, banners, rumble; generic furnishing for any floor plan
+- **Did:**
+  - **Earthquake v2 (key A, Aziz's strength setting feeds it as more `aftershock` events):** 5.2 s of shake with a hard first half second and a long decay; four ceiling slabs and fourteen chunks fall from roof height onto the collapse footprint, bounce once and stay as debris; a bigger, longer dust cloud; the scene lights stutter for the length of the shake (power flicker) and recover; a synthesized rumble (sub-bass thud plus a low swell, Web Audio, only after a user gesture such as the A key); an "AFTERSHOCK" banner over the main view ("Part of the building came down · relay RL2 crushed · robots rerouting").
+  - **"NEW SCENARIO" banner:** fires when `hello` brings a different building, or the same building with the survivors moved after a reset (key N variants), with the building's name. The N key itself waits for Aziz's reset-into-floorplan control name.
+  - **Props on random floor plans:** every room is furnished from its name (office, storage, break, plant, corridor) with a default for rooms we can't classify; items hug walls (centre <= 0.5 m), stay 1.2 m from doors and 0.8 m from corners. `?generic=1` shows it on the demo building to compare; the demo building keeps its hand layout.
+  - `window.__dz` exposes the store for testing (the aftershock visuals were checked by setting `aftershock` by hand; the user's server runs without `DZ_AFTERSHOCK=1`).
+- **Contract changes:** none.
+- **Heads-up for others:** Aziz: when your strength setting sends a second `aftershock` ~10 s later, the shake, slabs and banner play again from that event's `at`. Rayan: the banner copy is judge language; tell me if you want other words.
+- **Next:** exterior shell (upper-floor remnant, street), then the PR.
+
+### 2026-11-08 11:25 · p3/collapse-geometry · Captions on every AI image, judge-first labels, Rescue Status strip; OK for Aziz on J and I
+- **Did (PLAN.md "Purpose, trust and visibility", in its priority order):**
+  - **Caption every AI image:** "Real thermal camera image, Teledyne FLIR dataset: the same input a thermal camera on a rescue robot produces." on the AI cards, the robot camera's thermal view and the AI Lab (live crop, examples grid, in-building crops). `AI_CAPTION` in `format.js`.
+  - **Judge-first labels:** "No link, keeps searching", "Heading back to radio range", "Radio beacon left with survivor S1", "Route for rescuers to S1 · 52 m, avoids no-go zones", "… redrawn around new rubble", "R2 found S3, confirmed by onboard AI".
+  - **Rescue Status strip** across the top of the main view, judge language only: survivors found (robots' sightings), confirmed by onboard AI (score >= 0.6), reported to command and rescue routes ready (delivered data only), time since collapse. The old top-bar counter is gone; title, toasts, inset and robot camera moved under the strip.
+- **Contract changes:** none.
+- **For Aziz (the J judge test and I Under-the-hood panels in `web/`): yes, go ahead.** Conditions so we don't collide: new files only (`web/src/panels/JudgeTest.jsx`, `web/src/panels/UnderHood.jsx`, styles appended at the end of `web/src/styles.css` under a `/* J: judge test */` and `/* I: under the hood */` comment, or your own CSS file); mount them in `web/src/BigScreen.jsx` next to `<AILab />`; keys J and I in `web/src/panels/Panels.jsx` (`KEYS` list plus two lines in `useKeyboard`, same pattern as L); read from the store (`tick.stats`, events) and your own endpoints, no changes to `web/src/three/` or to `handleMessage` beyond passing new fields through; glass look: reuse the `.lab` / `.lab-head` / `.report-close` classes; captions: every FLIR image carries `AI_CAPTION` from `format.js`; `npm run build` before the PR. I'm editing `three/`, `Actors.jsx`, `Pane.jsx`, `store.js` (aftershock/banner fields) and `Props.jsx` tonight; if you need a store field, add it at the end of the state object.
+- **Heads-up for others:** Rayan: key N's banner reacts to a floorplan change in `hello` (any new building id or name), so it works as soon as Aziz's reset-into-floorplan control exists; the N key itself is wired once he posts the control's name and value. Dropped tonight as agreed: multi-story interior, voice UI, clinic map (`p3/clinic-map` stays unmerged).
+- **Next:** earthquake v2 visuals (4-6 s shake, falling slabs, dust, flickering lights, rumble, AFTERSHOCK banner), generic props for unknown rooms, exterior shell.
+
+### 2026-11-08 11:00 · p3/collapse-geometry · Ceiling perf fix, Rayan's plain textures wired, final full-quality shots
+- **Did:**
+  - Ceiling: applied the review fix (hanging grid fragments never below 1.67 m even with sway; snap scraps clamped at 1.72 m; slab door gap 1.25 m); T-bars and tiles toned to dusty aluminium.
+  - Rayan's `assets-pack/plain/` (thanks, fast): `damaged_plaster` now textures the plaster skin and drywall, `cracked_concrete_floor` (Concrete Floor Damaged 01) the slab, his `crack_02.png` decal replaces the procedural cracks. Copied at 1K into `web/public/assets/textures/` (his 2K originals stay in the pack); his `cracked_concrete_wall` is the Concrete Wall 008 set I already had. Replaced sets removed; `CREDITS.md` updated.
+  - Final full-quality shots at every pinned angle: `docs/visuals/final-*.jpg`.
+  - Server suite after the merge with main: 392 passed, 1 skipped.
+- **Contract changes:** none.
+- **Heads-up for others:** Rayan: steps 1-5 done; 6 keeps the procedural rover (your note on `robot.glb`). For the dry run: night is the default scene, K switches to day, P is the fallback.
+- **Next:** PR for steps 2-6; then whatever the dry run turns up.
+
+### 2026-11-08 10:50 · p3/collapse-geometry · Steps 2 and 3: collapsed ceiling, debris everywhere; fog of war as a veil
+- **Did:**
+  - `web/src/three/Ceiling.jsx` (parallel agent; rules review clean, one perf finding being fixed): per room a pancaked ceiling slab leaning from the wall top (steep in normal rooms so the floor reach stays within 0.48 m of the wall; true shallow pancakes only inside hazard rooms), snapped I-beams in the odd rooms hinging into a V with rebar scraps, ceiling T-grid fragments with tiles hanging tilted from wall tops, a galvanized duct run with a crushed open section, dangling cables and conduits; three cables and one grid fragment sway. About 18 draw calls, 3-4k triangles.
+  - `web/src/three/Litter.jsx` (parallel agent; both reviews clean; a node audit checked every instance against the path rules on collapse_01 and two generated maps): mixed-size concrete chunks on every floor (open floor <= 0.12 m), 800 glass shards under the outer-wall windows, paper and folders, fallen ceiling tiles, generic overturned and crushed furniture against walls, heaved floor plates (<= 0.105 m) with crack decals, dust layers; plus `ScannedDebris`: the CC0 Poly Haven scans (moon rocks as concrete chunks, road barriers, desk and chairs overturned, tyres) decimated and instanced. About 173k triangles full, 93k in P mode, 30 draw calls.
+  - Fog of war is a dark veil (alpha 150 instead of 232) so unmapped rooms still read as unmapped while the collapse shows through.
+  - Ceiling T-bars toned to dusty aluminium (they read as neon).
+  - Shots: `docs/visuals/after-3-*.jpg`. 55-60 fps in this browser at the corridor and overview angles.
+- **Contract changes:** none. New static assets under `web/public/assets/models/` (13 MB, CC0, credited in `CREDITS.md`).
+- **Heads-up for others:** Rayan: steps 1-5 of your list are built; 6 keeps the procedural rover until a better glTF exists. The whole look is behind nothing: night is the default (K for day), P is the fallback.
+- **Next:** apply the ceiling perf fix, full-quality retakes, merge main, PR for steps 2-5.
+
+### 2026-11-08 10:25 · p3/collapse-geometry · Step 4 scene module integrated (atmosphere), scout camera at night
+- **Did:**
+  - `web/src/three/Atmosphere.jsx` (built by a parallel agent; usage limit killed its two reviewers, so I reviewed it: one useFrame per subsystem, no per-frame allocations, 4 lights, Reality-only, placements derived from `fp`): a lit dust haze (one instanced mesh of camera-facing quads whose shader sums the scene lights, so headlights, the truck flood, strobes and fire light the air), a broken pipe with a water jet and a growing puddle in the break room, a fire with embers and smoke in the hazard room, two flickering emergency fixtures (red beacon near the entry with a sweeping spot, amber at the far end of the largest room). About 22 extra draw calls baked. `perf` and the robot camera copy get the light version.
+  - The scout camera at night is dark with the robot's own headlight riding on the camera.
+  - Shots: `docs/visuals/after-4-*.jpg` (night + atmosphere at the pinned angles) and `after-5-e-default.jpg` (the new default view).
+- **Contract changes:** none.
+- **Heads-up for others:** the workflow that builds the ceiling and litter modules (steps 2 and 3) was cut off by the usage limit and is running again now.
+- **Next:** integrate ceiling and litter; PR for steps 2-5.
 
 ### 2026-11-08 09:55 · p3/collapse-geometry · Step 5 camera, night by default, rover glTF loader, short spoken briefing
 - **Did:**

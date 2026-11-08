@@ -1,14 +1,17 @@
 import { useEffect } from 'react'
 import { connectScreen } from './net/socket'
 import Pane from './three/Pane'
-import { HelpOverlay, Sidebar, TopBar, useKeyboard } from './panels/Panels'
+import { HelpOverlay, RescueStatus, Sidebar, TopBar, useKeyboard } from './panels/Panels'
 import { JoinOverlay } from './panels/JoinPanel'
 import Toasts from './panels/Toasts'
 import Timeline from './panels/Timeline'
 import ReportPanel from './panels/ReportPanel'
 import AILab from './panels/AILab'
 import Intro from './panels/Intro'
+import JudgeTest from './panels/JudgeTest'
+import UnderHood from './panels/UnderHood'
 import { DirectorChip, useDirector } from './panels/Director'
+import Banner from './panels/Banner'
 import { ReplayLoader } from './panels/ReplayPanel'
 import { REPLAY } from './net/replay'
 import { useSim } from './store'
@@ -30,6 +33,8 @@ export default function BigScreen() {
             <Pane which="command" title="What the command post knows" subtitle="only what reached its antenna" />
           </>
         )}
+        <RescueStatus />
+        <Banner />
         <Toasts />
         <DirectorChip />
         <ReportPanel />
@@ -40,6 +45,8 @@ export default function BigScreen() {
       <ReplayLoader />
       <HelpOverlay />
       <AILab />
+      <JudgeTest />
+      <UnderHood />
       <Intro />
     </div>
   )

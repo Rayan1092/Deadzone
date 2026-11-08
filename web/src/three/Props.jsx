@@ -397,9 +397,103 @@ function Decoys({ fp, M }) {
 
 // Furniture is laid out by hand for the demo building; other maps get the decoys and the
 // collapse dressing (debris, damage) without furniture.
+// --------------------------------------------------------------- any building
+// Furniture for a floor plan we have never seen: each room is read from its name and
+// furnished along its walls (desks and cabinets in offices, shelving and pallets in storage,
+// a counter in break rooms, boilers in plant rooms, nothing in corridors), with a default
+// for rooms we cannot classify. Everything hugs a wall (centre <= 0.5 m from the wall line),
+// stays 1.2 m clear of door openings and 0.8 m from corners, so no robot path is touched.
+const KIND = [
+  [/corridor|hall|spine|stair|lobby|entry|passage/i, 'corridor'],
+  [/office|admin|reception|loading office|meeting|ward|clinic|theatre|radiology/i, 'office'],
+  [/storage|store|warehouse|stock|cage|supply|lab|pharm|archive/i, 'storage'],
+  [/break|kitchen|canteen|cafe|waiting|staff/i, 'break'],
+  [/boiler|plant|mechanical|utility|electrical|server/i, 'plant'],
+]
+function roomKind(name = '') {
+  return (KIND.find(([re]) => re.test(name)) ?? [null, 'default'])[1]
+}
+function prng(seed) {
+  let s = (seed % 2147483647) || 1
+  return () => (s = (s * 16807) % 2147483647) / 2147483647
+}
+// Free spots along one side of a room, away from doors and corners. side: 'N' | 'S' | 'E' | 'W'.
+function wallSlots(room, side, doors, step, inset) {
+  const xs = room.poly.map((p) => p[0])
+  const ys = room.poly.map((p) => p[1])
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
+  const horiz = side === 'N' || side === 'S'
+  const lo = (horiz ? x0 : y0) + 0.8
+  const hi = (horiz ? x1 : y1) - 0.8
+  const out = []
+  for (let t = lo + step / 2; t <= hi - step / 2; t += step) {
+    const x = horiz ? t : side === 'W' ? x0 + inset : x1 - inset
+    const y = horiz ? (side === 'S' ? y0 + inset : y1 - inset) : t
+    if (doors.some((d) => Math.hypot(d.at[0] - x, d.at[1] - y) < 1.2 + step / 2)) continue
+    out.push({ x, y, rot: side === 'N' ? N : side === 'S' ? S : side === 'W' ? W : E })
+  }
+  return out
+}
+function GenericRoom({ room, fp, M }) {
+  const kind = roomKind(room.name)
+  if (kind === 'corridor') return null
+  const xs = room.poly.map((p) => p[0])
+  const ys = room.poly.map((p) => p[1])
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
+  const r = prng(Math.round(x0 * 7 + y0 * 13 + x1 * 3 + y1 * 5) + 101)
+  const doors = fp.doors ?? []
+  const sides = ['N', 'E', 'S', 'W'].sort(() => r() - 0.5)
+  const items = []
+  const take = (side, step, inset, n, make) => {
+    const slots = wallSlots(room, side, doors, step, inset)
+    for (let i = 0; i < n && slots.length; i++) {
+      const s = slots.splice(Math.floor(r() * slots.length), 1)[0]
+      items.push({ ...s, el: make(i) })
+    }
+  }
+  const area = (x1 - x0) * (y1 - y0)
+  if (kind === 'office') {
+    take(sides[0], 1.8, 0.45, Math.max(1, Math.round(area / 30)), (i) => <Desk M={M} key={`d${i}`} />)
+    take(sides[1], 0.7, 0.4, 2, (i) => <FilingCabinet M={M} key={`c${i}`} />)
+    take(sides[2], 2.0, 0.3, 1, () => <Bookshelf M={M} len={1.6} />)
+    items.push({ x: (x0 + x1) / 2 + (r() - 0.5) * 2, y: (y0 + y1) / 2 + (r() - 0.5) * 2, rot: 0, el: <Papers M={M} n={6} seed={Math.round(x0 * 11 + y0)} /> })
+  } else if (kind === 'storage') {
+    take(sides[0], 2.2, 0.42, Math.max(1, Math.round(area / 25)), (i) => <Shelving M={M} seed={i * 7 + 31} />)
+    take(sides[1], 2.2, 0.42, Math.max(1, Math.round(area / 40)), (i) => <Shelving M={M} seed={i * 11 + 61} />)
+    if (area > 80) take(sides[2], 3.0, 0.5, 1, () => <PalletRack M={M} seed={83} />)
+    else take(sides[2], 1.4, 0.5, 1, () => <Pallet M={M} seed={91} />)
+  } else if (kind === 'break') {
+    take(sides[0], 3.2, 0.42, 1, () => <Counter M={M} len={2.8} />)
+    take(sides[1], 1.0, 0.45, 1, () => <Fridge M={M} />)
+    take(sides[2], 1.2, 0.5, 1, () => <Vending M={M} />)
+    take(sides[3], 0.8, 0.5, 2, (i) => <Chair M={M} tipped={i === 0} />)
+  } else if (kind === 'plant') {
+    take(sides[0], 3.4, 0.9, Math.max(1, Math.round(area / 60)), () => <Boiler M={M} />)
+    const len = Math.min(x1 - x0, y1 - y0) - 1.5
+    items.push({ x: (x0 + x1) / 2, y: y0 + 0.3, rot: S, el: <PipeRun M={M} len={Math.max(2, (x1 - x0) - 1.5)} /> })
+    if (len > 3) items.push({ x: x0 + 0.25, y: (y0 + y1) / 2, rot: W, el: <PipeRun M={M} len={(y1 - y0) - 1.5} /> })
+  } else {
+    // unknown room: a desk, a shelf and a cabinet is enough to say "people used this"
+    take(sides[0], 1.8, 0.45, 1, () => <Desk M={M} />)
+    take(sides[1], 2.2, 0.42, 1, () => <Shelving M={M} seed={47} />)
+    take(sides[2], 0.7, 0.4, 1, () => <FilingCabinet M={M} />)
+  }
+  return items.map((it, i) => <At key={i} x={it.x} y={it.y} rot={it.rot}>{it.el}</At>)
+}
+
+// ?generic=1 shows the generic furnishing on the demo building too (to compare)
+const FORCE_GENERIC = (() => { try { return new URLSearchParams(location.search).has('generic') } catch { return false } })()
+
 export function Interior({ fp, cold: isCold = false }) {
   const M = isCold ? cold() : mats()
-  if (fp?.id !== 'collapse_01') return <group><Decoys fp={fp} M={M} /></group>
+  if (fp?.id !== 'collapse_01' || FORCE_GENERIC) {
+    return (
+      <group>
+        <Decoys fp={fp} M={M} />
+        {(fp?.rooms ?? []).map((room) => <GenericRoom key={room.id} room={room} fp={fp} M={M} />)}
+      </group>
+    )
+  }
   return (
     <group>
       <Decoys fp={fp} M={M} />

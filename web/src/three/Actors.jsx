@@ -210,11 +210,16 @@ function TruthMarker({ pos, id, sub = 'not found yet', color = COLORS.red, decoy
   )
 }
 
+function rng(seed) {
+  let s = (seed % 2147483647) || 1
+  return () => (s = (s * 16807) % 2147483647) / 2147483647
+}
+
 // --------------------------------------------------------------- aftershock
 // The world shakes for a moment when an aftershock hits (Reality panes only: it is truth),
 // and a dust cloud billows out of the collapse and settles.
-const SHAKE_S = 1.4
-const DUST_S = 6
+const SHAKE_S = 5.2   // Rayan's earthquake v2: 4 to 6 s of shake
+const DUST_S = 9
 export function Shake({ children }) {
   const ref = useRef()
   useFrame(() => {
@@ -223,9 +228,10 @@ export function Shake({ children }) {
     if (!g) return
     const age = a ? (performance.now() - a.born) / 1000 : Infinity
     if (age > SHAKE_S) { if (g.position.lengthSq()) g.position.set(0, 0, 0); return }
-    const k = 0.22 * (1 - age / SHAKE_S) ** 2
+    // hits hard in the first half second, then rumbles out; two frequencies so it never loops
+    const k = 0.26 * Math.min(1, age * 3) * (1 - age / SHAKE_S) ** 1.6
     const t = age * 40
-    g.position.set(Math.sin(t * 1.3) * k, Math.abs(Math.sin(t * 0.9)) * k * 0.4, Math.cos(t * 1.7) * k)
+    g.position.set(Math.sin(t * 1.3) * k + Math.sin(t * 0.37) * k * 0.5, Math.abs(Math.sin(t * 0.9)) * k * 0.35, Math.cos(t * 1.7) * k + Math.cos(t * 0.29) * k * 0.5)
   })
   return <group ref={ref}>{children}</group>
 }
@@ -233,8 +239,8 @@ export function Shake({ children }) {
 function AftershockDust() {
   const a = useSim((s) => s.aftershock)
   const group = useRef()
-  const puffs = useMemo(() => Array.from({ length: 16 }, (_, i) => ({
-    ang: (i / 16) * Math.PI * 2 + (i % 3) * 0.4, dist: 0.6 + (i % 4) * 0.5, h: 0.4 + (i % 5) * 0.35, s: 1.6 + (i % 3) * 0.8,
+  const puffs = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
+    ang: (i / 26) * Math.PI * 2 + (i % 3) * 0.4, dist: 0.6 + (i % 5) * 0.6, h: 0.4 + (i % 5) * 0.4, s: 1.8 + (i % 3) * 0.9,
   })), [])
   useFrame(() => {
     if (!group.current || !a) return
@@ -245,8 +251,8 @@ function AftershockDust() {
       const p = puffs[i]
       const r = p.dist * (0.4 + k * 1.6)
       sp.position.set(Math.cos(p.ang) * r, p.h * (0.5 + k), Math.sin(p.ang) * r)
-      sp.scale.setScalar(p.s * (0.5 + k))
-      sp.material.opacity = 0.55 * (1 - age / DUST_S)
+      sp.scale.setScalar(p.s * (0.5 + k * 0.8))
+      sp.material.opacity = 0.3 * (1 - age / DUST_S)
     })
   })
   if (!a) return null
@@ -259,6 +265,62 @@ function AftershockDust() {
       ))}
     </group>
   )
+}
+
+// Ceiling slabs and chunks that come down with the aftershock: they fall from roof height
+// onto the new rubble footprint in the first second, bounce once and stay as debris.
+const SLAB_FALL_S = 0.9
+function AftershockSlabs() {
+  const a = useSim((s) => s.aftershock)
+  const group = useRef()
+  const pieces = useMemo(() => {
+    if (!a) return []
+    const r = rng(Math.round(a.at[0] * 31 + a.at[1] * 17) + 11)
+    const out = []
+    for (let i = 0; i < 4; i++) {
+      out.push({ slab: true, x: a.at[0] + (r() - 0.5) * 1.6, y: a.at[1] + (r() - 0.5) * 1.6, h0: 3.0 + r() * 1.2, rest: 0.25 + i * 0.16,
+        size: [0.9 + r() * 0.9, 0.16, 0.7 + r() * 0.8], rot: [(r() - 0.5) * 0.8, r() * Math.PI, (r() - 0.5) * 0.8], delay: r() * 0.35, spin: (r() - 0.5) * 2 })
+    }
+    for (let i = 0; i < 14; i++) {
+      out.push({ slab: false, x: a.at[0] + (r() - 0.5) * 3.2, y: a.at[1] + (r() - 0.5) * 3.2, h0: 2.6 + r() * 1.5, rest: 0.06 + r() * 0.3,
+        size: [0.12 + r() * 0.25, 0.1 + r() * 0.2, 0.12 + r() * 0.25], rot: [r() * 6, r() * 6, r() * 6], delay: r() * 0.6, spin: (r() - 0.5) * 6 })
+    }
+    return out
+  }, [a])
+  useFrame(() => {
+    if (!group.current || !a) return
+    const age = (performance.now() - a.born) / 1000
+    group.current.children.forEach((m, i) => {
+      const p = pieces[i]
+      const t = Math.max(0, age - p.delay)
+      const fall = p.h0 - 0.5 * 9.81 * t * t * 1.6 // a little faster than g: the drop is seen from far away
+      let h = Math.max(p.rest, fall)
+      if (fall < p.rest && t < SLAB_FALL_S + 0.5) h = p.rest + Math.max(0, 0.18 * Math.sin((t - Math.sqrt((p.h0 - p.rest) / (0.5 * 9.81 * 1.6))) * 9)) * (p.slab ? 1 : 0.5)
+      m.position.set(p.x, h, -p.y)
+      const k = Math.min(1, t / SLAB_FALL_S)
+      m.rotation.set(p.rot[0] * k, p.rot[1] + p.spin * k, p.rot[2] * k)
+      m.visible = t > 0
+    })
+  })
+  if (!a) return null
+  const mat = slabMats()
+  return (
+    <group ref={group}>
+      {pieces.map((p, i) => (
+        <mesh key={i} material={p.slab ? mat.slab : mat.rock} castShadow>
+          <boxGeometry args={p.size} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+let slabCache = null
+function slabMats() {
+  slabCache ??= {
+    slab: new THREE.MeshStandardMaterial({ ...tiledSet(materials().rubble, 0.6, 0.6), color: '#b9b2a8', roughness: 0.93 }),
+    rock: new THREE.MeshStandardMaterial({ ...tiledSet(materials().rubble, 1, 1), color: '#9d968c', roughness: 0.96 }),
+  }
+  return slabCache
 }
 
 // --------------------------------------------------------------- views
@@ -301,6 +363,7 @@ export function RealityActors({ gap = false }) {
         </group>
       ))}
       <AftershockDust />
+      <AftershockSlabs />
       <RealityLinks />
       <RealityRelays />
       <RealityRoutes gap={gap} />

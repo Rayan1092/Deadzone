@@ -1,7 +1,7 @@
 import { Fragment, useEffect } from 'react'
 import { setNight, setPerf, setView, useSim } from '../store'
 import { control } from '../net/socket'
-import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt } from '../format'
+import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt, latestRoutes } from '../format'
 import { JoinButton } from './JoinPanel'
 import { requestReport } from './ReportPanel'
 import { ReplayChip } from './ReplayPanel'
@@ -11,8 +11,9 @@ import { followRobot, overview, resetOverview } from '../three/camera'
 export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
   ['R', 'rubble ahead of the robot'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
-  ['U', 'resume after safe stop'], ['A', 'aftershock (server needs DZ_AFTERSHOCK=1)'], ['B', 'baseline: robots without Deadzone'], ['L', 'AI Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
+  ['U', 'resume after safe stop'], ['A', 'aftershock (server needs DZ_AFTERSHOCK=1)'], ['⇧A', 'strong aftershock: three areas, two relays'], ['N', 'new scenario: survivors shuffled (Q&A)'], ['B', 'baseline: robots without Deadzone'], ['L', 'AI Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
   ['M', 'one view / split view'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
+  ['J', 'judge test (Q&A)'], ['I', 'under the hood (Q&A)'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
 ]
 
@@ -21,11 +22,32 @@ function toggleView() {
   setView(useSim.getState().view === 'gap' ? 'split' : 'gap')
 }
 
+// Rescue Status: the first thing a judge reads, in plain words. Found = the robots' own
+// sightings (Reality); confirmed = those the onboard classifier scored as a person; reported
+// and routes = only what reached the command post.
+const AI_THRESHOLD = 0.6
+const NONE_LIST = []
+export function RescueStatus() {
+  const time = useSim((s) => s.time)
+  const found = useSim((s) => s.tick?.reality.survivors_found ?? NONE_LIST)
+  const reported = useSim((s) => s.tick?.command.survivors.length ?? 0)
+  const routes = useSim((s) => latestRoutes(s.tick?.command.routes ?? NONE_LIST).length)
+  const ids = new Set(found.map((f) => f.id))
+  const confirmed = new Set(found.filter((f) => (f.conf ?? 1) >= AI_THRESHOLD).map((f) => f.id)).size
+  return (
+    <div className="rescue-status" aria-label="Rescue status">
+      <div className="rs-cell found"><b>{ids.size}</b><span>survivors found</span></div>
+      <div className="rs-cell ai"><b>{confirmed}</b><span>confirmed by onboard AI</span></div>
+      <div className={`rs-cell cmd${reported < ids.size ? ' behind' : ''}`}><b>{reported}</b><span>reported to command</span></div>
+      <div className="rs-cell route"><b>{routes}</b><span>rescue routes ready</span></div>
+      <div className="rs-cell time"><b className="mono">{fmt(time)}</b><span>since collapse</span></div>
+    </div>
+  )
+}
+
 export function TopBar() {
   const fp = useSim((s) => s.floorplan)
   const time = useSim((s) => s.time)
-  const found = useSim((s) => new Set(s.tick?.reality.survivors_found.map((f) => f.id)).size)
-  const reported = useSim((s) => s.tick?.command.survivors.length ?? 0)
   const connected = useSim((s) => s.connected)
   const running = useSim((s) => s.running)
   const speed = useSim((s) => s.speed)
@@ -40,10 +62,6 @@ export function TopBar() {
       <div className="brand">DEADZONE</div>
       <div className="incident">{fp ? fp.name : 'Waiting for sim'}</div>
       <div className="clock mono">T+{fmt(time)}</div>
-      <div className="survivor-count" title="Found by robots vs known at the command post">
-        <span>Survivors: <b>{found}</b> found</span>
-        <span className={reported < found ? 'gap' : ''}><b>{reported}</b> at command</span>
-      </div>
       {detector && (
         <span className={`detector-chip ${detector.mode}`} title={detector.reason ?? ''}>
           Detector: {detector.mode === 'model' ? 'AI model' : 'sim fallback'}
@@ -66,6 +84,8 @@ export function TopBar() {
         </button>
         {!REPLAY && <JoinButton />}
         <button className="icon-btn" title="Keys (?)" onClick={() => set({ helpOpen: true })}>?</button>
+        <button title="Held-out thermal judge test (J)" onClick={() => set({ judgeOpen: true, hoodOpen: false, labOpen: false })}>J · Test</button>
+        <button title="Live diagnostic counters (I)" onClick={() => set({ hoodOpen: true, judgeOpen: false, labOpen: false })}>I · Counters</button>
         {!REPLAY && <span className={connected ? 'conn ok' : 'conn bad'}>{connected ? 'live' : 'offline'}</span>}
       </div>
     </header>
@@ -177,18 +197,48 @@ export function HelpOverlay() {
   )
 }
 
+// Key N: reset into the next registered scenario (Aziz's reset-into-floorplan control). Variants
+// of the current building come first (same walls, survivors and decoys shuffled), then any
+// other registered map. Q&A only; the "NEW SCENARIO" banner fires from the hello that follows.
+async function nextScenario() {
+  const s = useSim.getState()
+  const note = (msg) => s.set({ toasts: [...s.toasts, { kind: 'control_error', code: 'scenario', msg, time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
+  let cat
+  try {
+    const res = await fetch('/api/scenarios')
+    if (!res.ok) throw new Error(String(res.status))
+    cat = await res.json()
+  } catch {
+    note('New scenario needs the latest server (GET /api/scenarios)')
+    return
+  }
+  const all = (cat.floorplans ?? []).map((f) => f.id).filter((id) => id !== cat.selected)
+  const base = (cat.selected ?? s.floorplan?.id ?? '').split('/').pop()
+  const variants = all.filter((id) => /variant/i.test(id) && id.includes(base))
+  const pool = variants.length ? variants : all
+  if (!pool.length) { note('No other scenario is registered on this server'); return }
+  const last = useSim.getState().lastScenario
+  const next = pool[(pool.indexOf(last) + 1) % pool.length]
+  s.set({ lastScenario: next })
+  control('reset', { floorplan: next, timeline: false })
+}
+
 export function useKeyboard() {
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.tagName === 'INPUT') return
+      if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable="true"]')) return
       const s = useSim.getState()
       const robots = s.tick?.reality.robots ?? []
       // director keys act on the followed robot, else the first one
       const target = robots.find((r) => r.id === s.follow) ?? robots[0]
       const key = e.key.toLowerCase()
+      // A modal's buttons keep their native Space/Enter behavior; data panels never drive the sim.
+      if ((s.judgeOpen || s.hoodOpen) && !['escape', 'j', 'i'].includes(key)) return
       if (key === 'q') s.set({ joinOpen: !s.joinOpen })
-      if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null, helpOpen: false, labOpen: false, introOpen: false })
-      if (key === 'l') s.set({ labOpen: !s.labOpen })
+      if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null, helpOpen: false, labOpen: false, introOpen: false, judgeOpen: false, hoodOpen: false })
+      if (key === 'l') s.set({ labOpen: !s.labOpen, judgeOpen: false, hoodOpen: false })
+      if (key === 'j' && !e.repeat) s.set({ judgeOpen: !s.judgeOpen, hoodOpen: false, labOpen: false })
+      if (key === 'i' && !e.repeat) s.set({ hoodOpen: !s.hoodOpen, judgeOpen: false, labOpen: false })
       if (key === 'k') setNight(!s.night)
       if (key === 'd') { if (s.director) overview(); s.set({ director: !s.director, shot: null }) }
       if (e.key === '?' || key === 'h') s.set({ helpOpen: !s.helpOpen })
@@ -212,7 +262,8 @@ export function useKeyboard() {
       if (key === 'o' && target) control('director', { do: 'overload', robot: target.id })
       if (key === 'u' && target) control('director', { do: 'resume', robot: target.id })
       // server picks the spot: the first powered relay (crushing it), else the corridor
-      if (key === 'a') control('director', { do: 'aftershock' })
+      if (key === 'a') control('director', e.shiftKey ? { do: 'aftershock', strength: 'strong' } : { do: 'aftershock' })
+      if (key === 'n') nextScenario()
       // "without Deadzone": robots stop and wait whenever they lose the link
       if (key === 'b') control('mode', s.mode === 'baseline' ? 'deadzone' : 'baseline')
       if (key === 'g') {

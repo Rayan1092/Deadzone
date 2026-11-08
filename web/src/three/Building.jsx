@@ -9,6 +9,10 @@ import { CommandPost, GasLeak, Interior, Lot } from './Props'
 import { CollapseLive, CollapseStatic, WallDetails, holedWallGeometry, wallDamage } from './Collapse'
 import { DisasterLive, DisasterStatic } from './Disaster'
 import FracturedWalls from './Fracture'
+import { AtmosphereLive, AtmosphereStatic } from './Atmosphere'
+import { LitterStatic, ScannedDebris } from './Litter'
+import { CeilingLive, CeilingStatic } from './Ceiling'
+import ExteriorShell from './Shell'
 
 // Thermal palette for the robot's-eye view: everything cold reads as deep blue.
 const COLD = { floor: '#070b1f', wall: '#1d3a8a', wallGlow: '#0b1d5c' }
@@ -274,6 +278,7 @@ function staticRubble(fp) {
 export default function Building({ thermal = false, blueprint = false, props = true, lite = false }) {
   const fp = useSim((s) => s.floorplan)
   const perf = useSim((s) => s.perf)
+  const night = useSim((s) => s.night)
   const mode = blueprint ? 'blueprint' : thermal ? 'thermal' : 'plain'
   // collapse damage is truth: Reality panes only (the Command pane keeps the intact plan)
   const damage = useMemo(() => (fp && props && mode === 'plain' ? wallDamage(fp) : null), [fp, props, mode])
@@ -302,9 +307,16 @@ export default function Building({ thermal = false, blueprint = false, props = t
         {damage && <WallDamageLayer walls={fp.walls} damage={damage} />}
         {damage && <CollapseStatic fp={fp} />}
         {damage && <DisasterStatic fp={fp} outside={!lite} />}
+        {damage && <AtmosphereStatic fp={fp} />}
+        {damage && <LitterStatic fp={fp} perf={perf} />}
+        {damage && <ScannedDebris fp={fp} perf={perf} outside={!lite} />}
+        {damage && <CeilingStatic fp={fp} />}
+        {damage && !lite && <ExteriorShell fp={fp} />}
       </Baked>
       {damage && <CollapseLive fp={fp} dust={!perf && !lite} />}
       {damage && !perf && !lite && <DisasterLive fp={fp} />}
+      {damage && <AtmosphereLive fp={fp} night={night} perf={perf || lite} />}
+      {damage && <CeilingLive fp={fp} perf={perf || lite} />}
       {mode === 'plain' && (fp.hazards ?? []).map((hz) => <GasLeak key={hz.id} hazard={hz} />)}
       {blueprint && (
         <mesh position={w2t(cx, cy, 0.5)}>
