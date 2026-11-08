@@ -1,7 +1,7 @@
 """Typed inputs shared by REST faults and screen/phone control messages."""
 from typing import Annotated, Literal
 
-from pydantic import Field, TypeAdapter
+from pydantic import Field, TypeAdapter, field_validator
 
 from .plan import Identifier, Model, Number, Point
 
@@ -12,6 +12,18 @@ class RelayPower(Model):
 
 class RelayPlace(Model):
     pos: Point
+
+
+class AskQuestion(Model):
+    question: str = Field(min_length=1, max_length=1000, strict=True)
+
+    @field_validator("question")
+    @classmethod
+    def trim_question(cls, value):
+        value = value.strip()
+        if not value:
+            raise ValueError("Question must not be blank")
+        return value
 
 
 class RubbleFault(Model):

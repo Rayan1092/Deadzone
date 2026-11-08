@@ -25,7 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
-from .command.controls import FaultRequest, RelayPlace, RelayPower, director_adapter
+from .command.controls import AskQuestion, FaultRequest, RelayPlace, RelayPower, director_adapter
 from .command.reports import command_report
 from .command.safety import SafetyChecker
 from .robot.robot import resume_command
@@ -380,6 +380,15 @@ def join(request: Request):
         parts = parts._replace(netloc=f"{address}:{port or (443 if parts.scheme == 'https' else 80)}")
     url = urlunsplit((parts.scheme, parts.netloc, parts.path.rstrip("/") + "/phone", "", ""))
     return {"url": url}
+
+
+@app.post("/api/ask")
+async def ask(question: AskQuestion):
+    post = hub.sim.post
+    result = await command_report(post, hub.sim.time, question=question.question)
+    if post is not hub.sim.post:
+        raise PlanError("report_reset", "Simulation reset during answer; ask again", 409)
+    return result  # private HTTP reply; no screen-wide report broadcast
 
 
 @app.post("/api/control")
