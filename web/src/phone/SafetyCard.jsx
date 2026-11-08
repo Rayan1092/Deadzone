@@ -1,6 +1,7 @@
 import { usePhone } from './store'
 import { RULE_LABEL, checkPlan, commit, dispatchPlan, updateZone } from './plan'
 import { hasPlanContent } from './zones'
+import { canSendPlan } from './sync'
 
 // Check → (fix) → dispatch. A pass is never stored as approval: dispatch rechecks
 // against the latest delivered Command knowledge and can still be rejected.
@@ -10,8 +11,28 @@ export default function SafetyCard() {
   const checking = usePhone((s) => s.checking)
   const connected = usePhone((s) => s.connected)
   const dispatched = usePhone((s) => s.dispatched)
-  // a plan with only no-go areas is sent to every robot, which route around them
-  if (!hasPlanContent(draft)) return null
+  const lastDispatch = usePhone((s) => s.lastDispatch)
+  // An acknowledged clear stays visible even though the draft has no regions.
+  if (draft && !hasPlanContent(draft) && lastDispatch?.plan_id === draft.plan_id && !lastDispatch.hasContent) {
+    return (
+      <section className="m3-card safety sent" role="status">
+        <b>Cleared, sent to {lastDispatch.robots} robots</b>
+        <span className="muted small">Sent through the network. Each robot applies it when it arrives.</span>
+      </section>
+    )
+  }
+  if (!canSendPlan({ draft, lastDispatch })) return null
+  if (!hasPlanContent(draft)) {
+    return (
+      <section className="m3-card safety">
+        <b>Ready to clear the plan</b>
+        <span className="muted small">Send the empty plan so robots learn the no-go areas are gone.</span>
+        <button className="filled" disabled={!connected || checking} onClick={dispatchPlan}>
+          {checking ? 'Clearing...' : 'Clear plan'}
+        </button>
+      </section>
+    )
+  }
 
   const result = safety?.plan_id === draft.plan_id ? safety : null
   const robots = [...new Set(draft.zones.map((z) => z.robot))].sort().join(', ') || 'every robot'

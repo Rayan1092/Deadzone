@@ -15,11 +15,13 @@ import Banner from './panels/Banner'
 import { ReplayLoader } from './panels/ReplayPanel'
 import { REPLAY } from './net/replay'
 import { useSim } from './store'
+import { useOpening } from './three/opening'
 
 export default function BigScreen() {
   useEffect(() => (REPLAY ? undefined : connectScreen()), []) // replay plays a file, no server
   useKeyboard()
   useDirector()
+  useOpening() // street-level opening shot, dives in on Space
   const view = useSim((s) => s.view)
   const layout = useSim((s) => s.layout)
   return (

@@ -1,6 +1,6 @@
 import { usePhone } from './store'
-import { createDraftSync, postJSON } from './sync'
-import { hasPlanContent, pickRobot, refusalText } from './zones'
+import { canSendPlan, createDraftSync, dispatchedState, postJSON } from './sync'
+import { pickRobot, refusalText } from './zones'
 
 // Shared draft editing for planner phones. The server keeps one draft
 // (last write wins) and broadcasts it as plan_state to every phone.
@@ -126,9 +126,9 @@ export async function dispatchPlan() {
   return planAction('/api/dispatch')
 }
 
-async function planAction(path) {
+async function planAction(path, { allowEmpty = false } = {}) {
   const initial = usePhone.getState()
-  if (initial.checking || !hasPlanContent(initial.draft)) return
+  if (!initial.connected || initial.checking || !initial.draft || (!allowEmpty && !canSendPlan(initial))) return
   initial.set({ checking: true, safety: null })
   const epoch = initial.hello?.plan_epoch
   let draft = null
@@ -140,7 +140,7 @@ async function planAction(path) {
     const s = usePhone.getState()
     if (s.hello?.plan_epoch !== epoch || s.draft !== draft) return
     if (path === '/api/dispatch' && body.ok) {
-      s.set({ dispatched: [...new Set([...s.dispatched, body.plan_id])], refusal: null })
+      s.set({ ...dispatchedState(s, body.plan_id), refusal: null })
     } else {
       s.set({ safety: body })
       // a dispatch the command post refused stays on screen until it is read (red banner)
@@ -155,4 +155,14 @@ async function planAction(path) {
   } finally {
     if (usePhone.getState().hello?.plan_epoch === epoch) usePhone.getState().set({ checking: false })
   }
+}
+
+// Clear all is an explicit send, including on a fresh/reconnected phone that
+// has not seen the earlier dispatch. Saving still precedes server validation.
+export async function clearAll() {
+  const s = usePhone.getState()
+  if (!s.connected || s.checking) return
+  commit((d) => { d.zones = []; d.no_go = [] })
+  usePhone.getState().set({ selected: null, mode: 'view' })
+  return planAction('/api/dispatch', { allowEmpty: true })
 }

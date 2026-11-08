@@ -556,6 +556,56 @@ export function CommandPost({ pos, entry, cold: isCold = false }) {
   )
 }
 
+// --------------------------------------------------------------- ambulance
+// Parked on the street west of the lot (Shell.jsx: kerbs at x -13.2 and -21.2), on the building's
+// side, a little north of the entry, rear doors open toward the site, light bar flashing.
+export function ambulanceSpot(fp) {
+  const [, H] = fp.size
+  const ey = fp.entry?.[1] ?? H / 2
+  return { x: -14.7, y: Math.min(H + 6, Math.max(-6, ey + 6)), rot: -Math.PI / 2 } // nose south (local +x = -y)
+}
+export function Ambulance({ fp, cold: isCold = false }) {
+  const M = isCold ? cold() : mats()
+  const red = useRef()
+  const blue = useRef()
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime * 3.1
+    if (red.current) red.current.emissiveIntensity = Math.sin(t * Math.PI) > 0 ? 3.2 : 0.1
+    if (blue.current) blue.current.emissiveIntensity = Math.sin(t * Math.PI) > 0 ? 0.1 : 3.2
+  })
+  const side = useMemo(() => signTexture(['AMBULANCE'], { w: 512, h: 64, bg: '#f2f4f5', fg: '#b91c1c', font: 'bold 44px Inter, sans-serif' }), [])
+  const stripe = useMemo(() => new THREE.MeshStandardMaterial({ color: isCold ? '#555' : '#c81e1e', roughness: 0.5 }), [isCold])
+  const { x, y, rot } = ambulanceSpot(fp)
+  return (
+    <At x={x} y={y} rot={rot}>
+      <B m={M.darkSteel} s={[5.6, 0.28, 1.7]} p={[0, 0.55, 0]} />
+      <B m={M.truckWhite} s={[3.6, 2.2, 2.1]} p={[-0.85, 1.8, 0]} />
+      <B m={M.truckWhite} s={[1.7, 1.6, 2.0]} p={[1.85, 1.45, 0]} />
+      <B m={M.glass} s={[0.05, 0.7, 1.85]} p={[2.72, 1.8, 0]} r={[0, 0, 0.18]} />
+      {[-1.051, 1.051].map((z) => (
+        <group key={z}>
+          <mesh position={[-0.85, 1.25, z]} rotation={[0, z > 0 ? 0 : Math.PI, 0]} material={stripe}><planeGeometry args={[3.5, 0.28]} /></mesh>
+          {!isCold && <mesh position={[-0.85, 2.15, z]} rotation={[0, z > 0 ? 0 : Math.PI, 0]}><planeGeometry args={[3.0, 0.38]} /><meshStandardMaterial map={side} roughness={0.4} /></mesh>}
+        </group>
+      ))}
+      {/* rear doors swung open */}
+      {[-1, 1].map((s) => (
+        <B key={s} m={M.truckWhite} s={[0.05, 1.9, 1.0]} p={[-2.9, 1.7, s * 1.45]} r={[0, s * 0.35, 0]} />
+      ))}
+      <mesh position={[1.9, 2.32, -0.45]}><boxGeometry args={[0.3, 0.13, 0.75]} />
+        <meshStandardMaterial ref={red} color="#ff3030" emissive="#ff1a1a" toneMapped={false} userData={{ live: true }} /></mesh>
+      <mesh position={[1.9, 2.32, 0.45]}><boxGeometry args={[0.3, 0.13, 0.75]} />
+        <meshStandardMaterial ref={blue} color="#3060ff" emissive="#1a4dff" toneMapped={false} userData={{ live: true }} /></mesh>
+      {[[-2.0, 0.95], [1.9, 0.95], [-2.0, -0.95], [1.9, -0.95]].map(([xx, z]) => (
+        <group key={`${xx}${z}`}>
+          <C m={M.rubber} rt={0.42} h={0.3} p={[xx, 0.42, z]} r={[Math.PI / 2, 0, 0]} seg={18} />
+          <C m={M.chrome} rt={0.2} h={0.31} p={[xx, 0.42, z]} r={[Math.PI / 2, 0, 0]} seg={10} />
+        </group>
+      ))}
+    </At>
+  )
+}
+
 // Pop-up canopy (3 x 3 m, red roof), a folding table with three laptops and three operators
 // seated at it facing the building. Local frame like the truck: +x along the heading.
 const OPERATORS = ['op-a', 'op-b', 'op-c']

@@ -1,3 +1,5 @@
+import { hasPlanContent } from './zones.js'
+
 // Whole-draft last-write-wins saves, ordered before checks and dispatches.
 // HTTP acknowledges persistence; the socket broadcasts changes to all viewers.
 export async function postJSON(path, data) {
@@ -63,5 +65,23 @@ export function phoneHelloState(s, data, time) {
     safety: null, relay: null, relayPending: null, checking: false, error: null, time,
     view: sameIncident ? s.view : null, map: sameIncident ? s.map : null,
     dispatched: data.dispatched_plan_ids ?? (sameIncident ? s.dispatched : []),
+    lastDispatch: data.plan && data.dispatched_plan_ids?.includes(data.plan.plan_id)
+      ? dispatchInfo(data.plan, data.robots)
+      : sameIncident ? s.lastDispatch : null,
+  }
+}
+
+// Empty drafts are meaningful only as a clear of a previously sent plan.
+// A blank new incident still has no implicit plan to send.
+export const canSendPlan = (s) => Boolean(s.draft && (hasPlanContent(s.draft) || s.lastDispatch?.hasContent))
+
+function dispatchInfo(draft, robots) {
+  return { plan_id: draft.plan_id, hasContent: hasPlanContent(draft), robots: robots?.length ?? 0 }
+}
+
+export function dispatchedState(s, planId) {
+  return {
+    dispatched: [...new Set([...s.dispatched, planId])],
+    ...(!s.pending && s.draft?.plan_id === planId ? { lastDispatch: dispatchInfo(s.draft, s.hello?.robots) } : {}),
   }
 }
