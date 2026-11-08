@@ -6,13 +6,29 @@ import { FOG_H, w2t } from './util'
 
 // Textures built from the occupancy grids:
 //  - fog: dark over UNKNOWN cells, sits above the walls so unmapped rooms stay hidden
-//  - tint: faint teal on known FREE floor, bright on OCC so the map reads as a scan
+//  - tint: faint teal on known FREE floor, bright on OCC so the map reads as a scan,
+//    and a bright edge on the frontier (free cells next to unknown)
 //  - haze (which = 'gap' only): amber over cells the robots have mapped but Command
 //    has not received yet. It fades out as the map patches arrive: the reveal.
 const HAZE_A = 95      // alpha of not-yet-reported floor
 const FADE_OUT = 3     // alpha per frame when Command learns a cell (~0.5 s)
 
 // cover={false}: skip the dark layer (the Command inset shows the public floorplan).
+function unknownNear(map, i, w, h) {
+  const x = i % w
+  const y = (i - x) / w
+  let n = 0
+  for (let dy = -2; dy <= 2; dy++) {
+    const yy = y + dy
+    if (yy < 0 || yy >= h) continue
+    for (let dx = -2; dx <= 2; dx++) {
+      const xx = x + dx
+      if (xx >= 0 && xx < w && map[yy * w + xx] === 0) n++
+    }
+  }
+  return n
+}
+
 export default function Fog({ which, cover = true }) {
   const grid = useSim((s) => s.grid)
   const fp = useSim((s) => s.floorplan)
@@ -49,8 +65,12 @@ export default function Fog({ which, cover = true }) {
       // fog: unknown = near black
       fog[o] = 12; fog[o + 1] = 14; fog[o + 2] = 17
       fog[o + 3] = v === 0 ? 232 : 0
-      // tint
-      if (v === 1) { tint[o] = 45; tint[o + 1] = 212; tint[o + 2] = 191; tint[o + 3] = 34 }
+      // tint; free cells at the edge of real unknown space are the frontier the robots are
+      // chasing. Lidar leaves speckles of unknown between distant beams, so require a real
+      // chunk of unknown nearby (10 of the 24 neighbors in a 5x5 window).
+      const frontier = v === 1 && unknownNear(map, i, grid.w, grid.h) >= 10
+      if (frontier) { tint[o] = 140; tint[o + 1] = 255; tint[o + 2] = 236; tint[o + 3] = 190 }
+      else if (v === 1) { tint[o] = 90; tint[o + 1] = 220; tint[o + 2] = 210; tint[o + 3] = 16 }
       else if (v === 2) { tint[o] = 180; tint[o + 1] = 255; tint[o + 2] = 245; tint[o + 3] = 200 }
       else { tint[o + 3] = 0 }
       if (cmd) {

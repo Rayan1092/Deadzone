@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Billboard } from '@react-three/drei'
 import * as THREE from 'three'
 import { useSim } from '../store'
 import Building from './Building'
@@ -32,7 +33,33 @@ function EyeCamera({ robotId }) {
 }
 
 // Hot spots as the camera sees them: survivors and decoys both glow in thermal,
-// which is exactly why the onboard detector has to judge them.
+// which is exactly why the onboard detector has to judge them. In thermal mode each one
+// is the exact FLIR crop the detector scores (served at /crops), so this view and the
+// AI card show the same image. A shape stands in if the crop is unavailable.
+const loader = new THREE.TextureLoader()
+const crops = new Map()
+function cropTexture(name) {
+  if (!crops.has(name)) {
+    const tex = loader.load(`/crops/${name}`, undefined, undefined, () => crops.set(name, null))
+    tex.colorSpace = THREE.SRGBColorSpace
+    crops.set(name, tex)
+  }
+  return crops.get(name)
+}
+
+function ThermalCrop({ name, fallback }) {
+  const tex = name ? cropTexture(name) : null
+  if (!tex) return fallback
+  return (
+    <Billboard position={[0, 0.6, 0]}>
+      <mesh>
+        <planeGeometry args={[1.1, 1.1]} />
+        <meshBasicMaterial map={tex} toneMapped={false} />
+      </mesh>
+    </Billboard>
+  )
+}
+
 function HotSpots({ thermal }) {
   const fp = useSim((s) => s.floorplan)
   if (!fp) return null
@@ -41,18 +68,25 @@ function HotSpots({ thermal }) {
       {(fp.survivors ?? []).map((s) => (
         <group key={s.id} position={w2t(s.pos[0], s.pos[1], 0)}>
           {thermal ? (
-            <mesh position={[0, 0.15, 0]} scale={[1.4, 0.35, 0.6]}>
-              <sphereGeometry args={[0.5, 16, 12]} />
-              <meshBasicMaterial color="#fff1b8" />
-            </mesh>
+            <ThermalCrop name={s.thermal} fallback={(
+              <mesh position={[0, 0.15, 0]} scale={[1.4, 0.35, 0.6]}>
+                <sphereGeometry args={[0.5, 16, 12]} />
+                <meshBasicMaterial color="#fff1b8" />
+              </mesh>
+            )} />
           ) : <PersonFigure id={s.id} />}
         </group>
       ))}
       {(fp.decoys ?? []).map((d) => (
-        <mesh key={d.id} position={w2t(d.pos[0], d.pos[1], 0.45)}>
-          <boxGeometry args={[0.6, 0.9, 0.35]} />
-          {thermal ? <meshBasicMaterial color="#ffb347" /> : <meshStandardMaterial color="#6b7280" roughness={0.6} />}
-        </mesh>
+        <group key={d.id} position={w2t(d.pos[0], d.pos[1], 0)}>
+          {thermal ? (
+            <ThermalCrop name={d.thermal} fallback={(
+              <mesh position={[0, 0.45, 0]}><boxGeometry args={[0.6, 0.9, 0.35]} /><meshBasicMaterial color="#ffb347" /></mesh>
+            )} />
+          ) : (
+            <mesh position={[0, 0.45, 0]}><boxGeometry args={[0.6, 0.9, 0.35]} /><meshStandardMaterial color="#6b7280" roughness={0.6} /></mesh>
+          )}
+        </group>
       ))}
     </group>
   )

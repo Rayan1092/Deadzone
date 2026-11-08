@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { useSim } from '../store'
 import { COLORS, WALL_H, w2t } from './util'
+import { concreteTextures } from './textures'
 
 // Deterministic pseudo random so rubble looks the same on every client and reload
 function rng(seed) {
@@ -15,20 +16,32 @@ const COLD = { floor: '#070b1f', wall: '#1d3a8a', wallGlow: '#0b1d5c', rubble: '
 const PRINT = { floor: '#0a1830', wall: '#7fb2ff', wallGlow: '#1e40af' }
 
 function Walls({ walls, thermal, blueprint }) {
+  const plain = !thermal && !blueprint
+  const tex = plain ? concreteTextures().wall : null
   return walls.map((w, i) => {
     const [ax, ay] = w.a
     const [bx, by] = w.b
     const len = Math.hypot(bx - ax, by - ay)
     const ang = Math.atan2(by - ay, bx - ax)
     const thick = w.material === 'concrete' ? 0.3 : w.material === 'metal' ? 0.12 : 0.2
-    const col = blueprint ? PRINT.wall : thermal ? COLD.wall : w.material === 'metal' ? '#4b5563' : COLORS.wall
+    const metal = w.material === 'metal'
+    const col = blueprint ? PRINT.wall : thermal ? COLD.wall : metal ? '#6b7280' : '#8a949e'
     return (
-      <mesh key={i} position={w2t((ax + bx) / 2, (ay + by) / 2, WALL_H / 2)} rotation={[0, ang, 0]}
-            castShadow receiveShadow>
-        <boxGeometry args={[len + thick, WALL_H, thick]} />
-        <meshStandardMaterial color={col} roughness={0.9}
-                              emissive={blueprint ? PRINT.wallGlow : thermal ? COLD.wallGlow : '#000000'} />
-      </mesh>
+      <group key={i} position={w2t((ax + bx) / 2, (ay + by) / 2, 0)} rotation={[0, ang, 0]}>
+        <mesh position={[0, WALL_H / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[len + thick, WALL_H, thick]} />
+          <meshStandardMaterial color={col} map={metal ? null : tex} roughness={metal ? 0.45 : 0.95}
+                                metalness={plain && metal ? 0.55 : 0}
+                                emissive={blueprint ? PRINT.wallGlow : thermal ? COLD.wallGlow : '#000000'} />
+        </mesh>
+        {plain && (
+          // light cap on top so the floorplan reads from across the room
+          <mesh position={[0, WALL_H + 0.015, 0]}>
+            <boxGeometry args={[len + thick, 0.03, thick + 0.02]} />
+            <meshStandardMaterial color="#c3ccd5" emissive="#3b4652" roughness={0.6} />
+          </mesh>
+        )}
+      </group>
     )
   })
 }
@@ -75,6 +88,22 @@ function Hazards({ hazards }) {
   })
 }
 
+// Inside the walls: concrete slab with saw-cut joints every 4 m.
+function ConcreteFloor({ W, H }) {
+  const tex = useMemo(() => {
+    const t = concreteTextures().floor.clone()
+    t.repeat.set(W / 4, H / 4)
+    t.needsUpdate = true
+    return t
+  }, [W, H])
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={w2t(W / 2, H / 2, 0)} receiveShadow>
+      <planeGeometry args={[W, H]} />
+      <meshStandardMaterial map={tex} color="#9aa3ab" roughness={0.95} />
+    </mesh>
+  )
+}
+
 export default function Building({ thermal = false, blueprint = false }) {
   const fp = useSim((s) => s.floorplan)
   if (!fp) return null
@@ -82,12 +111,11 @@ export default function Building({ thermal = false, blueprint = false }) {
   const [cx, cy] = fp.command_post.pos
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={w2t(W / 2, H / 2, 0)} receiveShadow>
-        <planeGeometry args={[W + 8, H + 8]} />
-        <meshStandardMaterial color={blueprint ? PRINT.floor : thermal ? COLD.floor : COLORS.floor} roughness={1} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={w2t(W / 2, H / 2, -0.01)} receiveShadow>
+        <planeGeometry args={[W + 30, H + 30]} />
+        <meshStandardMaterial color={blueprint ? PRINT.floor : thermal ? COLD.floor : '#0f1215'} roughness={1} />
       </mesh>
-      {!thermal && !blueprint && <gridHelper args={[Math.max(W, H) + 8, Math.max(W, H) + 8, '#22292f', '#1e2429']}
-                                             position={w2t(W / 2, H / 2, 0.005)} />}
+      {!thermal && !blueprint && <ConcreteFloor W={W} H={H} />}
       <Walls walls={fp.walls} thermal={thermal} blueprint={blueprint} />
       {!blueprint && <Rubble rubble={fp.rubble || []} thermal={thermal} />}
       {!thermal && <Hazards hazards={fp.hazards || []} />}
@@ -99,7 +127,7 @@ export default function Building({ thermal = false, blueprint = false }) {
         </mesh>
         <mesh position={[0, 2.45, 0]}>
           <sphereGeometry args={[0.18, 16, 16]} />
-          <meshStandardMaterial color={COLORS.amber} emissive={COLORS.amber} emissiveIntensity={1.5} />
+          <meshStandardMaterial color={COLORS.amber} emissive={COLORS.amber} emissiveIntensity={2.2} toneMapped={false} />
         </mesh>
       </group>
     </group>

@@ -69,6 +69,13 @@ function RobotBody({ pose, color, ghost = false, label, sub, headlight = true })
         <meshStandardMaterial color="#e5e7eb" transparent={ghost} opacity={op}
                               emissive="#ffffff" emissiveIntensity={ghost ? 0 : 0.6} />
       </mesh>
+      {!ghost && [-0.185, 0.185].map((z) => (
+        // LED strip in the robot's color; not tone mapped, so it blooms
+        <mesh key={z} position={[0, 0.19, z]}>
+          <boxGeometry args={[0.42, 0.035, 0.012]} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2.4} toneMapped={false} />
+        </mesh>
+      ))}
       {!ghost && headlight && !perf && <Headlight />}
       </group>
       {label && (
@@ -116,9 +123,10 @@ function lieAngle(id = '') {
 }
 
 // Low-poly person lying down, colored like a thermal image: head hottest, limbs cooler.
-const HOT = { color: '#ffd166', emissive: '#ffb02e', emissiveIntensity: 1.6, flatShading: true, roughness: 0.7 }
-const WARM = { color: '#ff7a3d', emissive: '#ff4d1a', emissiveIntensity: 1.3, flatShading: true, roughness: 0.7 }
-const COOL = { color: '#c2410c', emissive: '#9a2a0a', emissiveIntensity: 1.0, flatShading: true, roughness: 0.8 }
+// Not tone mapped, so the body heat blooms (the head brightest).
+const HOT = { color: '#ffd166', emissive: '#ffb02e', emissiveIntensity: 1.6, flatShading: true, roughness: 0.7, toneMapped: false }
+const WARM = { color: '#ff7a3d', emissive: '#ff4d1a', emissiveIntensity: 1.1, flatShading: true, roughness: 0.7, toneMapped: false }
+const COOL = { color: '#c2410c', emissive: '#9a2a0a', emissiveIntensity: 0.8, flatShading: true, roughness: 0.8, toneMapped: false }
 export function PersonFigure({ id }) {
   return (
     <group rotation={[0, lieAngle(id), 0]} scale={1.5}>

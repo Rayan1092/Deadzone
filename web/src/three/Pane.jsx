@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
+import { Bloom, EffectComposer } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import Building from './Building'
 import Fog from './Fog'
@@ -15,6 +16,27 @@ import RobotEye from './RobotEye'
 import CommandInset from './CommandInset'
 
 const GAP_COLUMN_PX = 330 // Command inset (300) + margins
+
+// Warm key light from the entrance side (west), cool sky fill. The shadow frustum covers
+// the whole building (the default ±5 m only shaded one corner).
+function Lights({ perf }) {
+  const target = useMemo(() => {
+    const t = new THREE.Object3D()
+    t.position.set(20, 0, -15)
+    return t
+  }, [])
+  return (
+    <>
+      <ambientLight intensity={0.28} />
+      <hemisphereLight args={['#a9bfd6', '#0b0d10', 0.45]} />
+      <primitive object={target} />
+      <directionalLight position={[-6, 30, -4]} target={target} intensity={1.15} color="#ffe6c4"
+                        castShadow={!perf} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0005}
+                        shadow-camera-left={-30} shadow-camera-right={30}
+                        shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-far={90} />
+    </>
+  )
+}
 
 function SyncedControls({ id }) {
   const ctrl = useRef()
@@ -134,15 +156,19 @@ export default function Pane({ which, title, subtitle }) {
       <Canvas shadows={!perf} dpr={perf ? 1 : [1, 1.5]} camera={{ fov: 50, near: 0.1, far: 300 }}>
         <color attach="background" args={[COLORS.bg]} />
         <fog attach="fog" args={[COLORS.bg, 90, 170]} />
-        <ambientLight intensity={0.35} />
-        <directionalLight position={[10, 30, 10]} intensity={0.6} castShadow={!perf} />
-        <hemisphereLight args={['#9fb3c8', '#0b0d10', 0.25]} />
+        <Lights perf={perf} />
         <Building />
         <Fog which={which} />
         <AntennaPulse />
         <PlanZones />
         {which === 'command' ? <CommandActors /> : <RealityActors gap={which === 'gap'} />}
         <SyncedControls id={which} />
+        {which !== 'command' && !perf && (
+          // only materials pushed past the threshold bloom: robot LEDs, survivors, antenna
+          <EffectComposer multisampling={4}>
+            <Bloom mipmapBlur luminanceThreshold={0.9} luminanceSmoothing={0.25} intensity={0.9} />
+          </EffectComposer>
+        )}
       </Canvas>
     </div>
   )
