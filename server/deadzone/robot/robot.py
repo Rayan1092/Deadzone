@@ -34,6 +34,17 @@ BATTERY_TIME_SCALE = 6.0  # demo: drain faster so bars visibly move
 PEER_TARGET_RADIUS = 4.0   # m, frontiers this close to a claimed target are penalized
 PEER_TARGET_PENALTY = 12.0  # larger than the best possible size bonus (40 * 0.25)
 PEER_FRESH_S = 15.0        # ignore claims older than this (peer out of contact)
+# Robots never drive through each other: peers' delivered poses (telemetry, every 1 s while in
+# contact) are dynamic obstacles for planning, and when two robots close within PEER_YIELD_M the
+# lower-priority one (R1 > R2 > R3) stops; after PEER_WAIT_S it replans around the peer instead.
+# Only delivered poses are known (lidar does not see robots), so a dark peer is invisible: the
+# sim's hard body collision is the physical backstop.
+# Opt-in with DZ_PEER_AVOID=1 (startup): a yield changes the timing of everything after it, so the
+# default demo keeps today's beats until they are re-baselined with the sim's hard collision.
+PEER_YIELD_M = 1.2         # m, yield when a higher-priority peer is this close, ahead and closing
+PEER_BLOCK_M = 0.6         # m, disk kept out of motion plans around every fresh peer pose
+PEER_POSE_FRESH_S = 2.5    # s, a peer pose older than this is no obstacle (it has moved on)
+PEER_WAIT_S = 3.0          # s, wait this long for the peer to pass before sidestepping
 DEPLOY_STAGGER_S = 1.5     # robot n waits n * this before exploring, so claims go out in order
 
 # Relay drop rule (DARPA SubT style: drop before the link breaks, not after)
@@ -170,6 +181,15 @@ def is_robot_id(nid):
     return len(nid) > 1 and nid[0] == "R" and nid[1:].isdigit()
 
 
+def _point_segment_dist(p, a, b):
+    """Distance from point p to segment ab."""
+    ax, ay, bx, by = a[0], a[1], b[0], b[1]
+    dx, dy = bx - ax, by - ay
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / L2))
+    return math.dist(p, (ax + t * dx, ay + t * dy))
+
+
 def robot_rank(rid):
     """R1 -> 0, R2 -> 1 ... Lower rank has priority when two robots want the same frontier."""
     digits = "".join(ch for ch in rid if ch.isdigit())
@@ -226,6 +246,13 @@ class Robot:
         self.outbox = []
         self.inbox = []           # bundles the network delivered to this robot
         self.peers = {}           # peer id -> {"target", "pose", "t"} from their telemetry
+        self.peer_dist = {}       # peer id -> distance at the last tick (to tell closing from leaving)
+        self.yield_to = None      # peer we are letting pass, and since when
+        self.yield_since = None
+        self.avoid_peers = False  # the next motion plan keeps clear of fresh peer poses (encounter)
+        # Opt-in until the demo beats are re-baselined together with the sim's hard body collision:
+        # one real yield in the seed-7 run moves every later beat (measured, see rayan.md).
+        self.peer_avoid = os.environ.get("DZ_PEER_AVOID") == "1"
         self.rank = robot_rank(rid)
         self.last_telemetry_t = -99.0
         self.lidar_pts = []
@@ -242,7 +269,7 @@ class Robot:
         # (and its test, which expects robots to supply none by default) reads them.
         self.counters = {"detector_calls": 0, "detector_persons": 0, "detector_rejections": 0,
                          "detector_unsure": 0, "scheduler_deadlines_met": 0, "scheduler_deadlines_missed": 0,
-                         "rescue_routes": 0, "replans": 0, "dark_s": 0.0}
+                         "rescue_routes": 0, "replans": 0, "dark_s": 0.0, "peer_yields": 0}
         self.wheel_a = 0.0
         self.spike_until = -1.0      # director-injected overcurrent ends at this time
         self.over_since = None       # wheel current above the limit since
@@ -304,7 +331,8 @@ class Robot:
         self._check_faults(odo)
         self._behave()
         self._check_command_done()
-        v, w =self._reverse() if self.state == "FAULT" else self._follow()
+        v, w = self._reverse() if self.state == "FAULT" else self._follow()
+        v, w = self._yield_to_peers(v, w)
         io.drive(v, w)
         self.cmd_v = v
         self.v = odo["v"]
@@ -559,7 +587,11 @@ class Robot:
             return
         prev = self.peers.get(p["id"])
         if prev is None or prev["t"] <= b["created"]:
-            self.peers[p["id"]] = {"target": p.get("target"), "pose": p.get("pose"),
+            vel = None                                    # the peer's velocity from its last two poses
+            if prev is not None and prev.get("pose") and p.get("pose") and b["created"] - prev["t"] > 0.2:
+                dt = b["created"] - prev["t"]
+                vel = [(p["pose"][0] - prev["pose"][0]) / dt, (p["pose"][1] - prev["pose"][1]) / dt]
+            self.peers[p["id"]] = {"target": p.get("target"), "pose": p.get("pose"), "vel": vel,
                                    "relays": p.get("relays", []), "found": p.get("found", []),
                                    "t": b["created"]}
             if self.explorer is not None:
@@ -1138,22 +1170,48 @@ class Robot:
     def _trav(self):
         return planning.traversable(self.map.grid, self.nogo)
 
-    def _drive_trav(self):
+    def _fresh_peers(self):
+        """Peers whose delivered pose is recent enough to still be where it says."""
+        return [(pid, info["pose"]) for pid, info in self.peers.items()
+                if info.get("pose") and len(info["pose"]) >= 2 and self.t - info["t"] <= PEER_POSE_FRESH_S]
+
+    def _peer_motion(self, pid):
+        """("stopped" | "oncoming" | "leaving" | None) from the peer's delivered velocity, relative
+        to us. None until two poses have arrived."""
+        vel = self.peers[pid].get("vel")
+        if vel is None:
+            return None
+        speed = math.hypot(*vel)
+        if speed < 0.15:
+            return "stopped"
+        px, py = self.peers[pid]["pose"][:2]
+        toward = ((self.pose[0] - px) * vel[0] + (self.pose[1] - py) * vel[1]) / speed
+        return "oncoming" if toward > 0.1 else "leaving"
+
+    def _drive_trav(self, peers=None):
         """Where this robot may drive: traversable, minus a disk around every survivor it has
-        confirmed, so it never runs a person over. Rescue routes still use _trav (they have
-        to reach the survivor). The robot's own cell stays open so it can always leave."""
+        confirmed (never run a person over) and, while an encounter is being resolved
+        (`self.avoid_peers`, set by _yield_to_peers for the next plan), around every fresh peer
+        pose (a peer we have waited PEER_WAIT_S for gets a wider berth so the plan sidesteps it).
+        Ordinary plans ignore peers: robots pass each other at normal distance and the demo's
+        paths stay what they are. Rescue routes still use _trav (they have to reach the
+        survivor). The robot's own cell stays open so it can always leave."""
         trav = self._trav()
-        if not self.found:
+        disks = [(rec["pos"], SURVIVOR_CLEAR_M) for rec in self.found.values()]
+        if self.avoid_peers if peers is None else peers:
+            waiting = self.yield_to if self.yield_since is not None and self.t - self.yield_since > PEER_WAIT_S else None
+            disks += [(pose, PEER_YIELD_M if pid == waiting else PEER_BLOCK_M) for pid, pose in self._fresh_peers()]
+        if not disks:
             return trav
         trav = trav.copy()
-        r = int(math.ceil(SURVIVOR_CLEAR_M / self.cell))
-        ys, xs = np.ogrid[-r:r + 1, -r:r + 1]
-        disk = xs * xs + ys * ys <= r * r
         h, w = trav.shape
         mx, my = self._cell(*self.pose[:2])
         keep = trav[my, mx] if 0 <= mx < w and 0 <= my < h else None
-        for rec in self.found.values():
-            cx, cy = self._cell(*rec["pos"])
+        for pos, radius in disks:
+            r = int(math.ceil(radius / self.cell))
+            ys, xs = np.ogrid[-r:r + 1, -r:r + 1]
+            disk = xs * xs + ys * ys <= r * r
+            cx, cy = self._cell(*pos[:2])
             x0, x1, y0, y1 = max(0, cx - r), min(w, cx + r + 1), max(0, cy - r), min(h, cy + r + 1)
             if x0 >= x1 or y0 >= y1:
                 continue
@@ -1162,6 +1220,54 @@ class Robot:
         if keep is not None:
             trav[my, mx] = keep
         return trav
+
+    def _yield_to_peers(self, v, w):
+        """Right of way: a higher-priority peer (lower number) that is within PEER_YIELD_M, ahead
+        of us and closing makes us stop. After PEER_WAIT_S of waiting we drop our path, so the next
+        plan (which keeps a wider disk around that peer) sidesteps it. Robots that are parked
+        (DEPLOYING, HOLDING, DONE, waiting for link) or reversing out of a fault are left alone."""
+        self.avoid_peers = False
+        if not self.peer_avoid:
+            return v, w                                   # DZ_PEER_AVOID unset: behaviour as before
+        if v <= 0 or self.state in ("DEPLOYING", "HOLDING", "DONE", "FAULT", "WAITING_FOR_LINK"):
+            self.yield_to = self.yield_since = None
+            return v, w
+        x, y, th = self.pose
+        closest = None
+        for pid, pose in self._fresh_peers():
+            d = math.dist((x, y), pose[:2])
+            prev = self.peer_dist.get(pid)
+            self.peer_dist[pid] = d
+            if d > PEER_YIELD_M or not self.path:
+                continue
+            ahead = abs(wrap_angle(math.atan2(pose[1] - y, pose[0] - x) - th)) < math.pi / 2
+            # collision course: the peer sits on (or next to) the segment we are about to drive
+            on_course = ahead and _point_segment_dist(pose[:2], (x, y), self.path[0]) < PEER_BLOCK_M
+            motion = self._peer_motion(pid)
+            if not on_course or motion in (None, "leaving"):
+                continue                                  # a leader pulling away is followed, not yielded to
+            if robot_rank(pid) >= self.rank:
+                # we have right of way, but we drive around a robot, never through it: it yielded
+                # (its last delivered velocity may still read "oncoming") or it is parked. Replan
+                # now with the peer kept out of the plan.
+                self.avoid_peers = True
+                self.path = []
+                self.last_plan_t = -99.0
+                continue
+            if closest is None or d < closest[1]:        # stopped or oncoming, and it has priority
+                closest = (pid, d)
+        if closest is None:
+            self.yield_to = self.yield_since = None
+            return v, w
+        pid, d = closest
+        if self.yield_to != pid:
+            self.yield_to, self.yield_since = pid, self.t
+            self.counters["peer_yields"] += 1
+            self.events.append({"kind": "peer_yield", "robot": self.id, "peer": pid, "dist_m": round(d, 2)})
+        elif self.t - self.yield_since > PEER_WAIT_S:
+            self.avoid_peers = True                       # sidestep: the next plan keeps the wider berth
+            self.path = []
+        return 0.0, 0.0
 
     def _plan_frontier(self):
         if self.explorer is not None:
@@ -1238,7 +1344,7 @@ class Robot:
         inflated traversable area of our own map (a new wall, rubble or no-go seen on it)."""
         if not self.path:
             return False
-        trav = self._drive_trav()
+        trav = self._drive_trav(peers=False)              # a passing robot is handled by yielding, not REPLANNING
         pts = [tuple(self.pose[:2])] + [tuple(p) for p in self.path]
         along = 0.0
         for (ax, ay), (bx, by) in zip(pts, pts[1:]):
