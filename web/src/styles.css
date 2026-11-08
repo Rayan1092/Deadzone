@@ -429,6 +429,7 @@ button:hover { border-color: var(--teal); }
 .pane-gap.swapped .robot-eye { display: none; } /* the scout camera belongs to the building view */
 .cmd-inset.big .inset-tag { font-size: 15px; padding: 3px 10px; }
 .lg-robot { width: 9px; height: 9px; border-radius: 50%; background: var(--teal); }
+.lg-known { width: 14px; height: 10px; border-radius: 2px; background: rgba(37,99,235,.6); box-shadow: inset 0 0 0 1px rgba(94,234,212,.7); }
 .lg-robot.dark { background: transparent; border: 2.5px solid #64748b; width: 10px; height: 10px; box-sizing: border-box; }
 .lg-survivor { width: 10px; height: 10px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 0 3px rgba(251,191,36,.3); }
 .split.single .director-chip { left: 27%; }
