@@ -106,6 +106,11 @@ function Chair({ M, tipped = false }) {
   )
 }
 
+// the office chair a survivor slumps in (Actors.jsx SurvivorFigure), facing +x like the figure
+export function SeatChair() {
+  return <group rotation={[0, -Math.PI / 2, 0]}><Chair M={mats()} /></group>
+}
+
 function FilingCabinet({ M }) {
   return (
     <group>

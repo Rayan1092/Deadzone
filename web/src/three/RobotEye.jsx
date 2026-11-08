@@ -6,7 +6,7 @@ import { FOCUS_HOLD_MS, useSim } from '../store'
 import { AI_CAPTION } from '../format'
 import { useCropManifest } from '../crops'
 import Building from './Building'
-import { PersonFigure } from './Actors'
+import { SurvivorFigure, survivorPose } from './Actors'
 import { ROBOT_SCALE } from './Rover'
 import RoverModel from './RoverModel'
 import { w2t } from './util'
@@ -98,6 +98,7 @@ function ThermalCrop({ name, fallback }) {
 
 function HotSpots({ thermal }) {
   const fp = useSim((s) => s.floorplan)
+  const manifest = useCropManifest()
   if (!fp) return null
   return (
     <group>
@@ -110,7 +111,7 @@ function HotSpots({ thermal }) {
                 <meshBasicMaterial color="#fff1b8" />
               </mesh>
             )} />
-          ) : <PersonFigure id={s.id} />}
+          ) : <SurvivorFigure id={s.id} pose={survivorPose(s, manifest)} />}
         </group>
       ))}
       {decoyLayout(fp).map((d) => (
