@@ -1,5 +1,6 @@
 import { usePhone } from './store'
 import { createDraftSync, postJSON } from './sync'
+import { pickRobot } from './zones'
 
 // Shared draft editing for planner phones. The server keeps one draft
 // (last write wins) and broadcasts it as plan_state to every phone.
@@ -76,11 +77,11 @@ export function addRegion(kind, poly) {
   let id = null
   commit((d) => {
     if (kind === 'zone') {
-      const robots = usePhone.getState().hello?.robots ?? []
-      const used = new Set(d.zones.map((z) => z.robot))
-      const robot = (robots.find((r) => !used.has(r.id)) ?? robots[0])?.id ?? 'R1'
+      const s = usePhone.getState()
+      const robot = pickRobot(d.zones, s.hello?.robots ?? [], s.view?.robots, poly)
+      for (const z of d.zones) if (z.robot === robot) z.priority = Math.min(10, z.priority + 1)
       id = nextId('Z', d)
-      d.zones.push({ id, robot, priority: Math.min(10, d.zones.length + 1), poly, comms: 'relay' })
+      d.zones.push({ id, robot, priority: 1, poly, comms: 'relay' })
     } else {
       id = nextId('NG', d)
       d.no_go.push({ id, poly, reason: 'Responder no-go area' })

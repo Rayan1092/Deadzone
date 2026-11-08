@@ -252,3 +252,4 @@
 .cmd-status { padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); }
 .cmd-status.ok { color: var(--green); }
 .cmd-status.bad { color: var(--red); }
+.violation .filled.tonal { margin-top: 6px; padding: 9px 14px; font-size: 13px; background: rgba(45,212,191,.16); color: var(--teal); }
