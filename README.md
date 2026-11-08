@@ -97,14 +97,14 @@ Deadzone is a test bench for one question: what should a team of search robots d
 
 ### What you are looking at
 
-Two views of the same mission. **Reality** is the simulated world: where the robots really are, every survivor and heat source (press **T** to show the hidden ones). The **Command post** is only what has reached the antenna over the simulated radio: delivered maps, last reported robot positions (a grey ghost when a robot is out of contact), reported survivors and rescue routes. A test fails if the Command post ever learns something before the radio delivered it. **M** switches between one view (Reality with the Command post inset) and side by side; **C** swaps the inset and the main view.
+Two views of the same mission. **Reality** is the simulated world: where the robots really are, every survivor and heat source. The **Command post** is only what has reached the antenna over the simulated radio: delivered maps, last reported robot positions (a grey ghost when a robot is out of contact), reported survivors and rescue routes. A test fails if the Command post ever learns something before the radio delivered it. **M** switches between one view (Reality with the Command post inset) and the split view; **C** swaps the inset and the main view, or in the split view looks down on the Command post. The mission clock is in the top bar.
 
 ### Buildings, variants and scenarios
 
 | Building | What it is | How to load it |
 |---|---|---|
 | **Riverside Block C, post-earthquake** | the reference building: 40 x 30 m offices, break room and warehouse, a steel storage cage that kills the radio, 3 survivors, 3 warm decoys (a radiator among them), a gas hazard, and a scripted secondary collapse at 162.5 s | the default (`collapse_01`) |
-| **Riverside Block C, variants 1 to 5** | the same walls with the people and decoys moved (one survivor always deep in the steel cage) | **N** loads another building (these five first); **Shift+N** returns to the default (`variants/collapse_01_v1` ...) |
+| **Riverside Block C, variants 1 to 5** | the same walls with the people and decoys moved (one survivor always deep in the steel cage) | **N** loads another building (these five first); **Shift+N** goes back to the main scenario (`variants/collapse_01_v1` ...) |
 | **Harborview Logistics Center, post-earthquake** | 80 x 60 m, 36 rooms, two steel dead zones, 4 survivors, 4 decoys, a three-area earthquake | reset into `showcase_01` (below) |
 | **Building 1234, post-earthquake** (any seed) | `python data/floorplans/generate.py --seed 1234` writes `data/floorplans/generated/gen_1234.json`: a random collapsed building, validated (everything reachable, a steel dead zone, survivors, decoys, a disaster script), plus a default search plan in `data/plans/` | reset into `generated/gen_1234` |
 
@@ -124,27 +124,33 @@ Press **Q** for a join code. Any phone on the same network opens a web page; not
 
 ### Keys on the big screen
 
+The same list is on screen: press **H**.
+
 | Key | What it does |
 | --- | --- |
-| Space / Backspace | start or pause / reset (paused) |
-| + / - | sim speed |
-| 1, 2, 3 / 0 | follow a robot (or click its card) / overview |
-| M / C | one view or side by side / swap the Command post inset and the main view |
-| E | Operator view (map first) / Engineering view (scheduler, legends, every panel) |
-| V | the followed robot's camera, with a thermal toggle |
-| T | show hidden survivors and decoys on Reality |
+| Space | start or pause the mission. The page opens on a street shot outside the building; the first Space dives in |
+| + / - | run faster or slower |
+| Backspace | restart this scenario from the beginning |
+| G | a short spoken briefing written only from what reached the command post (`DZ_GEMINI=1`) |
+| Q | the codes for joining from a phone |
+| X | sound cues on or off |
+| H / Esc | show or hide the key help / close whatever is open |
+| 0 / 1–9 | see the whole building / follow a robot (or click its chip or card) |
+| M | one view or the split view |
+| C | one view: swap the command post map with the main view; split view: look down on the command post |
+| V | the followed robot's camera |
+| D | the camera follows the action by itself |
+| P | lighter graphics on a slower computer (set before a run) |
+| R | rubble in front of the followed robot (with `DZ_SMART_RUBBLE=1` it never seals anyone in) |
+| F / O | jam the followed robot's wheels / overload its computer (the safety task keeps its deadlines) |
+| U | tell the followed robot to resume after a safety stop (sent over the radio) |
+| A / Shift+A | aftershock / strong aftershock in three areas (`DZ_AFTERSHOCK=1`) |
+| B | the same robots without Deadzone (they stop when the link drops), and back |
+| N / Shift+N | a different building / back to the main scenario |
+| L / J | Model Lab / try to beat the model on a held-out thermal image |
+| I | live counters from under the hood |
 | Y | belief map: where survivors may still be |
-| R | rubble on the followed robot's path (with `DZ_SMART_RUBBLE=1` it never seals anyone in) |
-| F / O | jam a wheel / overload the robot's processor (the safety task keeps its deadlines) |
-| U | resume a robot from safe stop (sent over the radio) |
-| A / Shift+A | aftershock / strong three-area aftershock (`DZ_AFTERSHOCK=1`) |
-| B | baseline: every robot behaves like a conventional one that stops when its link drops |
-| N / Shift+N | a new building / back to the default |
-| G | spoken situation briefing from Command post data (`DZ_GEMINI=1`) |
-| L / J | Model Lab / one held-out thermal sample: guess, then see the model's answer |
-| K / D | night lighting / automatic camera |
-| X / P | sound cues / performance mode (set before a run) |
-| Q / S / ? | phone join code / save the mission recording / this list |
+| W | the radio coverage the command post predicts: strong, weak or dead |
 
 ### Model Lab
 
@@ -152,7 +158,7 @@ Press **L** (server started with `DZ_AI_LAB=1`): training examples, the training
 
 ### Mission recording and replay
 
-Open `http://localhost:8000/?record`, run the mission, press **S**: the browser saves a gzipped recording of everything both views showed. Open `/?replay` and drop the file in to watch it again without the simulator (Space pauses, Backspace restarts); the detection images load only while a server is running.
+Open `http://localhost:8000/?record`, run the mission and save the recording: the browser downloads a gzipped recording of everything both views showed. Open `/?replay` and drop the file in to watch it again without the simulator (Space pauses, Backspace restarts); the detection images load only while a server is running.
 
 ### Optional features
 
