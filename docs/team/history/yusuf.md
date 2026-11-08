@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/aftershock`: key A for Aziz's aftershock director (done, not pushed). 3D world #51 merged. Next: Step 4 collapsed scheduler, Step 5 auto-director.
+- **Working on:** `p3/ai-eye`, the Version 3 plan below. Items 1–3 now: route replace + key B / Baseline chip / "No link, waiting", AI recognition in the robot's-eye view, phone Ask Gemini + spoken G briefing.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,39 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 03:30 · p3/ai-eye · Plan for Rayan's realistic visuals + AI showcase (answer to his ask)
+- **Plan, in order, with estimates (from about 8:45 PM; freeze 7:30 AM):**
+  1. Updated routes replace old ones (a newer `t` for the same survivor); key B sends `{action:"mode",value:"baseline"|"deadzone"}` with a "Baseline" chip from the hello/control `mode`; `WAITING_FOR_LINK` shows "No link, waiting". 45 min.
+  2. AI recognition in the robot's-eye view. 1h15.
+     - On `survivor_found` the camera opens on that robot and faces the person.
+     - Red box with "PERSON 97% · onboard AI", using the real `conf`.
+     - Action steps only from real events: detected → marking location → planning rescue route (`rescue_route`) → dropping beacon (`relay_dropped` with `beacon_for`, only if it happens).
+     - Decoys get "NOT A PERSON 0.3% · rejected" from `hotspot_rejected`.
+     - Wording: a classifier judged the boxed object. The box is placed from the object's known position, not drawn by the model.
+  3. Phone "Ask Gemini" box (`POST /api/ask`, shows `source`) and the spoken G briefing on the big screen. Never cut. 1h.
+  4. Collapse look, built in code: angled ceiling slabs, partly missing roof, sagging beams, jagged wall holes, broken windows, dangling rebar and cables, cracks, debris against walls, overturned furniture, airborne dust. 1h30.
+  5. AI Lab overlay on key L. Needs Rayan's export by about 1 AM. 1h.
+  6. Asset pack swap: robot GLB, person GLB under debris, photo-scanned textures and decals, HDRI. Behind a toggle until a dry run passes. Needs Rayan's pack by about 2 AM. 1h30.
+  7. Lighting: dark interior lit mainly by headlights, flicker and emergency lights, light shafts through dust, light grain and depth of field. 1h.
+  8. Auto-director and close cinematic shots (robot going dark, S1 discovery, the reveal). 1h.
+  9. Multi-story shell with an x-ray cutaway (visual only; sim stays on the ground floor). 1h.
+  10. Scheduler strip. 30 min.
+- **Cut order (first to go):** 10 scheduler strip, 9 multi-story shell, grain/depth of field/light shafts, photo-scanned texture swap (procedural textures stay), 8 auto-director (manual follow stays), robot and person GLBs (improved procedural models stay). **Never cut:** 1, 2, 3, 4, 5.
+- **Contract changes:** none yet. Asks for Rayan's exports below.
+- **Rayan, AI Lab export:** uses Aziz's reserved `/ai-lab/results/<file>` (from `ml/results/`, `DZ_AI_LAB=1`). Please add `ml/results/lab.json`:
+  `{"model":{"name","input_px","params","onboard_ms"},"metrics":{"accuracy","precision","recall","f1","n_test"},"confusion":{"labels":["person","not person"],"matrix":[[tp,fn],[fp,tn]]},"curve":[{"epoch","train_loss","val_loss","train_acc","val_acc"}],"examples":[{"file":"lab/pos_01.png","label","predicted","conf"}]}`.
+  - 12 person and 12 not-a-person example crops, PNG at 192 px, under `ml/results/lab/`.
+  - Real numbers only. If there's no per-epoch log, leave `curve` out and the overlay hides that chart.
+  - The live panel uses the event fields that already exist (`crop`, `heatmap_alpha`, `conf`).
+- **Rayan, asset pack (accepting your offer):**
+  - GLB, meshopt or Draco compressed. 1 unit = 1 m, Y up, origin at floor center.
+  - Robot: faces +X, under 50k triangles, named nodes `lidar`, `track_L`, `track_R`, `led_*`, `headlight`.
+  - Person: lying or partly buried pose, under 30k triangles, no debris attached.
+  - Texture sets (color, normal, roughness), 1k JPG, 2k only for floor and walls: cracked concrete, damaged plaster, brick, dusty tiles, rusted metal. Plus crack and stain decals with alpha.
+  - HDRI: 1k `.hdr`, overcast or dusk.
+  - Total under 40 MB, CC0 or CC-BY only. Commit to `web/public/assets/` (you're OK to write there) with `CREDITS.md` (source, author, licence per file).
+- **Next:** items 1–3.
 
 ### 2026-11-08 03:05 · p3/aftershock · Key A: aftershock on the big screen
 - **Did:** wired Aziz's ask from `docs/AFTERSHOCK.md`.
