@@ -1,0 +1,401 @@
+{
+ "temperature": 1.159,
+ "threshold": 0.6,
+ "sets": {
+  "FLIR street (held-out val)": {
+   "eval": {
+    "before": {
+     "n": 600,
+     "ece": 0.0073,
+     "mce": 0.182,
+     "brier": 0.0234,
+     "log_loss": 0.0843,
+     "accuracy_at_threshold": 0.9717,
+     "mean_confidence": 0.9696,
+     "bins": [
+      {
+       "bin": [
+        0.5,
+        0.6
+       ],
+       "n": 13,
+       "confidence": 0.543,
+       "accuracy": 0.5385
+      },
+      {
+       "bin": [
+        0.6,
+        0.7
+       ],
+       "n": 6,
+       "confidence": 0.6514,
+       "accuracy": 0.8333
+      },
+      {
+       "bin": [
+        0.7,
+        0.8
+       ],
+       "n": 14,
+       "confidence": 0.7376,
+       "accuracy": 0.7857
+      },
+      {
+       "bin": [
+        0.8,
+        0.9
+       ],
+       "n": 16,
+       "confidence": 0.8422,
+       "accuracy": 0.875
+      },
+      {
+       "bin": [
+        0.9,
+        1.0
+       ],
+       "n": 551,
+       "confidence": 0.9927,
+       "accuracy": 0.9891
+      }
+     ]
+    },
+    "after": {
+     "n": 600,
+     "ece": 0.0061,
+     "mce": 0.1756,
+     "brier": 0.0236,
+     "log_loss": 0.0842,
+     "accuracy_at_threshold": 0.9717,
+     "mean_confidence": 0.9639,
+     "bins": [
+      {
+       "bin": [
+        0.5,
+        0.6
+       ],
+       "n": 13,
+       "confidence": 0.5372,
+       "accuracy": 0.5385
+      },
+      {
+       "bin": [
+        0.6,
+        0.7
+       ],
+       "n": 12,
+       "confidence": 0.6578,
+       "accuracy": 0.8333
+      },
+      {
+       "bin": [
+        0.7,
+        0.8
+       ],
+       "n": 15,
+       "confidence": 0.7546,
+       "accuracy": 0.8
+      },
+      {
+       "bin": [
+        0.8,
+        0.9
+       ],
+       "n": 20,
+       "confidence": 0.859,
+       "accuracy": 0.9
+      },
+      {
+       "bin": [
+        0.9,
+        1.0
+       ],
+       "n": 540,
+       "confidence": 0.9907,
+       "accuracy": 0.9907
+      }
+     ]
+    }
+   },
+   "all_before": {
+    "n": 1200,
+    "ece": 0.0058,
+    "mce": 0.0793,
+    "brier": 0.0265,
+    "log_loss": 0.0963,
+    "accuracy_at_threshold": 0.9667,
+    "mean_confidence": 0.9688,
+    "bins": [
+     {
+      "bin": [
+       0.5,
+       0.6
+      ],
+      "n": 27,
+      "confidence": 0.5452,
+      "accuracy": 0.5185
+     },
+     {
+      "bin": [
+       0.6,
+       0.7
+      ],
+      "n": 15,
+      "confidence": 0.654,
+      "accuracy": 0.7333
+     },
+     {
+      "bin": [
+       0.7,
+       0.8
+      ],
+      "n": 26,
+      "confidence": 0.7452,
+      "accuracy": 0.7308
+     },
+     {
+      "bin": [
+       0.8,
+       0.9
+      ],
+      "n": 37,
+      "confidence": 0.8542,
+      "accuracy": 0.8378
+     },
+     {
+      "bin": [
+       0.9,
+       1.0
+      ],
+      "n": 1095,
+      "confidence": 0.9928,
+      "accuracy": 0.989
+     }
+    ]
+   }
+  },
+  "Indoor, SDT (held-out 20%)": {
+   "eval": {
+    "before": {
+     "n": 1137,
+     "ece": 0.0033,
+     "mce": 0.4869,
+     "brier": 0.0033,
+     "log_loss": 0.0101,
+     "accuracy_at_threshold": 0.9947,
+     "mean_confidence": 0.9957,
+     "bins": [
+      {
+       "bin": [
+        0.5,
+        0.6
+       ],
+       "n": 1,
+       "confidence": 0.5131,
+       "accuracy": 1.0
+      },
+      {
+       "bin": [
+        0.6,
+        0.7
+       ],
+       "n": 4,
+       "confidence": 0.6471,
+       "accuracy": 0.75
+      },
+      {
+       "bin": [
+        0.7,
+        0.8
+       ],
+       "n": 5,
+       "confidence": 0.7339,
+       "accuracy": 0.4
+      },
+      {
+       "bin": [
+        0.8,
+        0.9
+       ],
+       "n": 5,
+       "confidence": 0.8476,
+       "accuracy": 0.8
+      },
+      {
+       "bin": [
+        0.9,
+        1.0
+       ],
+       "n": 1122,
+       "confidence": 0.9992,
+       "accuracy": 1.0
+      }
+     ]
+    },
+    "after": {
+     "n": 1137,
+     "ece": 0.0029,
+     "mce": 0.4474,
+     "brier": 0.0033,
+     "log_loss": 0.0104,
+     "accuracy_at_threshold": 0.9938,
+     "mean_confidence": 0.9948,
+     "bins": [
+      {
+       "bin": [
+        0.5,
+        0.6
+       ],
+       "n": 2,
+       "confidence": 0.5526,
+       "accuracy": 1.0
+      },
+      {
+       "bin": [
+        0.6,
+        0.7
+       ],
+       "n": 6,
+       "confidence": 0.6635,
+       "accuracy": 0.5
+      },
+      {
+       "bin": [
+        0.7,
+        0.8
+       ],
+       "n": 3,
+       "confidence": 0.7492,
+       "accuracy": 0.6667
+      },
+      {
+       "bin": [
+        0.8,
+        0.9
+       ],
+       "n": 7,
+       "confidence": 0.852,
+       "accuracy": 0.8571
+      },
+      {
+       "bin": [
+        0.9,
+        1.0
+       ],
+       "n": 1119,
+       "confidence": 0.9989,
+       "accuracy": 1.0
+      }
+     ]
+    }
+   },
+   "all_before": {
+    "n": 2273,
+    "ece": 0.0016,
+    "mce": 0.1543,
+    "brier": 0.0025,
+    "log_loss": 0.0079,
+    "accuracy_at_threshold": 0.9956,
+    "mean_confidence": 0.996,
+    "bins": [
+     {
+      "bin": [
+       0.5,
+       0.6
+      ],
+      "n": 3,
+      "confidence": 0.5278,
+      "accuracy": 0.6667
+     },
+     {
+      "bin": [
+       0.6,
+       0.7
+      ],
+      "n": 8,
+      "confidence": 0.642,
+      "accuracy": 0.625
+     },
+     {
+      "bin": [
+       0.7,
+       0.8
+      ],
+      "n": 7,
+      "confidence": 0.7258,
+      "accuracy": 0.5714
+     },
+     {
+      "bin": [
+       0.8,
+       0.9
+      ],
+      "n": 9,
+      "confidence": 0.8572,
+      "accuracy": 0.8889
+     },
+     {
+      "bin": [
+       0.9,
+       1.0
+      ],
+      "n": 2246,
+      "confidence": 0.9993,
+      "accuracy": 1.0
+     }
+    ]
+   }
+  }
+ },
+ "demo_crops": {
+  "neg_0001.png": {
+   "before": 0.0024,
+   "after": 0.0055
+  },
+  "neg_0002.png": {
+   "before": 0.0381,
+   "after": 0.0581
+  },
+  "neg_0003.png": {
+   "before": 0.0088,
+   "after": 0.0167
+  },
+  "pos_0001.png": {
+   "before": 0.9999,
+   "after": 0.9998
+  },
+  "pos_0002.png": {
+   "before": 1.0,
+   "after": 1.0
+  },
+  "pos_0003.png": {
+   "before": 1.0,
+   "after": 1.0
+  },
+  "unsure_object_01.png": {
+   "before": 0.4409,
+   "after": 0.449
+  },
+  "unsure_object_01_close.png": {
+   "before": 0.0004,
+   "after": 0.001
+  },
+  "unsure_person_01.png": {
+   "before": 0.5843,
+   "after": 0.5729
+  },
+  "unsure_person_01_close.png": {
+   "before": 1.0,
+   "after": 1.0
+  }
+ },
+ "recommend": {
+  "ship_temperature": false,
+  "mean_ece_before": 0.0053,
+  "mean_ece_after": 0.0045,
+  "mean_accuracy_before": 0.9832,
+  "mean_accuracy_after": 0.9828,
+  "demo_flips": [],
+  "rule": "ship T only if mean ECE drops by more than 1 point, accuracy at the threshold does not drop, and no demo crop changes verdict"
+ }
+}

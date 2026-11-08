@@ -3,9 +3,9 @@
 Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on the testing laptop edits this file. Rayan's robot session writes `history/rayan.md`.
 
 ## Now
-- **Working on:** `rayan-ml/gradcam-poses` (PR open, merging after tests): Grad-CAM on the body, README/DEVPOST/slides at 96.7%, poses for Yusuf. Next: calibration (waiting for Rayan to say what it covers).
-- **Works on main:** trained survivor detector + `perception.filter_hits()` with sim fallback (PR #14), runtime crops, robot hookup and decoys (PR #17), Grad-CAM heatmaps (PR #49), AI Lab export (PR #68), logged retrain (PR #71), judge pool `ml/results/judge_pool/` (PR #96), benchmark v2 radio sweep (PR #97), real-scene crops + detector fine-tuned on indoor thermal people, FLIR 96.7% / indoor 99.6% (PR #95).
-- **In flight (not merged):** `rayan-ml/gradcam-poses`: fused Grad-CAM heatmaps, stats card indoor line, README data section, DEVPOST numbers.
+- **Working on:** `rayan-ml/calibration` (PR open, merging after tests). Next: radio model vs published measurements, benchmark-only study (values posted here for Aziz).
+- **Works on main:** trained survivor detector + `perception.filter_hits()` with sim fallback (PR #14), runtime crops, robot hookup and decoys (PR #17), Grad-CAM heatmaps (PR #49), AI Lab export (PR #68), logged retrain (PR #71), judge pool `ml/results/judge_pool/` (PR #96), benchmark v2 radio sweep (PR #97), fused Grad-CAM + 96.7% docs (PR #100), real-scene crops + detector fine-tuned on indoor thermal people, FLIR 96.7% / indoor 99.6% (PR #95).
+- **In flight (not merged):** `rayan-ml/calibration`: `ml/calibration.py`, `ml/results/calibration.json`, `docs/assets/calibration.png`, `calibration` block in lab.json.
 - **Blocked on / need from others:** **Yusuf:** pose the three 3D survivor figures to match the real crops and use `shows` as the caption line (gradcam-poses entry).
 - **Promises to others:**
   - `filter_hits(hits)` keeps the `io.thermal()` hit shape `{id,pos,crop,conf}`. Kept hits get `conf` = model P(person) and `detector:"model"`; rejected hits are dropped.
@@ -15,6 +15,12 @@ Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on
   - Judge pool manifest format below (judge-test entry), readable by Aziz's `readJudgePool`.
 
 ## Log
+
+### 2026-11-08 14:20 · rayan-ml/calibration · The detector's confidence is honest (no temperature needed)
+- **Did:** `py ml/calibration.py` scores both held-out sets with the shipped model and checks whether a confidence of X is right X of the time. **ECE 0.6% on FLIR street (1,200) and 0.2% indoor (2,273)**; 91% of FLIR answers and 99% of indoor answers are 90%+ confident and are right 98.9% and 100% (2,246 of 2,246) of the time. Temperature scaling, fitted on one half of each set and judged on the other, gives T = 1.16 and gains under 0.1 point of ECE while costing a little indoor accuracy, so **it is not shipped** and the detector is unchanged. No demo crop changes verdict either way; Rayan's unsure pairs stay inside the 0.35-0.75 band (0.44 and 0.58). Slide `docs/assets/calibration.png` (dot size = images per bin, bins under 20 images hollow and labelled, so small bins can't pass for a trend).
+- **Contract changes:** `lab.json` gains `calibration` {ece per set, temperature_tested, temperature_shipped, chart, note}. New `docs/assets/calibration.png` (served at `/ai-lab/slides/calibration.png`).
+- **Heads-up for others:** **Yusuf:** optional line for key L: "Confidence is honest: off by 0.6% on average (street), 0.2% (indoor)" from `calibration.ece`, chart at `/ai-lab/slides/calibration.png`. Judge answer to "can I trust the 100%?": "A 90%+ answer was right 98.9% of the time on 1,200 street images it never saw, and every time on 2,246 indoor ones."
+- **Next:** radio model vs published measurements (benchmark only).
 
 ### 2026-11-08 13:50 · rayan-ml/gradcam-poses · Grad-CAM on the body, 96.7% everywhere, survivor poses for Yusuf
 - **Did:** the survivor heatmaps sat on the background: the old single-layer map (features[8], 6 x 6) put only 15% of its heat on the body, below chance (the body is 23% of a crop). Measured every layer on the 3 survivors + 11 indoor examples: the exported maps are now a **fused Grad-CAM**, the last conv layer (features[12], where the person is) times features[1] (24 x 24 detail), on the person-minus-not-person logit: **62% of the heat on the body** (S1 68%, S2 33%, S3 67%). Occlusion maps fail here (scores saturated at 1.0). `gradcam()` itself is unchanged for the tests. Regenerated heatmaps, lab.json, slides. Stats card gains "Indoor people lying or sitting: 83.9% to 99.6%". README: detector line at 96.7% / 97.3% / 96.0% plus the indoor result, new "Data and resources" section (FLIR ADAS v2; SDT, Zenodo 4124309, CC BY 4.0, real indoor split only). DEVPOST: same numbers (confusion 576 / 24 / 584 / 16), SDT data line, indoor result line. Server on the test station now runs with `DZ_AI_LAB=1 DZ_GEMINI=1 DZ_AFTERSHOCK=1` (J and L have data, G answers from Gemini).

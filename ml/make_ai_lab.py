@@ -131,6 +131,17 @@ def main():
     elif (RESULTS / "lab.json").is_file():
         indoor = json.loads((RESULTS / "lab.json").read_text()).get("metrics_indoor")
 
+    # confidence honesty (ml/calibration.py): ECE per held-out set, and whether temperature ships
+    calibration = None
+    cal_path = RESULTS / "calibration.json"
+    if cal_path.is_file():
+        cal = json.loads(cal_path.read_text())
+        calibration = {"ece": {name: r["all_before"]["ece"] for name, r in cal["sets"].items()},
+                       "temperature_tested": cal["temperature"],
+                       "temperature_shipped": cal["recommend"]["ship_temperature"],
+                       "chart": "/ai-lab/slides/calibration.png",
+                       "note": "ECE = average gap between confidence and how often the model is right (0 is perfectly honest)."}
+
     hist_path = RESULTS / "train_history.json"
     hist = json.loads(hist_path.read_text()) if hist_path.is_file() else None
     curve = [{k: e[k] for k in ("epoch", "train_loss", "val_loss", "train_acc", "val_acc")}
@@ -147,6 +158,8 @@ def main():
     rm = RUNTIME / "manifest.json"
     if rm.is_file():
         for e in json.loads(rm.read_text())["crops"]:
+            if not e.get("role"):          # only the sim's survivors and decoys, not the unsure pairs
+                continue
             runtime.append({"id": e["id"], "role": e["role"], "object": e["object"], "label": e["label"],
                             "pose": e.get("pose"), "shows": e.get("shows"), "caption": e.get("caption"),
                             "predicted": e["predicted"], "conf": e["conf"], "file": f"/crops/{e['file']}",
@@ -161,6 +174,7 @@ def main():
         "metrics": {"accuracy": round(m["accuracy"], 4), "precision": round(m["precision"], 4),
                     "recall": round(m["recall"], 4), "f1": round(m["f1"], 4), "n_test": m["n"]},
         "metrics_indoor": indoor,
+        "calibration": calibration,
         "confusion": {"labels": ["person", "not person"],
                       "matrix": [[c["tp"], c["fn"]], [c["fp"], c["tn"]]]},
         "curve": curve,
