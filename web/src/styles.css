@@ -48,6 +48,7 @@ button:hover { border-color: var(--teal); }
 .dot { width: 8px; height: 8px; border-radius: 50%; }
 .dot.reality { background: var(--teal); }
 .dot.command { background: var(--amber); }
+.dot.gap { background: var(--teal); box-shadow: 0 0 0 3px rgba(245,158,11,.35); }
 .truth-chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; color: #fecaca; border: 1px dashed rgba(239,68,68,.6); }
 
 .pane-legend { position: absolute; z-index: 2; bottom: 10px; left: 12px; display: flex; gap: 12px; font-size: 11px;
@@ -291,3 +292,26 @@ button:hover { border-color: var(--teal); }
 .pane-title { white-space: nowrap; max-width: calc(100% - 24px); }
 .pane-title .muted { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .det-cards { bottom: 50px; }
+
+/* ---------------------------------------------------------------- one view (Step 2, M key) */
+.split.single { grid-template-columns: 1fr; }
+.view-btn { padding: 6px 12px; }
+
+/* Command inset: top-right corner of the one-view pane */
+.cmd-inset { position: absolute; z-index: 4; top: 52px; right: 12px; width: 300px; height: 232px; display: flex;
+  flex-direction: column; overflow: hidden; border-radius: 14px; border: 1px solid rgba(127,178,255,.35);
+  background: #081325; box-shadow: 0 12px 32px rgba(0,0,0,.5), var(--glass-hi); }
+.cmd-inset > div:not(.inset-head) { flex: 1; }
+.inset-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12px; color: #bfdbfe;
+  border-bottom: 1px solid rgba(127,178,255,.2); }
+.pane-gap .robot-eye { right: auto; left: 12px; }
+
+/* status tags: amber while Command hasn't heard yet */
+.tag.pending { border-color: rgba(245,158,11,.75); color: #fde68a; }
+.tag.route.pending { border-color: rgba(250,204,21,.35); color: rgba(254,240,138,.75); }
+
+/* gap legend */
+.lg-haze { width: 14px; height: 10px; border-radius: 2px; background: rgba(245,158,11,.45); }
+.lg-link.tether { border-top: 2px dashed var(--amber); }
+.lg-route { width: 16px; height: 0; border-top: 3px dashed #facc15; }
+.pane-gap .det-cards { top: 296px; bottom: auto; right: 12px; width: 300px; }

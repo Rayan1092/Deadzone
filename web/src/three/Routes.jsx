@@ -31,31 +31,37 @@ function Beacon({ pos, id }) {
   )
 }
 
-function Route({ route, relays }) {
+// pending = the robot has the route but Command doesn't yet (gap view): faint, says so.
+function Route({ route, relays, pending = false }) {
   const pts = route.path.map(([x, y]) => w2t(x, y, 0.12))
   const end = route.path[route.path.length - 1]
   const beacon = route.beacon && relays.find((r) => r.id === route.beacon)
   return (
     <group>
       {/* drawn through the fog layer so a route over not-yet-mapped cells stays visible */}
-      <Line points={pts} color={ROUTE} lineWidth={3.5} dashed dashSize={0.6} gapSize={0.35}
-            depthTest={false} renderOrder={4} transparent opacity={0.95} />
+      <Line points={pts} color={ROUTE} lineWidth={pending ? 2 : 3.5} dashed dashSize={pending ? 0.3 : 0.6}
+            gapSize={pending ? 0.4 : 0.35} depthTest={false} renderOrder={4} transparent opacity={pending ? 0.45 : 0.95} />
       <mesh position={pts[0]} renderOrder={4}>
         <sphereGeometry args={[0.18, 12, 12]} />
         <meshBasicMaterial color={ROUTE} depthTest={false} />
       </mesh>
       <Html position={w2t(end[0], end[1], 1.9)} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
-        <div className="tag route"><b>Route to {route.survivor}</b><span>{route.length_m.toFixed(1)} m</span></div>
+        <div className={`tag route${pending ? ' pending' : ''}`}>
+          <b>Route to {route.survivor}</b><span>{pending ? 'not reported yet' : `${route.length_m.toFixed(1)} m`}</span>
+        </div>
       </Html>
       {beacon && <Beacon pos={beacon.pos} id={beacon.id} />}
     </group>
   )
 }
 
-export function RealityRoutes() {
+export function RealityRoutes({ gap = false }) {
   const routes = useSim((s) => s.routes)
   const relays = useSim((s) => s.tick?.reality.relays) ?? NONE
-  return Object.values(routes).map((r) => <Route key={r.survivor} route={r} relays={relays} />)
+  const delivered = useSim((s) => s.tick?.command.routes) ?? NONE
+  return Object.values(routes).map((r) => (
+    <Route key={r.survivor} route={r} relays={relays} pending={gap && !delivered.some((d) => d.survivor === r.survivor)} />
+  ))
 }
 
 export function CommandRoutes() {
