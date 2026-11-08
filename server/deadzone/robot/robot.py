@@ -57,6 +57,7 @@ REPLAN_COOLDOWN_S = 5.0    # repeat obstacles this soon after a replan are repla
 TRAPPED_AFTER_S = 10.0     # no route for this long raises a TRAPPED fault to the command post
 ROUTE_CHECK_PERIOD = 2.0   # s between "is the rescue route I sent still open on my map?" checks
 COLLAPSE_MARGINS_CELLS = (4, 2)  # rescue routes stay 1 m (else 0.5 m) clear of fresh collapse
+ROUTE_MAX_POINTS = 60      # Command's RescueRoute cap (Aziz, PR #28)
 
 # Wheel overcurrent (plan: above 6 A for 0.5 s -> stop, reverse 0.5 m, mark ahead, replan)
 OVERCURRENT_A = 6.0
@@ -102,6 +103,49 @@ def default_mode():
     """DZ_MODE=baseline starts every robot in baseline mode; anything else means deadzone."""
     mode = os.environ.get("DZ_MODE", "deadzone").strip().lower()
     return mode if mode in MODES else "deadzone"
+
+
+def _collinear_compact(pts):
+    """Command's own compaction (PR #28): drop exactly-collinear middle points only."""
+    out = []
+    for q in pts:
+        if out and q == out[-1]:
+            continue
+        while len(out) > 1:
+            a, b = out[-2:]
+            u = b[0] - a[0], b[1] - a[1]
+            v = q[0] - b[0], q[1] - b[1]
+            if u[0] * v[1] - u[1] * v[0] != 0 or u[0] * v[0] + u[1] * v[1] < 0:
+                break
+            out.pop()
+        out.append(q)
+    return out
+
+
+def fit_route(pts, cap=ROUTE_MAX_POINTS, tol=0.15):
+    """Rescue route points, rounded to cm, that Command will accept (at most `cap` after its
+    compaction). Routes that already fit are returned unchanged, so nothing about normal routes
+    (the demo's included) changes. Longer ones (big generated buildings) are simplified with
+    Douglas-Peucker at `tol` m, then thinned evenly, always keeping both ends."""
+    pts = [[round(px, 2), round(py, 2)] for px, py in pts]
+    if len(pts) <= cap or len(_collinear_compact(pts)) <= cap:
+        return pts
+
+    def dp(seg):
+        if len(seg) < 3:
+            return seg
+        (ax, ay), (bx, by) = seg[0], seg[-1]
+        L = math.hypot(bx - ax, by - ay) or 1e-9
+        d = [abs((bx - ax) * (ay - y) - (ax - x) * (by - ay)) / L for x, y in seg[1:-1]]
+        k = max(range(len(d)), key=d.__getitem__)
+        if d[k] <= tol:
+            return [seg[0], seg[-1]]
+        return dp(seg[:k + 2])[:-1] + dp(seg[k + 1:])
+    out = dp(pts)
+    if len(out) > cap:
+        idx = sorted({round(i * (len(out) - 1) / (cap - 1)) for i in range(cap)})
+        out = [out[i] for i in idx]
+    return out
 
 
 def resume_command(rid, now):
@@ -606,7 +650,7 @@ class Robot:
         watch = [(cx, cy) for cx, cy in cells if trav[cy, cx]]
         centers = [((cx + 0.5) * self.cell, (cy + 0.5) * self.cell) for cx, cy in cells]
         pts = [list(self.entry)] + [list(p) for p in planning.simplify(cells, self.cell)] + [list(goal)]
-        pts = [[round(px, 2), round(py, 2)] for px, py in pts]
+        pts = fit_route(pts)
         length = math.dist(self.entry, centers[0]) + planning.path_length(centers) + math.dist(centers[-1], goal)
         return watch, pts, round(length, 1), planning.INFLATE_CELLS * self.cell
 
