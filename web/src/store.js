@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { rumble } from './audio'
 
 // Events worth a toast on the big screen. replan, deadline_miss and deliveries
 // fire too often and stay in the sidebar feed or the timeline.
@@ -74,7 +75,9 @@ export const useSim = create((set) => ({
   hoodOpen: false,     // I: actual simulator counters, after the close
   eyeFocus: null,      // the hot spot the onboard classifier just judged: { kind, subject, robot, pos, conf, linked, born }
   mode: null,          // 'deadzone' | 'baseline' | 'mixed' from hello/control (Rayan's baseline mode)
-  aftershock: null,    // { at, born } of the latest aftershock, for the shake and dust
+  aftershock: null,    // { at, born, rubble } of the latest aftershock, for the shake, slabs and dust
+  banner: null,
+  lastScenario: null,  // key N cycles through registered scenarios        // { title, sub, tone, at }: AFTERSHOCK / NEW SCENARIO over the main view
   report: null,        // briefing from /api/report: { text, generated_at, source } | { loading } | { error }
   detector: null,      // { mode: 'model' | 'sim', reason } from hello, null until the server sends it
   detections: [],      // AI detection cards: { eid, side: 'reality' | 'command', verdict, crop, conf, ... }
@@ -122,6 +125,13 @@ export function handleMessage(msg) {
     case 'hello': {
       // hello also arrives after a rubble drop; only a reset (time going back) clears history
       const reset = time < s.time
+      // a different building, or the same building with the survivors moved (key N variants):
+      // say so, so nobody thinks the run is scripted
+      const prev = s.floorplan
+      const changed = prev && data.floorplan && (prev.id !== data.floorplan.id || prev.name !== data.floorplan.name ||
+        (reset && JSON.stringify(prev.survivors?.map((x) => x.pos)) !== JSON.stringify(data.floorplan.survivors?.map((x) => x.pos))))
+      if (changed) s.set({ banner: { title: 'NEW SCENARIO', tone: 'info', at: Date.now(),
+        sub: prev.id !== data.floorplan.id || prev.name !== data.floorplan.name ? data.floorplan.name : `${data.floorplan.name} · survivors and decoys shuffled, new seed` } })
       s.set({ floorplan: data.floorplan, grid: data.grid, robotsMeta: data.robots,
               running: data.running, speed: data.speed, mode: data.mode ?? null, time,
               detector: data.detector ? { mode: data.detector, reason: data.detector_reason } : null,
@@ -171,7 +181,12 @@ export function handleMessage(msg) {
       const events = fold ? [{ ...ev, count: (top.count ?? 1) + 1 }, ...s.events.slice(1)] : [ev, ...s.events]
       if (ev.kind === 'plan_dispatched') s.set({ dispatchedPlans: [...s.dispatchedPlans, ev.plan_id] })
       // the 3D view shakes and throws up a dust cloud where the ceiling came down (Reality only)
-      if (ev.kind === 'aftershock') s.set({ aftershock: { at: ev.at, born: performance.now() } })
+      if (ev.kind === 'aftershock') {
+        s.set({ aftershock: { at: ev.at, born: performance.now(), rubble: ev.rubble ?? [] },
+          banner: { title: 'AFTERSHOCK', tone: 'alert', at: Date.now(),
+            sub: ev.destroyed_relay ? `Part of the building came down · relay ${ev.destroyed_relay} crushed · robots rerouting` : 'Part of the building came down · robots rerouting' } })
+        rumble(5) // only audible after a user gesture (the A key counts)
+      }
       // the robot's own route (Reality knowledge); Command draws only delivered command.routes
       if (ev.kind === 'rescue_route') {
         // a newer route for the same survivor replaces the old one; an older one is ignored
@@ -217,3 +232,6 @@ export function handleMessage(msg) {
       break
   }
 }
+
+// dev aid: inspect or poke the store from the console (window.__dz.getState())
+if (typeof window !== 'undefined') window.__dz = useSim

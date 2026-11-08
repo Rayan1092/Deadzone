@@ -17,3 +17,7 @@ Step 4 so far: night by default, night sky photo, haze fog, grading and grain (P
 Steps 2+3: `after-3-a/b` were taken with Performance mode on (P was toggled in another tab); `after-3-c` is full quality. Full-quality retakes follow with the next commit.
 
 Final column: everything merged on `p3/collapse-geometry` with Rayan's damaged-plaster and cracked-floor sets, full quality, night, sim running (robots and tags differ from earlier columns).
+
+| F street (exterior shell) | `?cam=-26,9,8,8,1,-22,42` | | | | | ![](final-f-street.jpg) |
+
+Final-stretch additions (12:20 AM list): Rescue Status strip at the top, captions on every AI image, earthquake v2 (press A with `DZ_AFTERSHOCK=1`), generic furnishing on unknown floor plans (`?generic=1` to preview on the demo building), exterior shell (storey stubs, pancaked corner slab, street).

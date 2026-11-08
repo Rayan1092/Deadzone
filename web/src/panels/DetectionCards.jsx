@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSim } from '../store'
+import { AI_CAPTION } from '../format'
 
 const CARD_MS = 9000
 
@@ -47,6 +48,7 @@ export default function DetectionCards({ side, sides = [side] }) {
               <span className="det-warn small">No link, holding the report</span>
             )}
             {c.side === 'command' && c.delay != null && <span className="muted small">arrived {c.delay}s after detection</span>}
+            <span className="det-caption">{AI_CAPTION}</span>
           </div>
         </div>
       ))}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSim } from '../store'
-import { fmtClock } from '../format'
+import { AI_CAPTION, fmtClock } from '../format'
 
 // AI Lab (key L): how the onboard person detector was trained and how it scores, plus the
 // crop a robot just judged with its Grad-CAM. Static ML evidence comes from Rayan's exports,
@@ -134,6 +134,7 @@ function Live({ crops }) {
       </div>
       <div className="lab-live-text">
         <span className="muted small">Just judged onboard · {last.robot} · T+{fmtClock(last.time ?? 0)}</span>
+        <span className="det-caption">{AI_CAPTION}</span>
         <b className={person ? 'yes' : 'no'}>{person ? 'Person' : 'Not a person'} · {pct(last.conf ?? (person ? 1 : 0), last.conf > 0 && last.conf < 0.01 ? 1 : 0)}</b>
         <span className="muted small">{person ? `Survivor ${last.survivor}` : `Hot spot ${last.id}${entry?.object ? ` (${entry.object})` : ''}, rejected`}</span>
         {heatmap && (
@@ -152,6 +153,7 @@ function Examples({ lab, crops }) {
     return (
       <section className="lab-examples">
         <h4>Training examples</h4>
+        <p className="det-caption">{AI_CAPTION} Held-out: the model never trained on these; misses are kept on purpose.</p>
         <div className="lab-grid">
           {lab.examples.slice(0, 24).map((ex) => (
             <figure key={ex.file} className={ex.label === ex.predicted ? '' : 'wrong'}>

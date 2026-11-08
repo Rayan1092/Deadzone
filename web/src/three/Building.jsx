@@ -12,6 +12,7 @@ import FracturedWalls from './Fracture'
 import { AtmosphereLive, AtmosphereStatic } from './Atmosphere'
 import { LitterStatic, ScannedDebris } from './Litter'
 import { CeilingLive, CeilingStatic } from './Ceiling'
+import ExteriorShell from './Shell'
 
 // Thermal palette for the robot's-eye view: everything cold reads as deep blue.
 const COLD = { floor: '#070b1f', wall: '#1d3a8a', wallGlow: '#0b1d5c' }
@@ -310,6 +311,7 @@ export default function Building({ thermal = false, blueprint = false, props = t
         {damage && <LitterStatic fp={fp} perf={perf} />}
         {damage && <ScannedDebris fp={fp} perf={perf} outside={!lite} />}
         {damage && <CeilingStatic fp={fp} />}
+        {damage && !lite && <ExteriorShell fp={fp} />}
       </Baked>
       {damage && <CollapseLive fp={fp} dust={!perf && !lite} />}
       {damage && !perf && !lite && <DisasterLive fp={fp} />}
