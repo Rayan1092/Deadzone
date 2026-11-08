@@ -39,9 +39,8 @@ export function setView(view) {
   useSim.getState().set({ view, insetSwap: false })
 }
 
-// K key: night operations lighting (dark interior, headlights, emergency lights). Off by
-// default until a dry run passes; remembered per browser.
-// Night operations lighting is the scene (the K toggle is gone; an old stored choice is ignored).
+// K key: lighting, night operations (dark interior, headlights, emergency lights) or day.
+// Every load starts at night (not remembered, so the demo always opens the same way).
 function readNight() {
   return true
 }
