@@ -12,7 +12,7 @@ import RoverModel from './RoverModel'
 import Human from './Human'
 import { SeatChair } from './Props'
 import { cropEntry, useCropManifest } from '../crops'
-import { planCaption, zoneLabel } from '../format'
+import { planCaption, robotTag } from '../format'
 import { LightBeam } from './NightLights'
 import { CommandRelays, RealityLinks, RealityRelays } from './Network'
 import { CommandRoutes, RealityRoutes } from './Routes'
@@ -35,7 +35,7 @@ function Headlight() {
 }
 
 
-function RobotBody({ pose, color, tag, ghost = false, label, sub, headlight = true, linkUp = true, powered = true }) {
+function RobotBody({ pose, color, tag, ghost = false, label, sub, headlight = true, linkUp = true, powered = true, dark = false }) {
   const perf = useSim((s) => s.perf)
   const group = useRef()
   const sensor = useRef()
@@ -70,7 +70,7 @@ function RobotBody({ pose, color, tag, ghost = false, label, sub, headlight = tr
       </group>
       {label && (
         <Html position={[0, 0.8 * ROBOT_SCALE, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
-          <div className={ghost ? 'tag ghost' : 'tag'}>
+          <div className={ghost ? 'tag ghost' : dark ? 'tag nolink' : 'tag'} style={ghost || dark ? undefined : { borderColor: color }}>
             <b>{label}</b>{sub ? <span>{sub}</span> : null}
           </div>
         </Html>
@@ -397,28 +397,31 @@ export function RealityActors({ gap = false }) {
   const zoneSeen = useRef(new Map()) // robot -> { key: plan|zone, at }: a new zone gets a short caption
   if (!tick || !fp) return null
   const now = performance.now()
-  // the line under a robot's name: off, holding, plan not delivered yet, then for 8 s after it
-  // starts a zone "→ Zone 3" (so the tag reads "Scout 2 → Zone 3"); plain words, no glow
+  // the line under the robot's label: holding, plan not delivered yet, then for 8 s after it
+  // starts a zone "Scout 2 → Zone 3"; plain words, no glow
   const caption = (r) => {
     const key = `${r.plan_id}|${r.zone}`
     const seen = zoneSeen.current.get(r.id)
     if (!seen || seen.key !== key) zoneSeen.current.set(r.id, { key, at: seen ? now : -Infinity }) // not on page load
-    if (r.state === 'SHUTDOWN') return 'powered down'
+    if (r.state === 'SHUTDOWN') return null // the label says it
     const c = planCaption(r, { dispatched, plan })
     if (c?.kind === 'holding' || c?.kind === 'pending') return c.text
-    if (c?.kind === 'zone' && now - zoneSeen.current.get(r.id).at < 8000) return `→ ${zoneLabel(r.zone)}`
-    return r.link.up ? null : 'no link'
+    if (c?.kind === 'zone' && now - zoneSeen.current.get(r.id).at < 8000) return c.text // "Scout 2 → Zone 3"
+    return null // dark: the label says NO LINK
   }
   const { robots } = tick.reality
   const found = new Set(survivors_found.map((s) => s.id))
   const foundBy = new Map(survivors_found.map((s) => [s.id, s]))
+  const cmdById = Object.fromEntries(tick.command.robots.map((c) => [c.id, c]))
+  const simTime = useSim.getState().time // updates with every tick, like this component
+  const tags = Object.fromEntries(robots.map((r) => [r.id, robotTag(r, cmdById[r.id], simTime)]))
   return (
     <group>
       {robots.map((r) => (
         <group key={r.id}>
           {/* Rayan's SHUTDOWN: back at command, powered down (lights, lidar and camera off) */}
-          <RobotBody pose={r.pose} color={r.color} tag={r.id} label={r.name} linkUp={r.link.up} powered={r.lights !== false}
-                     sub={caption(r)} />
+          <RobotBody pose={r.pose} color={r.color} tag={r.id} linkUp={r.link.up} powered={r.lights !== false}
+                     label={tags[r.id].text} dark={tags[r.id].dark} sub={caption(r)} />
           {r.lights !== false && <Lidar robot={r} />}
           {r.path.length > 1 && (
             <Line points={[[r.pose[0], 0.06, -r.pose[1]], ...r.path.map(([px, py]) => [px, 0.06, -py])]}
@@ -478,7 +481,8 @@ function commandView(s) {
   return {
     robots: c.robots.map((r) => {
       const stale = s.time - r.last_seen
-      return { id: r.id, pose: r.pose, ghost: stale > 3, ago: stale > 3 ? Math.floor(stale) : null }
+      return { id: r.id, pose: r.pose, ghost: stale > 3, ago: stale > 3 ? Math.floor(stale) : null,
+        color: s.robotsMeta.find((m) => m.id === r.id)?.color ?? '#2dd4bf' }
     }),
     survivors: c.survivors.map((v) => ({ id: v.id, pos: v.pos })),
   }
@@ -492,7 +496,7 @@ export function CommandActors() {
   return (
     <group>
       {robots.map((r) => (
-        <RobotBody key={r.id} pose={r.pose} color={r.ghost ? '#94a3b8' : '#2dd4bf'} tag={r.id} ghost={r.ghost}
+        <RobotBody key={r.id} pose={r.pose} color={r.ghost ? '#94a3b8' : r.color} tag={r.id} ghost={r.ghost}
                    headlight={false} label={r.id} sub={r.ghost ? `${r.ago}s ago` : null} />
       ))}
       <CommandRelays />

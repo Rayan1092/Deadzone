@@ -78,3 +78,10 @@ test('plan captions: zone assignment, plan pending while dark, holding first', a
   assert.equal(planCaption({ ...r2, link: { up: true } }, { dispatched: ['P-1', 'P-3'], plan: { plan_id: 'P-3', zones: [] } }).text, 'Scout 2 → Zone ZNE')
   assert.equal(planCaption({ id: 'R1', link: { up: true } }), null)
 })
+
+test('robot identity label: link in dBm, then NO LINK with seconds since Command heard it', async () => {
+  const { robotTag } = await import('../src/format.js')
+  assert.deepEqual(robotTag({ id: 'R1', link: { up: true, rssi: -75.6 } }, null, 10), { text: 'R1 · LINK −76 dBm', dark: false })
+  assert.deepEqual(robotTag({ id: 'R2', link: { up: false } }, { last_seen: 88 }, 100.4), { text: 'R2 · NO LINK · 12 s', dark: true })
+  assert.equal(robotTag({ id: 'R3', state: 'SHUTDOWN', link: { up: true, rssi: -50 } }, null, 0).text, 'R3 · POWERED DOWN')
+})
