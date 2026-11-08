@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { fieldUnitName, fmtClock, unitName } from '../format'
+import { fieldUnitName, fmtClock } from '../format'
 import { usePhone } from './store'
-import { DARK_S, HEARTBEAT_MS, ackFor, claim, command, heartbeat, holder, isDark, lastFrame, leaseOf, release } from './control'
+import { publicText, robotName } from './labels'
+import { DARK_S, HEARTBEAT_MS, ackFor, claim, command, heartbeat, holder, isDark, lastFrame, release } from './control'
 
 const NONE = []
 const ACTION_LABEL = { hold: 'Hold', resume: 'Resume', return_home: 'Return home', explore_zone: 'Explore' }
@@ -28,13 +29,16 @@ function CommandStatus({ robot }) {
   const mine = usePhone((s) => s.commands[robot])
   const view = usePhone((s) => s.view)
   if (!mine) return null
-  const label = `${ACTION_LABEL[mine.action] ?? mine.action}${mine.zone ? ` ${mine.zone}` : ''}`
-  if (mine.status === 'refused') return <div className="cmd-status bad small">{label} refused: {mine.say ?? 'safety check failed'}</div>
+  const label = ACTION_LABEL[mine.action] ?? 'Instruction'
+  const state = usePhone.getState()
+  const name = robotName(robot, state.hello?.robots)
+  const say = (value) => publicText(value, state.hello, state.draft)
+  if (mine.status === 'refused') return <div role="status" className="cmd-status bad small">{label} refused: {say(mine.say ?? 'The safety check did not pass.')}</div>
   const ack = ackFor(view, mine.cmd_id)
-  if (!ack) return <div className="cmd-status small">{label} sent · waiting for {robot}'s answer (it needs radio contact)</div>
+  if (!ack) return <div role="status" className="cmd-status small">Sent to {name}. Waiting for an answer over the radio.</div>
   return (
     <div className={`cmd-status small ${ack.status === 'refused' ? 'bad' : 'ok'}`}>
-      {robot} {ack.status}: {ack.say}{ack.delay_s != null ? ` · answer took ${ack.delay_s}s` : ''}
+      {name} {ack.status === 'refused' ? 'could not follow this instruction' : 'answered'}: {say(ack.say)}{ack.delay_s != null ? ` · answer took ${ack.delay_s}s` : ''}
     </div>
   )
 }
@@ -53,29 +57,36 @@ export function ControlPanel({ meta }) {
   if (role !== 'planner') return null
   const who = holder(leases, meta.id, client)
   if (who === 'off') {
-    return <div className="control muted small" onClick={(e) => e.stopPropagation()}>Direct control is off on this server (DZ_CONTROL_LEASES=1 turns it on)</div>
+    return <div className="control muted small" onClick={(e) => e.stopPropagation()}>Direct control is unavailable for this session. You can still view reports and send search plans.</div>
   }
-  const lease = leaseOf(leases, meta.id)
-  const run = async (fn) => {
+  const run = async (fn, message) => {
+    const epoch = usePhone.getState().hello?.plan_epoch
     setBusy(true)
-    try { await fn() } catch (e) { fail(e) } finally { setBusy(false) }
+    usePhone.getState().set({ notice: null, error: null })
+    try {
+      await fn()
+      if (message && usePhone.getState().hello?.plan_epoch === epoch) usePhone.getState().set({ notice: { msg: message, at: Date.now() } })
+    } catch (e) { if (usePhone.getState().hello?.plan_epoch === epoch) fail(e) }
+    finally { setBusy(false) }
   }
   const send = (intent) => run(async () => {
+    const epoch = usePhone.getState().hello?.plan_epoch
     const res = await command(meta.id, intent, token)
     const s = usePhone.getState()
-    s.set({ commands: { ...s.commands, [meta.id]: { cmd_id: res.cmd_id, action: intent.action, zone: intent.zone, status: res.status, say: res.say, at: Date.now() } } })
+    if (s.hello?.plan_epoch !== epoch) return
+    s.set({ commands: { ...s.commands, [meta.id]: { cmd_id: res.cmd_id, action: intent.action, zone: intent.zone, status: res.status, say: res.say, at: Date.now() } }, notice: res.status === 'refused' ? null : { msg: `Sent to ${meta.name}. Waiting for an answer over the radio.`, at: Date.now() } })
   })
   const off = busy || !connected
   return (
     <div className="control" onClick={(e) => e.stopPropagation()}>
       <div className="control-row">
         {who === 'free' && <span className="muted small">No one is controlling {meta.name}</span>}
-        {who === 'other' && <span className="chip bad">Locked · {unitName(lease.controller.name)} has control</span>}
+        {who === 'other' && <span className="chip bad">Another operator has control</span>}
         {who === 'me' && <span className="chip ok">You have control</span>}
         {who === 'free' && (
-          <button className="filled small" disabled={off || !token} onClick={() => run(() => claim(meta.id, fieldUnitName(leases, client), token))}>Take control</button>
+          <button className="filled small" disabled={off || !token} onClick={() => run(() => claim(meta.id, fieldUnitName(leases, client), token), `You now control ${meta.name}.`)}>Take control</button>
         )}
-        {who === 'me' && <button className="text-btn" disabled={off} onClick={() => run(() => release(meta.id, token))}>Release</button>}
+        {who === 'me' && <button className="text-btn" disabled={off} onClick={() => run(() => release(meta.id, token), `Control of ${meta.name} released.`)}>Release control</button>}
       </div>
       {who === 'me' && (
         <>
@@ -93,7 +104,7 @@ export function ControlPanel({ meta }) {
               <button className="chip-btn" disabled={off || !voice || !zone} onClick={() => send({ action: 'explore_zone', zone })}>Send</button>
             </div>
           )}
-          {!voice && <div className="muted small">This server only allows Resume; Hold, Return home and Explore need DZ_VOICE=1.</div>}
+          {!voice && <div className="muted small">Only Resume is available in this session. Other instructions are unavailable.</div>}
           <CommandStatus robot={meta.id} />
         </>
       )}
@@ -141,7 +152,7 @@ function FrameView({ frame, pose }) {
 
 function CropImage({ crop }) {
   const [failed, setFailed] = useState(false)
-  if (failed) return <div className="cam-empty">thermal</div>
+  if (failed) return <div className="cam-empty">Image unavailable</div>
   return <img src={`/crops/${crop}`} alt="Last thermal image the robot delivered" onError={() => setFailed(true)} />
 }
 
@@ -158,33 +169,33 @@ export function RobotCamera({ meta, report }) {
   return (
     <div className={`robot-cam${dark || off ? ' dark' : ''}`}>
       <div className="cam-view">
-        {f?.kind === 'jpeg' && <img style={{ objectFit: 'contain' }} src={`data:image/jpeg;base64,${f.frame.jpeg}`} alt={`${meta.id} last received camera frame`} />}
+        {f?.kind === 'jpeg' && <img style={{ objectFit: 'contain' }} src={`data:image/jpeg;base64,${f.frame.jpeg}`} alt={`${meta.name} last received camera image`} />}
         {f?.kind === 'frame' && report?.pose && <FrameView frame={f.frame} pose={report.pose} />}
         {f?.kind === 'crop' && <CropImage crop={f.crop.crop} />}
         {!f && <div className="cam-empty">No camera image delivered yet</div>}
         {off && (
           <div className="cam-nosignal off">
-            <b>POWERED DOWN</b>
-            <span>back at command, camera off</span>
+            <b>Powered down</b>
+            <span>Back at the command post. Camera off.</span>
           </div>
         )}
         {dark && !off && (
           <div className="cam-nosignal">
-            <b>NO SIGNAL</b>
-            <span>{f ? `last frame ${age} s ago` : report ? `last report ${Math.round(report.stale_s)} s ago` : 'no report yet'}</span>
+            <b>No signal</b>
+            <span>{f ? `Last image ${age} seconds ago` : report ? `Last report ${Math.round(report.stale_s)} seconds ago` : 'No report yet'}</span>
           </div>
         )}
       </div>
       {f?.kind === 'frame' && f.frame.hits?.length > 0 && (
         <ul className="cam-hits">
-          {f.frame.hits.map((h, i) => <li key={h.id ?? i} className={h.verdict}>{h.id ? `${h.id} · ` : ''}{hitLabel(h)}</li>)}
+          {f.frame.hits.map((h, i) => <li key={h.id ?? i} className={h.verdict}>{hitLabel(h)}</li>)}
         </ul>
       )}
       <div className="muted small">
-        {f?.kind === 'jpeg' && `Camera frame from ${meta.id}, taken T+${fmtClock(f.t)}`}
-        {f?.kind === 'frame' && `Thermal camera frame from ${meta.id}, taken T+${fmtClock(f.t)}${f.frame.hits?.length ? '' : ' · nothing warm in view'}`}
-        {f?.kind === 'crop' && `${f.crop.id} · person${f.crop.conf != null ? ` ${Math.round(f.crop.conf * 100)}%` : ''} · last thermal image ${meta.id} delivered, taken T+${fmtClock(f.t)}`}
-        {!f && (dark ? `${meta.id} has been out of contact for over ${DARK_S} s` : `Only images that reached the antenna are shown`)}
+        {f?.kind === 'jpeg' && `Camera image from ${meta.name}, taken T+${fmtClock(f.t)}`}
+        {f?.kind === 'frame' && `Thermal image from ${meta.name}, taken T+${fmtClock(f.t)}${f.frame.hits?.length ? '' : ' · nothing warm in view'}`}
+        {f?.kind === 'crop' && `Person${f.crop.conf != null ? ` ${Math.round(f.crop.conf * 100)}%` : ''} · last thermal image ${meta.name} delivered, taken T+${fmtClock(f.t)}`}
+        {!f && (dark ? `${meta.name} has been out of contact for over ${DARK_S} s` : `Only images that reached the antenna are shown`)}
       </div>
     </div>
   )

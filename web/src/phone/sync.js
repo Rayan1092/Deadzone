@@ -1,4 +1,5 @@
 import { hasPlanContent } from './zones.js'
+import { robotCount } from './labels.js'
 
 // Whole-draft last-write-wins saves, ordered before checks and dispatches.
 // HTTP acknowledges persistence; the socket broadcasts changes to all viewers.
@@ -40,7 +41,8 @@ export function createDraftSync(getState, request = postJSON) {
         const current = getState()
         if (current.hello?.plan_epoch !== epoch) return false
         // Edits made while saving must get their own acknowledged save.
-        if (current.draft === draft) current.set({ pending: false, error: null })
+        if (current.draft === draft) current.set({ pending: false, error: null,
+          notice: { msg: 'Changes saved. Check the plan before sending it to robots.', at: Date.now() } })
       } catch (error) {
         if (getState().hello?.plan_epoch === epoch) {
           getState().set({ error: { code: error.code ?? 'save', msg: error.message, at: Date.now() } })
@@ -63,6 +65,7 @@ export function phoneHelloState(s, data, time) {
     hello: data, draft: preserve ? s.draft : data.plan,
     pending: preserve, selected: preserve ? s.selected : null, mode: 'view',
     safety: null, relay: null, relayPending: null, checking: false, error: null, time,
+    notice: null, relayAction: null,
     view: sameIncident ? s.view : null, map: sameIncident ? s.map : null,
     dispatched: data.dispatched_plan_ids ?? (sameIncident ? s.dispatched : []),
     lastDispatch: data.plan && data.dispatched_plan_ids?.includes(data.plan.plan_id)
@@ -82,6 +85,9 @@ function dispatchInfo(draft, robots) {
 export function dispatchedState(s, planId) {
   return {
     dispatched: [...new Set([...s.dispatched, planId])],
-    ...(!s.pending && s.draft?.plan_id === planId ? { lastDispatch: dispatchInfo(s.draft, s.hello?.robots) } : {}),
+    ...(!s.pending && s.draft?.plan_id === planId ? {
+      lastDispatch: dispatchInfo(s.draft, s.hello?.robots),
+      notice: { msg: `${hasPlanContent(s.draft) ? 'Sent to' : 'Cleared, sent to'} ${robotCount(s.hello?.robots?.length ?? 0)}. Each robot applies the plan when it arrives.`, at: Date.now() },
+    } : {}),
   }
 }

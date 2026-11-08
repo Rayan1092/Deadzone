@@ -262,3 +262,60 @@
 .refusal-banner b { font-size: 16px; }
 .refusal-banner span { font-size: 14px; line-height: 1.35; }
 .refusal-banner small { font-size: 12px; opacity: .8; }
+
+/* Field screens share the console's frosted surfaces and generous touch targets. */
+.phone-app { gap: 16px; font-size: 16px; line-height: 1.5; }
+.phone-app button, .phone-app select, .phone-app input { min-height: 48px; }
+.phone-app button { min-width: 48px; white-space: normal; }
+.phone-app button:focus-visible, .phone-app input:focus-visible, .phone-app select:focus-visible {
+  outline: 3px solid var(--teal); outline-offset: 3px;
+}
+.phone-app button:disabled { opacity: .45; cursor: not-allowed; }
+.phone-app .small, .phone-app .hint { font-size: 13px; line-height: 1.5; }
+.phone-app h1 { margin: 0; font-size: 22px; line-height: 1.25; letter-spacing: -.025em; }
+.phone-app h2 { margin: 0 0 8px; font-size: 18px; line-height: 1.3; }
+.phone-app p { margin: 6px 0; }
+.phone-app .appbar { position: sticky; top: 0; z-index: 30; flex-wrap: wrap; padding: 14px;
+  background: var(--glass-strong); border: 1px solid var(--glass-edge); border-radius: 20px;
+  box-shadow: var(--glass-hi), 0 8px 24px rgba(0,0,0,.24);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+.phone-app .appbar .brand { font-size: 11px; text-transform: uppercase; margin-bottom: 4px; }
+.phone-app .appbar .text-btn { padding: 8px; }
+.phone-app .m3-card { padding: 16px; border-radius: 18px; }
+.phone-app .landing-head { margin: 12px 4px 0; }
+.phone-app.landing { justify-content: flex-start; }
+.phone-app .role-card { min-height: 100px; padding: 18px; }
+.phone-nav { display: flex; gap: 8px; }
+.phone-nav button { flex: 1; border-radius: 14px; background: var(--glass); font-weight: 600; }
+.phone-nav button[aria-current="page"] { color: var(--teal); border-color: var(--teal); background: rgba(45,212,191,.12); }
+.phone-app .connection-banner { border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.08); }
+.phone-app .connection-banner b { color: var(--amber); }
+.phone-app .connection-banner p { font-size: 14px; }
+.robot-picker { display: grid; gap: 12px; }
+.phone-app .robot-choice { display: grid; grid-template-columns: 8px minmax(0,1fr) auto 10px;
+  align-items: center; gap: 10px; width: 100%; text-align: left; min-height: 100px; }
+.robot-choice > span:nth-child(2) { display: flex; flex-direction: column; gap: 4px; }
+.robot-dot { height: 36px; border-radius: 6px; background: var(--c); }
+.phone-app .robot-detail { border-top: 3px solid var(--c); }
+.robot-detail progress { width: 100%; height: 8px; accent-color: var(--c); }
+.phone-app .incident-name { margin: 0 4px; }
+.phone-app .confirmation { display: flex; align-items: center; gap: 12px; border-color: rgba(45,212,191,.4); }
+.confirmation > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.phone-app .refusal-banner { position: static; margin: 0; border-radius: 18px; }
+.phone-app .refusal-banner .text-btn { color: white; text-decoration: underline; }
+.phone-app .tools, .phone-app .actions { flex-wrap: wrap; }
+.phone-app .tools > button { flex: 1 1 110px; }
+.phone-app .region-row { flex-wrap: wrap; gap: 8px; }
+.phone-app .segmented { border-radius: 14px; flex-wrap: wrap; }
+.phone-app .stepper button { width: 48px; height: 48px; }
+.phone-app .map-card .card-head { flex-wrap: wrap; }
+.phone-app .map-card { padding: 10px; }
+.phone-app .cam-nosignal b { text-transform: none; letter-spacing: 0; }
+.phone-app .cam-nosignal span { padding: 0 12px; text-align: center; }
+.phone-app .control-row .small { font-size: 14px; }
+.phone-app .room-pick { font-size: 16px; }
+.phone-app .relay-id { font-size: 22px; }
+.phone-app .phone-foot { padding-bottom: 16px; }
+@media (prefers-reduced-motion: reduce) {
+  .phone-app *, .phone-app *::before, .phone-app *::after { animation: none !important; transition: none !important; }
+}

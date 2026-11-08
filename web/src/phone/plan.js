@@ -1,6 +1,7 @@
 import { usePhone } from './store'
 import { canSendPlan, createDraftSync, dispatchedState, postJSON } from './sync'
-import { pickRobot, refusalText } from './zones'
+import { hasPlanContent, pickRobot, refusalText } from './zones'
+import { robotCount } from './labels'
 
 // Shared draft editing for planner phones. The server keeps one draft
 // (last write wins) and broadcasts it as plan_state to every phone.
@@ -140,7 +141,8 @@ async function planAction(path, { allowEmpty = false } = {}) {
     const s = usePhone.getState()
     if (s.hello?.plan_epoch !== epoch || s.draft !== draft) return
     if (path === '/api/dispatch' && body.ok) {
-      s.set({ ...dispatchedState(s, body.plan_id), refusal: null })
+      s.set({ ...dispatchedState(s, body.plan_id), refusal: null,
+        notice: { msg: `${hasPlanContent(draft) ? 'Sent to' : 'Cleared, sent to'} ${robotCount(s.hello?.robots?.length ?? 0)}. Each robot applies the plan when it arrives.`, at: Date.now() } })
     } else {
       s.set({ safety: body })
       // a dispatch the command post refused stays on screen until it is read (red banner)
