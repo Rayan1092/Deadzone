@@ -37,6 +37,12 @@ blocked with 409 `plan_conflict` until fixed, preventing dispatch of an old draf
 Clients must merge incoming winning registers with pending local edits; do not
 blindly overwrite pending edits with `plan_state`.
 
+Plan mutations and their complete publications are serialized with checks,
+dispatch and reset. A slow client cannot make an older in-flight `plan_state`
+arrive after a newer draft or reset. Reset keeps the same publication lock while
+replacing draft/epoch state. Physics ticks do not acquire that lock. The wire
+schemas and existing feature toggle are unchanged.
+
 Reset or whole-plan REST/legacy `plan_edit` replacement invalidates the epoch.
 409 `sync_epoch` means fetch the replacement and ask the responder to rebase their
 pending edits; do not silently recreate the old incident. Dispatched IDs are
