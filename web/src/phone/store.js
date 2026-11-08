@@ -19,6 +19,9 @@ export const usePhone = create((set) => ({
   checking: false,   // waiting for a safety or dispatch answer
   dispatched: [],    // plan IDs this phone dispatched or saw rejected as dispatched
   error: null,       // last error frame { code, msg, at }
+  leases: null,      // server lease table { enabled, ttl_s, robots: [{ robot, controller, expires_at }] }
+  token: null,       // this phone's controller token (planner role, leases on); new on every connect
+  commands: {},      // robot -> my latest command { cmd_id, action, zone, status, say, at }
   time: 0,
   set,
 }))
@@ -28,7 +31,11 @@ export function handlePhoneMessage(msg) {
   const s = usePhone.getState()
   switch (t) {
     case 'hello':
-      s.set(phoneHelloState(s, data, time))
+      // a new connection is a new controller: any lease and command from before are gone
+      s.set({ ...phoneHelloState(s, data, time), leases: data.leases ?? null, token: data.controller_token ?? null, commands: {} })
+      break
+    case 'leases':
+      s.set({ leases: data })
       break
     case 'cmd_view': {
       const { map, ...view } = data

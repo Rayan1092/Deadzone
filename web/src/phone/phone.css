@@ -222,3 +222,33 @@
 .ask-source { color: var(--muted); }
 .ask-source.gemini { color: #a5b4fc; }
 .ask-error { margin-top: 8px; color: var(--red); }
+
+/* Robot camera (delivered frames only) and direct control (Aziz's leases) */
+.robot-cam { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.cam-view { position: relative; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; background: #05070a; display: grid; place-items: center; }
+.cam-view img { width: 100%; height: 100%; object-fit: cover; }
+.cam-empty { color: var(--muted); font-size: 13px; }
+.robot-cam.dark .cam-view img, .robot-cam.dark .cam-frame { filter: grayscale(1) brightness(.45); }
+.cam-nosignal { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  background: rgba(5,7,10,.55); color: #fca5a5; font-size: 12px; letter-spacing: .04em; }
+.cam-nosignal b { font-size: 18px; letter-spacing: .14em; }
+.cam-frame { width: 100%; height: 100%; }
+.cam-cone { fill: rgba(251,146,60,.14); stroke: rgba(251,146,60,.5); stroke-width: .6; }
+.cam-robot { fill: var(--teal); }
+.cam-hit circle { fill: #94a3b8; }
+.cam-hit.person circle { fill: var(--red); }
+.cam-hit.unsure circle { fill: var(--amber); }
+.cam-hits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.cam-hits li.person { color: var(--red); }
+.cam-hits li.unsure { color: var(--amber); }
+.cam-hits li.rejected { color: var(--muted); }
+.cam-hit text { fill: #e6edf3; font-size: 6px; font-weight: 600; }
+.control { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--outline); }
+.control-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.control-row .filled.small { padding: 8px 14px; font-size: 13px; margin-left: auto; }
+.control-row .text-btn { margin-left: auto; }
+.control-row.cmds .chip-btn:disabled { opacity: .4; }
+.room-pick { flex: 1; min-width: 0; padding: 7px 10px; border-radius: 8px; background: var(--surface-2); color: inherit; border: 1px solid var(--outline); font: inherit; font-size: 13px; }
+.cmd-status { padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.05); }
+.cmd-status.ok { color: var(--green); }
+.cmd-status.bad { color: var(--red); }

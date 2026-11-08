@@ -8,6 +8,8 @@ import PlanEditor from './PlanEditor'
 import SafetyCard from './SafetyCard'
 import RelayPanel from './RelayPanel'
 import AskCard from './AskCard'
+import { ControlPanel, RobotCamera, useLeaseHeartbeat } from './RobotControl'
+import { holder } from './control'
 import './phone.css'
 
 // Stable fallback: zustand selectors must not return a new [] on every call.
@@ -65,29 +67,12 @@ function Legend() {
   )
 }
 
-// The newest delivered survivor report from this robot, with the crop its detector judged.
-function LastCrop({ robot, survivors }) {
-  const last = survivors.filter((s) => s.by === robot).sort((a, b) => b.reported_t - a.reported_t)[0]
-  const [failed, setFailed] = useState(false)
-  if (!last) return <div className="last-crop empty muted small">No survivor reports from {robot} yet</div>
-  return (
-    <div className="last-crop">
-      {last.crop && !failed
-        ? <img src={`/crops/${last.crop}`} alt={`Thermal crop of ${last.id}`} onError={() => setFailed(true)} />
-        : <div className="crop-ph" aria-hidden>thermal</div>}
-      <div>
-        <b>{last.id} · person{last.conf != null ? ` ${Math.round(last.conf * 100)}%` : ''}</b>
-        <div className="muted small">Last thermal crop {robot} reported, T+{fmtClock(last.reported_t)}</div>
-      </div>
-    </div>
-  )
-}
-
 function RobotList() {
   const robots = usePhone((s) => s.hello?.robots ?? NONE)
   const reported = usePhone((s) => s.view?.robots ?? NONE)
   const faults = usePhone((s) => s.view?.faults ?? NONE)
-  const survivors = usePhone((s) => s.view?.survivors ?? NONE)
+  const leases = usePhone((s) => s.leases)
+  const client = usePhone((s) => s.hello?.client)
   const [open, setOpen] = useState(null)
   const byId = Object.fromEntries(reported.map((r) => [r.id, r]))
   const faultById = Object.fromEntries(faults.map((f) => [f.robot, f]))
@@ -104,6 +89,8 @@ function RobotList() {
           <i className="swatch" />
           <b>{meta.name}</b>
           <span className="muted">{meta.id}</span>
+          {holder(leases, meta.id, client) === 'me' && <span className="chip ok">Yours</span>}
+          {holder(leases, meta.id, client) === 'other' && <span className="chip bad">Locked</span>}
           <span className={`chip ${r ? (r.stale_s > 3 ? 'warn' : 'ok') : ''}`}>
             {r ? (r.stale_s > 3 ? `${Math.round(r.stale_s)}s old` : 'Reporting') : 'No report yet'}
           </span>
@@ -125,10 +112,11 @@ function RobotList() {
         ) : (
           <div className="muted small">Waiting for this robot's first report to reach the antenna</div>
         )}
-        {isOpen && <LastCrop robot={meta.id} survivors={survivors} />}
+        {isOpen && <RobotCamera meta={meta} report={r} />}
+        {isOpen && <ControlPanel meta={meta} />}
         <div className="caps muted small">
           {caps.stairs ? 'Can climb stairs' : 'No stairs'} · {caps.max_rubble_height ? `Rubble up to ${caps.max_rubble_height} m` : 'No rubble climbing'}
-          <span className="tap-hint">{isOpen ? 'Tap to close' : 'Tap for last crop'}</span>
+          <span className="tap-hint">{isOpen ? 'Tap to close' : 'Tap for camera and control'}</span>
         </div>
       </div>
     )
@@ -167,6 +155,7 @@ function Snackbar() {
 
 function Shell({ role }) {
   const hello = usePhone((s) => s.hello)
+  useLeaseHeartbeat()
   const error = usePhone((s) => s.error)
   const checking = usePhone((s) => s.checking)
   // Another phone dispatched this plan ID first; keep editing under a new ID.
