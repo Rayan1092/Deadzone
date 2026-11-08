@@ -96,6 +96,7 @@ def version(command, pattern):
 
 def port_free(port):
     probes = []
+    free = True
     try:
         for family, address in ((socket.AF_INET, "0.0.0.0"), (socket.AF_INET6, "::")):
             try:
@@ -106,14 +107,53 @@ def port_free(port):
                 if family == socket.AF_INET6:
                     probe.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
                 probe.bind((address, port))
+                # Some Windows address-sharing conflicts surface only on listen.
+                probe.listen(1)
             except OSError as error:
                 if family == socket.AF_INET6 and error.errno in (errno.EAFNOSUPPORT, errno.EADDRNOTAVAIL):
                     continue
-                return False
-        return True
+                free = False
+        return free
     finally:
         for probe in probes:
             probe.close()
+
+
+def listening_processes(port, *, windows=None):
+    """Listener names/PIDs only: never command lines or environment values."""
+    on_windows = os.name == "nt" if windows is None else windows
+    try:
+        if on_windows:
+            command = (
+                f"$owners = Get-NetTCPConnection -State Listen -LocalPort {int(port)} -ErrorAction SilentlyContinue; "
+                "$rows = @($owners | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { "
+                "$ownerId = $_; $p = Get-Process -Id $ownerId -ErrorAction SilentlyContinue; "
+                "@{pid=$ownerId;name=if($p){$p.ProcessName}else{'unknown'}} }); "
+                "ConvertTo-Json -InputObject $rows -Compress"
+            )
+            result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
+                capture_output=True, text=True, timeout=8,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            rows = json.loads(result.stdout) if result.returncode == 0 else []
+            owners = [(str(row["name"]), int(row["pid"])) for row in rows]
+        elif shutil.which("lsof"):
+            result = subprocess.run(["lsof", "-nP", f"-iTCP:{int(port)}", "-sTCP:LISTEN", "-Fpc"],
+                                    capture_output=True, text=True, timeout=5)
+            owners, owner = [], None
+            for line in result.stdout.splitlines():
+                if line.startswith("p") and line[1:].isdigit():
+                    owner = int(line[1:])
+                elif line.startswith("c") and owner is not None:
+                    owners.append((line[1:], owner))
+        elif shutil.which("ss"):
+            result = subprocess.run(["ss", "-H", "-ltnp", f"sport = :{int(port)}"],
+                                    capture_output=True, text=True, timeout=5)
+            owners = [(name, int(pid)) for name, pid in re.findall(r'\("([^"\n]+)",pid=(\d+)', result.stdout)]
+        else:
+            owners = []
+        return sorted({(re.sub(r"[^A-Za-z0-9_. -]", "?", name)[:64], pid) for name, pid in owners})
+    except (OSError, subprocess.TimeoutExpired, ValueError, TypeError, KeyError):
+        return []  # bind/listen still determines availability when names cannot be read
 
 
 def stop_process(process, *, windows=None):
@@ -226,9 +266,17 @@ def run_checks(root=ROOT, *, activation="failed", environ=None):
     except Exception:
         report.check("DEMO flags", False, "runbook assignments unavailable")
         report.check("extra DZ_ flags", False, "runbook assignments unavailable")
-    ports = {port: port_free(port) for port in (8000, 5173)}
-    for port, free in ports.items():
-        report.check(f"port {port}", free, "free" if free else "busy/unavailable")
+    ports = {}
+    for port in (8000, 5173):
+        bound = port_free(port)
+        owners = listening_processes(port)
+        ports[port] = bound and not owners  # listener table also catches Windows sharing/rebind cases
+        detail = "free" if ports[port] else "busy/unavailable"
+        if owners:
+            detail += "; listening: " + ", ".join(f"{name} (PID {pid})" for name, pid in owners)
+        elif not ports[port]:
+            detail += "; listening process unavailable"
+        report.check(f"port {port}", ports[port], detail)
     tunnel = shutil.which("cloudflared") is not None
     report.check("cloudflared PATH", tunnel, "found" if tunnel else "missing")
     node = version("node", r"v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?")

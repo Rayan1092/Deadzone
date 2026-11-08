@@ -68,10 +68,24 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    # DZ_SMART_RUBBLE=1    # already set in step 4: required, the scripted collapse at sim 162.5 and the smart R key (rayan.md 22:10)
    ```
    **Don't set `DZ_VOICE`, `DZ_CONTROL_LEASES` or `DZ_EXPLORATION_V2` for the main run.** With control leases on, the top bar shows a **presenter lock**: **B** and **U** stay locked (with a hint) until you press **Unlock**, which takes every robot for the big screen (phones then see them locked; R, F, O and A are not affected). **Lock** releases the robots so phones can take them (Q&A). Unlock fails, naming the holder, while a phone holds a robot. Leases off: no lock, B and U as before. With `DZ_EXPLORATION_V2=1` the robots explore differently and every beat in the beat sheet moves (S3 found at 23.8 s instead of 14.4, S2 found at 106 s instead of 246). `DZ_SENSOR_VIEW=1` is safe: it only adds camera frames to the Reality pane.
-6. Open **`http://localhost:8000/?nointro`** on the big screen (`?nointro` keeps the first-visit explainer card from covering the scene; the **?** overlay can still show it). Phones join with **Q** (QR) on the same Wi-Fi, or on the phone hotspot. Phone microphones need https: use Aziz's tunnel (`scripts/demo_tunnel.py`, see its docs) if voice or the mic is part of the run.
-7. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
-8. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped recording, and keep the file on the demo laptop.
-9. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
+6. **Before the phone test, Rayan starts the tunnel manually** in a second
+   PowerShell terminal from the repo root: `scripts/tunnel.ps1`. Install the tool
+   first if missing: `winget install Cloudflare.cloudflared`, then open a fresh
+   terminal and confirm `cloudflared --version`. The script runs
+   `cloudflared tunnel --url http://localhost:8000` and prints **HTTPS URL** and
+   **Phone URL** (`/phone`). Leave that terminal open; **Ctrl+C** stops the tunnel.
+   It uses the already-running server and does not start/reset it. The URL changes
+   on each run. No tunnel is started by preflight or installation.
+7. **Test the phone:** open the printed HTTPS URL with `/?nointro` on the big
+   screen and the printed **Phone URL** on the phone (or use **Q** for its QR).
+   Using the HTTPS origin on both keeps API/WebSocket/QR traffic on the same
+   origin and permits phone microphones. For a local Wi-Fi-only check without a
+   tunnel, use `http://localhost:8000/?nointro` on the laptop and its Q/QR link on
+   the same Wi-Fi/hotspot. `?nointro` keeps the first-visit explainer off the scene;
+   the **?** overlay can still show it.
+8. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
+9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped recording, and keep the file on the demo laptop.
+10. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
 
 ## Director keys (big screen)
 

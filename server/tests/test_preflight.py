@@ -1,5 +1,6 @@
 """Preflight must fail closed, avoid leaking keys, and clean up only its child."""
 import importlib.util
+import errno
 import os
 from pathlib import Path
 import socket
@@ -41,6 +42,7 @@ $env:DZ_DO_NOT_ALLOW=1
     monkeypatch.setattr(preflight, "activation_ok", lambda *args: True)
     monkeypatch.setattr(preflight, "python_probe", lambda *args, **kwargs: True)
     monkeypatch.setattr(preflight, "port_free", lambda port: True)
+    monkeypatch.setattr(preflight, "listening_processes", lambda port: [])
     monkeypatch.setattr(preflight.shutil, "which", lambda command: command)
     monkeypatch.setattr(preflight, "version", lambda command, pattern: "v22.0.0" if command == "node" else "Python 3.12.0")
     calls = []
@@ -194,3 +196,79 @@ def test_invalid_cli_arguments_are_not_echoed_as_possible_secrets():
     assert result.returncode == 1
     assert result.stderr.strip() == "FAIL preflight: invalid arguments"
     assert "fake-api-key" not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("family,address", [(socket.AF_INET, "0.0.0.0"), (socket.AF_INET, "127.0.0.1"),
+    (socket.AF_INET6, "::"), (socket.AF_INET6, "::1")])
+def test_wildcard_and_loopback_listeners_in_both_families_are_busy(family, address):
+    try:
+        listener = socket.socket(family, socket.SOCK_STREAM)
+        with listener:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Vite/Node-style reuse
+            if family == socket.AF_INET6:
+                listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+            listener.bind((address, 0))
+            listener.listen(1)
+            assert not preflight.port_free(listener.getsockname()[1])
+            assert listener.fileno() >= 0  # preflight never stops the owner
+    except OSError as error:
+        if family == socket.AF_INET6 and error.errno in (errno.EAFNOSUPPORT, errno.EADDRNOTAVAIL):
+            pytest.skip("IPv6 not enabled on this host")
+        raise
+
+
+def test_both_wildcard_probes_listen_and_close_even_if_first_listen_fails(monkeypatch):
+    probes = []
+    class Probe:
+        def __init__(self, family): self.family, self.closed, self.bound, self.listened = family, False, None, False
+        def setsockopt(self, *args): pass
+        def bind(self, address): self.bound = address
+        def listen(self, backlog):
+            self.listened = True
+            if self.family == socket.AF_INET:
+                raise OSError(errno.EADDRINUSE, "shared address fails only at listen")
+        def close(self): self.closed = True
+    def create(family, kind):
+        probe = Probe(family); probes.append(probe); return probe
+    monkeypatch.setattr(preflight.socket, "socket", create)
+    assert not preflight.port_free(5173)
+    assert [p.bound for p in probes] == [("0.0.0.0", 5173), ("::", 5173)]
+    assert all(p.listened and p.closed for p in probes)
+
+
+@pytest.mark.parametrize("port", [5173, 8000])
+def test_listener_table_prevents_false_free_and_reports_process_name(setup, monkeypatch, capsys, port):
+    root, env, calls = setup
+    monkeypatch.setattr(preflight, "port_free", lambda port: True)  # simulated Windows sharing false-free
+    monkeypatch.setattr(preflight, "listening_processes", lambda current: [("node", 21204)] if current == port else [])
+    assert preflight.run_checks(root, activation="ok", environ=env) == 1
+    assert f"FAIL port {port}: busy/unavailable; listening: node (PID 21204)" in capsys.readouterr().out
+    assert bool(calls) == (port != 8000)
+
+
+def test_cloudflared_missing_is_explicit_fail_never_skip(setup, monkeypatch, capsys):
+    root, env, _ = setup
+    monkeypatch.setattr(preflight.shutil, "which", lambda command: None if command == "cloudflared" else command)
+    assert preflight.run_checks(root, activation="ok", environ=env) == 1
+    lines = capsys.readouterr().out.splitlines()
+    assert "FAIL cloudflared PATH: missing" in lines
+    assert not any("skip" in line.lower() for line in lines)
+
+
+def test_windows_listener_lookup_is_bounded_and_prints_names_not_command_lines(monkeypatch):
+    calls = []
+    def run(args, **kwargs):
+        calls.append((args, kwargs))
+        return SimpleNamespace(returncode=0, stdout='[{"pid":42,"name":"node"},{"pid":42,"name":"node"}]')
+    monkeypatch.setattr(preflight.subprocess, "run", run)
+    assert preflight.listening_processes(5173, windows=True) == [("node", 42)]
+    assert "Get-NetTCPConnection -State Listen -LocalPort 5173" in calls[0][0][-1]
+    assert "ProcessName" in calls[0][0][-1] and "CommandLine" not in calls[0][0][-1]
+    assert calls[0][1]["timeout"] == 8
+
+
+def test_listener_lookup_failure_does_not_echo_subprocess_output(monkeypatch, capsys):
+    def fail(*args, **kwargs): raise subprocess.TimeoutExpired("probe", 8, output="fake-secret")
+    monkeypatch.setattr(preflight.subprocess, "run", fail)
+    assert preflight.listening_processes(8000, windows=True) == []
+    assert capsys.readouterr().out == ""
