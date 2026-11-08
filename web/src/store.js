@@ -122,6 +122,7 @@ function detectionCard(ev, repeat, tick) {
 }
 
 export function decodeMap(b64) {
+  if (b64 instanceof Uint8Array) return b64
   const bin = atob(b64)
   const out = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)

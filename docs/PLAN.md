@@ -430,6 +430,56 @@ Two WebSockets carry everything live: `/ws/screen` for the big screen and `/ws/p
 | server to screen | `report` | after `/api/report` | `text`, `generated_at` |
 | screen to server | `control` | keyboard and buttons | `action`: `start`, `pause`, `reset`, `speed`, `director` + `value` |
 
+#### Compact screen maps (`DZ_COMPACT_STREAM`, default off)
+
+At Hub construction, `DZ_COMPACT_STREAM=1` enables lossless map deltas for screens
+that advertise `/ws/screen?map_deltas=1`. The web advertises this only when native
+`DecompressionStream` is available; ordinary clients and the flag-off server keep
+the existing base64 `maps` messages. Phones do not receive this screen protocol.
+This gate does not enable the older `DZ_STREAM_OPTIMIZE` tick-rate cap. Tick/event
+cadence and robot sensor inputs are unchanged. Screen lidar is capped at the
+36 endpoints `Actors.Lidar` actually draws (18 via the existing perf-mode filter),
+preserving every currently drawn endpoint and the fan geometry.
+If `DZ_STREAM_OPTIMIZE` is separately enabled too, its existing 24-point / 15 Hz
+profile is retained.
+
+Negotiated `hello.data.compact_stream` declares
+`{epoch,map_encoding:"zlib-base64",patch_encoding:"zlib-base64-u32le-u8",lidar_max_points:36}`.
+Each connection, incident reset, or grid-dimension/key-set change starts with one
+full compressed keyframe, using the ordinary envelope:
+
+```json
+{"t":"maps","seq":20,"time":0.1,"data":{
+  "w":160,"h":120,"cell":0.25,"epoch":"incident-id","version":0,
+  "encoding":"zlib-base64","reality":"<base64(zlib(uint8 grid))>",
+  "command":"<base64(zlib(uint8 grid))>"}}
+```
+
+After that keyframe, each periodic map update sends **only changed cells**, never
+a full periodic grid. Unchanged grids are omitted; no changes means no message:
+
+```json
+{"t":"map_patch","seq":30,"time":0.5,"data":{
+  "w":160,"h":120,"cell":0.25,"epoch":"incident-id","base":0,"version":1,
+  "encoding":"zlib-base64-u32le-u8","grids":{"command":"<compressed records>"}}}
+```
+
+Each `grids[key]` is base64 of a zlib stream of packed 5-byte records:
+**uint32 little-endian row-major cell index, then uint8 value**. The index is
+`iy*w+ix`; records are sorted by index and contain only cells changed since that
+socket's last emitted version. Optional `belief` / `belief_command` grids use
+the same encoding if already present; they are never fabricated. Optional JSON
+metadata such as `missing` is preserved; metadata-only updates may have
+`grids:{}`. Versions are per socket, so late joiners get their own independent
+keyframe. `epoch` changes on incident reset. A geometry-only `hello` in the same
+epoch does not discard the map baseline.
+
+The web decodes messages in wire order, applies patches to new `Uint8Array`
+buffers, and feeds the existing map store/renderer. An epoch/base mismatch,
+invalid index or malformed record closes that screen connection with 1002 and
+reconnects for a fresh keyframe. Recorded compact sessions normalize to legacy
+full base64 maps, preserving the existing synchronous replay format.
+
 `tick.data` shape:
 
 ```json

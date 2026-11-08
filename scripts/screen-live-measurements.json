@@ -1,0 +1,96 @@
+{
+  "before": {
+    "compact": false,
+    "seed": 7,
+    "robots": 3,
+    "speed": 2,
+    "requested_wall_s": 60,
+    "wall_s": 60.0,
+    "last_sim_s": 120.0,
+    "counts": "UTF-8 JSON application bytes, excludes initial 4 frames and WS/TLS overhead",
+    "messages": 2159,
+    "bytes": 20968312,
+    "messages_per_s": 35.983,
+    "bytes_per_s": 349471.867,
+    "by_type": {
+      "control": {
+        "messages": 1,
+        "bytes": 88,
+        "messages_per_s": 0.017,
+        "bytes_per_s": 1.467
+      },
+      "tick": {
+        "messages": 1199,
+        "bytes": 8549168,
+        "messages_per_s": 19.983,
+        "bytes_per_s": 142486.133
+      },
+      "event": {
+        "messages": 719,
+        "bytes": 107619,
+        "messages_per_s": 11.983,
+        "bytes_per_s": 1793.65
+      },
+      "maps": {
+        "messages": 240,
+        "bytes": 12311437,
+        "messages_per_s": 4.0,
+        "bytes_per_s": 205190.617
+      }
+    }
+  },
+  "after": {
+    "compact": true,
+    "seed": 7,
+    "robots": 3,
+    "speed": 2,
+    "requested_wall_s": 60,
+    "wall_s": 60.0,
+    "last_sim_s": 120.1,
+    "counts": "UTF-8 JSON application bytes, excludes initial 4 frames and WS/TLS overhead",
+    "messages": 2098,
+    "bytes": 8778803,
+    "messages_per_s": 34.967,
+    "bytes_per_s": 146313.383,
+    "by_type": {
+      "control": {
+        "messages": 1,
+        "bytes": 88,
+        "messages_per_s": 0.017,
+        "bytes_per_s": 1.467
+      },
+      "tick": {
+        "messages": 1200,
+        "bytes": 8556447,
+        "messages_per_s": 20.0,
+        "bytes_per_s": 142607.45
+      },
+      "event": {
+        "messages": 719,
+        "bytes": 107619,
+        "messages_per_s": 11.983,
+        "bytes_per_s": 1793.65
+      },
+      "map_patch": {
+        "messages": 178,
+        "bytes": 114649,
+        "messages_per_s": 2.967,
+        "bytes_per_s": 1910.817
+      }
+    }
+  },
+  "total_bytes_reduction_pct": 58.13,
+  "map_bytes_reduction_pct": 99.07,
+  "parity": {
+    "grid_checks": 482,
+    "identical_lidar_pose_ticks": 1200,
+    "compact_map_frames": 179,
+    "replay_round_trips": 358
+  },
+  "notes": [
+    "Actual localhost uvicorn/WebSocket runs, 60 wall seconds each, speed 2, 3 robots, seed 7, P-1 dispatched.",
+    "Initial four connection frames excluded equally; all messages inside each 60-second window counted.",
+    "Window boundary differs by one tick (120.0 vs 120.1 sim s); no tick/event throttling.",
+    "JSON application payload bytes before WebSocket/TLS framing; no browser FPS claim."
+  ]
+}

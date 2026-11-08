@@ -15,12 +15,12 @@ def stream_profile(compact=False):
             "screen_hz": SCREEN_HZ, "lidar_max_points": LIDAR_POINTS}
 
 
-def thin_tick(snapshot):
+def thin_tick(snapshot, limit=LIDAR_POINTS):
     robots = []
     for robot in snapshot["reality"]["robots"]:
         points = robot.get("lidar", [])
-        if len(points) > LIDAR_POINTS:
-            points = [points[i * (len(points) - 1) // (LIDAR_POINTS - 1)] for i in range(LIDAR_POINTS)]
+        if len(points) > limit:
+            points = [points[i * (len(points) - 1) // (limit - 1)] for i in range(limit)]
         robots.append(dict(robot, lidar=points))
     return dict(snapshot, reality=dict(snapshot["reality"], robots=robots))
 

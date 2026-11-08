@@ -42,6 +42,7 @@ from .robot.perception import CROP_DIR, get_detector
 from .sim import DT, ROBOT_DEFS, Sim
 from .network.dtn import make_bundle
 from .network.stream import StreamState, compact_message, stream_profile, thin_tick
+from .network.map_delta import DRAWN_LIDAR_POINTS, MapDeltaState
 from .scenarios import ResetScenario, prepare_scenario, scenario_catalog
 
 MAPS_EVERY = 5
@@ -77,6 +78,8 @@ class Hub:
         self.seq = 0
         self.stream = StreamState(enabled=os.environ.get("DZ_STREAM_OPTIMIZE") == "1")
         self.compact_clients = set()
+        self.compact_stream = os.environ.get("DZ_COMPACT_STREAM") == "1"
+        self.delta_screens = {}
         self.plan_lock = asyncio.Lock()  # survives reset: old publications finish first
         self.lease_lock = asyncio.Lock()
         self.leases = LeaseTable(self.sim.robots)
@@ -86,6 +89,8 @@ class Hub:
     def _init_plans(self):
         self.stream.reset()
         self.plan_epoch = secrets.token_hex(16)
+        for state in self.delta_screens.values():
+            state.reset(self.plan_epoch)
         checker = SafetyChecker(self.sim.prior, self.sim.robot_specs, self.sim.energy_time_scale)
         self.plans = PlanManager(self.sim, checker)
         self.plan_sync = PlanSync(self.plans)
@@ -103,7 +108,11 @@ class Hub:
         for ws in list(clients):
             try:
                 wire = msg
-                if ws in self.compact_clients:
+                if ws in self.delta_screens:
+                    wire = self.delta_screens[ws].transform(msg)
+                    if wire is None:
+                        continue
+                elif ws in self.compact_clients:
                     if compact is None:
                         compact = compact_message(msg)
                     wire = compact
@@ -113,9 +122,15 @@ class Hub:
         for ws in dead:
             clients.discard(ws)
             self.compact_clients.discard(ws)
+            self.delta_screens.pop(ws, None)
 
     async def send_one(self, ws, msg):
-        await ws.send_text(compact_message(msg) if ws in self.compact_clients else msg)
+        if ws in self.delta_screens:
+            msg = self.delta_screens[ws].transform(msg)
+        elif ws in self.compact_clients:
+            msg = compact_message(msg)
+        if msg is not None:
+            await ws.send_text(msg)
 
     async def accept_socket(self, ws, compact=False):
         await ws.accept()
@@ -128,6 +143,8 @@ class Hub:
 
     def screen_snapshot(self):
         snapshot = self.sim.snapshot()
+        if self.compact_stream and not self.stream.enabled:
+            return thin_tick(snapshot, DRAWN_LIDAR_POINTS)
         return thin_tick(snapshot) if self.stream.enabled else snapshot
 
     def screen_maps(self):
@@ -856,10 +873,12 @@ async def control(body: dict, request: Request):
 
 
 @app.websocket("/ws/screen")
-async def ws_screen(ws: WebSocket, compact: bool = False):
+async def ws_screen(ws: WebSocket, compact: bool = False, map_deltas: bool = False):
     if not await hub.accept_socket(ws, compact):
         return
     hub.screens.add(ws)
+    if map_deltas and hub.compact_stream:
+        hub.delta_screens[ws] = MapDeltaState(hub.plan_epoch)
     hub.register_controller(ws, "screen")
     try:
         await hub.send_one(ws, hub.hello(ws))
@@ -888,6 +907,7 @@ async def ws_screen(ws: WebSocket, compact: bool = False):
     finally:
         hub.screens.discard(ws)
         hub.compact_clients.discard(ws)
+        hub.delta_screens.pop(ws, None)
         await hub.disconnect_controller(ws)
 
 
