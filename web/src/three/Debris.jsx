@@ -16,7 +16,7 @@ function rng(seed) {
 // facets read as fractured concrete.
 const VARIANTS = 5
 let chunkGeoms = null
-function chunks() {
+export function chunks() {
   if (chunkGeoms) return chunkGeoms
   chunkGeoms = Array.from({ length: VARIANTS }, (_, k) => {
     const g = new THREE.IcosahedronGeometry(1, 1)

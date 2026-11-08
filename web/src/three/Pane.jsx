@@ -24,18 +24,20 @@ const GAP_COLUMN_PX = 330 // Command inset (300) + margins
 // glass and polished concrete have something to reflect. The shadow frustum covers the
 // whole site.
 function Lights({ perf, night }) {
+  const fp = useSim((s) => s.floorplan)
+  const [W, H] = fp?.size ?? [40, 30]
   const target = useMemo(() => {
     const t = new THREE.Object3D()
-    t.position.set(19.5, 0, -15)
+    t.position.set(W / 2, 0, -H / 2)
     return t
-  }, [])
+  }, [W, H])
   return (
     <>
       <ambientLight intensity={night ? 0.03 : 0.08} />
       <hemisphereLight args={night ? ['#6f86b0', '#120f0c', 0.14] : ['#c4d3e6', '#2b2622', 0.35]} />
       <primitive object={target} />
       {/* night: a weak cold moon instead of the afternoon sun */}
-      <directionalLight position={[2, 32, 0]} target={target} intensity={night ? 0.45 : 2.6} color={night ? '#9db4ff' : '#ffe0b5'}
+      <directionalLight position={[W / 2 - 17.5, 32, -H / 2 + 15]} target={target} intensity={night ? 0.45 : 2.6} color={night ? '#9db4ff' : '#ffe0b5'}
                         castShadow={!perf} shadow-mapSize={[4096, 4096]} shadow-bias={-0.0004} shadow-normalBias={0.03}
                         shadow-camera-left={-34} shadow-camera-right={34}
                         shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-far={100} />
@@ -84,11 +86,14 @@ function SyncedControls({ id }) {
   }, [camera, size.width, size.height, reserve])
 
   // Fit once the canvas has a real size (a fresh canvas can report 0 on its first render).
+  // A different map (or the floorplan arriving) needs a fresh fit too.
+  const mapId = useSim((s) => s.floorplan?.id)
   useEffect(() => {
+    if (shared.map !== mapId) { shared.home = null; shared.map = mapId }
     if (shared.home || !size.width || !size.height) return
     fitOverview(camera, Math.max(0.5, (size.width - reserve) / size.height))
     shared.rev++
-  }, [camera, size.width, size.height, reserve])
+  }, [camera, size.width, size.height, reserve, mapId])
 
   useEffect(() => {
     camera.position.copy(shared.pos)

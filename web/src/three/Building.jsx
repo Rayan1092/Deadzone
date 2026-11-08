@@ -7,6 +7,7 @@ import Baked from './Baked'
 import Debris from './Debris'
 import { CommandPost, GasLeak, Interior, Lot } from './Props'
 import { CollapseLive, CollapseStatic, WallDetails, holedWallGeometry, wallDamage } from './Collapse'
+import { DisasterLive, DisasterStatic } from './Disaster'
 
 // Thermal palette for the robot's-eye view: everything cold reads as deep blue.
 const COLD = { floor: '#070b1f', wall: '#1d3a8a', wallGlow: '#0b1d5c' }
@@ -282,11 +283,13 @@ export default function Building({ thermal = false, blueprint = false, props = t
         {/* rubble that fell during the run (R key, aftershock) is truth: Reality panes only */}
         {!blueprint && <Debris rubble={props ? fp.rubble ?? NO_RUBBLE : staticRubble(fp)} cold={thermal} />}
         {props && !blueprint && <Interior fp={fp} cold={thermal} />}
-        {!blueprint && <CommandPost pos={[cx, cy]} cold={thermal} />}
+        {!blueprint && <CommandPost pos={[cx, cy]} entry={fp.entry} cold={thermal} />}
         {damage && <WallDamageLayer walls={fp.walls} damage={damage} />}
         {damage && <CollapseStatic fp={fp} />}
+        {damage && <DisasterStatic fp={fp} />}
       </Baked>
       {damage && <CollapseLive fp={fp} dust={!perf} />}
+      {damage && !perf && <DisasterLive fp={fp} />}
       {mode === 'plain' && (fp.hazards ?? []).map((hz) => <GasLeak key={hz.id} hazard={hz} />)}
       {blueprint && (
         <mesh position={w2t(cx, cy, 0.5)}>

@@ -5,12 +5,15 @@ import * as THREE from 'three'
 import { FOCUS_HOLD_MS, useSim } from '../store'
 import Building from './Building'
 import { PersonFigure } from './Actors'
+import Rover, { ROBOT_SCALE } from './Rover'
 import { w2t } from './util'
 
 // Picture-in-picture from a robot's forward camera (V key or the card's Camera
 // button). Reality pane only: it shows what the robot's own camera sees. A third
 // WebGL canvas, so it only exists while open and renders small at dpr 1.
-const EYE_H = 0.4 // m, camera height on the robot
+// the camera head on the drawn rover (Rover.jsx, scaled): lens height and how far forward
+const EYE_H = 0.56
+const EYE_FWD = 0.36
 
 // While the classifier's verdict is on screen the camera turns from straight ahead to
 // the judged hot spot, then back.
@@ -27,11 +30,11 @@ function EyeCamera({ robotId }) {
     const r = useSim.getState().tick?.reality.robots.find((x) => x.id === robotId)
     if (!r) return
     const [x, y, th] = r.pose
-    const goal = new THREE.Vector3(...w2t(x, y, EYE_H))
+    const goal = new THREE.Vector3(...w2t(x + Math.cos(th) * EYE_FWD, y + Math.sin(th) * EYE_FWD, EYE_H))
     const f = focusFor(robotId)
     const ahead = f
       ? new THREE.Vector3(...w2t(f.pos[0], f.pos[1], 0.2))
-      : new THREE.Vector3(...w2t(x + Math.cos(th), y + Math.sin(th), EYE_H - 0.05))
+      : new THREE.Vector3(...w2t(x + Math.cos(th) * 2, y + Math.sin(th) * 2, EYE_H - 0.3))
     if (!at.current) { at.current = goal.clone(); look.current.copy(ahead) }
     const k = Math.min(1, dt * 8) // 10 Hz poses, smoothed to the frame rate
     at.current.lerp(goal, k)
@@ -100,14 +103,33 @@ function HotSpots({ thermal }) {
   )
 }
 
-function OtherRobots({ robotId, thermal }) {
+// Every robot in this camera is the same rover model as on the 3D map, at the same drawn
+// scale, smoothed toward its streamed pose. The camera's own robot
+// is left out: when the camera pans to a hot spot its own mast would fill the frame.
+function EyeRover({ r, thermal }) {
+  const g = useRef()
+  const sensor = useRef()
+  useFrame((_, dt) => {
+    if (!g.current) return
+    const [x, y, th] = r.pose
+    g.current.position.lerp(new THREE.Vector3(...w2t(x, y, 0)), Math.min(1, dt * 10))
+    let d = th - g.current.rotation.y
+    d = Math.atan2(Math.sin(d), Math.cos(d))
+    g.current.rotation.y += d * Math.min(1, dt * 10)
+    if (sensor.current) sensor.current.rotation.y += dt * 6
+  })
+  return (
+    <group ref={g} position={w2t(r.pose[0], r.pose[1], 0)} rotation={[0, r.pose[2], 0]}>
+      <group scale={ROBOT_SCALE}>
+        <Rover color={r.color} tag={r.id} thermal={thermal} sensor={sensor} linkUp={r.link?.up ?? true} />
+      </group>
+    </group>
+  )
+}
+
+function Robots({ robotId, thermal }) {
   const robots = useSim((s) => s.tick?.reality.robots)
-  return (robots ?? []).filter((r) => r.id !== robotId).map((r) => (
-    <mesh key={r.id} position={w2t(r.pose[0], r.pose[1], 0.16)} rotation={[0, r.pose[2], 0]}>
-      <boxGeometry args={[0.5, 0.2, 0.36]} />
-      {thermal ? <meshBasicMaterial color="#f97316" /> : <meshStandardMaterial color={r.color} emissive={r.color} emissiveIntensity={0.4} />}
-    </mesh>
-  ))
+  return (robots ?? []).filter((r) => r.id !== robotId).map((r) => <EyeRover key={r.id} r={r} thermal={thermal} />)
 }
 
 // Screen box around the judged object: its known extent projected through the robot
@@ -239,7 +261,7 @@ export default function RobotEye() {
         {!thermal && <fog attach="fog" args={['#0e1114', 8, 26]} />}
         <Building thermal={thermal} />
         <HotSpots thermal={thermal} />
-        <OtherRobots robotId={robotId} thermal={thermal} />
+        <Robots robotId={robotId} thermal={thermal} />
         <EyeCamera robotId={robotId} />
         <FocusBox robotId={robotId} thermal={thermal} boxRef={boxRef} />
       </Canvas>

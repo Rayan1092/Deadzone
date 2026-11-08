@@ -386,10 +386,23 @@ const S = Math.PI     // back to the south wall
 const W = Math.PI / 2 // back to the west wall, facing east
 const E = -Math.PI / 2
 
-export function Interior({ cold: isCold = false }) {
+// Decoy heat sources as the real objects they are, wherever the floorplan puts them.
+const DECOY = { radiator: Radiator, engine: Engine, 'coffee machine': CoffeeCart }
+function Decoys({ fp, M }) {
+  return (fp.decoys ?? []).map((d, i) => {
+    const Obj = DECOY[d.label]
+    return Obj ? <At key={d.id} x={d.pos[0]} y={d.pos[1]} rot={0.15 + i * 0.1}><Obj M={M} /></At> : null
+  })
+}
+
+// Furniture is laid out by hand for the demo building; other maps get the decoys and the
+// collapse dressing (debris, damage) without furniture.
+export function Interior({ fp, cold: isCold = false }) {
   const M = isCold ? cold() : mats()
+  if (fp?.id !== 'collapse_01') return <group><Decoys fp={fp} M={M} /></group>
   return (
     <group>
+      <Decoys fp={fp} M={M} />
       {/* Office A */}
       <At x={2.2} y={29.5} rot={N}><Desk M={M} /></At>
       <At x={7.4} y={29.5} rot={N}><Desk M={M} /></At>
@@ -407,13 +420,11 @@ export function Interior({ cold: isCold = false }) {
       <At x={10.11} y={23.5} rot={W}><Whiteboard M={M} /></At>
       {/* bookshelf toppled face down off the north wall */}
       <At x={12.6} y={29.4} rot={N}><group rotation={[Math.PI / 2, 0, 0]} position={[0, 0.17, -0.2]}><Bookshelf M={M} len={1.8} /></group></At>
-      <At x={15} y={28} rot={0.25}><Radiator M={M} /></At>
       <At x={16.5} y={21}><Papers M={M} n={5} seed={23} /></At>
       {/* Break room */}
       <At x={25.5} y={29.55} rot={N}><Counter M={M} len={3.6} /></At>
       <At x={31.45} y={29.45} rot={N}><Fridge M={M} /></At>
       <At x={20.58} y={20.2} rot={W}><Vending M={M} /></At>
-      <At x={22} y={28} rot={0.15}><CoffeeCart M={M} /></At>
       <At x={23.4} y={24.6} rot={1.2}><Chair M={M} tipped /></At>
       {/* Storage */}
       {[3, 5.2, 9.6].map((y, i) => <At key={y} x={0.42} y={y} rot={W}><Shelving M={M} seed={31 + i * 7} /></At>)}
@@ -439,7 +450,6 @@ export function Interior({ cold: isCold = false }) {
       {/* Warehouse */}
       <At x={39.45} y={16.5} rot={E}><PalletRack M={M} seed={83} /></At>
       <At x={33.3} y={1.6} rot={0}><Forklift M={M} /></At>
-      <At x={37} y={12} rot={0.1}><Engine M={M} /></At>
       <At x={32.85} y={29.2} rot={W}><Pallet M={M} seed={91} /></At>
       <At x={39.6} y={27.4} rot={E}><Shelving M={M} len={2.4} depth={0.45} seed={97} /></At>
       {!isCold && (
@@ -487,7 +497,7 @@ export function Lot({ W: w, H: h }) {
 // Command post: a response truck parked by the entrance with a telescoping antenna mast
 // at the post's radio position. Light bar flashes; the beacon on the mast is where radio
 // links and delivery pulses end (MAST_H).
-export function CommandPost({ pos, cold: isCold = false }) {
+export function CommandPost({ pos, entry, cold: isCold = false }) {
   const M = isCold ? cold() : mats()
   const red = useRef()
   const blue = useRef()
@@ -498,10 +508,17 @@ export function CommandPost({ pos, cold: isCold = false }) {
   })
   const livery = useMemo(() => signTexture(['INCIDENT COMMAND'], { w: 512, h: 64, bg: '#b91c1c', fg: '#ffffff', font: 'bold 40px Inter, sans-serif' }), [])
   const [x, y] = pos
+  // park the truck beside the mast, parallel to the wall, on the side away from the building
+  const [ex, ey] = entry ?? [x + 1, y]
+  const dl = Math.hypot(ex - x, ey - y) || 1
+  const dx = (ex - x) / dl
+  const dy = (ey - y) / dl
+  const truck = [x - dx * 1.18 - dy * 1.8, y - dy * 1.18 + dx * 1.8]
+  const heading = Math.atan2(dx, -dy)
   return (
     <group>
       {/* truck: box body behind, cab facing north */}
-      <At x={x - 1.18} y={y + 1.8} rot={Math.PI / 2}>
+      <At x={truck[0]} y={truck[1]} rot={heading}>
         <B m={M.darkSteel} s={[6.6, 0.3, 1.6]} p={[-0.1, 0.62, 0]} />
         <B m={M.truckWhite} s={[4.6, 2.3, 2.3]} p={[-1.1, 2.0, 0]} />
         {!isCold && [-1.151, 1.151].map((z) => (

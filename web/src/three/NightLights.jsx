@@ -110,7 +110,7 @@ export default function NightLights() {
   if (warehouse) { const [, x1, y0, y1] = box(warehouse); strobes.push([x1 - 0.45, (y0 + y1) / 2 - 4]) }
   return (
     <group>
-      <Flood from={w2t(cx, cy, MAST_H - 0.6)} to={w2t(ex + 6, ey, 0)} />
+      <Flood from={w2t(cx, cy, MAST_H - 0.6)} to={w2t(ex + (ex - cx) / (Math.hypot(ex - cx, ey - cy) || 1) * 6, ey + (ey - cy) / (Math.hypot(ex - cx, ey - cy) || 1) * 6, 0)} />
       {strobes.map((s, i) => <Strobe key={i} at={s} phase={i * 0.7} />)}
       {/* a little cold moonlight spilling over the top of the walls */}
       <pointLight position={w2t(fp.size[0] / 2, fp.size[1] / 2, WALL_H + 6)} intensity={4} distance={40} color="#7d93c9" />

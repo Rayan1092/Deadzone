@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/collapse`: items 4, 5, 7, 8 done (collapse look, AI Lab L, night lighting K, auto-director D). Item 6 asset pack waits on Rayan's pack. Next: 9 multi-story shell, 10 scheduler strip, voice UI when Aziz's `/api/voice` lands.
+- **Working on:** `p3/disaster`: disaster-site pass, new rover model, scheduler redesign (done). `p3/clinic-map`: second building `clinic_02` + `DZ_FLOORPLAN` (PR for Rayan and Aziz to review). #70 open.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,29 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 07:40 · p3/disaster · Disaster site, one rover model everywhere, scheduler redesign
+- **Did (Yusuf's ask: "an actual disaster site", "fix the scheduler", "robots hyper realistic and the same from above and in the scout camera"):**
+  - **Disaster site** (`Disaster.jsx`, Reality only, visual only):
+    - Every floor is littered with broken concrete, ceiling-tile fragments and dust, low enough to drive over. Debris is heaped against the walls with fallen ceiling boards leaning on them.
+    - The no-go hazard room holds a real collapse mound under its missing roof.
+    - Outside, the neighbouring buildings came down (jagged wall stubs, a rubble mound, pancaked slabs, beams) north and east of the building. The lot is cracked and heaved, with debris thrown across it, three crushed cars and a downed utility pole.
+    - Smoke rises from the ruins and one is on fire (flickering light, embers; off in P mode).
+    - Survivors lie pinned under a slab and chunks.
+    - Instanced, so thousands of pieces cost a few draw calls.
+  - **Rover** (`Rover.jsx`): one detailed model used by the 3D map, Command's ghosts and the robot camera.
+    - Extruded track pods with tread, sprocket and road wheels, and a gunmetal hull with a sloped glacis.
+    - The robot's color on the deck and flanks, its id painted on both sides, and a hazard-striped bumper with headlights.
+    - A pan-tilt camera with a light bar, a lidar with a glowing ring, a battery pack and roll bar, and a link-colored whip tip.
+    - The robot camera sits at the camera head and draws the other robots with the same model and scale (it used to draw boxes). Its own robot is left out so its mast never fills the frame.
+  - **Scheduler** (plan Step 4): collapsed to one line by default, with a stacked CPU bar per robot and "All deadlines met" or "R2 missed a perception deadline".
+    - It opens by itself for the followed robot, a missed deadline or an overload (≥85%), or when pinned by a click.
+    - Open rows are taller, with labelled slices, 10 ms grid, axis and an on-time / missed status.
+    - Task colors are categorical slots 1–6, which passed the palette validator on the dark surface. A missed deadline is hatched red, never color alone.
+  - **Any building:** camera framing, sun target, truck placement (parallel to the wall, away from the building), decoy objects (from `fp.decoys` by label) and lot-debris exclusion now come from the floorplan. Hand-placed furniture only loads for `collapse_01`.
+- **Contract changes:** none.
+- **Heads-up for others:** Rayan: buildings from your generator get the disaster dressing, decoy objects and framing automatically.
+- **Next:** clinic map PR, then the 9 multi-story shell.
 
 ### 2026-11-08 06:50 · p3/collapse · Items 7 + 8: night operations lighting (K), auto-director camera (D)
 - **Did:**
