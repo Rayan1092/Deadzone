@@ -396,8 +396,8 @@ class Hub:
     async def save_plan(self, plan, check=True):
         async with self.plan_lock:
             self.require_plan_epoch(getattr(plan, "plan_epoch", None))
-            if check and not plan.zones:
-                raise PlanError("empty_plan", "Add a search zone before checking or dispatching", 422)
+            # A plan without zones (no-go only, or empty = clear the exclusions) is accepted: robots keep
+            # their current zones (PlanManager.assignments). Rayan's P0, 2026-11-08; edit authorized by Rayan.
             state = self.plans.save(plan)
             self.plan_sync.invalidate(plan.plan_id)
             await self.plan_state(state)
