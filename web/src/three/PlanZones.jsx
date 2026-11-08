@@ -33,9 +33,11 @@ export default function PlanZones() {
   const plan = useSim((s) => s.plan)
   const dispatched = useSim((s) => s.dispatchedPlans)
   const robots = useSim((s) => s.robotsMeta)
+  // a robot reporting this plan also proves dispatch (covers a reload after the event)
+  const followed = useSim((s) => s.tick?.reality.robots.some((r) => r.plan_id === s.plan?.plan_id) ?? false)
   if (!plan) return null
   const colors = Object.fromEntries(robots.map((r) => [r.id, r.color]))
-  const draft = !dispatched.includes(plan.plan_id)
+  const draft = !dispatched.includes(plan.plan_id) && !followed
   return (
     <group>
       {plan.no_go.map((g) => (

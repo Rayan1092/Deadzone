@@ -11,20 +11,23 @@ function rng(seed) {
 
 // Thermal palette for the robot's-eye view: everything cold reads as deep blue.
 const COLD = { floor: '#070b1f', wall: '#1d3a8a', wallGlow: '#0b1d5c', rubble: '#1e293b' }
+// Blueprint palette for the Command inset: the public floorplan only, no truth rubble.
+const PRINT = { floor: '#0a1830', wall: '#7fb2ff', wallGlow: '#1e40af' }
 
-function Walls({ walls, thermal }) {
+function Walls({ walls, thermal, blueprint }) {
   return walls.map((w, i) => {
     const [ax, ay] = w.a
     const [bx, by] = w.b
     const len = Math.hypot(bx - ax, by - ay)
     const ang = Math.atan2(by - ay, bx - ax)
     const thick = w.material === 'concrete' ? 0.3 : w.material === 'metal' ? 0.12 : 0.2
-    const col = thermal ? COLD.wall : w.material === 'metal' ? '#4b5563' : COLORS.wall
+    const col = blueprint ? PRINT.wall : thermal ? COLD.wall : w.material === 'metal' ? '#4b5563' : COLORS.wall
     return (
       <mesh key={i} position={w2t((ax + bx) / 2, (ay + by) / 2, WALL_H / 2)} rotation={[0, ang, 0]}
             castShadow receiveShadow>
         <boxGeometry args={[len + thick, WALL_H, thick]} />
-        <meshStandardMaterial color={col} roughness={0.9} emissive={thermal ? COLD.wallGlow : '#000000'} />
+        <meshStandardMaterial color={col} roughness={0.9}
+                              emissive={blueprint ? PRINT.wallGlow : thermal ? COLD.wallGlow : '#000000'} />
       </mesh>
     )
   })
@@ -72,7 +75,7 @@ function Hazards({ hazards }) {
   })
 }
 
-export default function Building({ thermal = false }) {
+export default function Building({ thermal = false, blueprint = false }) {
   const fp = useSim((s) => s.floorplan)
   if (!fp) return null
   const [W, H] = fp.size
@@ -81,12 +84,12 @@ export default function Building({ thermal = false }) {
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={w2t(W / 2, H / 2, 0)} receiveShadow>
         <planeGeometry args={[W + 8, H + 8]} />
-        <meshStandardMaterial color={thermal ? COLD.floor : COLORS.floor} roughness={1} />
+        <meshStandardMaterial color={blueprint ? PRINT.floor : thermal ? COLD.floor : COLORS.floor} roughness={1} />
       </mesh>
-      {!thermal && <gridHelper args={[Math.max(W, H) + 8, Math.max(W, H) + 8, '#22292f', '#1e2429']}
-                               position={w2t(W / 2, H / 2, 0.005)} />}
-      <Walls walls={fp.walls} thermal={thermal} />
-      <Rubble rubble={fp.rubble || []} thermal={thermal} />
+      {!thermal && !blueprint && <gridHelper args={[Math.max(W, H) + 8, Math.max(W, H) + 8, '#22292f', '#1e2429']}
+                                             position={w2t(W / 2, H / 2, 0.005)} />}
+      <Walls walls={fp.walls} thermal={thermal} blueprint={blueprint} />
+      {!blueprint && <Rubble rubble={fp.rubble || []} thermal={thermal} />}
       {!thermal && <Hazards hazards={fp.hazards || []} />}
       {/* command post antenna */}
       <group position={w2t(cx, cy, 0)}>

@@ -12,6 +12,9 @@ import { useSim } from '../store'
 import { fitOverview, shared } from './camera'
 import DetectionCards from '../panels/DetectionCards'
 import RobotEye from './RobotEye'
+import CommandInset from './CommandInset'
+
+const GAP_COLUMN_PX = 330 // Command inset (300) + margins
 
 function SyncedControls({ id }) {
   const ctrl = useRef()
@@ -20,8 +23,24 @@ function SyncedControls({ id }) {
   const applying = useRef(false)
   const goal = useRef(new THREE.Vector3()).current
 
+  // One view keeps a right-hand column free for the Command inset and AI cards: frame
+  // the building in the rest and shift the projection so it sits centered there.
+  const reserve = id === 'gap' ? GAP_COLUMN_PX : 0
   useEffect(() => {
-    if (!shared.home && size.width && size.height) fitOverview(camera, size.width / size.height)
+    if (!size.width || !size.height) return
+    if (reserve) camera.setViewOffset(size.width, size.height, reserve / 2, 0, size.width, size.height)
+    else camera.clearViewOffset()
+    camera.updateProjectionMatrix()
+  }, [camera, size.width, size.height, reserve])
+
+  // Fit once the canvas has a real size (a fresh canvas can report 0 on its first render).
+  useEffect(() => {
+    if (shared.home || !size.width || !size.height) return
+    fitOverview(camera, Math.max(0.5, (size.width - reserve) / size.height))
+    shared.rev++
+  }, [camera, size.width, size.height, reserve])
+
+  useEffect(() => {
     camera.position.copy(shared.pos)
     ctrl.current?.target.copy(shared.target)
     ctrl.current?.update()
@@ -32,7 +51,7 @@ function SyncedControls({ id }) {
     // Follow mode: Reality tracks the robot, Command tracks its last reported pose,
     // so the Command camera never reveals where a dark robot really is.
     const { follow, tick } = useSim.getState()
-    const robot = follow && (id === 'reality' ? tick?.reality.robots : tick?.command.robots)?.find((r) => r.id === follow)
+    const robot = follow && (id === 'command' ? tick?.command.robots : tick?.reality.robots)?.find((r) => r.id === follow)
     if (robot) {
       const offset = shared.pos.clone().sub(shared.target)
       ctrl.current.target.lerp(goal.set(robot.pose[0], 0, -robot.pose[1]), Math.min(1, dt * 4))
@@ -88,9 +107,18 @@ export default function Pane({ which, title, subtitle }) {
             {delivered.toLocaleString()} delivered · {waiting} in transit
           </span>
         )}
-        {which === 'reality' && showTruth && <span className="truth-chip">Truth overlay · T</span>}
-        {follow && <span className="follow-chip">{which === 'reality' ? `Following ${follow}` : `${follow} last report`} · 0</span>}
+        {which !== 'command' && showTruth && <span className="truth-chip">Truth overlay · T</span>}
+        {follow && <span className="follow-chip">{which === 'command' ? `${follow} last report` : `Following ${follow}`} · 0</span>}
       </div>
+      {which === 'gap' && (
+        <div className="pane-legend">
+          <span><i className="lg-link home" />Path home</span>
+          <span><i className="lg-haze" />Not reported yet</span>
+          <span><i className="lg-link tether" />Command's last fix</span>
+          <span><i className="lg-route" />Rescue route</span>
+          <span><i className="lg-relay" />Relay</span>
+        </div>
+      )}
       {which === 'reality' && (
         <div className="pane-legend">
           <span><i className="lg-link home" />Path home</span>
@@ -100,8 +128,9 @@ export default function Pane({ which, title, subtitle }) {
           <span><i className="lg-relay" />Relay</span>
         </div>
       )}
-      <DetectionCards side={which} />
-      {which === 'reality' && <RobotEye />}
+      <DetectionCards side={which} sides={which === 'gap' ? ['command', 'reality'] : undefined} />
+      {which !== 'command' && <RobotEye />}
+      {which === 'gap' && <CommandInset />}
       <Canvas shadows={!perf} dpr={perf ? 1 : [1, 1.5]} camera={{ fov: 50, near: 0.1, far: 300 }}>
         <color attach="background" args={[COLORS.bg]} />
         <fog attach="fog" args={[COLORS.bg, 90, 170]} />
@@ -112,7 +141,7 @@ export default function Pane({ which, title, subtitle }) {
         <Fog which={which} />
         <AntennaPulse />
         <PlanZones />
-        {which === 'reality' ? <RealityActors /> : <CommandActors />}
+        {which === 'command' ? <CommandActors /> : <RealityActors gap={which === 'gap'} />}
         <SyncedControls id={which} />
       </Canvas>
     </div>

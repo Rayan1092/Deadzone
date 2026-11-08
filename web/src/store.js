@@ -19,6 +19,17 @@ function readPerf() {
   try { return localStorage.getItem('dz-perf') === '1' } catch { return false }
 }
 
+function readView() {
+  try { return localStorage.getItem('dz-view') === 'gap' ? 'gap' : 'split' } catch { return 'split' }
+}
+
+// 'split' = Reality and Command side by side; 'gap' = one Reality view with what
+// Command doesn't know yet drawn on it (Version 2 plan). M toggles.
+export function setView(view) {
+  try { localStorage.setItem('dz-view', view) } catch { /* storage blocked: session only */ }
+  useSim.getState().set({ view })
+}
+
 export function setPerf(on) {
   try { localStorage.setItem('dz-perf', on ? '1' : '0') } catch { /* storage blocked: session only */ }
   useSim.getState().set({ perf: on })
@@ -52,6 +63,7 @@ export const useSim = create((set) => ({
   routes: {},          // Reality rescue routes from robot `rescue_route` events, by survivor id
   bigDeliveries: 0,    // count of survivor / route / fault reports delivered to CMD (antenna pulse)
   perf: readPerf(),    // P key: lighter rendering for a slow demo laptop (remembered per browser)
+  view: readView(),    // M key: 'split' (two panes) or 'gap' (one view + Command gap), remembered
   recorder: null,      // ?record: { frames, ms, bytes } of the captured stream
   replay: null,        // ?replay: { loaded, playing, rate, pos, dur, ended }
   set,
