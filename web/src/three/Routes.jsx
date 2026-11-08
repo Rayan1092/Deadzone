@@ -4,6 +4,7 @@ import { Html, Line } from '@react-three/drei'
 import * as THREE from 'three'
 import { useSim } from '../store'
 import { w2t } from './util'
+import { latestRoutes } from '../format'
 
 // Safe A* routes from the entrance to a confirmed survivor (Rayan's rescue_route).
 // Reality draws the robot's own event; Command draws only routes delivered to it.
@@ -59,13 +60,15 @@ export function RealityRoutes({ gap = false }) {
   const routes = useSim((s) => s.routes)
   const relays = useSim((s) => s.tick?.reality.relays) ?? NONE
   const delivered = useSim((s) => s.tick?.command.routes) ?? NONE
+  // pending until Command holds this version of the route (an older one doesn't count)
   return Object.values(routes).map((r) => (
-    <Route key={r.survivor} route={r} relays={relays} pending={gap && !delivered.some((d) => d.survivor === r.survivor)} />
+    <Route key={r.survivor} route={r} relays={relays}
+           pending={gap && !delivered.some((d) => d.survivor === r.survivor && (d.t ?? 0) >= (r.t ?? 0))} />
   ))
 }
 
 export function CommandRoutes() {
-  const routes = useSim((s) => s.tick?.command.routes) ?? NONE
+  const routes = latestRoutes(useSim((s) => s.tick?.command.routes) ?? NONE)
   const relays = useSim((s) => s.tick?.command.relays) ?? NONE
   return routes.map((r) => <Route key={r.survivor} route={r} relays={relays} />)
 }

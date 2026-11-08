@@ -11,7 +11,7 @@ import { followRobot, overview, resetOverview } from '../three/camera'
 export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
   ['R', 'rubble ahead of the robot'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
-  ['U', 'resume after safe stop'], ['A', 'aftershock (server needs DZ_AFTERSHOCK=1)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
+  ['U', 'resume after safe stop'], ['A', 'aftershock (server needs DZ_AFTERSHOCK=1)'], ['B', 'baseline: robots without Deadzone'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
   ['M', 'one view / split view'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
 ]
@@ -33,6 +33,7 @@ export function TopBar() {
   const perf = useSim((s) => s.perf)
   const set = useSim((s) => s.set)
   const view = useSim((s) => s.view)
+  const mode = useSim((s) => s.mode)
   return (
     <header className="topbar">
       <div className="brand">DEADZONE</div>
@@ -49,6 +50,9 @@ export function TopBar() {
       )}
       <ReplayChip />
       {perf && <span className="perf-chip" title="Press P to turn off">Performance mode</span>}
+      {mode === 'baseline' && (
+        <span className="baseline-chip" title="Press B to switch Deadzone back on">Baseline · without Deadzone</span>
+      )}
       <div className="controls">
         <button onClick={() => control(running ? 'pause' : 'start')}>{running ? 'Pause' : 'Start'}</button>
         <button onClick={() => control('speed', speed / 2)}>-</button>
@@ -203,6 +207,8 @@ export function useKeyboard() {
       if (key === 'u' && target) control('director', { do: 'resume', robot: target.id })
       // server picks the spot: the first powered relay (crushing it), else the corridor
       if (key === 'a') control('director', { do: 'aftershock' })
+      // "without Deadzone": robots stop and wait whenever they lose the link
+      if (key === 'b') control('mode', s.mode === 'baseline' ? 'deadzone' : 'baseline')
       if (key === 'g') {
         if (s.report && !s.report.loading) s.set({ report: null })
         else requestReport()
