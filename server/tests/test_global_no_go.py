@@ -61,8 +61,8 @@ def test_one_zone_global_exclusion_reaches_every_robot_and_can_be_cleared():
     assert all(not r.nogo[iy, ix] for r in sim.robots.values())
 
 
-def test_flag_off_keeps_legacy_recipient_behavior(monkeypatch):
-    monkeypatch.delenv("DZ_GLOBAL_NO_GO", raising=False)
+def test_flag_explicitly_off_keeps_legacy_recipient_behavior(monkeypatch):
+    monkeypatch.setenv("DZ_GLOBAL_NO_GO", "0")
     sim = Sim(n_robots=3)
     sim.tick()
     plans = manager(sim)
@@ -179,3 +179,22 @@ def test_escape_keeps_command_only_boundary_and_does_not_read_live_robots():
     sim.robots["R1"].battery.wh = 0
     assert plans.check("P-global") == before
     assert "reality" not in json.dumps(before)
+
+
+def test_unset_flag_means_global_no_go_is_the_default(monkeypatch):
+    """Rayan's decision: with nothing set, a plan reaches every deployed robot (so a no-go drawn on a
+    phone binds robots without a zone too) and the checker lets a robot inside a new no-go route out.
+    DZ_GLOBAL_NO_GO=0 is the only way back to the legacy behaviour."""
+    monkeypatch.delenv("DZ_GLOBAL_NO_GO", raising=False)
+    sim = Sim(n_robots=3)
+    sim.tick()
+    plans = manager(sim)
+    assert plans.global_no_go
+    plans.save(draft())
+    assert plans.dispatch("P-global")["ok"]
+    assert sorted(b["dst"] for b in sim.network.queues["CMD"] if b["kind"] == "plan") == ["R1", "R2", "R3"]
+    fp = open_prior()
+    post = CommandPost(fp)
+    report(post)
+    checker = SafetyChecker(fp, {"R1": RobotSpec()})
+    assert checker.global_no_go and checker.check(escape_plan(), post, 0)["ok"]
