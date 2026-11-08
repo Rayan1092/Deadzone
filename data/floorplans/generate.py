@@ -632,6 +632,7 @@ def variant_of(base, seed):
     for attempt in range(MAX_VARIANTS):  # room is mostly hazard); a variant is judged on its people only
         rng = random.Random(f"variant:{base_id}:{seed}:{attempt}")
         data = json.loads(json.dumps(base))
+        data.pop("events", None)        # the base's scenario events are its own script, not a variant's
         fp = FloorPlan(data)
         reach = reachable(fp)
         iy, ix = np.nonzero(reach)

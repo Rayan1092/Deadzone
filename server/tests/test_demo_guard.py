@@ -3,8 +3,8 @@
 Seed 7, 3 robots, solid furniture on (DZ_OBSTACLES=1, the main-run setting since the
 2026-11-08 20:30 re-baseline), plan P-1 (rejected: R2's north-east zone is a dead zone) then
 fixed to lost_link_ok and dispatched after the startup tick, exactly like the phone beat.
-The reroute beat is not a key press: with DZ_SMART_RUBBLE=1 the sim drops a scripted "secondary
-collapse" 1.5 m ahead of R1 at 162.5 s (rubble_fall, cause "collapse"), when R1 is on S1's
+The reroute beat is not a key press: collapse_01.json's scenario event (`events`: collapse near
+R1 at 162.5 s) drops rubble 1.5 m ahead of R1 (rubble_fall, cause "collapse"), when R1 is on S1's
 rescue corridor and R2 is 4 m away. Director presses at the DEMO.md times: F (overcurrent on R3)
 at 177.5 s, O (perception overload on R1) at 187.5 s.
 
@@ -37,10 +37,10 @@ BEATS = {
     "S1_rerouted": 162.8,   # R2 sees the collapse rubble on S1's rescue route and resends it
     "S2_found": 219.4,      # the finale, only with F/O on time
 }
-COLLAPSE_AT = 162.5     # the sim's scripted secondary collapse (DZ_SMART_RUBBLE=1, collapse_01 default)
+COLLAPSE_AT = 162.5     # collapse_01.json scenario event: collapse near R1
 DIRECTOR = {177.5: ("overcurrent", "R3"), 187.5: ("overload", "R1")}
 END = 230.0
-FLAGS = {"DZ_OBSTACLES": "1", "DZ_SMART_RUBBLE": "1"}   # the main run's environment (docs/DEMO.md pre-flight step 3)
+FLAGS = {"DZ_OBSTACLES": "1", "DZ_SMART_RUBBLE": "1"}   # the main run's environment (docs/DEMO.md pre-flight step 4)
 
 ZW = [[0, 17], [20, 17], [20, 30], [0, 30]]
 ZB = [[20, 17], [32, 17], [32, 30], [20, 30]]
