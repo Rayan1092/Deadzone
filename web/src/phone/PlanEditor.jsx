@@ -1,5 +1,5 @@
 import { usePhone } from './store'
-import { flush, removeRegion, setBudget, updateZone } from './plan'
+import { clearAll, flush, removeRegion, setBudget, updateZone } from './plan'
 import { unitName } from '../format'
 
 const NONE = []
@@ -48,6 +48,8 @@ function ZoneEditor({ zone, robots }) {
 export default function PlanEditor() {
   const draft = usePhone((s) => s.draft)
   const pending = usePhone((s) => s.pending)
+  const checking = usePhone((s) => s.checking)
+  const lastDispatch = usePhone((s) => s.lastDispatch)
   const connected = usePhone((s) => s.connected)
   const error = usePhone((s) => s.error)
   const mode = usePhone((s) => s.mode)
@@ -80,12 +82,15 @@ export default function PlanEditor() {
         <button className={`tool${mode === 'nogo' ? ' on' : ''}`} onClick={() => toggle('nogo')}>
           <i className="tool-nogo" />Add no-go
         </button>
+        <button className="tool danger" disabled={!connected || checking} onClick={clearAll}>Clear all</button>
       </div>
       {mode !== 'view' && (
         <p className="hint">Drag on the map to draw {mode === 'zone' ? 'a search zone' : 'a no-go area'}. Tap the button again to cancel.</p>
       )}
       {mode === 'view' && !zones.length && !noGo.length && (
-        <p className="hint">Draw a search zone on the map and assign a robot to it.</p>
+        <p className="hint">{lastDispatch?.hasContent
+          ? 'All regions removed. Use Clear plan to send this change to robots.'
+          : 'Draw a search zone on the map and assign a robot to it.'}</p>
       )}
 
       {[...zones].sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id)).map((z) => (
