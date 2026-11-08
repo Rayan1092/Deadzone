@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit, urlunsplit
 
+from dotenv import load_dotenv
+
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,13 +26,14 @@ from pydantic import ValidationError
 
 from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
 from .command.controls import FaultRequest, RelayPlace, RelayPower, director_adapter
-from .command.reports import local_report
+from .command.reports import command_report
 from .command.safety import SafetyChecker
 from .robot.robot import resume_command
 from .robot.perception import CROP_DIR, get_detector
 from .sim import DT, ROBOT_DEFS, Sim
 
 MAPS_EVERY = 5
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
 MAX_PHONE_RELAYS = 32
 WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 
@@ -347,7 +350,10 @@ async def inject_fault(fault: FaultRequest):
 
 @app.get("/api/report")
 async def report():
-    result = local_report(hub.sim.post, hub.sim.time)
+    post = hub.sim.post
+    result = await command_report(post, hub.sim.time)
+    if post is not hub.sim.post:
+        raise PlanError("report_reset", "Simulation reset during briefing; request a new briefing", 409)
     await hub.send_all(hub.screens, hub.envelope("report", result))
     return result
 
