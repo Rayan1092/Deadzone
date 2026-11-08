@@ -200,7 +200,7 @@ def draw(seed, variant, size=None):
         rubble.append({"id": f"RB{k + 1}", "poly": rect(x - s / 2, y - s / 2, x + s / 2, y + s / 2),
                        "height": r1(rng.uniform(0.8, 1.6))})
 
-    data = {"id": f"gen_{seed}", "name": f"Generated collapse #{seed}", "size": [W, H], "cell": 0.25,
+    data = {"id": f"gen_{seed}", "name": f"Building {seed}, post-earthquake", "size": [W, H], "cell": 0.25,
             "wall_height": 3.0, "materials": dict(MATERIALS), "walls": walls, "doors": doors,
             "rooms": rooms, "rubble": rubble, "hazards": hazards, "survivors": [], "decoys": [],
             "entry": [1.0, cy], "command_post": {"pos": [-2.0, cy], "tx_dbm": 20},
@@ -340,7 +340,7 @@ def draw_big(rng, W, H, seed, variant):
 
     vault_room = next(r for r in band_rooms if r.get("steel"))
     vault_door = dict(room_doors)[vault_room["id"]]
-    data = {"id": f"gen_{seed}", "name": f"Generated collapse #{seed}", "size": [W, H], "cell": 0.25,
+    data = {"id": f"gen_{seed}", "name": f"Building {seed}, post-earthquake", "size": [W, H], "cell": 0.25,
             "wall_height": 3.0, "materials": dict(MATERIALS), "walls": walls, "doors": doors,
             "rooms": rooms, "rubble": rubble, "hazards": hazards, "survivors": [], "decoys": [],
             "entry": [1.0, cy], "command_post": {"pos": [-2.0, cy], "tx_dbm": 20},
@@ -434,6 +434,55 @@ def place_heat_sources(data):
 
 def out_pos(sources):
     return [(h["x"], h["y"]) for h in sources]
+
+
+# User-facing text (the screen shows names, never file ids): a short descriptor per survivor for
+# captions, from the pose in its thermal crop and the room it is in.
+POSE_PHRASE = {"pos_0001.png": "Crouched low", "pos_0002.png": "Kneeling, bent over",
+               "pos_0003.png": "Slumped in a chair", "unsure_person_01.png": "Partly hidden"}
+
+
+def room_at(data, pos):
+    """The smallest room containing pos (a cage inside a warehouse is the cage), or None."""
+    inside = [r for r in data.get("rooms", []) if in_poly(pos, r["poly"])]
+    if not inside:
+        return None
+
+    def area(r):
+        xs, ys = [q[0] for q in r["poly"]], [q[1] for q in r["poly"]]
+        return (max(xs) - min(xs)) * (max(ys) - min(ys))
+    return min(inside, key=area)["name"]
+
+
+def where_phrase(room):
+    if room is None:
+        return "near the entrance"
+    if room.lower().endswith("floor"):                                # "on the warehouse floor"
+        return f"on the {room.lower()}"
+    last = room.split()[-1]
+    if len(last) <= 2 and (last.isupper() or last.isdigit()):       # "Office A", "Cross Hall 1"
+        return f"in {room}"
+    return f"in the {room.lower()}"
+
+
+def survivor_descriptor(data, survivor):
+    pose = POSE_PHRASE.get(survivor.get("thermal"), "Lying still")
+    return f"{pose} {where_phrase(room_at(data, survivor['pos']))}"
+
+
+def describe(data):
+    """One-line description of a generated building."""
+    W, H = data["size"]
+    rooms = sum(1 for r in data["rooms"] if not r["name"].startswith(("Main Corridor", "Hall ", "Cross Hall")))
+    steel = sum(1 for r in data["rooms"] if r.get("steel") or "Steel" in r["name"])
+    n = len(data["survivors"])
+    zones = "1 steel dead zone that blocks" if steel == 1 else f"{steel} steel dead zones that block"
+    return f"Collapsed building, {W:.0f} x {H:.0f} m: {rooms} rooms, {zones} the radio, {n} people to find"
+
+
+def name_people(data):
+    for sv in data["survivors"]:
+        sv["descriptor"] = survivor_descriptor(data, sv)
 
 
 def place_people(data, rng, info):
@@ -636,7 +685,7 @@ def default_plan(data, robots=ROBOTS):
             "no_go": [], "zones": plan_zones}
 
 
-def generate(seed, size=None, plan_id=None, name=None, location=None):
+def generate(seed, size=None, plan_id=None, name=None, location=None, description=None):
     """The building for this seed (first valid variant). Deterministic for (seed, size).
     `location` is where the CLI writes it under data/floorplans/ (default generated/<id>); it only
     sets the `default_plan` path."""
@@ -668,6 +717,8 @@ def generate(seed, size=None, plan_id=None, name=None, location=None):
                 data["id"] = plan_id
             if name:
                 data["name"] = name
+            data["description"] = description or describe(data)
+            name_people(data)
             data["default_plan"] = plan_location(location or f"generated/{data['id']}")
             data["expected_survivors"] = len(data["survivors"])   # the briefing's count, a prior for the belief map
             data["validation"] = {"ok": True, "checks": [
@@ -730,7 +781,11 @@ def variant_of(base, seed):
         if data["decoys"]:
             data["decoys"][-1]["thermal"] = UNSURE_OBJECT
         data["id"] = f"{base_id}_v{seed}"
-        data["name"] = f"{base['name']}, variant {seed}"
+        short = base["name"].split(",")[0]
+        data["name"] = f"{short}, variant {seed}"
+        data["description"] = (f"{short} with the people moved: same walls and damage, survivors and warm "
+                               "decoys in new places, one survivor still deep in the steel dead zone")
+        name_people(data)
         data["generator"] = {"kind": "variant", "base": base_id, "seed": seed, "attempt": attempt, "version": VERSION,
                              "people": len(chosen)}
         data["default_plan"] = plan_location(f"variants/{data['id']}")
@@ -894,6 +949,7 @@ def main():
                          "heights over 34 use the multi-hall layout)")
     ap.add_argument("--id", default=None, help="building id (default gen_<seed>)")
     ap.add_argument("--name", default=None)
+    ap.add_argument("--description", default=None)
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--png", type=Path, default=None)
     ap.add_argument("--check", action="store_true", help="run the default plan through the safety checker")
@@ -910,7 +966,7 @@ def main():
         location = None
         if out is not None and out.resolve().is_relative_to(HERE.resolve()):
             location = out.resolve().relative_to(HERE.resolve()).with_suffix("").as_posix()
-        data = generate(args.seed, size=tuple(args.size) if args.size else None, plan_id=args.id, name=args.name,
+        data = generate(args.seed, size=tuple(args.size) if args.size else None, plan_id=args.id, name=args.name, description=args.description,
                         location=location)
         out = out or HERE / "generated" / f"{data['id']}.json"
     if out.resolve() == (HERE / "collapse_01.json").resolve():
