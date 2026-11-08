@@ -30,7 +30,7 @@ from pydantic import ValidationError
 from .ai_lab import AILabAssets
 from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
 from .command.crdt import MergeBatch, PlanSync
-from .command.leases import LeaseClaim, LeaseTable, PresenterRelease, RobotRef
+from .command.leases import LeaseClaim, LeaseGroupClaim, LeaseTable, PresenterRelease, RobotGroup, RobotRef
 from .command import voice as voice_services
 from .command.voice import ManualCommand, SpeechRequest, VoiceRequest
 from .command.controls import AskQuestion, FaultRequest, RelayPlace, RelayPower, director_adapter
@@ -147,6 +147,15 @@ class Hub:
                 self.leases.claim(body.robot, token, body.name)
             else:
                 getattr(self.leases, action)(body.robot, token)
+            await self.broadcast_leases()
+            return self.lease_state()
+
+    async def change_lease_group(self, action, body, token):
+        self.require_leases()
+        async with self.lease_lock:
+            if self.leases.expire():
+                await self.broadcast_leases()
+            self.leases.group(action, body.robots, token, getattr(body, "name", None))
             await self.broadcast_leases()
             return self.lease_state()
 
@@ -592,6 +601,21 @@ async def release_lease(body: RobotRef, request: Request):
 @app.post("/api/leases/override")
 async def override_lease(body: PresenterRelease):
     return await hub.change_lease("override", body)
+
+
+@app.post("/api/leases/group/claim")
+async def claim_lease_group(body: LeaseGroupClaim, request: Request):
+    return await hub.change_lease_group("claim", body, request.headers.get("x-controller-token"))
+
+
+@app.post("/api/leases/group/heartbeat")
+async def heartbeat_lease_group(body: RobotGroup, request: Request):
+    return await hub.change_lease_group("heartbeat", body, request.headers.get("x-controller-token"))
+
+
+@app.post("/api/leases/group/release")
+async def release_lease_group(body: RobotGroup, request: Request):
+    return await hub.change_lease_group("release", body, request.headers.get("x-controller-token"))
 
 
 @app.post("/api/robot-command")
