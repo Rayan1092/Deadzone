@@ -85,6 +85,8 @@ npm run build
 
 `npm run dev` serves the web app on port 5173 and proxies the backend on 8000. The launch helpers use argument arrays, preserve runtime settings, and never read or print API-key values. `scripts/preflight.ps1` and `scripts/preflight.sh` check the demo laptop, real detector, flags, ports, tools and LAN access before a rehearsal.
 
+For a physical robot adapter, see [hardware/README.md](hardware/README.md).
+
 ## License and resources
 
 Original Deadzone source code is available under the [MIT license](LICENSE). Third-party datasets, image derivatives and assets retain their original terms and provenance. Runtime thermal-image provenance is recorded in [the crop manifest](ml/crops/runtime/manifest.json) and [decoy manifest](ml/crops/decoys/manifest.json); these sample images are included, while the full training datasets are not. See [asset credits](assets-pack/CREDITS.md) and [web asset credits](web/public/assets/CREDITS.md) for models and textures.
