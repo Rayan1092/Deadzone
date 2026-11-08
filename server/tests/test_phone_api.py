@@ -86,11 +86,13 @@ def test_no_go_only_and_cleared_drafts_sync_to_screen_and_both_phones(session):
                 assert message["data"]["no_go"] == regions
                 assert message["data"]["zones"] == []
                 assert "plan_epoch" not in message["data"]
+        # A plan without zones (no-go only, or cleared) is accepted and reaches every robot, which
+        # keeps its current zone assignment (Rayan's P0, 2026-11-08; plan.py edited with authorization).
         for path in ("/api/plan/check", "/api/dispatch"):
             response = client.post(path, json={"plan_id": "P-1", "plan_epoch": hello["plan_epoch"]})
-            assert response.status_code == 422
-            assert response.json()["detail"]["code"] == "empty_plan"
-        assert not hub.sim.network.queues["CMD"]
+            assert response.status_code == 200, response.json()
+            assert response.json()["ok"]
+        assert {b["dst"] for b in hub.sim.network.queues["CMD"]} == set(hub.sim.robot_specs)
 
 
 def test_dispatch_notifies_all_phones_and_reconnect_retains_immutability(session):
