@@ -56,6 +56,7 @@ class AftershockControl(Model):
     type: Literal["aftershock"]
     at: Point | None = None
     relay: Identifier | None = None
+    strength: Literal["normal", "strong"] = "normal"
 
 
 DirectorRequest = Annotated[

@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "origin": "http://127.0.0.1:8030",
+  "paused": true,
+  "frontend_panels": "J/I production chunk served byte-for-byte",
+  "screen_ws": "hello/maps/tick/plan_state and diagnostic counters passed",
+  "scenario_catalog": 4,
+  "judge_pool_status": 404,
+  "providers_called": 0,
+  "browser_automation": "user stopped with physical Escape; no further UI input"
+}

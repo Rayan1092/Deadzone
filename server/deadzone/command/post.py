@@ -24,6 +24,7 @@ class CommandPost:
         self.routes = {}      # survivor id -> latest delivered route
         self.command_acks = OrderedDict()  # bounded latest delivered decision per cmd_id
         self.delivered = 0
+        self.delivery_hops_total = 0
         self.events = []
         # Bounded, delivered-only evidence for read-only briefings. Sim.events
         # contains Reality events and must never be passed to an AI tool.
@@ -61,6 +62,7 @@ class CommandPost:
                 return False
         self._seen[b["bid"]] = b["created"] + b["ttl"]
         self.delivered += 1
+        self.delivery_hops_total += max(0, len(b["hops"]) - 1)
         event_start = len(self.events)
         p = b["payload"]
         k = b["kind"]

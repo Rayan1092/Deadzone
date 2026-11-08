@@ -30,7 +30,7 @@ from pydantic import ValidationError
 from .ai_lab import AILabAssets
 from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
 from .command.crdt import MergeBatch, PlanSync
-from .command.leases import LeaseClaim, LeaseTable, PresenterRelease, RobotRef
+from .command.leases import LeaseClaim, LeaseGroupClaim, LeaseTable, PresenterRelease, RobotGroup, RobotRef
 from .command import voice as voice_services
 from .command.voice import ManualCommand, SpeechRequest, VoiceRequest
 from .command.controls import AskQuestion, FaultRequest, RelayPlace, RelayPower, director_adapter
@@ -41,6 +41,7 @@ from .robot.robot import resume_command
 from .robot.perception import CROP_DIR, get_detector
 from .sim import DT, ROBOT_DEFS, Sim
 from .network.dtn import make_bundle
+from .scenarios import ResetScenario, prepare_scenario, scenario_catalog
 
 MAPS_EVERY = 5
 load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
@@ -58,7 +59,11 @@ def detector_status():
 
 class Hub:
     def __init__(self):
-        self.sim = Sim(n_robots=int(os.environ.get("DZ_ROBOTS", "1")), seed=int(os.environ.get("DZ_SEED", "7")))
+        count = int(os.environ.get("DZ_ROBOTS", "1"))
+        self.scenario_id, path, player = prepare_scenario(os.environ.get("DZ_FLOORPLAN") or "collapse_01",
+                                                         [rid for rid, _, _ in ROBOT_DEFS[:count]])
+        self.timeline_enabled = False
+        self.sim = Sim(plan_path=path, n_robots=count, seed=int(os.environ.get("DZ_SEED", "7")))
         self.sim.tick()  # real sensor/bundle delivery before the paused QR/plan demo beat
         self.running = False
         self.speed = float(os.environ.get("DZ_SPEED", "2"))
@@ -147,6 +152,15 @@ class Hub:
                 self.leases.claim(body.robot, token, body.name)
             else:
                 getattr(self.leases, action)(body.robot, token)
+            await self.broadcast_leases()
+            return self.lease_state()
+
+    async def change_lease_group(self, action, body, token):
+        self.require_leases()
+        async with self.lease_lock:
+            if self.leases.expire():
+                await self.broadcast_leases()
+            self.leases.group(action, body.robots, token, getattr(body, "name", None))
             await self.broadcast_leases()
             return self.lease_state()
 
@@ -257,6 +271,7 @@ class Hub:
 
     def hello(self, ws=None):
         return self.envelope("hello", self.sim.hello() | self.control_state()
+                             | {"scenario": {"id": self.scenario_id, "timeline": self.timeline_enabled}}
                              | detector_status() | {"leases": self.lease_state(), "voice":{"enabled":os.environ.get("DZ_VOICE") == "1"}}
                              | self.controller_hello(ws))
 
@@ -409,12 +424,22 @@ class Hub:
             if ev.get("kind") == "command_ack_reported":
                 await self.send_all(self.phones, message)
 
-    async def reset(self):
+    async def reset(self, selection=None):
+        choice = ResetScenario.model_validate(selection or {})
         async with self.plan_lock:
             async with self.lease_lock:
+                timeline = self.timeline_enabled if choice.timeline is None else choice.timeline
+                if timeline and os.environ.get("DZ_SCENARIO_TIMELINE") != "1":
+                    raise PlanError("feature_disabled", "Enable DZ_SCENARIO_TIMELINE=1 for disaster scripts", 409)
+                identifier, path, player = prepare_scenario(choice.floorplan or self.scenario_id,
+                    self.sim.robots, timeline, allow_aftershock=os.environ.get("DZ_AFTERSHOCK") == "1")
+                # Prepare the new world before swapping it. Invalid selection/script leaves the old incident intact.
+                candidate = Sim(plan_path=path, n_robots=self.sim.n_robots, seed=self.sim.seed)
+                candidate.timeline = player if timeline else None
+                candidate.tick()
                 self.running = False
-                self.sim.reset()
-                self.sim.tick()
+                self.sim = candidate
+                self.scenario_id, self.timeline_enabled = identifier, timeline
                 self._init_plans()
                 self.leases.reset()
                 await self.broadcast_leases()
@@ -451,7 +476,9 @@ class Hub:
         elif action == "toggle":
             self.running = not self.running
         elif action == "reset":
-            await self.reset()
+            if value is not None and not isinstance(value, dict):
+                raise PlanError("invalid_reset", "Reset value must be a scenario object", 422)
+            await self.reset(value)
             return
         elif action == "speed":
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
@@ -473,7 +500,7 @@ class Hub:
                 if os.environ.get("DZ_AFTERSHOCK") != "1":
                     raise PlanError("feature_disabled", "Enable DZ_AFTERSHOCK=1 for an aftershock dry run", 409)
                 try:
-                    self.sim.aftershock(request.at, request.relay)
+                    self.sim.earthquake(request.strength, request.at, request.relay)
                 except ValueError as error:
                     raise PlanError("invalid_aftershock", str(error), 422) from None
                 await self.send_all(self.screens, self.hello())
@@ -513,8 +540,12 @@ class Hub:
         while True:
             await self.sweep_leases()
             if self.running:
+                revision = self.sim.geometry_revision
                 self.sim.tick()
-                await self.broadcast_tick()
+                changed = revision != self.sim.geometry_revision
+                if changed:
+                    await self.send_all(self.screens, self.hello())
+                await self.broadcast_tick(force_maps=changed)
             next_t += DT / self.speed
             delay = next_t - time.perf_counter()
             if delay < -0.5:          # fell behind (laptop busy), don't spiral
@@ -568,6 +599,13 @@ def health():
     return {"ok": True, "tick": hub.sim.tick_n, "time": hub.sim.time, "running": hub.running}
 
 
+@app.get("/api/scenarios")
+def scenarios():
+    return {"floorplans": scenario_catalog(), "selected": hub.scenario_id,
+            "timeline_enabled": hub.timeline_enabled,
+            "timeline_available": os.environ.get("DZ_SCENARIO_TIMELINE") == "1"}
+
+
 @app.get("/api/leases")
 async def lease_state():
     await hub.sweep_leases()
@@ -592,6 +630,21 @@ async def release_lease(body: RobotRef, request: Request):
 @app.post("/api/leases/override")
 async def override_lease(body: PresenterRelease):
     return await hub.change_lease("override", body)
+
+
+@app.post("/api/leases/group/claim")
+async def claim_lease_group(body: LeaseGroupClaim, request: Request):
+    return await hub.change_lease_group("claim", body, request.headers.get("x-controller-token"))
+
+
+@app.post("/api/leases/group/heartbeat")
+async def heartbeat_lease_group(body: RobotGroup, request: Request):
+    return await hub.change_lease_group("heartbeat", body, request.headers.get("x-controller-token"))
+
+
+@app.post("/api/leases/group/release")
+async def release_lease_group(body: RobotGroup, request: Request):
+    return await hub.change_lease_group("release", body, request.headers.get("x-controller-token"))
 
 
 @app.post("/api/robot-command")

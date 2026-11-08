@@ -40,7 +40,7 @@ Version 1 works end to end (every demo beat verified on the testing laptop), so 
 - **Demo guard test first.** `DEMO.md` becomes a pytest that runs seed 7 and asserts every beat time within a small tolerance. Any PR that moves a beat fails. Version 1 stays recordable at all times.
 - **Every new feature is behind a toggle or key** until it has passed a full dry run on the testing laptop.
 - **Record the Version 1 backup video tonight** (`?record`, then S, plus a screen recording) before big visual changes land.
-- **7:30 AM feature freeze still holds.** After it: fixes, video, Devpost, rehearsal only.
+- **Rayan announces the feature freeze.** After it: fixes, recording, Devpost, rehearsal only.
 
 ### UX fixes the team agreed on
 
@@ -145,6 +145,10 @@ Robots compute every path live (frontier exploration plus A\* on their own map).
 - **Testing laptop is now a builder** for ML and benchmark work in `ml/` and `docs/assets/` (history file `rayan-ml.md`): benchmark refinement (sensitivity sweep over radio settings, random rubble, more seeds, two generated buildings), then the earthquake rehearsal report.
 - **Yusuf's cut list tonight:** multi-story interior, voice UI, clinic map. **Handed to Aziz with Yusuf's OK:** the judge test overlay (J) and the Under the hood panel (I), both data panels.
 - **Aziz's queue:** short G briefing, B/U presenter fix, earthquake strength, floor plan switch and timeline player, counters in `tick.stats`, judge pool serving, then J and I panels.
+
+Aziz's implemented API/panel contract and acceptance status:
+[FINAL-STRETCH-BACKEND.md](FINAL-STRETCH-BACKEND.md). The judge pool and optional
+detector/met-deadline instrumentation remain Rayan-owned exports.
 
 **Priority against the 7:30 AM freeze:** live judge test and captions first (cheap, highest trust), Rescue Status strip second, Under the hood third. These rank above multi-story, voice UI and the clinic map. The main run stays exactly as `DEMO.md`; J and I are for after the close and Q&A.
 

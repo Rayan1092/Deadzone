@@ -29,6 +29,26 @@ class PresenterRelease(RobotRef):
     presenter_token: str = Field(min_length=1, max_length=256, strict=True)
 
 
+class RobotGroup(Model):
+    robots: list[Identifier] = Field(min_length=1, max_length=3)
+
+    @field_validator("robots")
+    @classmethod
+    def distinct_robots(cls, value):
+        if len(value) != len(set(value)):
+            raise ValueError("Robot IDs must be distinct")
+        return value
+
+
+class LeaseGroupClaim(RobotGroup):
+    name: str = Field(min_length=1, max_length=64, strict=True)
+
+    @field_validator("name")
+    @classmethod
+    def trim_name(cls, value):
+        return LeaseClaim.trim_name(value)
+
+
 class LeaseTable:
     """Mutate only on the Hub event loop, with no await between auth and enqueue."""
 
@@ -91,6 +111,37 @@ class LeaseTable:
             return
         self.require(robot, token)
         del self.leases[robot]
+        self.revision += 1
+
+    def group(self, action, robots, token, name=None):
+        """Preflight the whole group before changing any grant; no await here."""
+        self.actor(token)
+        for robot in robots:
+            self.robot(robot)
+        self.expire()
+        if action == "claim":
+            for robot in robots:
+                old = self.leases.get(robot)
+                if old and old["token"] != token:
+                    raise PlanError("robot_controlled", f"{robot} is controlled by {old['name']}", 409)
+            deadline = self.clock() + TTL_S
+            self.leases.update({robot: {"token": token, "name": name, "deadline": deadline}
+                                for robot in robots})
+        elif action in ("heartbeat", "release"):
+            for robot in robots:
+                if action == "heartbeat" or robot in self.leases:
+                    self.require(robot, token)
+            if action == "heartbeat":
+                deadline = self.clock() + TTL_S
+                for robot in robots:
+                    self.leases[robot]["deadline"] = deadline
+            else:
+                if not any(robot in self.leases for robot in robots):
+                    return
+                for robot in robots:
+                    self.leases.pop(robot, None)
+        else:
+            raise ValueError("Unsupported lease group operation")
         self.revision += 1
 
     def override(self, robot):
