@@ -45,8 +45,9 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    $env:DZ_AFTERSHOCK=1   # key A
    $env:DZ_AI_LAB=1       # key L (serves ml/results and docs/assets read-only)
    $env:DZ_GEMINI=1       # G briefing and phone Ask through Gemini (needs GEMINI_API_KEY in server/.env); without it they use the local summary
-   # $env:DZ_VOICE=1      # voice commands: backend ready (docs/VOICE.md), big-screen/phone UI not on main yet
+   # $env:DZ_VOICE=1      # voice commands: NOT ready. Robot side is on main; /api/voice is still a placeholder (501) and the push-to-talk UI isn't on main
    ```
+   **Don't set `DZ_VOICE` or `DZ_CONTROL_LEASES` for the main run:** with control leases on, **B** and **U** from the big screen need robot leases it doesn't hold, so they fail with a toast. R, F, O and A are not affected.
 5. Open `http://localhost:8000` on the big screen. Phones join with **Q** (QR) on the same Wi-Fi, or on the phone hotspot. Phone microphones need https: use Aziz's tunnel (`scripts/demo_tunnel.py`, see its docs) if voice or the mic is part of the run.
 6. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
 7. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped recording, and keep the file on the demo laptop.
@@ -152,7 +153,7 @@ The safety check needs the command post to have heard each robot once. Startup a
 | "What if the building shifts again?" | **A** (with `DZ_AFTERSHOCK=1`): collapse, relay crushed, links reroute, robots replan and resend rescue routes they see blocked | Best after the reveal; it changes everything after it |
 | "How was the AI trained?" | **L** (with `DZ_AI_LAB=1`): real FLIR examples, curve, confusion matrix, Grad-CAM "where the AI looked" | The training curve shows once the logged retrain has run on the testing laptop |
 | "Can you do a different building?" | A generated building (`py data/floorplans/generate.py --seed <judge's number> --png out.png`) | Preview image and a headless run today; loading it on the big screen needs Aziz's loader (asked in rayan.md) |
-| "Can I talk to a robot?" | Voice command | Not yet: robot side and backend are on main, the push-to-talk UI is not |
+| "Can I talk to a robot?" | Voice command | Not yet: the robot side is on main; Aziz's voice endpoint and Yusuf's push-to-talk UI are not |
 
 ## Judge questions (one answer each)
 
