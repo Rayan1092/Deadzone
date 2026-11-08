@@ -4,11 +4,17 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** `p2/sensor-camera`, stacked on routing PR #77. User explicitly requests actual robot-facing camera and further route review; authorizes focused robot/web edits. Estimate 30-45 min; no ML/map/other-history edits. Main `68dcfd2` current; reviewed Yusuf unmerged hyperreal/plan-v4 camera changes rather than merging his visual stack.
-- **Contract BEFORE code:** startup opt-in `DZ_SENSOR_VIEW=1`. Screen-only `hello.sensor_view={enabled:true,range_m:5,fov_rad:2.0943951023931953,height_m:0.4}`; `tick.reality.robots[].camera={t,pose:[x,y,yaw],hits:[{id,pos,crop,verdict:"person"|"rejected",conf:number|null,source:"model"|"sim"}]}` from actual `io.thermal()` plus the actual onboard detector. Empty hits clears boxes. No camera field in robot bundles, Command, phone or Gemini. Default wire payload stays unchanged. Renderer uses frame pose, 120-degree horizontal lens, no independent auto-aim, no manifest-derived guesses; label simulated reconstruction/crop evidence honestly. Flag off keeps existing view until dry run.
-- **Heads-up:** Yusuf's unmerged hyperreal already removes auto-aim; his boxes still infer results from truth positions + manifest/range. New opt-in sensor component and helper will be small/independent for him to integrate. Route PR #77 remains open/default off; inspecting additional route safety without changing demo timing.
+- **Working on:** owner handoff only (`p2/camera-owner-handoffs`). User clarified Aziz stays backend/network/integration; Yusuf owns rendering, Rayan owns robot policy. Optional patch artifacts under outputs/handoffs are not applied source and must not be merged as a feature branch.
+- **Backend:** PR #78 will contain actual sensor-frame exposure, Command/phone privacy, paused-world invalidation, tests and the minimal observation capture hook for Rayan review. No frontend source or additional route policy in that PR.
+- **Need from owners:** Yusuf/Rayan review only their respective optional patches and findings in outputs/handoffs/README.md. Existing #77 exploration is now merged/default off. New model and plan pulled at main 0c5c823.
 
 ## Log
+
+### 2026-11-07 PT - p2/camera-owner-handoffs - Restore ownership boundaries
+- **Did:** user clarified Aziz's role; removed all own frontend/proposed extra route-policy edits from backend working tree, preserved them only as optional owner patches. Restored committed frontend build and stopped experimental camera preview. Existing phone tunnel untouched.
+- **Contract changes:** none beyond preposted backend sensor contract. No source code from this handoff branch should merge into main.
+- **Heads-up for others:** Yusuf: modified browser shortcuts can trigger director R; see exact finding in outputs/handoffs/README.md. Rayan: 60-point thinning can cut walls; 4 passing route tests/proposed safe fitter in your patch. Both owner patches pass git apply --check against their stated bases; prototypes require owner integration/dry run.
+- **Next:** finish backend-only #78; owner UI/policy implementation stays with Yusuf/Rayan.
 
 ### 2026-11-07 PT - p2/sensor-camera - Reserve actual sensor-frame camera contract
 - **Did:** audited current and Yusuf's unmerged camera: independent detection pan, lens/range mismatch, and metadata-based inferred classifications. User explicitly asked for robot/web fixes; ownership exception is task-scoped.
