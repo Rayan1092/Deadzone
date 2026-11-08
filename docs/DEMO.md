@@ -116,6 +116,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 
 | Key | Action | Status |
 |---|---|---|
+| T | toggle hidden survivor and warm-object truth markers on Reality only; off by default | live |
 | Space | start / pause. The page opens on the street shot outside the building; the first Space dives into the building and starts the run | live |
 | Backspace | reset to seed 7, paused | live |
 | `+` / `-` | sim speed ×2 / ÷2 | live |

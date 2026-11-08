@@ -20,6 +20,7 @@ export const KEY_GROUPS = [
     ['D', 'Let the camera follow the action by itself.'],
     ['P', 'Use lighter graphics on a slower computer.'],
     ['K', 'Lighting: night / day.'],
+    ['T', 'Truth markers: hidden survivors and warm objects, Reality only.'],
   ] },
   { title: 'Scenario', keys: [
     ['R', 'Drop rubble in front of the followed robot (Scout 1 if none).'],

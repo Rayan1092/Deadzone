@@ -4,13 +4,18 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** p2/public-tunnel-origin / PR #209 validated; user explicitly approved the deadline extension. Merge and restart the existing backend with its public tunnel origin. Performance #207 merged before 1:30.
-- **Works on main:** performance #207 merged at 1:23 Eastern (841 backend / 1 skipped, 105 web/build); deployment #186/#191/#199 and LAN #178. Latest main also includes Rayan's README #208.
-- **In flight (not merged):** shared validated phone URL helper; configured-only public_url/phone_url in both hello messages; exact PowerShell assignment from tunnel.ps1; DEMO order tunnel -> set server-terminal origin -> start server.
-- **Validation:** targeted public URL / script checks and full backend in progress. Existing live user-test server and tunnel remain on merged #207; private .env untouched.
-- **Blocked on / need from others:** none. User explicitly answered "Yes, finish and merge the follow-up" after the full suite passed.
+- **Working on:** p2/restore-truth-key, explicit urgent cross-area user request to restore T truth markers. Off by default; Reality only.
+- **Works on main:** public-origin #209 (842 backend / 1 skipped), performance #207, previous deployment/LAN items.
+- **In flight (not merged):** T toggles hidden survivor/red and warm-decoy/amber markers, on-screen status and H help. No server/protocol/simulation changes. Built app is live immediately; verified real T key in owned Chrome, full backend green before PR.
+- **Blocked on / need from others:** none.
 
 ## Log
+
+### 2026-11-08 PT - p2/restore-truth-key - Restore T truth markers now
+- **Did:** user explicitly asked to restore T. Recovered the existing TruthMarker visual removed with the H help pass; T now toggles hidden survivors and warm-object decoys on Reality only, default off. Top bar says Truth markers on, H lists T, repeated keydown does not flicker the toggle and text inputs retain normal typing.
+- **Contract changes:** T restored as a local observer shortcut. No REST/WS, robot or Command knowledge changes; Command/inset/phones never get the overlay.
+- **Validation:** 105 web tests/build pass; full backend 842 passed / 1 skipped (309.11 s), demo guard green. Real Chrome test: T shows 6 markers, all on Reality; key repeat ignored; one-view Command inset stays clean; uppercase T hides all markers. Test camera uploads blocked; browser stopped. Existing help regression updated because T is intentionally restored.
+- **Next:** user requested a restart after manual test; both servers restarted with the same Cloudflare link. Immediate main sync, one PR and merge.
 
 ### 2026-11-08 PT - p2/public-tunnel-origin - Advertise one configured public origin everywhere
 - **Did:** factored the existing /api/join URL validation/LAN fallback into a shared helper; both screen and phone hello advertise the configured public origin and /phone link. The Q/QR endpoint uses the same helper. tunnel.ps1 prints an exact copyable $env:DZ_PUBLIC_URL assignment and DEMO explicitly starts tunnel, sets that variable in the server terminal, then starts server. Setting it in the tunnel terminal cannot update an already-running backend.

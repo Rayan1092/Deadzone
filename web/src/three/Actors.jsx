@@ -234,6 +234,26 @@ function Survivor({ pos, label, born, id, burst = false, tone = 'alert', hold = 
 }
 
 
+// Ground truth the robots have not found yet (T key): survivors in red, thermal
+// decoys in amber. Reality pane only, never Command. Drawn just above the fog layer.
+function TruthMarker({ pos, id, sub = 'Not found yet', color = COLORS.red, decoy = false }) {
+  const ring = useRef()
+  useFrame(({ clock }) => {
+    if (ring.current) ring.current.material.opacity = 0.35 + 0.2 * Math.sin(clock.elapsedTime * 2)
+  })
+  return (
+    <group position={w2t(pos[0], pos[1], 0)}>
+      <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} position={[0, FOG_H + 0.03, 0]} renderOrder={3}>
+        <ringGeometry args={[0.35, 0.42, 32]} />
+        <meshBasicMaterial color={color} transparent side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      <Html position={[0, FOG_H + 0.6, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
+        <div className={`tag ghost truth${decoy ? ' decoy' : ''}`}><b>{id}</b><span>{sub}</span></div>
+      </Html>
+    </group>
+  )
+}
+
 function rng(seed) {
   let s = (seed % 2147483647) || 1
   return () => (s = (s * 16807) % 2147483647) / 2147483647
@@ -365,6 +385,7 @@ function useBirths(ids) {
 }
 
 export function RealityActors({ gap = false }) {
+  const showTruth = useSim((s) => s.showTruth)
   const tick = useSim((s) => s.tick)
   const fp = useSim((s) => s.floorplan)
   const survivors_found = firstFinds(tick?.reality.survivors_found ?? [])
@@ -421,6 +442,12 @@ export function RealityActors({ gap = false }) {
             : { label: `${s.id} · not reported yet`, tone: 'pending', hold: true }
         return <RealitySurvivor key={s.id} id={s.id} pos={s.pos} pose={survivorPose(s, manifest)} tag={tag} />
       })}
+      {showTruth && (fp.survivors ?? []).filter((s) => !foundBy.has(s.id)).map((s) => (
+        <TruthMarker key={s.id} pos={s.pos} id={`Survivor ${s.id.replace(/^S/, '')}`} />
+      ))}
+      {showTruth && decoyLayout(fp).map((d) => (
+        <TruthMarker key={d.id} pos={d.pos} id={d.label} sub="Warm object" color={COLORS.amber} decoy />
+      ))}
     </group>
   )
 }
