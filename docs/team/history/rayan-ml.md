@@ -3,10 +3,10 @@
 Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on the testing laptop edits this file. Rayan's robot session writes `history/rayan.md`.
 
 ## Now
-- **Working on:** `rayan-ml/calibration` (PR open, merging after tests). Next: radio model vs published measurements, benchmark-only study (values posted here for Aziz).
-- **Works on main:** trained survivor detector + `perception.filter_hits()` with sim fallback (PR #14), runtime crops, robot hookup and decoys (PR #17), Grad-CAM heatmaps (PR #49), AI Lab export (PR #68), logged retrain (PR #71), judge pool `ml/results/judge_pool/` (PR #96), benchmark v2 radio sweep (PR #97), fused Grad-CAM + 96.7% docs (PR #100), real-scene crops + detector fine-tuned on indoor thermal people, FLIR 96.7% / indoor 99.6% (PR #95).
-- **In flight (not merged):** `rayan-ml/calibration`: `ml/calibration.py`, `ml/results/calibration.json`, `docs/assets/calibration.png`, `calibration` block in lab.json.
-- **Blocked on / need from others:** **Yusuf:** pose the three 3D survivor figures to match the real crops and use `shows` as the caption line (gradcam-poses entry).
+- **Working on:** phone bug diagnosis (posted below, For Aziz), then big-screen performance profile; radio-vs-published benchmark study finished, PR next.
+- **Works on main:** trained survivor detector + `perception.filter_hits()` with sim fallback (PR #14), runtime crops, robot hookup and decoys (PR #17), Grad-CAM heatmaps (PR #49), AI Lab export (PR #68), logged retrain (PR #71), judge pool `ml/results/judge_pool/` (PR #96), benchmark v2 radio sweep (PR #97), fused Grad-CAM + 96.7% docs (PR #100), confidence calibration (PR #103), real-scene crops + detector fine-tuned on indoor thermal people, FLIR 96.7% / indoor 99.6% (PR #95).
+- **In flight (not merged):** `rayan-ml/radio-published` (benchmark at published 2.4 GHz values).
+- **Blocked on / need from others:** **Aziz:** phone plan fixes 1.1 and 1.2 (phone-diagnosis entry). **Yusuf:** fixes 1.4, 2.1, 2.2 (same entry); 3D survivor poses + `shows` captions (gradcam-poses entry). **Rayan (robot session):** fix 1.3, escape from a no-go (same entry).
 - **Promises to others:**
   - `filter_hits(hits)` keeps the `io.thermal()` hit shape `{id,pos,crop,conf}`. Kept hits get `conf` = model P(person) and `detector:"model"`; rejected hits are dropped.
   - It falls back to passthrough (sim sensor) when `DETECTOR=sim` is set, when no model file exists, or when torch is missing.
@@ -15,6 +15,27 @@ Owns `ml/` and `server/deadzone/robot/perception.py`. Only Rayan's ML session on
   - Judge pool manifest format below (judge-test entry), readable by Aziz's `readJudgePool`.
 
 ## Log
+
+### 2026-11-08 15:10 · rayan-ml/phone-diagnosis · Phone no-go and add-zone bugs traced end to end (diagnosis only, no fixes)
+
+**For Aziz: exact break points**
+
+Reproduced on main `2da65d2` with a second server (seed 7, 3 robots) driven exactly like the phone: `plan_edit` on `/ws/phone?role=planner`, then `POST /api/dispatch` immediately (what `dispatchPlan()` does), then run. No-go = room S1 `[[0.5,0.5],[11.5,0.5],[11.5,12.5],[0.5,12.5]]` (outside every zone; robots normally drive there). Harness `phone_repro.py` / `phone_repro2.py` lives in the testing laptop's scratchpad; ask and I'll commit it.
+
+**Bug 1, no-go ignored.** The chain phone edit -> plan_edit -> save -> dispatch -> plan bundle -> `plan_applied` -> robot no-go mask -> path cleared and replanned **works when every robot owns a zone in the plan** (A1: zones for R1-R3 + the no-go, 0 robots entered it). It breaks here:
+1. **Aziz, the main cause:** `server/deadzone/command/plan.py:150`, `PlanManager.dispatch` only makes bundles `for rid in sorted({z.robot for z in plan.zones})`. A robot with no zone in the plan never receives it, so it never gets the no-go. Repro A2: one zone for R1 + the no-go: only R1 logs `plan_applied`; **R3 drove through the no-go from 21 to 56 s, R2 from 46 to 77 s.** Fix: send a bundle to every deployed robot (`sorted(self.sim.robots)`), with that robot's zones (possibly empty) and the full `no_go`. The robot side handles `zones: []` (explores freely, obeys the no-go).
+2. **Aziz:** `server/deadzone/command/safety.py:71-76` (`route_length`) returns None when the robot's last delivered pose is inside the new no-go (start cell not traversable), so a mid-run no-go drawn over a robot rejects the plan as "No safe route to Z3 and back home" for a zone that passed at sim 0 (repro A3: sim 25, R3 in room S1). Fix: start the route from the nearest traversable cell to the robot (BFS outward), not the robot's own cell.
+3. **Rayan (robot):** a robot standing inside a newly applied no-go **freezes in REPLANNING forever** (in-process repro: R3 at (3.8, 10.0), 65+ s, empty path): its own cell is blocked, so A* has no start. Fix: when the current cell is in `self.nogo`, plan to the nearest cell outside it first (allow the start cell), then resume. A robot outside the no-go whose route ran into it replans correctly (applied at sim 15 and 18: never entered).
+4. **Yusuf (+ Aziz), smaller:** a draft with only a no-go is never sent: `web/src/phone/plan.js:74` `flush()` returns when there are no zones and `dispatchPlan()` returns silently; the server schema requires at least one zone (`plan.py:87`). Fix: the phone says "Add a zone to send no-go areas" (or Aziz accepts `zones: []` plans that carry `no_go`).
+- No race between the WebSocket `plan_edit` and the HTTP dispatch: the edit was always saved first.
+
+**Bug 2, "add zone" has no visible effect.** The chain works end to end (zone saved, dispatched, `plan_applied` lists it). It breaks in the phone's defaults:
+1. **Yusuf:** `web/src/phone/plan.js:83-87` (`addRegion`) gives a new zone to the first robot without a zone, else `robots[0]`, with `priority = zones.length + 1`. With 3 zones that is **R1 at priority 4**, and robots work their zones in priority order (`robot.py:343`, `_active_zone`), so the new zone waits behind R1's current zone for minutes. Repro B2 (R1, priority 4, room S1): accepted and applied, no move. B3 (same room, R2, priority 1): **R2 entered it 12 s after dispatch.** Fix: a new zone gets priority 1 and the nearest or least-loaded robot (or the planner picks the robot before drawing).
+2. **Yusuf:** new zones default to `comms: 'relay'`, so a zone in a predicted dead zone is rejected (`comms_plan`; repro in room S3). The safety card shows it, but it reads as "nothing happened". Fix: put the "Allow to go dark" one-tap fix on that rejection.
+
+- **Contract changes:** none (diagnosis only).
+- **Heads-up for others:** Aziz: 1.1 and 1.2. Yusuf: 1.4, 2.1, 2.2. Rayan's robot session: 1.3.
+- **Next:** big-screen performance profile (for Yusuf and Aziz), then the radio-vs-published PR.
 
 ### 2026-11-08 14:20 · rayan-ml/calibration · The detector's confidence is honest (no temperature needed)
 - **Did:** `py ml/calibration.py` scores both held-out sets with the shipped model and checks whether a confidence of X is right X of the time. **ECE 0.6% on FLIR street (1,200) and 0.2% indoor (2,273)**; 91% of FLIR answers and 99% of indoor answers are 90%+ confident and are right 98.9% and 100% (2,246 of 2,246) of the time. Temperature scaling, fitted on one half of each set and judged on the other, gives T = 1.16 and gains under 0.1 point of ECE while costing a little indoor accuracy, so **it is not shipped** and the detector is unchanged. No demo crop changes verdict either way; Rayan's unsure pairs stay inside the 0.35-0.75 band (0.44 and 0.58). Slide `docs/assets/calibration.png` (dot size = images per bin, bins under 20 images hollow and labelled, so small bins can't pass for a trend).
