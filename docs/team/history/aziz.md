@@ -12,6 +12,12 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Log
 
+### 2026-11-08 PT - p2/shelf-obstacles - Include testing-laptop performance profile before merge
+- **Did:** #111 opened with 503 backend passed/1 skipped and fixed guard green; integrated main 65fea46 (#110 performance-profile history only), which landed during PR creation. No server/web source delta from this merge; existing validation still applies.
+- **Contract changes:** none. The performance diagnosis is recorded in rayan-ml.md 16:10; payload work remains batch 4, scene optimizations remain Yusuf's area.
+- **Heads-up for others:** no claim that network payload alone fixes the profiler's shader/draw-call costs. Shelves still default off, actual footprint exports remain external.
+- **Next:** merge/confirm #111, delete its branch, then start camera backend with a fresh team-sync.
+
 ### 2026-11-08 PT - p2/shelf-obstacles - Known shelf occupancy and material radio loss
 - **Did:** added default-off physical obstacle loading with footprint validation, filled/boundary occupancy for shelves, actual material radio loss per edge, and matching known pre-collapse planning metadata. Thin shelves block lidar instead of falling between cell centres. Integrated shutdown main baf9d29 without robot source edits.
 - **Contract changes:** DZ_OBSTACLES=1 and obstacles poly/material schema were recorded before code; material defaults metal, loss comes from materials, known shelves enter planning_data only when enabled. No API/event shape changes and no truth rubble or survivor leak.
