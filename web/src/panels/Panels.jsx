@@ -1,8 +1,9 @@
-import { Fragment, useEffect } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { setLayout, setNight, setPerf, setView, useSim } from '../store'
 import { control } from '../net/socket'
 import { FAULT_LABEL, describeEvent, fmtClock as fmt, latestRoutes, robotStateLabel } from '../format'
 import { lastContact, linkQuality, linkText } from './robotCard'
+import { FILTERS, eventCategory, feedParts, readFilters, robotIds, saveFilters, visibleEvents } from './eventFeed'
 import { JoinButton } from './JoinPanel'
 import { requestReport } from './ReportPanel'
 import { ReplayChip } from './ReplayPanel'
@@ -16,7 +17,7 @@ import { ping, setSound, soundOn } from '../audio'
 
 export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
-  ['R', 'rubble ahead of the robot'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
+  ['R', 'rubble ahead of the followed robot (R1 on the overview)'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
   ['U', 'resume after safe stop'], ['A', 'aftershock at a random spot (server needs DZ_AFTERSHOCK=1)'], ['⇧A', 'strong aftershock: three areas, two relays'], ['N', 'new random building (Q&A)'], ['⇧N', 'back to the main building'], ['B', 'baseline: robots without Deadzone (with control leases on: Unlock first)'], ['L', 'AI Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
   ['M', 'one view / split view'], ['C', 'one view: swap the Command post inset and the main view'], ['Y', 'belief map: where survivors may still be'], ['E', 'judge layout / all panels (sidebar, scheduler, legends)'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
   ['J', 'judge test (Q&A)'], ['I', 'under the hood (Q&A)'],
@@ -212,16 +213,56 @@ export function Sidebar() {
           </div>
         )
       })}
-      <h3>Events</h3>
+      <EventFeed events={events} />
+    </aside>
+  )
+}
+
+// Plain-English event lines with each robot's name in its own colour, filtered by group.
+function EventFeed({ events }) {
+  const meta = useSim((s) => s.robotsMeta)
+  const [active, setActive] = useState(readFilters)
+  const toggle = (id) => {
+    const next = new Set(active)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    saveFilters(next)
+    setActive(next)
+  }
+  const counts = {}
+  for (const e of events) {
+    const c = eventCategory(e.kind)
+    if (c) counts[c] = (counts[c] ?? 0) + 1
+  }
+  const shown = visibleEvents(events, active)
+  return (
+    <>
+      <div className="feed-head">
+        <h3>Events</h3>
+        <div className="feed-chips" role="group" aria-label="Filter events">
+          {FILTERS.map((f) => (
+            <button key={f.id} className={`feed-chip ${f.id}${active.has(f.id) ? ' on' : ''}`} aria-pressed={active.has(f.id)}
+                    onClick={(e) => { e.stopPropagation(); toggle(f.id) }}>
+              {f.label}{counts[f.id] ? <small>{counts[f.id]}</small> : null}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="events">
-        {events.slice(0, 10).map((e) => (
-          <div key={e.eid} className={`event ${e.kind}`}>
-            <i /><span className="mono muted">{fmt(e.time)}</span> {describeEvent(e)}
+        {shown.length === 0 && <div className="muted small">{active.size ? 'Nothing in these groups yet' : 'Pick a group to see its events'}</div>}
+        {shown.map((e) => (
+          <div key={e.eid} className={`event ${e.kind} cat-${eventCategory(e.kind) ?? 'note'}`}>
+            <i /><span className="mono muted">{fmt(e.time)}</span>
+            <span className="ev-text">
+              {feedParts(describeEvent(e), robotIds(e), meta).map((p, i) => (p.robot
+                ? <b key={i} className="ev-robot" style={{ '--c': p.robot.color }}>{p.robot.name}</b>
+                : <Fragment key={i}>{p.text}</Fragment>))}
+            </span>
             {e.count > 1 && <span className="count">×{e.count}</span>}
           </div>
         ))}
       </div>
-    </aside>
+    </>
   )
 }
 
@@ -319,10 +360,17 @@ export function useKeyboard() {
       if (e.key === '-') control('speed', s.speed / 2)
       if (/^[1-9]$/.test(e.key) && robots[Number(e.key) - 1]) followRobot(robots[Number(e.key) - 1].id)
       if (e.key === '0') overview()
-      if (key === 'r' && target) {
-        // drop rubble 1.5 m ahead of the robot
-        const [x, y, th] = target.pose
-        control('director', { do: 'rubble', at: [x + Math.cos(th) * 1.5, y + Math.sin(th) * 1.5] })
+      if (key === 'r' && !e.repeat) {
+        // rubble ahead of the robot the camera follows (1-3), R1 on the overview. The control
+        // contract (PLAN.md director keys; RubbleFault takes `at` only) has no robot field: the
+        // spot 1.5 m ahead of it makes the server credit that robot (nearest), and with
+        // DZ_SMART_RUBBLE=1 move the drop onto its planned path. The banner names the server's robot.
+        const aim = robots.find((r) => r.id === s.follow) ?? robots.find((r) => r.id === 'R1') ?? robots[0]
+        if (aim) {
+          const [x, y, th] = aim.pose
+          s.set({ rubbleAimed: { robot: aim.id, at: Date.now() } })
+          control('director', { do: 'rubble', at: [x + Math.cos(th) * 1.5, y + Math.sin(th) * 1.5] })
+        }
       }
       if (key === 'f' && target) control('director', { do: 'overcurrent', robot: target.id })
       if (key === 'o' && target) control('director', { do: 'overload', robot: target.id })

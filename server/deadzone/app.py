@@ -555,6 +555,9 @@ class Hub:
             if "value" in data and value != data["mode"]:
                 raise PlanError("invalid_mode", "mode and value must agree", 422)
             value = data["mode"]
+        if data.get("action") == "rubble" and "robot" in data:
+            # {t:"control", data:{action:"rubble", robot:"R2"}}: the robot id sits next to action (Rayan's contract)
+            value = {**(value if isinstance(value, dict) else {}), "robot": data["robot"]}
         await self.control(data.get("action"), value, controller_token=data.get("controller_token"))
 
     async def control(self, action, value=None, *, controller_token=None):
@@ -569,6 +572,16 @@ class Hub:
                 raise PlanError("invalid_reset", "Reset value must be a scenario object", 422)
             await self.reset(value)
             return
+        elif action == "rubble":
+            # The R key on the followed robot: {action:"rubble", robot:"R2"}; no robot means R1.
+            # With DZ_SMART_RUBBLE=1 the rubble lands on that robot's path ahead, never trapping anyone.
+            robot = (value or {}).get("robot") if isinstance(value, dict) else None
+            robot = robot or "R1"
+            if robot not in self.sim.robots:
+                raise PlanError("robot_not_found", f"Unknown robot: {robot}", 404)
+            self.sim.press_rubble(None, robot=robot)
+            await self.send_all(self.screens, self.hello())
+            await self.broadcast_tick(force_maps=True)
         elif action == "speed":
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
                 raise PlanError("invalid_speed", "Speed must be a finite positive number", 422)

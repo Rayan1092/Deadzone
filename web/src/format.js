@@ -69,7 +69,8 @@ export function describeEvent(e) {
     case 'rescue_route_blocked': return `Rescuers' route to ${e.survivor} is blocked, no safe path right now`
     case 'rescue_route_reported': return `${e.updated ? 'Updated route' : 'Route'} to ${e.survivor} reached the command post · ${Math.round(e.length_m)} m`
     case 'deadline_miss': return `${e.robot} missed a ${e.task} deadline`
-    case 'rubble_fall': return 'Rubble fell'
+    case 'rubble_fall': return e.cause === 'collapse' ? `Secondary collapse: rubble across ${e.robot ?? 'a robot'}'s path`
+      : e.cause === 'key' ? `Rubble dropped ahead of ${e.robot ?? 'the robot'}` : 'Rubble fell'
     case 'mode_changed': return e.mode === 'baseline'
       ? 'Baseline mode: without Deadzone, robots stop and wait when they lose the link'
       : 'Deadzone on: robots keep exploring in the dark'
@@ -124,4 +125,22 @@ export const FRESH_DELIVERY_S = 6
 export function freshDelivery(survivor, now) {
   const t = survivor?.reported_t
   return typeof t === 'number' && now - t <= FRESH_DELIVERY_S
+}
+
+// Rayan's rubble causes (DZ_SMART_RUBBLE=1): the scripted secondary collapse (no key, sim 162.5 on
+// collapse_01) gets a big alert banner; an R press a smaller one naming the robot it landed in
+// front of. Other rubble (an aftershock's own) has no cause and its own banner. `robot` is the
+// server's (the robot the drop was aimed at), else the robot the screen aimed it at.
+export function rubbleBanner(ev, aimed) {
+  if (ev?.kind !== 'rubble_fall' || !ev.cause) return null
+  const robot = ev.robot ?? aimed ?? null
+  if (ev.cause === 'collapse') {
+    return { title: 'SECONDARY COLLAPSE', sub: robot ? `${robot} blocked` : 'A robot is blocked', tone: 'alert', size: 'major' }
+  }
+  return { title: 'RUBBLE', sub: robot ? `Dropped ahead of ${robot}` : 'Dropped ahead of the robot', tone: 'warn', size: 'minor', ms: 3500 }
+}
+
+export function polyCenter(poly) {
+  if (!poly?.length) return null
+  return [poly.reduce((t, p) => t + p[0], 0) / poly.length, poly.reduce((t, p) => t + p[1], 0) / poly.length]
 }

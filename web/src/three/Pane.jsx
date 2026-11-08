@@ -61,15 +61,16 @@ function Lights({ perf, night }) {
   useFrame(() => {
     const a = useSim.getState().aftershock
     const age = a ? (performance.now() - a.born) / 1000 : Infinity
+    const len = a?.shakeS ?? 5.5
     const lights = [amb.current, hemi.current, sun.current]
     if (!lights.every(Boolean)) return
-    if (age > 5.5) {
+    if (age > len) {
       if (base.current) { lights.forEach((l, i) => { l.intensity = base.current[i] }); base.current = null }
       return
     }
     base.current ??= lights.map((l) => l.intensity)
     const burst = Math.sin(age * 41) + Math.sin(age * 23.7) + Math.sin(age * 7.1)
-    const f = age < 0.4 ? 0.25 : burst > 1.1 ? 0.3 : 1 - 0.25 * Math.max(0, 1 - age / 5.5)
+    const f = age < 0.4 ? 0.25 : burst > 1.1 ? 0.3 : 1 - 0.25 * Math.max(0, 1 - age / len)
     lights.forEach((l, i) => { l.intensity = base.current[i] * f })
   })
   return (

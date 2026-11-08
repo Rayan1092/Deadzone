@@ -229,9 +229,10 @@ export function Shake({ children }) {
     const a = useSim.getState().aftershock
     if (!g) return
     const age = a ? (performance.now() - a.born) / 1000 : Infinity
-    if (age > SHAKE_S) { if (g.position.lengthSq()) g.position.set(0, 0, 0); return }
+    const len = a?.shakeS ?? SHAKE_S // a secondary collapse shakes shorter and softer than an aftershock
+    if (age > len) { if (g.position.lengthSq()) g.position.set(0, 0, 0); return }
     // hits hard in the first half second, then rumbles out; two frequencies so it never loops
-    const k = 0.26 * Math.min(1, age * 3) * (1 - age / SHAKE_S) ** 1.6
+    const k = 0.26 * (a.k ?? 1) * Math.min(1, age * 3) * (1 - age / len) ** 1.6
     const t = age * 40
     g.position.set(Math.sin(t * 1.3) * k + Math.sin(t * 0.37) * k * 0.5, Math.abs(Math.sin(t * 0.9)) * k * 0.35, Math.cos(t * 1.7) * k + Math.cos(t * 0.29) * k * 0.5)
   })
