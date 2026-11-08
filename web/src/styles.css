@@ -401,12 +401,18 @@ button:hover { border-color: var(--teal); }
 .split.single { grid-template-columns: 1fr; }
 .view-btn { padding: 6px 12px; }
 
-/* Command post inset (one view): about a quarter of the screen, bottom right. C swaps it with the main view. */
+/* Command post inset (one view): about a fifth of the screen, bottom right; the top-left corner
+   resizes it (CommandInset.jsx, size per browser). C swaps it with the main view. */
 .pane-view { position: absolute; inset: 0; }
-.cmd-inset { position: absolute; z-index: 4; right: 12px; bottom: 12px; width: 46%; height: 48%; display: flex;
+.cmd-inset { position: absolute; z-index: 4; right: 12px; bottom: 12px; width: 34%; height: 38%; display: flex;
   flex-direction: column; overflow: hidden; border-radius: 14px; border: 1px solid rgba(245,158,11,.45);
   background: #081325; box-shadow: 0 12px 32px rgba(0,0,0,.5), var(--glass-hi); }
-.cmd-inset > div:not(.inset-head):not(.inset-legend) { flex: 1; min-height: 0; }
+.cmd-inset > div:not(.inset-head):not(.inset-legend):not(.inset-resize) { flex: 1; min-height: 0; }
+.inset-resize { position: absolute; z-index: 5; top: 0; left: 0; width: 22px; height: 22px; cursor: nwse-resize; touch-action: none; }
+.inset-resize::before { content: ''; position: absolute; top: 5px; left: 5px; width: 10px; height: 10px; border-radius: 3px 0 0 0;
+  border-top: 2px solid rgba(251,191,36,.85); border-left: 2px solid rgba(251,191,36,.85); }
+.inset-resize:hover::before { border-color: #fde68a; width: 12px; height: 12px; }
+.cmd-inset:not(.big) .inset-head { padding-left: 24px; }
 .inset-head, .view-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 12px; font-size: 15px; color: #fde68a;
   border-bottom: 1px solid rgba(245,158,11,.25); background: rgba(8,19,37,.92); white-space: nowrap; }
 .inset-head b, .view-head b { font-weight: 700; }

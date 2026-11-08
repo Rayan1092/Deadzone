@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
@@ -8,6 +8,7 @@ import Building from './Building'
 import CoverageLayer, { CoverageLegend } from './Coverage'
 import { w2t } from './util'
 import { latestRoutes, lastContact, CONTACT_STALE_S, freshDelivery } from '../format'
+import { clampInset, loadInset, saveInset } from './insetSize'
 
 // One view's Command post inset: what the command post knows, as a top-down blueprint, from
 // delivered data only (tick.command; the floor plan drawn without truth rubble). This is the
@@ -168,10 +169,48 @@ function Known() {
   )
 }
 
+const store = () => { try { return window.localStorage } catch { return null } }
+
+// Drag the top-left corner (the inset sits bottom right) to resize; the size is kept per browser.
+function useInsetSize(box) {
+  const [size, setSize] = useState(() => loadInset(store()))
+  const onPointerDown = (e) => {
+    const el = box.current
+    const pane = el?.parentElement
+    if (!el || !pane || e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    const handle = e.currentTarget
+    handle.setPointerCapture(e.pointerId)
+    const start = { x: e.clientX, y: e.clientY, w: el.offsetWidth, h: el.offsetHeight }
+    const pw = pane.clientWidth
+    const ph = pane.clientHeight
+    let last = null
+    const move = (ev) => {
+      last = clampInset({ w: (start.w + start.x - ev.clientX) / pw, h: (start.h + start.y - ev.clientY) / ph }, pw, ph)
+      setSize(last)
+    }
+    const up = () => {
+      handle.removeEventListener('pointermove', move)
+      handle.removeEventListener('pointerup', up)
+      handle.removeEventListener('pointercancel', up)
+      if (last) saveInset(store(), last)
+    }
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', up)
+    handle.addEventListener('pointercancel', up)
+  }
+  return [size, onPointerDown]
+}
+
 export default function CommandInset({ big = false }) {
   const swap = () => useSim.getState().set({ insetSwap: !useSim.getState().insetSwap })
+  const box = useRef(null)
+  const [size, onResize] = useInsetSize(box)
+  const style = big ? undefined : { width: `${size.w * 100}%`, height: `${size.h * 100}%` }
   return (
-    <div className={`cmd-inset${big ? ' big' : ''}`}>
+    <div ref={box} className={`cmd-inset${big ? ' big' : ''}`} style={style}>
+      {!big && <div className="inset-resize" onPointerDown={onResize} title="Drag to resize" aria-hidden="true" />}
       <div className="inset-head">
         <i className="dot command" />
         <b>Command post</b><span>· knows only what was delivered</span>

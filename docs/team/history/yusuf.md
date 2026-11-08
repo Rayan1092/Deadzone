@@ -3,9 +3,9 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** Save recording button (`p3/save-recording`, this entry, PR next). Then nothing: code freeze at 11:15.
+- **Working on:** `p3/inset-resize-keys` (resizable Command inset, Y/W only with their data), PR next. Then nothing: code freeze moved to 11:40.
 - **Works on main:** everything through #94: 3D world, AI showcase (route replace, B, AI in the scout camera, phone Ask Gemini, spoken G), collapse look, AI Lab (L), night lighting (K), auto-director (D), disaster site and realism pass, Rayan's collapse list steps 1-6 (walls, ceiling, debris, night atmosphere, camera, rover loader), and the 12:20 AM final-stretch list (Rescue Status strip, captions, judge labels, earthquake v2, banners, generic props, exterior shell, N, Shift+A). Dropped: multi-story interior, voice UI, clinic map.
-- **In flight (not merged):** `p3/save-recording`. #195 merged.
+- **In flight (not merged):** `p3/inset-resize-keys`. #195 and #197 (Save recording) merged.
 - **Blocked on / need from others:**
   - **Aziz (contract proposal, please confirm or change before building):** reset value `{seed: <int 1..99999>, timeline: false}` builds the building for that seed with Rayan's `generate(seed)` (about 0.1 s measured), in memory, and resets into it exactly like `{floorplan}` (starts paused, plain reset keeps it). `hello.floorplan` is the generated plan (`id` `gen_<seed>`, name `Generated collapse #<seed>`). Suggest the Sim seed = the building seed so robot runs differ too. `GET /api/scenarios` adds `"generator": true` when this works; my N only sends `seed` when it sees that flag, so nothing breaks before.
   - **Aziz:** the strong aftershock's 2nd and 3rd areas are fixed fractions of the building (`sim.py` `earthquake`), so Shift+A still hits the same two spots every run. Ask: pick them randomly from free floor, at least 2.5 m from survivors and 3 m from the entry and keeping every survivor reachable, seeded from the sim seed plus the requested `at` (the screen now sends a random `at` each press, so a given seed and input still replay the same).
@@ -15,6 +15,12 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Every scene layer reads the floor plan, so any generated building renders with furniture, camera framing and the exterior shell.
 
 ## Log
+### 2026-11-08 11:28 EST · p3/inset-resize-keys · Command inset smaller and resizable; Y and W say nothing only when there is nothing to show
+- **Did:** one view's Command post inset now opens at 34% x 38% of the pane (was 46% x 48%; about 13% of the screen area, measured 653 x 391 at 1920x1080). Drag the amber corner at its top left (it sits bottom right) to resize, kept between 260 x 180 px and 90% x 85% of the pane; the size is stored as fractions in `localStorage` `dz-inset-size` (each browser keeps its own; a bad value or a private window falls back to the default). C still swaps, and swapping back restores the dragged size. Help (H) lists Y only when the server sends a belief map (`maps.belief` or `maps.belief_command`); W without a coverage grid now shows the one-line toast "Coverage data not enabled". Checked in headless Chrome against a separate server on :8014 (practice :8000 untouched): drag 653x391 to 853x511, the same after a reload, C to full screen and back, W toast, help without Y. 103 frontend tests (new: size clamp/load/save, Y filter), web build.
+- **Contract changes:** none.
+- **Heads-up for others:** **Rayan:** if the inset was dragged during practice, the demo laptop remembers that size; to reset it, run `localStorage.removeItem('dz-inset-size')` in the console or drag it back.
+- **Next:** stop at the 11:40 freeze.
+
 ### 2026-11-08 10:43 EST · p3/save-recording · "Save recording" button in the top bar, only with ?record
 - **Did:** with the S key gone (#185) the only way to save a recording was clicking the REC chip, which never said so. With `?record` in the URL (and never otherwise) the top bar now shows the REC status ("REC 03:12 · 4.2 MB") and a **Save recording** button next to it, which downloads `deadzone-<date>-<time>.json.gz` (the same `saveRecording`). Checks in headless Chrome: one Save recording button with `?record`, none without; 87 frontend tests, web build, backend suite green.
 - **Contract changes:** none.
