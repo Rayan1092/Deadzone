@@ -21,6 +21,23 @@ token and cannot claim. They can view state. All planner phones can still plan.
 | POST `/api/leases/release` | `{robot:"R2"}` | same holder token |
 | POST `/api/leases/override` | `{robot:"R2",presenter_token:"..."}` | server-configured presenter credential |
 
+Presenter fleet control also has atomic group operations (same feature gate,
+session header and response):
+
+| Request | JSON body |
+| --- | --- |
+| POST `/api/leases/group/claim` | `{robots:["R1","R2","R3"],name:"Presenter"}` |
+| POST `/api/leases/group/heartbeat` | `{robots:["R1","R2","R3"]}` |
+| POST `/api/leases/group/release` | `{robots:["R1","R2","R3"]}` |
+
+Use a nonempty list of distinct robot IDs (at most 3). Every target must exist.
+Claim succeeds only when every target is free or already held by this session;
+a conflict returns 409 without claiming or renewing any target. Heartbeat needs
+every target's live lease; release permits already-free targets, but neither
+operation changes any target if another target fails authorization. Ordinary
+expiry still applies. These operations never command a robot or take control
+away from another session. Existing single-robot operations are unchanged.
+
 Responses and WS envelope `t:"leases"` contain:
 
 ```json

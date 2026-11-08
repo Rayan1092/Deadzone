@@ -1,5 +1,6 @@
 """Exclusive leases across real REST/WS command paths, including spoofed identities."""
 import asyncio
+from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 import importlib
@@ -222,3 +223,154 @@ def test_reset_waits_for_lease_transaction_before_replacing_world(monkeypatch):
         assert hub.sim.post is not before
 
     asyncio.run(run())
+
+
+def group_change(client, action, token, robots=None, **extra):
+    return client.post(f"/api/leases/group/{action}", headers=headers(token),
+                       json={"robots": robots if robots is not None else ["R1", "R2", "R3"], **extra})
+
+
+def test_group_claim_never_takes_partial_control_or_renews_on_conflict(session):
+    client, hub, now = session
+    with phone(client, "presenter") as (_, presenter), phone(client, "judge") as (_, judge):
+        change(client, "claim", presenter, "R1", name="Presenter").raise_for_status()
+        change(client, "claim", judge, "R3", name="Judge").raise_for_status()
+        before, revision = deepcopy(hub.leases.leases), hub.leases.revision
+        now[0] = 5
+        result = group_change(client, "claim", presenter, name="Presenter")
+        assert result.status_code == 409
+        assert result.json()["detail"]["code"] == "robot_controlled"
+        assert hub.leases.leases == before and hub.leases.revision == revision
+        assert "R2" not in hub.leases.leases
+        assert client.post("/api/control", headers=headers(presenter),
+                           json={"action":"mode", "value":"baseline"}).status_code == 403
+        assert {robot.mode for robot in hub.sim.robots.values()} == {"deadzone"}
+        # Explicit release, then a fresh claim; there is no group takeover.
+        change(client, "release", judge, "R3").raise_for_status()
+        result = group_change(client, "claim", presenter, name=" Presenter ")
+        result.raise_for_status()
+        assert {lease["token"] for lease in hub.leases.leases.values()} == {presenter}
+        assert {lease["name"] for lease in hub.leases.leases.values()} == {"Presenter"}
+        assert {lease["deadline"] for lease in hub.leases.leases.values()} == {20}
+        assert presenter not in result.text and judge not in result.text
+
+
+def test_group_heartbeat_and_release_are_atomic_and_expiry_never_reclaims(session):
+    client, hub, now = session
+    with phone(client, "presenter") as (_, presenter), phone(client, "judge") as (_, judge):
+        group_change(client, "claim", presenter, name="Presenter").raise_for_status()
+        now[0] = 5
+        group_change(client, "heartbeat", presenter).raise_for_status()
+        assert {lease["deadline"] for lease in hub.leases.leases.values()} == {20}
+        change(client, "release", presenter, "R3").raise_for_status()
+        change(client, "claim", judge, "R3", name="Judge").raise_for_status()
+        before, revision = deepcopy(hub.leases.leases), hub.leases.revision
+        now[0] = 10
+        for action in ("heartbeat", "release"):
+            assert group_change(client, action, presenter).status_code == 403
+            assert hub.leases.leases == before and hub.leases.revision == revision
+        now[0] = 20
+        assert group_change(client, "heartbeat", presenter).status_code == 403
+        assert not hub.leases.leases
+        # Release of already-free robots is idempotent, never a reclaim.
+        group_change(client, "release", presenter).raise_for_status()
+        assert not hub.leases.leases
+
+
+def test_overlapping_group_claims_have_one_winner_without_a_split_fleet(session):
+    client, hub, _ = session
+    with phone(client, "a") as (_, a), phone(client, "b") as (_, b):
+        with ThreadPoolExecutor(2) as pool:
+            replies = list(pool.map(lambda token: group_change(client, "claim", token,
+                ["R1", "R2", "R3"] if token == a else ["R3", "R2", "R1"], name="Presenter"), (a, b)))
+        assert sorted(reply.status_code for reply in replies) == [200, 409]
+        assert len(hub.leases.leases) == 3
+        assert len({lease["token"] for lease in hub.leases.leases.values()}) == 1
+
+
+def test_group_heartbeat_does_not_renew_live_targets_when_another_has_expired(session):
+    client, hub, now = session
+    with phone(client) as (_, token):
+        group_change(client, "claim", token, name="Presenter").raise_for_status()
+        now[0] = 5
+        group_change(client, "heartbeat", token, ["R1", "R2"]).raise_for_status()
+        now[0] = 15
+        assert group_change(client, "heartbeat", token).status_code == 403
+        assert "R3" not in hub.leases.leases
+        assert {lease["deadline"] for lease in hub.leases.leases.values()} == {20}
+        group_change(client, "release", token).raise_for_status()
+        assert not hub.leases.leases
+
+
+@pytest.mark.parametrize("action", ["claim", "heartbeat", "release"])
+def test_group_unknown_robot_and_forged_sessions_leave_existing_grants_unchanged(session, action):
+    client, hub, _ = session
+    with phone(client) as (_, token):
+        group_change(client, "claim", token, name="Presenter").raise_for_status()
+        before, revision = deepcopy(hub.leases.leases), hub.leases.revision
+        extra = {"name":"Presenter"} if action == "claim" else {}
+        assert group_change(client, action, token, ["R1", "R9"], **extra).status_code == 404
+        for forged in (None, "forged"):
+            assert group_change(client, action, forged, **extra).status_code == 403
+        assert hub.leases.leases == before and hub.leases.revision == revision
+
+
+@pytest.mark.parametrize("body", [
+    {"robots":[], "name":"Presenter"},
+    {"robots":["R1", "R1"], "name":"Presenter"},
+    {"robots":["R1", "R2", "R3", "R4"], "name":"Presenter"},
+    {"robots":["R1"], "name":"   "},
+    {"robots":["R1"], "name":"Presenter", "force":True},
+])
+def test_invalid_group_input_cannot_mutate_leases(session, body):
+    client, hub, _ = session
+    with phone(client) as (_, token):
+        assert client.post("/api/leases/group/claim", headers=headers(token), json=body).status_code == 422
+        assert not hub.leases.leases
+
+
+def test_presenter_group_enables_screen_b_and_u_only_until_release_or_reset(session):
+    client, hub, _ = session
+    with client.websocket_connect("/ws/screen") as screen:
+        token = screen.receive_json()["data"]["controller_token"]
+        for _ in range(3):
+            screen.receive_json()
+        group_change(client, "claim", token, name="Presenter").raise_for_status()
+        leases = screen.receive_json()
+        assert leases["t"] == "leases" and token not in json.dumps(leases)
+        screen.send_json({"t":"control", "data":{"action":"mode", "mode":"baseline", "controller_token":token}})
+        assert screen.receive_json()["data"]["mode"] == "baseline"
+        assert {robot.mode for robot in hub.sim.robots.values()} == {"baseline"}
+        screen.send_json({"t":"control", "data":{"action":"director", "value":{"do":"resume", "robot":"R2"},
+                                                     "controller_token":token}})
+        assert screen.receive_json()["t"] == "control"
+        assert len(hub.sim.network.queues["CMD"]) == 1  # queued, not a delivered robot acknowledgement
+        group_change(client, "release", token).raise_for_status()
+        assert screen.receive_json()["t"] == "leases"
+        screen.send_json({"t":"control", "data":{"action":"mode", "value":"deadzone", "controller_token":token}})
+        assert screen.receive_json()["data"]["code"] == "lease_required"
+        assert {robot.mode for robot in hub.sim.robots.values()} == {"baseline"}
+        group_change(client, "claim", token, name="Presenter").raise_for_status()
+        assert screen.receive_json()["t"] == "leases"
+        client.post("/api/control", json={"action":"reset"}).raise_for_status()
+        assert not hub.leases.leases
+        assert group_change(client, "heartbeat", token).status_code == 403
+        # Reset preserves this connection's identity, but requires explicit reclaim.
+        group_change(client, "claim", token, name="Presenter").raise_for_status()
+    deadline = time.monotonic() + 2
+    while client.get("/api/leases").json()["robots"][0]["controller"] is not None:
+        assert time.monotonic() < deadline
+    assert not hub.leases.leases
+
+
+def test_group_operations_keep_feature_gate_and_spectator_limits(session, monkeypatch):
+    client, hub, _ = session
+    with phone(client, role="spectator") as (_, token):
+        assert token is None
+        assert group_change(client, "claim", token, name="Spectator").status_code == 403
+    monkeypatch.setenv("DZ_VOICE", "0")
+    monkeypatch.setenv("DZ_CONTROL_LEASES", "0")
+    for action in ("claim", "heartbeat", "release"):
+        extra = {"name":"Presenter"} if action == "claim" else {}
+        assert group_change(client, action, None, **extra).status_code == 409
+    assert not hub.leases.leases

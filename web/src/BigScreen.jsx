@@ -8,6 +8,8 @@ import Timeline from './panels/Timeline'
 import ReportPanel from './panels/ReportPanel'
 import AILab from './panels/AILab'
 import Intro from './panels/Intro'
+import JudgeTest from './panels/JudgeTest'
+import UnderHood from './panels/UnderHood'
 import { DirectorChip, useDirector } from './panels/Director'
 import { ReplayLoader } from './panels/ReplayPanel'
 import { REPLAY } from './net/replay'
@@ -40,6 +42,8 @@ export default function BigScreen() {
       <ReplayLoader />
       <HelpOverlay />
       <AILab />
+      <JudgeTest />
+      <UnderHood />
       <Intro />
     </div>
   )

@@ -53,6 +53,11 @@ class DTNNetwork:
         self._wire = {}
         self._rng = random.Random(seed)  # never perturb robot/sim randomness
         self.codec = None
+        self.counters = {"bundles_created": 0, "hop_transfers": 0, "bytes_transmitted": 0,
+                         "transport_delivered": 0, "bundles_expired": 0, "bundles_evicted": 0,
+                         "bundles_destroyed": 0, "custody_refusals": 0, "corrupted_bytes": 0,
+                         "corrected_bytes": 0, "fec_failed_blocks": 0}
+        self._counted = {}
         if fec_enabled:
             from .fec import PayloadCodec
             self.codec = PayloadCodec()
@@ -68,7 +73,9 @@ class DTNNetwork:
             self.non_forwarding.add(node)
 
     def _expire(self, now):
+        self._counted = {bid: expiry for bid, expiry in self._counted.items() if now <= expiry}
         for node, queue in self.queues.items():
+            self.counters["bundles_expired"] += len({b["bid"] for b in queue if now > b["created"] + b["ttl"]})
             bids = set()
             kept = []
             for b in queue:
@@ -126,6 +133,7 @@ class DTNNetwork:
             if needed > 0:
                 return False
         if evict:
+            self.counters["bundles_evicted"] += len(evict)
             queue[:] = [b for b in queue if b["bid"] not in evict]
             for dropped in evict:
                 self._seen[node].pop(dropped, None)
@@ -143,6 +151,10 @@ class DTNNetwork:
         """
         self._expire(now)  # expiry must also run while completely disconnected
         candidates = [(node, b) for node in sorted(self.queues) for b in self.queues[node]]
+        for node, bundle in candidates:
+            if node == bundle["src"] and bundle["bid"] not in self._counted:
+                self.counters["bundles_created"] += 1
+                self._counted[bundle["bid"]] = bundle["created"] + bundle["ttl"]
         candidates.sort(key=lambda item: (*_order(item[1]), item[0]))
         budgets, progress, routes, wire = {}, {}, {}, {}
         self.link_stats = {}  # counters describe this transport tick, not snapshot calls
@@ -183,6 +195,7 @@ class DTNNetwork:
             elif frame is not None:
                 sent = 0  # changed coding mode: restart the hop
             amount = min(size - sent, budgets[edge])
+            self.counters["bytes_transmitted"] += amount
             sent += amount
             budgets[edge] -= amount
             if sent + 1e-9 < size:
@@ -206,25 +219,32 @@ class DTNNetwork:
                 stats["corrected_bytes"] += corrected
                 received = dict(bundle, payload=payload)  # deliver decoded bytes, never the original object
             if self._accept(receiver, received):
+                self.counters["hop_transfers"] += 1
                 # The receiver's successful custody ack is the ONLY place a
                 # transmitted bundle is removed from the sender's outbox.
                 self.queues[sender][:] = [b for b in self.queues[sender]
                                          if b["bid"] != bundle["bid"]]
                 self._seen[sender][bundle["bid"]] = bundle["created"] + bundle["ttl"]
+            else:
+                self.counters["custody_refusals"] += 1
         self._progress = progress  # drop partial hops interrupted by link/route changes
         self._wire = wire
+        for key in ("corrupted_bytes", "corrected_bytes", "fec_failed_blocks"):
+            self.counters[key] += sum(stats[key] for stats in self.link_stats.values())
         delivered = []
         for node, queue in self.queues.items():
             for b in queue:
                 if b["dst"] == node and b["bid"] not in self._delivered:
                     self._delivered[b["bid"]] = b["created"] + b["ttl"]
                     delivered.append(b)
+                    self.counters["transport_delivered"] += 1
             queue[:] = [b for b in queue if b["dst"] != node]
         return delivered
 
     def destroy(self, node):
         """Permanent physical loss; only this custodian's stored bundles are lost."""
         lost = len(self.queues[node])
+        self.counters["bundles_destroyed"] += lost
         self.queues[node].clear()
         self.disabled.add(node)
         self._seen[node].clear()
