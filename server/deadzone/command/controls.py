@@ -52,8 +52,14 @@ class ResumeControl(Model):
     robot: Identifier
 
 
+class AftershockControl(Model):
+    type: Literal["aftershock"]
+    at: Point | None = None
+    relay: Identifier | None = None
+
+
 DirectorRequest = Annotated[
-    RubbleFault | OvercurrentFault | OverloadControl | ResumeControl,
+    RubbleFault | OvercurrentFault | OverloadControl | ResumeControl | AftershockControl,
     Field(discriminator="type"),
 ]
 director_adapter = TypeAdapter(DirectorRequest)

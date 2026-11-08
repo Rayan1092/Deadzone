@@ -46,6 +46,7 @@ class DTNNetwork:
         self._delivered = {}  # bid -> expiry (destination dedupe)
         self._progress = {}   # (sender, receiver, bid) -> bytes transmitted
         self.non_forwarding = set()
+        self.disabled = set()
 
     def register(self, node, outbox=None, capacity_bytes=None, can_forward=True):
         """Attach an existing robot outbox, or create a relay/command queue."""
@@ -96,6 +97,8 @@ class DTNNetwork:
 
     def _accept(self, node, bundle):
         """Return a custody ack only after storage, or for an already stored bid."""
+        if node in self.disabled:
+            return False
         bid = bundle["bid"]
         queue = self.queues[node]
         if bid in self._seen[node] or any(b["bid"] == bid for b in queue):
@@ -134,13 +137,15 @@ class DTNNetwork:
         candidates.sort(key=lambda item: (*_order(item[1]), item[0]))
         budgets, progress, routes = {}, {}, {}
         for sender, bundle in candidates:
+            if sender in self.disabled:
+                continue
             if bundle["dst"] == sender:
                 continue
             if not any(b is bundle for b in self.queues[sender]):
                 continue  # another transfer may have evicted this queued bundle
             # Do not revisit a previous custodian, whose receipt would otherwise
             # acknowledge a copy it already forwarded. Wait for a loop-free route.
-            avoid = set(bundle["hops"][:-1]) | (self.non_forwarding - {sender, bundle["dst"]})
+            avoid = set(bundle["hops"][:-1]) | (self.non_forwarding - {sender, bundle["dst"]}) | self.disabled
             route_key = sender, bundle["dst"], tuple(sorted(avoid))
             if route_key not in routes:
                 routes[route_key] = links.path(sender, bundle["dst"], avoid=route_key[2])
@@ -176,3 +181,12 @@ class DTNNetwork:
                     delivered.append(b)
             queue[:] = [b for b in queue if b["dst"] != node]
         return delivered
+
+    def destroy(self, node):
+        """Permanent physical loss; only this custodian's stored bundles are lost."""
+        lost = len(self.queues[node])
+        self.queues[node].clear()
+        self.disabled.add(node)
+        self._seen[node].clear()
+        self._progress = {key: value for key, value in self._progress.items() if node not in key[:2]}
+        return lost
