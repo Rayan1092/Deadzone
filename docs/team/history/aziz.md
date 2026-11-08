@@ -4,13 +4,21 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** batch 5 p2/global-no-go (moved before 4 to fix the traced phone bug), ready for PR. Main 47805df includes camera #115, Rayan escape #116 and Yusuf phone controls/defaults #112. Full backend 535 passed / 1 skipped (117.97 s); 10 focused no-go cases passed. Traffic/stream is the one remaining batch PR.
+- **Working on:** batch 5 p2/global-no-go (moved before 4 to fix the traced phone bug), ready for PR. Main 123c32d includes camera #115, Rayan escape #116, Yusuf phone controls/defaults #112 and display-only belief #117. Full backend 540 passed / 1 skipped (127.81 s); 10 focused no-go cases passed. Traffic/stream is the one remaining batch PR.
 - **Completed:** #108 hard bodies, #111 shelf physics and #115 delivered phone camera merged/confirmed; old branches deleted. All experiment behavior remains default off until testing-laptop dry runs. No robot/web source edited by Aziz.
 - **No-go contract / works:** DZ_GLOBAL_NO_GO=1 at PlanManager/SafetyChecker construction. Every deployed ID from robot_specs receives the full shared no_go list via normal priority-1 DTN plan bundles, filtered zones (possibly empty), including clearing old exclusions. ID immutability/idempotence and safety recheck remain intact. A delivered start inside a new responder exclusion may BFS over non-occupied/non-static-hazard cells to the nearest allowed start in Rayan's 6 m coordinate window; full exit distance counts toward energy. Goals/home stay strict. No live pose/battery/map use and no direct robot mask changes. Flag off preserves old behavior. No-go-only drafts still need a zone to dispatch, as Yusuf's card explains.
 - **Trace evidence:** exact 80-sim-second room replay: no robot enters the exclusion, including unassigned R2/R3. Real-building R3 delivered pose (3.8,10) inside the new area now passes the route estimate. DTN application and later clearing confirmed on all 3 robots; static wall/hazard/home rejection, extra energy, default recipient behavior and Command-only boundary covered.
 - **Coordination:** Rayan owns physical escape (now main #116), Yusuf owns zone defaults/card (now #112). Prior save-order fix is defensive, not the demonstrated root cause. Camera backend ages the producer's supplied t; true capture timestamp preservation is a producer follow-up. Actual shelf footprints are Rayan/Yusuf's work; Gemini key remains deferred.
 
 ## Log
+
+### 2026-11-08 PT - p2/global-no-go - Combined belief/no-go validation green
+- **Did:** final source combination on main 123c32d passed the full backend after belief integration; no-go source unchanged from the focused trace replay.
+- **Contract changes:** none; DZ_GLOBAL_NO_GO remains default off and no new belief wire fields are claimed.
+- **Validation:** 540 backend passed / 1 opt-in skipped (127.81 s), including fixed seed-7 guard; exact 80 s no-go replay and delivered inside-start checks remain green.
+- **Heads-up for others:** no robot/web/data source edited; existing scope/ownership disclosure in #118 remains accurate.
+- **Next:** merge/confirm #118 and delete its branch, then the last batch PR for traffic/stream.
+
 
 ### 2026-11-08 PT - p2/global-no-go - Integrate belief main before no-go merge
 - **Did:** #118 opened with 535 backend passed/1 skipped; main advanced with Rayan's display-only belief PR #117 during creation. Integrated main 123c32d without editing his robot/data source; combined backend/guard rerun before merge.
