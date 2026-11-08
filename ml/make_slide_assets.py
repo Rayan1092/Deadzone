@@ -339,8 +339,7 @@ def gradcam_strip():
         shows = c.get("shows") or c.get("object") or ""
         if shows:
             import textwrap
-            bottom.set_xlabel("
-".join(textwrap.wrap(str(shows), 26)[:2]), color=MUTED, fontsize=8.5)
+            bottom.set_xlabel("\n".join(textwrap.wrap(str(shows), 26)[:2]), color=MUTED, fontsize=8.5)
     for ax in axes.flat:
         ax.set_xticks([])
         ax.set_yticks([])
