@@ -242,6 +242,8 @@ class Robot:
         self._cmd_zone_id = None
         self.explorer = (ProgressExplorer((h, w), cell)
                          if os.environ.get("DZ_EXPLORATION_V2") == "1" else None)
+        self.sensor_view = os.environ.get("DZ_SENSOR_VIEW") == "1"
+        self.camera_frame = None
 
     # ------------------------------------------------------------------ mode toggle
     def set_mode(self, mode):
@@ -559,6 +561,16 @@ class Robot:
         hits = io.thermal()
         kept = filter_hits(hits)
         kept_ids = {h["id"] for h in kept}
+        if self.sensor_view:
+            detector = get_detector()
+            observations = []
+            for hit in hits:
+                score = detector.score(hit.get("crop"))
+                observations.append({
+                    "id": hit["id"], "pos": list(hit["pos"]), "crop": hit.get("crop"),
+                    "verdict": "person" if hit["id"] in kept_ids else "rejected",
+                    "conf": score, "source": "model" if score is not None else "sim"})
+            self.camera_frame = {"t": self.t, "pose": list(self.pose), "hits": observations}
         for h in hits:
             if h["id"] in kept_ids or h["id"] in self.rejected:
                 continue
