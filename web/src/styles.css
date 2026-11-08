@@ -565,6 +565,15 @@ button:hover { border-color: var(--teal); }
 .banner.alert b { color: #fecaca; text-shadow: 0 0 24px rgba(239,68,68,.8); animation: banner-flash .18s steps(2) 8; }
 .banner.info { border-color: rgba(45,212,191,.5); }
 .banner.info b { color: #99f6e4; }
+/* Secondary collapse (scripted, no key): bigger than AFTERSHOCK's 48 px; an R press: smaller, amber */
+.banner.major { padding: 22px 40px; gap: 10px; }
+.banner.major b { font-size: 60px; white-space: nowrap; }
+.banner.major span { font-size: 22px; font-weight: 600; color: #fecaca; }
+.banner.minor { padding: 12px 22px; gap: 4px; top: 30%; }
+.banner.minor b { font-size: 28px; letter-spacing: .12em; }
+.banner.minor span { font-size: 15px; }
+.banner.warn { border-color: rgba(245,158,11,.55); }
+.banner.warn b { color: #fde68a; }
 @keyframes banner-in { from { opacity: 0; transform: translate(-50%, -50%) scale(1.12); } }
 @keyframes banner-out { to { opacity: 0; } }
 @keyframes banner-flash { 50% { opacity: .35; } }

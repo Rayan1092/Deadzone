@@ -3,6 +3,7 @@ import { useRef } from 'react'
 import { alarm, chime, confirm, ping, rumble } from './audio'
 import { lostFleet, newerTable } from './net/leaseState'
 import { pushTraffic, resetTraffic } from './net/traffic'
+import { polyCenter, rubbleBanner } from './format'
 
 // Events worth a toast on the big screen. replan, deadline_miss and deliveries
 // fire too often and stay in the sidebar feed or the timeline.
@@ -93,7 +94,8 @@ export const useSim = create((set) => ({
   eyeFocus: null,      // the hot spot the onboard classifier just judged: { kind, subject, robot, pos, conf, linked, born }
   mode: null,          // 'deadzone' | 'baseline' | 'mixed' from hello/control (Rayan's baseline mode)
   aftershock: null,    // { at, born, rubble } of the latest aftershock, for the shake, slabs and dust
-  banner: null,        // { title, sub, tone, at }: AFTERSHOCK / NEW SCENARIO over the main view
+  banner: null,        // { title, sub, tone, size, ms, at }: AFTERSHOCK / NEW SCENARIO / SECONDARY COLLAPSE / RUBBLE over the main view
+  rubbleAimed: null,   // { robot, at }: the robot the last R press was aimed at (banner fallback)
   traffic: false,      // network traffic events seen (DZ_NETWORK_TRAFFIC): packets and live line widths
   leases: null,        // public control-lease table (DZ_CONTROL_LEASES=1): { enabled, revision, robots: [{ robot, controller }] }
   presenter: { held: false, robots: [], pending: false }, // this screen's own fleet claim (net/presenter.js)
@@ -232,6 +234,16 @@ export function handleMessage(msg) {
           s.events[0].time === time) break
       // eid, not id: some events (relay_dropped) carry their own id field
       const ev = { ...data, time, eid: ++eventId }
+      // an R press's rubble_fall carries no robot (the server's rubble_pressed right after does):
+      // name the robot the press was aimed at, and correct the banner if the server credits another
+      const aimed = s.rubbleAimed && Date.now() - s.rubbleAimed.at < 5000 ? s.rubbleAimed.robot : null
+      if (ev.kind === 'rubble_fall' && ev.cause === 'key' && !ev.robot && aimed) ev.robot = aimed
+      if (ev.kind === 'rubble_pressed') {
+        if (ev.robot && s.banner?.title === 'RUBBLE' && Date.now() - s.banner.at < 2000 && s.banner.sub !== `Dropped ahead of ${ev.robot}`) {
+          s.set({ banner: { ...s.banner, sub: `Dropped ahead of ${ev.robot}${ev.smart ? ', on its path' : ''}` } })
+        }
+        break // the rubble_fall line already says it
+      }
       // a second route for the same survivor is a replan, not a new rescue
       if ((ev.kind === 'rescue_route' || ev.kind === 'rescue_route_reported') &&
           s.events.some((e) => e.kind === ev.kind && e.survivor === ev.survivor)) ev.updated = true
@@ -250,6 +262,15 @@ export function handleMessage(msg) {
           banner: { title: 'AFTERSHOCK', tone: 'alert', at: Date.now(),
             sub: ev.destroyed_relay ? `Part of the building came down · relay ${ev.destroyed_relay} crushed · robots rerouting` : 'Part of the building came down · robots rerouting' } })
         rumble(5) // only audible after a user gesture (the A key counts)
+      }
+      // Rayan's secondary collapse (no key) and R presses: a banner naming the robot; the collapse
+      // also brings a short shake with slabs and dust where it came down (Reality only)
+      const rb = rubbleBanner(ev, aimed)
+      if (rb) {
+        const at = polyCenter(ev.poly)
+        s.set({ banner: { ...rb, at: Date.now() },
+          ...(rb.size === 'major' && at ? { aftershock: { at, born: performance.now(), rubble: [], shakeS: 1.8, k: 0.5 } } : {}) })
+        if (rb.size === 'major') rumble(2)
       }
       // sound cues (X turns them off): news only, a repeat sighting stays quiet
       if (ev.kind === 'survivor_found' && !repeat) ping()
