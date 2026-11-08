@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/collapse`: items 4 (collapse look) and 5 (AI Lab, key L) done. Next: 6 asset pack (waits on Rayan), 7 lighting, 8 auto-director.
+- **Working on:** `p3/collapse`: items 4, 5, 7, 8 done (collapse look, AI Lab L, night lighting K, auto-director D). Item 6 asset pack waits on Rayan's pack. Next: 9 multi-story shell, 10 scheduler strip, voice UI when Aziz's `/api/voice` lands.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,22 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 06:50 · p3/collapse · Items 7 + 8: night operations lighting (K), auto-director camera (D)
+- **Did:**
+  - **K, night operations** (off by default until a dry run, remembered per browser, "Night ops" chip):
+    - Sun, sky and environment drop to a weak cold moon. The truck mast gets a flood light aimed through the entrance, with a visible beam.
+    - Amber strobes on tripods stand against walls (by the truck, the corridor, the warehouse).
+    - Robot headlights become the main light, with soft beams. Lit fluorescent fittings flicker and cast light with a downward shaft.
+    - Light film grain and a deeper vignette. Light shafts are additive fading cones, so the airborne dust reads as lit.
+  - **D, auto-director** (off by default; caption "Auto camera · …" at the bottom):
+    - `link_lost`, `survivor_found` and `fault` cut to a close follow shot of that robot for 9 s. `survivor_reported` (the reveal), `aftershock` and a rerouted `rescue_route_reported` cut to the wide shot.
+    - No cut sooner than 4 s unless the news is bigger. After 12 s quiet, a slow orbit.
+    - Dragging a view, the wheel or a 0–9 key hands the camera back to the presenter for 20 s.
+  - **Tested live at 4x:** the director cut to the wide shot on "S3 reached the command post", then to a close follow on "Scout 1 lost its link, still searching". Night mode checked from the overview: robots and labels stay readable. About 37 fps day or night with the robot camera open.
+- **Contract changes:** none. New keys K and D.
+- **Heads-up for others:** Rayan: try K and D in the dry run. D is a hands-free option for the demo video. Item 6 (asset pack) is still waiting on your pack; until then the built-in models and textures stay (as in the cut order).
+- **Next:** 9 multi-story shell, 10 scheduler strip.
 
 ### 2026-11-08 06:10 · p3/collapse · Item 5: AI Lab overlay (key L)
 - **Did:** glass overlay on **L** (Esc closes).

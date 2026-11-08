@@ -399,3 +399,11 @@ button:hover { border-color: var(--teal); }
 .lab-grid figcaption { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.35; }
 .lab-grid figcaption b { display: block; color: var(--text, #e6edf3); font-weight: 600; }
 .lab-grid figure.wrong img { outline: 2px solid #d97706; }
+
+/* auto-director caption (D) */
+.director-chip { position: absolute; z-index: 5; left: 50%; bottom: 52px; transform: translateX(-50%); display: flex; align-items: center;
+  gap: 8px; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; white-space: nowrap; pointer-events: none;
+  background: var(--glass-strong); border: 1px solid var(--glass-edge); box-shadow: 0 8px 24px rgba(0,0,0,.4), var(--glass-hi);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+.director-chip i { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: eye-wait 1.4s ease-in-out infinite; }
+.director-chip span { font-weight: 500; color: rgba(230,237,243,.85); }

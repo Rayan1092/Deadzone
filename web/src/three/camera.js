@@ -28,8 +28,10 @@ export function fitOverview(camera, aspect) {
 
 const CHASE = new THREE.Vector3(0, 17, 12) // follow offset: above and south of the robot
 
-export function followRobot(rid) {
-  shared.pos.copy(shared.target).add(CHASE)
+export const CLOSE = new THREE.Vector3(0, 6.5, 7) // auto-director close shot
+
+export function followRobot(rid, offset = CHASE) {
+  shared.pos.copy(shared.target).add(offset)
   shared.src = null
   shared.rev++
   useSim.getState().set({ follow: rid })
@@ -52,4 +54,13 @@ export function resetOverview() {
   shared.src = null
   shared.rev++
   useSim.getState().set({ follow: null })
+}
+
+// Auto-director idle shot: swing slowly around the building.
+const UP = new THREE.Vector3(0, 1, 0)
+export function orbit(angle) {
+  if (useSim.getState().follow) return
+  shared.pos.sub(shared.target).applyAxisAngle(UP, angle).add(shared.target)
+  shared.src = null
+  shared.rev++
 }

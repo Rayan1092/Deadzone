@@ -2,6 +2,8 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { WALL_H, w2t } from './util'
+import { useSim } from '../store'
+import { LightBeam } from './NightLights'
 import { materials, tiledSet } from './textures'
 
 // Collapse damage on the Reality world, all derived from the floorplan so a generated
@@ -271,10 +273,14 @@ function Beams({ rooms }) {
 function Fixture({ at, lit, phase, M }) {
   const g = useRef()
   const lamp = useRef()
+  const glow = useRef()
+  const night = useSim((s) => s.night)
   useFrame(({ clock }) => {
     const t = clock.elapsedTime + phase
     if (g.current) g.current.rotation.z = Math.sin(t * 0.9) * 0.08
-    if (lamp.current && lit) lamp.current.material.emissiveIntensity = Math.sin(t * 23) > 0.85 || Math.sin(t * 3.1) > 0.97 ? 0.2 : 1.6
+    const off = Math.sin(t * 23) > 0.85 || Math.sin(t * 3.1) > 0.97
+    if (lamp.current && lit) lamp.current.material.emissiveIntensity = off ? 0.2 : 1.6
+    if (glow.current) glow.current.intensity = off ? 0.3 : 6
   })
   const drop = 0.9
   return (
@@ -286,6 +292,12 @@ function Fixture({ at, lit, phase, M }) {
           <cylinderGeometry args={[0.025, 0.025, 1.12, 8]} />
         </mesh>
       </group>
+      {night && lit && (
+        <>
+          <pointLight ref={glow} position={[0, -drop - 0.2, 0]} color="#e6f4ff" distance={6} decay={1.6} />
+          <group position={[0, -drop - 0.05, 0]}><LightBeam length={WALL_H - 0.4} radius={1.1} color="#e8f6ff" opacity={0.1} /></group>
+        </>
+      )}
     </group>
   )
 }
