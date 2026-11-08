@@ -61,6 +61,7 @@ class Hub:
         self.relay_power_requests = {}
         self.next_phone_id = 1
         self.seq = 0
+        self.plan_lock = asyncio.Lock()  # survives reset: old publications finish first
         self._init_plans()
 
     def _init_plans(self):
@@ -145,7 +146,20 @@ class Hub:
         await self.send_all(self.phones, message)
         await self.send_all(self.screens, message)
 
+    async def save_plan(self, plan, check=True):
+        async with self.plan_lock:
+            state = self.plans.save(plan)
+            self.plan_sync.invalidate(plan.plan_id)
+            await self.plan_state(state)
+            if check:
+                return await self._check_plan(plan.plan_id)
+            return {"saved": True, "plan_id": plan.plan_id, "checked": False}
+
     async def dispatch(self, plan_id):
+        async with self.plan_lock:
+            return await self._dispatch(plan_id)
+
+    async def _dispatch(self, plan_id):
         self.plan_sync.assert_valid(plan_id)
         was_dispatched = plan_id in self.plans.dispatched
         result = self.plans.dispatch(plan_id)
@@ -165,6 +179,10 @@ class Hub:
             "map": base64.b64encode(self.sim.post.map.tobytes()).decode()}
 
     async def check_plan(self, plan_id):
+        async with self.plan_lock:
+            return await self._check_plan(plan_id)
+
+    async def _check_plan(self, plan_id):
         self.plan_sync.assert_valid(plan_id)
         result = self.plans.check(plan_id)
         await self.send_all(self.phones, self.envelope("safety", result))
@@ -196,9 +214,7 @@ class Hub:
             raise PlanError("read_only_role", "Relay sessions cannot edit or submit search plans", 403)
         if kind == "plan_edit":
             plan = SearchPlan.model_validate({**data, "author": client})
-            state = self.plans.save(plan)
-            self.plan_sync.invalidate(plan.plan_id)
-            await self.plan_state(state)
+            await self.save_plan(plan, check=False)
         elif kind == "plan_submit":
             ref = PlanRef.model_validate(data)
             await self.check_plan(ref.plan_id)
@@ -215,23 +231,8 @@ class Hub:
         for ev in self.sim.drain_events():
             await self.send_all(self.screens, self.envelope("event", ev))
 
-    async def control_message(self, data):
-        """Normalize the board's mode alias identically on REST and WebSocket."""
-        value = data.get("value")
-        if data.get("action") == "mode" and "mode" in data:
-            if "value" in data and value != data["mode"]:
-                raise PlanError("invalid_mode", "mode and value must agree", 422)
-            value = data["mode"]
-        await self.control(data.get("action"), value)
-
-    async def control(self, action, value=None):
-        if action == "start":
-            self.running = True
-        elif action == "pause":
-            self.running = False
-        elif action == "toggle":
-            self.running = not self.running
-        elif action == "reset":
+    async def reset(self):
+        async with self.plan_lock:
             self.running = False
             self.sim.reset()
             self.sim.tick()
@@ -250,6 +251,26 @@ class Hub:
                 except (RuntimeError, WebSocketDisconnect):
                     await self.disconnect_phone(ws, notify=False)
             await self.broadcast_tick(force_maps=True)
+            return
+
+    async def control_message(self, data):
+        """Normalize the board's mode alias identically on REST and WebSocket."""
+        value = data.get("value")
+        if data.get("action") == "mode" and "mode" in data:
+            if "value" in data and value != data["mode"]:
+                raise PlanError("invalid_mode", "mode and value must agree", 422)
+            value = data["mode"]
+        await self.control(data.get("action"), value)
+
+    async def control(self, action, value=None):
+        if action == "start":
+            self.running = True
+        elif action == "pause":
+            self.running = False
+        elif action == "toggle":
+            self.running = not self.running
+        elif action == "reset":
+            await self.reset()
             return
         elif action == "speed":
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
@@ -369,12 +390,7 @@ def floorplan():
 
 @app.post("/api/plan")
 async def save_plan(plan: SearchPlan, check: bool = True):
-    state = hub.plans.save(plan)
-    hub.plan_sync.invalidate(plan.plan_id)
-    await hub.plan_state(state)
-    if not check:
-        return {"saved": True, "plan_id": plan.plan_id, "checked": False}
-    return await hub.check_plan(plan.plan_id)
+    return await hub.save_plan(plan, check=check)
 
 
 def require_plan_sync():
@@ -383,6 +399,7 @@ def require_plan_sync():
 
 
 async def publish_sync(state):
+    # Callers hold hub.plan_lock across mutation and the complete publication.
     planners = {ws for ws, (_, role) in hub.phone_sessions.items() if role == "planner"}
     await hub.send_all(planners, hub.envelope("plan_sync", state))
     if state["valid"]:
@@ -393,11 +410,12 @@ async def publish_sync(state):
 @app.put("/api/plan-sync")
 async def seed_sync(plan: SearchPlan):
     require_plan_sync()
-    return await publish_sync(hub.plan_sync.seed(plan))
+    async with hub.plan_lock:
+        return await publish_sync(hub.plan_sync.seed(plan))
 
 
 @app.get("/api/plan-sync")
-def read_sync(plan_id: str):
+async def read_sync(plan_id: str):
     require_plan_sync()
     return hub.plan_sync.state(PlanRef(plan_id=plan_id).plan_id)
 
@@ -405,7 +423,8 @@ def read_sync(plan_id: str):
 @app.post("/api/plan-sync")
 async def merge_sync(batch: MergeBatch):
     require_plan_sync()
-    return await publish_sync(hub.plan_sync.merge(batch))
+    async with hub.plan_lock:
+        return await publish_sync(hub.plan_sync.merge(batch))
 
 
 @app.post("/api/dispatch")

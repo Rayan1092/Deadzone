@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "seed": 7,
+  "robots": 3,
+  "simulated_s": 90.0,
+  "wall_s": 3.39,
+  "detector": "model",
+  "fec_enabled": true,
+  "coded_attempt_ticks": 14,
+  "survivors_reported": [
+    "S3"
+  ],
+  "delivered_bundles": 510,
+  "corrupted_bytes": 77,
+  "corrected_bytes": 77,
+  "fec_failed_blocks": 0,
+  "note": "Enabled-feature simulation check; not a demo-timing or 10x performance pass"
+}

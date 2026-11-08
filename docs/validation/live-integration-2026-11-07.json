@@ -1,0 +1,18 @@
+{
+  "ok": true,
+  "url": "http://127.0.0.1:8017",
+  "detector": "model",
+  "gemini": "disabled; no key used",
+  "logical_phone_clients": 2,
+  "demo_sim_s_observed": 20.0,
+  "checks": [
+    "built screen/phone HTML and referenced assets served",
+    "trained detector and independent Command-only phone handshakes",
+    "concurrent queued offline operations converge and survive two reconnects",
+    "quiet preload, explicit safety rejection, fixed-plan dispatch",
+    "real model S3 report, crop and Grad-CAM asset delivered through live simulation",
+    "mode aliases, live relay placement, aftershock geometry/destruction and no revival",
+    "honest local G/Ask fallback and delivered rescue-order list (no Gemini API call)",
+    "reset clears live clients/drafts and rejects stale offline epoch"
+  ]
+}
