@@ -12,6 +12,7 @@ import PlanZones from './PlanZones'
 import { COLORS } from './util'
 import { useSim } from '../store'
 import { fitOverview, shared } from './camera'
+import BeliefLayer from './Belief'
 import DetectionCards from '../panels/DetectionCards'
 import RobotEye from './RobotEye'
 import CommandInset from './CommandInset'
@@ -235,7 +236,7 @@ const PULSE_MS = 900
 function commandSignature(s) {
   const c = s.tick?.command
   return [c ? c.robots.map((r) => r.last_seen).join(',') : '', c?.survivors.length, c?.routes?.length, c?.relays.length, c?.faults?.length,
-    s.maps.commandVersion, shared.rev, s.floorplan, s.night, s.follow, s.showTruth].join('|')
+    s.maps.commandVersion, shared.rev, s.floorplan, s.night, s.follow, s.showTruth, s.beliefOn].join('|')
 }
 function CommandRedraw() {
   const invalidate = useThree((s) => s.invalidate)
@@ -325,6 +326,7 @@ export default function Pane({ which, title, subtitle }) {
             <CommandRedraw />
             <Building props={false} />
             <Fog which={which} />
+            <BeliefLayer which={which === 'command' ? 'command' : 'reality'} />
             <AntennaPulse />
             <PlanZones />
             <CommandActors />
@@ -333,6 +335,7 @@ export default function Pane({ which, title, subtitle }) {
           <Shake>
             <Building />
             <Fog which={which} />
+            <BeliefLayer which={which === 'command' ? 'command' : 'reality'} />
             <AntennaPulse />
             <PlanZones />
             <RealityActors gap={which === 'gap'} />
