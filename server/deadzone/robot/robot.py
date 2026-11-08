@@ -51,6 +51,7 @@ HOME_COST_PERIOD = 2.0     # s between A* "distance home" refreshes
 # Lost link and replanning
 LINK_HOLD_S = 10.0         # after reconnecting, wait at most this long for the dark backlog to upload
 PATH_CHECK_M = 3.0         # look this far down the path for new obstacles
+SURVIVOR_CLEAR_M = 0.5     # never drive over a person: motion plans keep this far from confirmed survivors
 PATH_CHECK_SKIP_M = 0.4    # ignore the robot's own footprint (it may sit in a wall's inflation)
 REPLAN_PAUSE_S = 0.6       # stop briefly in REPLANNING so the replan is visible and the map settles
 REPLAN_COOLDOWN_S = 5.0    # repeat obstacles this soon after a replan are replanned silently
@@ -956,8 +957,33 @@ class Robot:
     def _trav(self):
         return planning.traversable(self.map.grid, self.nogo)
 
-    def _plan_frontier(self):
+    def _drive_trav(self):
+        """Where this robot may drive: traversable, minus a disk around every survivor it has
+        confirmed, so it never runs a person over. Rescue routes still use _trav (they have
+        to reach the survivor). The robot's own cell stays open so it can always leave."""
         trav = self._trav()
+        if not self.found:
+            return trav
+        trav = trav.copy()
+        r = int(math.ceil(SURVIVOR_CLEAR_M / self.cell))
+        ys, xs = np.ogrid[-r:r + 1, -r:r + 1]
+        disk = xs * xs + ys * ys <= r * r
+        h, w = trav.shape
+        mx, my = self._cell(*self.pose[:2])
+        keep = trav[my, mx] if 0 <= mx < w and 0 <= my < h else None
+        for rec in self.found.values():
+            cx, cy = self._cell(*rec["pos"])
+            x0, x1, y0, y1 = max(0, cx - r), min(w, cx + r + 1), max(0, cy - r), min(h, cy + r + 1)
+            if x0 >= x1 or y0 >= y1:
+                continue
+            sub = disk[y0 - (cy - r):y1 - (cy - r), x0 - (cx - r):x1 - (cx - r)]
+            trav[y0:y1, x0:x1] &= ~sub
+        if keep is not None:
+            trav[my, mx] = keep
+        return trav
+
+    def _plan_frontier(self):
+        trav = self._drive_trav()
         start = self._cell(*self.pose[:2])
         clusters, _, start = planning.frontier_clusters(self.map.grid, trav, start, self.blacklist)
         self.last_plan_t = self.t
@@ -1004,7 +1030,7 @@ class Robot:
         return False
 
     def _plan_to(self, xy):
-        trav = self._trav()
+        trav = self._drive_trav()
         cells = planning.astar(trav, self._cell(*self.pose[:2]), self._cell(*xy), planning.wall_cost(self.map.grid))
         self.last_plan_t = self.t
         if cells:
@@ -1019,7 +1045,7 @@ class Robot:
         inflated traversable area of our own map (a new wall, rubble or no-go seen on it)."""
         if not self.path:
             return False
-        trav = self._trav()
+        trav = self._drive_trav()
         pts = [tuple(self.pose[:2])] + [tuple(p) for p in self.path]
         along = 0.0
         for (ax, ay), (bx, by) in zip(pts, pts[1:]):

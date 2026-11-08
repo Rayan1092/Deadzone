@@ -17,6 +17,14 @@ Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Log
 
+### 2026-11-08 08:20 · p3/hyperreal · Robots keep 0.5 m off confirmed survivors (Rayan's robot code, please review)
+- **Did:** with Yusuf's OK, a small change in **Rayan's `server/deadzone/robot/robot.py`**: a new `_drive_trav()` used for frontier, go-to and path-blocked planning removes a 0.5 m disk around every survivor the robot has confirmed, so a motion plan never crosses a person. Rescue routes keep `_trav()` (they have to reach the survivor), and the robot's own cell stays open.
+  - Measured on seed 7: robots never came closer than 1.96 m to a survivor before or after the change. The run-over Yusuf saw was drawing scale (people drawn 1.35×; now true size, see the next entry).
+  - 0.9 m moved demo beats, so the clearance is 0.5 m. The demo guard and the full suite pass (341 passed).
+- **Contract changes:** none.
+- **Heads-up for others:** **Rayan**: please review or adjust `SURVIVOR_CLEAR_M`. It only matters on maps where a path would really cross a person (generator buildings, the clinic).
+- **Next:** frontend hyper-realism commit.
+
 ### 2026-11-08 07:40 · p3/disaster · Disaster site, one rover model everywhere, scheduler redesign
 - **Did (Yusuf's ask: "an actual disaster site", "fix the scheduler", "robots hyper realistic and the same from above and in the scout camera"):**
   - **Disaster site** (`Disaster.jsx`, Reality only, visual only):
