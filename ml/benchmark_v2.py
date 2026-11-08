@@ -204,7 +204,8 @@ def verdict(summ):
 
 
 # ---------------------------------------------------------------------- chart
-def chart(summ, v, seconds, path):
+def chart(summ, v, seconds, path, title="radio sensitivity sweep",
+          footer="Radio values are model choices swept around our defaults; every run adds random rubble; paired seeds per row."):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -256,7 +257,7 @@ def chart(summ, v, seconds, path):
     ax.set_yticks(y, [""] * len(rows))
     ax.set_xlim(0, seconds * 1.03)
     ax.set_title("Time until Command knows")
-    ax.set_xlabel("sim s: dot = mean (unreported = run end), bar = range")
+    ax.set_xlabel("sim s (dot = mean, unreported = run end)")
 
     # 3. map coverage on Command
     ax = axes[2]
@@ -269,17 +270,16 @@ def chart(summ, v, seconds, path):
     ax.set_yticks(y, [""] * len(rows))
     ax.set_xlim(0, 103)
     ax.set_title("Building mapped on Command")
-    ax.set_xlabel("% of open floor: dot = mean, bar = range")
+    ax.set_xlabel("% of open floor (dot = mean, bar = range)")
 
     handles = [plt.Rectangle((0, 0), 1, 1, color=v1.COLORS[m]) for m in MODES]
     fig.legend(handles, [v1.LABELS[m] for m in MODES], loc="upper left", ncol=2, frameon=False,
                bbox_to_anchor=(0.005, 0.955), fontsize=11)
     holds = ("Deadzone reports more survivors in every radio setting tested" if v["holds"] else
              f"Deadzone reports more survivors in {v['more']} of {v['rows']} settings")
-    fig.suptitle(f"In simulation: radio sensitivity sweep. {holds}", x=0.01, ha="left",
+    fig.suptitle(f"In simulation: {title}. {holds}", x=0.01, ha="left",
                  fontsize=15, fontweight="bold", color=INK)
-    fig.text(0.01, 0.012, "Simulation only, not a real-world result. Radio values are model "
-             "choices swept around our defaults; every run adds random rubble; paired seeds per row.",
+    fig.text(0.01, 0.012, "Simulation only, not a real-world result. " + footer,
              ha="left", va="bottom", fontsize=10.5, color=INK2)
     fig.tight_layout(rect=(0, 0.04, 1, 0.9), w_pad=2.5)
     fig.savefig(path, dpi=150, facecolor=SURFACE)

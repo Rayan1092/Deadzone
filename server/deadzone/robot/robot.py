@@ -271,6 +271,10 @@ class Robot:
                          if os.environ.get("DZ_EXPLORATION_V2") == "1" else None)
         self.sensor_view = os.environ.get("DZ_SENSOR_VIEW") == "1"
         self.camera_frame = None
+        # DZ_CAMERA_TELEMETRY=1: the same camera observations ride inside the telemetry bundle
+        # (`camera: {t, hits}`), so Command and the phone see them once the bundle is delivered
+        self.camera_telemetry = os.environ.get("DZ_CAMERA_TELEMETRY") == "1"
+        self.camera_hits = []
 
     # ------------------------------------------------------------------ mode toggle
     def set_mode(self, mode):
@@ -597,20 +601,23 @@ class Robot:
     def _perceive(self, io):
         # every hot spot goes through the trained detector (sim sensor fallback if no model)
         hits = io.thermal()
+        all_hits = hits                                   # everything in the camera cone, for the camera views
         hits, finals = self._triage_unsure(hits)
         kept = filter_hits(hits) + [h for h, conf in finals if conf >= get_detector().threshold]
         hits = hits + [h for h, _ in finals]
         kept_ids = {h["id"] for h in kept}
-        if self.sensor_view:
+        if self.sensor_view or self.camera_telemetry:
             detector = get_detector()
             observations = []
-            for hit in hits:
+            for hit in all_hits:
                 score = detector.score(hit.get("crop"))
+                verdict = "unsure" if hit["id"] in self.unsure else ("person" if hit["id"] in kept_ids else "rejected")
                 observations.append({
-                    "id": hit["id"], "pos": list(hit["pos"]), "crop": hit.get("crop"),
-                    "verdict": "person" if hit["id"] in kept_ids else "rejected",
-                    "conf": score, "source": "model" if score is not None else "sim"})
-            self.camera_frame = {"t": self.t, "pose": list(self.pose), "hits": observations}
+                    "id": hit["id"], "pos": [round(hit["pos"][0], 2), round(hit["pos"][1], 2)], "crop": hit.get("crop"),
+                    "verdict": verdict, "conf": score, "source": "model" if score is not None else "sim"})
+            if self.sensor_view:
+                self.camera_frame = {"t": self.t, "pose": list(self.pose), "hits": observations}
+            self.camera_hits = observations
         for h in hits:
             if h["id"] in kept_ids or h["id"] in self.rejected or h["id"] in self.found:
                 continue                  # (a person confirmed from close up still scores low from afar)
@@ -1348,7 +1355,7 @@ class Robot:
         if self.t - self.last_telemetry_t < TELEMETRY_PERIOD:
             return
         self.last_telemetry_t = self.t
-        self.outbox.append(make_bundle(self.id, "CMD", "telemetry", {
+        payload = {
             "id": self.id,
             "pose": [round(v, 2) for v in self.pose],
             "state": self.state,
@@ -1356,7 +1363,14 @@ class Robot:
             "found": list(self.found),
             "target": [round(v, 2) for v in self.target] if self.target else None,
             "relays": [list(p) for p in self.my_relays],
-        }, self.t, 120))
+        }
+        size = 120
+        if self.camera_telemetry:                         # contract B: what the camera sees, for the phone
+            payload["camera"] = {"t": round(self.t, 1), "hits": [
+                {"id": h["id"], "pos": h["pos"], "verdict": h["verdict"], "conf": h["conf"], "crop": h["crop"]}
+                for h in self.camera_hits]}
+            size += 40 * len(self.camera_hits)
+        self.outbox.append(make_bundle(self.id, "CMD", "telemetry", payload, self.t, size))
         ix, iy, vals = self.map.take_patch()
         if len(vals):
             self.outbox.append(make_bundle(self.id, "CMD", "map_patch",
