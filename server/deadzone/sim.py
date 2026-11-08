@@ -14,12 +14,13 @@ import numpy as np
 from .command.post import CommandPost
 from .command.safety import RobotSpec
 from .floorplan import FloorPlan, OCC, NOGO
-from .geometry import wrap_angle
+from .geometry import points_in_poly, wrap_angle
 from .network.dtn import DTNNetwork, RELAY_QUEUE_BYTES, make_bundle
 from .network.propagation import LinkGraph
 from .robot.lidar import raycast
 from .robot.power import wheel_current
 from .robot.perception import get_detector
+from .robot.planning import dilate
 from .robot.robot import BATTERY_TIME_SCALE, PEER_FRESH_S, Robot
 from .sensors import THERMAL_FOV, THERMAL_RANGE, camera_config
 
@@ -129,10 +130,23 @@ class Sim:
         self.sensor_view = os.environ.get("DZ_SENSOR_VIEW") == "1"
         self.robot_collisions = os.environ.get("DZ_ROBOT_COLLISIONS") == "1"
         self._robot_contacts = set()
+        # DZ_SMART_RUBBLE=1 (Rayan, demo robustness; sim-side edit authorized):
+        # - the R key drops its rubble on the followed robot's planned path 3-4 m ahead, at the
+        #   nearest spot that walls nobody in (press_rubble), for any robot at any time (Q&A);
+        # - a scripted "secondary collapse" drops rubble 1.5 m ahead of R1 at DZ_COLLAPSE_AT sim
+        #   seconds (default 162.5 on collapse_01, the demo's reroute beat; 0 disables), whatever
+        #   anyone pressed. It is not a key press: event rubble_fall with cause "collapse".
+        self.smart_rubble_on = os.environ.get("DZ_SMART_RUBBLE") == "1"
+        self.collapse_at = None
+        self.collapse_done = False
         random.seed(self.seed)
         np.random.seed(self.seed)
         self.fp = FloorPlan.load(self.plan_path)
         self.prior = FloorPlan(self.fp.planning_data())
+        if self.smart_rubble_on:
+            default = "162.5" if self.fp.data.get("id") == "collapse_01" else "0"
+            at = float(os.environ.get("DZ_COLLAPSE_AT", default).strip() or "0")
+            self.collapse_at = at if at > 0 else None
         self.robot_specs = {rid: RobotSpec() for rid, _, _ in ROBOT_DEFS[:self.n_robots]}
         self.energy_time_scale = BATTERY_TIME_SCALE
         self.time = 0.0
@@ -327,6 +341,8 @@ class Sim:
 
     # ------------------------------------------------------------------ tick
     def tick(self):
+        if self.collapse_at is not None and not self.collapse_done and self.time + 1e-6 >= self.collapse_at:
+            self.secondary_collapse()
         dt = DT
         self.time = round(self.time + dt, 3)
         self.tick_n += 1
@@ -542,7 +558,119 @@ class Sim:
         self._update_links()
         return event
 
-    def drop_rubble(self, at, size=1.4):
+    def press_rubble(self, at, size=1.4, robot=None, source="key"):
+        """The R key. Plain: rubble exactly at `at` (the screen sends 1.5 m ahead of the followed
+        robot). DZ_SMART_RUBBLE=1: on that robot's planned path 3-4 m ahead (then 2-6 m), at the
+        nearest sample whose rubble walls nobody in; when no such spot exists, the plain spot.
+        Returns {"at", "smart", "robot", "source"}."""
+        if robot is None and at is not None and self.robots:
+            robot = min(self.robots, key=lambda r: math.dist(self.robots[r].pose[:2], at))
+        if at is None and robot is not None:
+            x, y, th = self.robots[robot].pose
+            at = (x + math.cos(th) * 1.5, y + math.sin(th) * 1.5)
+        spot = self._smart_rubble_spot(robot, size) if (self.smart_rubble_on and robot in self.robots) else None
+        placed = spot if spot is not None else tuple(at)
+        self.drop_rubble(placed, size, cause="key")
+        self.events.append({"kind": "rubble_pressed", "robot": robot, "at": [round(v, 2) for v in placed],
+                            "smart": spot is not None, "source": source})
+        return {"at": list(placed), "smart": spot is not None, "robot": robot, "source": source}
+
+    def _smart_rubble_spot(self, rid, size):
+        """Nearest point on the robot's planned path 3-4 m ahead (then 2-6 m) where the rubble is
+        safe to drop, or None. The planned path is the one the robot reports in telemetry."""
+        r = self.robots[rid]
+        pts = [tuple(r.pose[:2])] + [(float(p[0]), float(p[1])) for p in r.path]
+        samples, along = [], 0.0
+        for a, b in zip(pts, pts[1:]):
+            seg = math.dist(a, b)
+            n = max(1, int(seg / self.fp.cell))
+            for k in range(1, n + 1):
+                samples.append((along + seg * k / n, (a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n)))
+            along += seg
+        prefer = sorted((v for v in samples if 3.0 <= v[0] <= 4.0), key=lambda v: v[0])
+        rest = sorted((v for v in samples if 2.0 <= v[0] < 3.0 or 4.0 < v[0] <= 6.0), key=lambda v: abs(v[0] - 3.5))
+        for _, p in prefer + rest:
+            if self._rubble_is_safe(p, size):
+                return p
+        return None
+
+    def _rubble_is_safe(self, center, size):
+        """A rubble square here (truth grid, 1-cell inflation like the robots' planners) covers no
+        robot or survivor and leaves every robot's reachable free space connected: everything a
+        robot could reach before and that is still free stays reachable."""
+        fp = self.fp
+        x, y = center
+        s = size / 2
+        if not (s <= x <= fp.W - s and s <= y <= fp.H - s):
+            return False
+        margin = s + 0.5
+        for b in self.bodies.values():
+            if abs(b["x"] - x) <= margin and abs(b["y"] - y) <= margin:
+                return False
+        for sv in fp.data.get("survivors", []):
+            pos = sv.get("pos") or sv.get("at")
+            if pos is not None and abs(pos[0] - x) <= margin and abs(pos[1] - y) <= margin:
+                return False
+        cx, cy = fp.cell_centers()
+        foot = points_in_poly(cx, cy, [[x - s, y - s], [x + s, y - s], [x + s, y + s], [x - s, y + s]])
+        free_before = ~dilate(fp.occ, 1)
+        free_after = ~dilate(fp.occ | foot, 1)
+        for b in self.bodies.values():
+            start = self._free_cell_near(free_before, fp.to_cell(b["x"], b["y"]))
+            if start is None:
+                continue
+            before = self._flood(free_before, start)
+            after = self._flood(free_after, start) if free_after[start[1], start[0]] else np.zeros_like(before)
+            if int(after.sum()) != int((before & free_after).sum()):
+                return False
+        return True
+
+    def _free_cell_near(self, free, cell, r=3):
+        sx, sy = cell
+        if not self.fp.in_bounds(sx, sy):
+            return None
+        if free[sy, sx]:
+            return sx, sy
+        best = None
+        for dy in range(-r, r + 1):
+            for dx in range(-r, r + 1):
+                x, y = sx + dx, sy + dy
+                if self.fp.in_bounds(x, y) and free[y, x] and (best is None or dx * dx + dy * dy < best[0]):
+                    best = (dx * dx + dy * dy, (x, y))
+        return None if best is None else best[1]
+
+    @staticmethod
+    def _flood(free, start):
+        reach = np.zeros_like(free)
+        sx, sy = start
+        if not free[sy, sx]:
+            return reach
+        reach[sy, sx] = True
+        while True:
+            grown = reach.copy()
+            grown[1:, :] |= reach[:-1, :]
+            grown[:-1, :] |= reach[1:, :]
+            grown[:, 1:] |= reach[:, :-1]
+            grown[:, :-1] |= reach[:, 1:]
+            grown &= free
+            if np.array_equal(grown, reach):
+                return reach
+            reach = grown
+
+    def secondary_collapse(self, robot="R1", size=1.4):
+        """The scripted collapse: rubble 1.5 m ahead of `robot` (the old R-key spot), once."""
+        self.collapse_done = True
+        rid = robot if robot in self.robots else next(iter(self.robots), None)
+        if rid is None:
+            return None
+        x, y, th = self.robots[rid].pose
+        at = (x + math.cos(th) * 1.5, y + math.sin(th) * 1.5)
+        s = size / 2
+        at = (min(max(at[0], s), self.fp.W - s), min(max(at[1], s), self.fp.H - s))
+        self.drop_rubble(at, size, cause="collapse", robot=rid)
+        return list(at)
+
+    def drop_rubble(self, at, size=1.4, cause=None, robot=None):
         x, y = at
         s = size / 2
         poly = [[x - s, y - s], [x + s, y - s], [x + s, y + s], [x - s, y + s]]
@@ -551,7 +679,12 @@ class Sim:
         self.fp.data.setdefault("rubble", []).append({"id": f"RBX{len(self.fp.data['rubble'])}",
                                                        "poly": poly, "height": 1.0, "dynamic": True})
         self._invalidate_camera_frames()
-        self.events.append({"kind": "rubble_fall", "poly": poly})
+        event = {"kind": "rubble_fall", "poly": poly}
+        if cause is not None:          # "key" (R) or "collapse" (scripted); unset for other callers
+            event["cause"] = cause
+        if robot is not None:
+            event["robot"] = robot
+        self.events.append(event)
 
     def _invalidate_camera_frames(self):
         """Changed world geometry needs a fresh IO sample, even while paused.

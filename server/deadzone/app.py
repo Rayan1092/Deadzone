@@ -599,9 +599,9 @@ class Hub:
             x, y = fault.at
             if not (0 <= x < self.sim.fp.W and 0 <= y < self.sim.fp.H):
                 raise PlanError("invalid_fault_position", "Rubble position must be inside the floor plan", 422)
-            self.sim.drop_rubble(fault.at, fault.size)
+            placed = self.sim.press_rubble(fault.at, fault.size)   # DZ_SMART_RUBBLE=1 may move it onto the path
             await self.send_all(self.screens, self.hello())
-            result = {"ok": True, "type": "rubble", "at": list(fault.at)}
+            result = {"ok": True, "type": "rubble", "at": placed["at"], "smart": placed["smart"]}
         await self.broadcast_tick()
         return result
 

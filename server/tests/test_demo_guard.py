@@ -3,9 +3,10 @@
 Seed 7, 3 robots, solid furniture on (DZ_OBSTACLES=1, the main-run setting since the
 2026-11-08 20:30 re-baseline), plan P-1 (rejected: R2's north-east zone is a dead zone) then
 fixed to lost_link_ok and dispatched after the startup tick, exactly like the phone beat.
-Director presses at the DEMO.md times: R (rubble ahead of R1) at 162.5 s, when R1 is on S1's
-rescue corridor and R2 is 4 m away, F (overcurrent on R3) at 177.5 s, O (perception overload
-on R1) at 187.5 s.
+The reroute beat is not a key press: with DZ_SMART_RUBBLE=1 the sim drops a scripted "secondary
+collapse" 1.5 m ahead of R1 at 162.5 s (rubble_fall, cause "collapse"), when R1 is on S1's
+rescue corridor and R2 is 4 m away. Director presses at the DEMO.md times: F (overcurrent on R3)
+at 177.5 s, O (perception overload on R1) at 187.5 s.
 
 If you change robot, network or floor plan behavior and a beat moves, this fails on purpose.
 Re-measure, update the BEATS table below AND docs/DEMO.md together, and tell the team.
@@ -33,12 +34,13 @@ BEATS = {
     "R2_dark": 91.3,        # R2 enters the steel cage
     "S1_found": 102.7,      # R2, dark, beacon next to the survivor
     "S1_reported": 118.5,   # S1 + rescue route reach Command
-    "S1_rerouted": 162.8,   # R2 sees the R-key rubble on S1's rescue route and resends it
-    "S2_found": 219.4,      # the finale, only with R/F/O on time
+    "S1_rerouted": 162.8,   # R2 sees the collapse rubble on S1's rescue route and resends it
+    "S2_found": 219.4,      # the finale, only with F/O on time
 }
-DIRECTOR = {162.5: ("rubble", "R1"), 177.5: ("overcurrent", "R3"), 187.5: ("overload", "R1")}
+COLLAPSE_AT = 162.5     # the sim's scripted secondary collapse (DZ_SMART_RUBBLE=1, collapse_01 default)
+DIRECTOR = {177.5: ("overcurrent", "R3"), 187.5: ("overload", "R1")}
 END = 230.0
-FLAGS = {"DZ_OBSTACLES": "1"}   # the main run's environment (docs/DEMO.md pre-flight step 3)
+FLAGS = {"DZ_OBSTACLES": "1", "DZ_SMART_RUBBLE": "1"}   # the main run's environment (docs/DEMO.md pre-flight step 3)
 
 ZW = [[0, 17], [20, 17], [20, 30], [0, 30]]
 ZB = [[20, 17], [32, 17], [32, 30], [20, 30]]
@@ -76,9 +78,9 @@ def _run():
         if act:
             name, rid = act
             r = sim.robots[rid]
-            if name == "rubble":
+            if name == "rubble":        # the R key, as the screen sends it (1.5 m ahead of the followed robot)
                 x, y, th = r.pose
-                sim.drop_rubble((x + math.cos(th) * 1.5, y + math.sin(th) * 1.5))
+                sim.press_rubble((x + math.cos(th) * 1.5, y + math.sin(th) * 1.5))
             elif name == "overcurrent":
                 r.inject_overcurrent()
             else:
@@ -153,8 +155,11 @@ def test_s1_reaches_command_late(run):
 
 def test_director_beats(run):
     log = run["log"]
-    t = next((t for t, e in log if t >= 162.5 and e["kind"] == "replan" and e["robot"] == "R1"), None)
-    assert t is not None and t <= 163.5, f"R key: R1 replan at {t}"
+    falls = [(t, e) for t, e in log if e["kind"] == "rubble_fall"]
+    assert [(t, e.get("cause"), e.get("robot")) for t, e in falls] == [(round(COLLAPSE_AT + 0.1, 1), "collapse", "R1")], \
+        f"exactly one scripted collapse ahead of R1, nothing pressed: {falls}"
+    t = next((t for t, e in log if t >= COLLAPSE_AT and e["kind"] == "replan" and e["robot"] == "R1"), None)
+    assert t is not None and t <= COLLAPSE_AT + 1.0, f"collapse: R1 replan at {t}"
     t, e = first(log, lambda e: e["kind"] == "fault" and e["robot"] == "R3")
     assert t is not None and 177.5 <= t <= 178.5 and e["fault"] == "OVERCURRENT", f"F key: {t} {e}"
     misses = [t for t, e in log if e["kind"] == "deadline_miss" and e["robot"] == "R1"]
@@ -174,7 +179,7 @@ def test_no_decoy_ever_reported(run):
 
 
 def test_rescue_routes_in_the_demo(run):
-    """The R-key rubble (162.5 s) lands on S1's rescue corridor with R2 4 m away. R2's lidar
+    """The scripted collapse (162.5 s) lands on S1's rescue corridor with R2 4 m away. R2's lidar
     sees it, R2 reroutes S1's route and resends it (Command replaces the old one); nothing else
     is resent."""
     log = run["log"]
