@@ -84,8 +84,13 @@ class Hub:
             clients.discard(ws)
 
     def hello(self):
-        return self.envelope("hello", self.sim.hello() | {"speed": self.speed, "running": self.running}
+        return self.envelope("hello", self.sim.hello() | self.control_state()
                              | detector_status())
+
+    def control_state(self):
+        modes = {r.mode for r in self.sim.robots.values()}
+        return {"running": self.running, "speed": self.speed,
+                "mode": next(iter(modes)) if len(modes) == 1 else "mixed"}
 
     def phone_hello(self, client, role):
         robots = [{"id": rid, "name": name, "color": color,
@@ -241,6 +246,11 @@ class Hub:
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
                 raise PlanError("invalid_speed", "Speed must be a finite positive number", 422)
             self.speed = max(0.25, min(10.0, float(value)))
+        elif action == "mode":
+            if value not in ("baseline", "deadzone"):
+                raise PlanError("invalid_mode", "Mode must be baseline or deadzone", 422)
+            for robot in self.sim.robots.values():
+                robot.set_mode(value)
         elif action == "director":
             if not isinstance(value, dict) or "type" in value:
                 raise PlanError("invalid_director", "Director value must use do, not type", 422)
@@ -266,7 +276,7 @@ class Hub:
                 await self.inject_fault(request)
         else:
             raise PlanError("unknown_control", "Unknown control action", 422)
-        await self.send_all(self.screens, self.envelope("control", {"running": self.running, "speed": self.speed}))
+        await self.send_all(self.screens, self.envelope("control", self.control_state()))
 
     async def inject_fault(self, fault):
         if fault.type == "overcurrent":
@@ -452,7 +462,7 @@ async def ordered_rescues():
 @app.post("/api/control")
 async def control(body: dict):
     await hub.control(body.get("action"), body.get("value"))
-    return {"ok": True, "running": hub.running, "speed": hub.speed}
+    return {"ok": True, **hub.control_state()}
 
 
 @app.websocket("/ws/screen")
