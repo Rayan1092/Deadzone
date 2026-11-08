@@ -15,7 +15,9 @@ export const shared = {
 
 // Pull the overview camera back along its viewing direction until the whole
 // building (plus the CMD antenna west of it) fits the pane, whatever its shape.
-const VIEW_DIR = new THREE.Vector3(0, 50, 31).normalize() // default overview angle
+// default overview: a low perspective from the south-west (about 34 degrees up), not a
+// top-down plan view, which reads as a scale model
+const VIEW_DIR = new THREE.Vector3(-0.42, 0.56, 0.72).normalize()
 
 // ?cam=px,py,pz,tx,ty,tz[,fov] (three.js coordinates: y up, z = -north) pins the camera, so
 // before/after screenshots and video takes use the exact same angle.
@@ -56,13 +58,13 @@ export function fitOverview(camera, aspect) {
   const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2)
   const byWidth = VIEW_W / 2 / (tanV * aspect)
   const byDepth = (VIEW_D * Math.sin(elevation)) / 2 / tanV
-  shared.pos.copy(shared.target).addScaledVector(dir, Math.max(byWidth, byDepth) * 1.05)
+  shared.pos.copy(shared.target).addScaledVector(dir, Math.max(byWidth, byDepth) * 1.12)
   shared.home = { pos: shared.pos.clone(), target: shared.target.clone() }
 }
 
-const CHASE = new THREE.Vector3(0, 17, 12) // follow offset: above and south of the robot
+const CHASE = new THREE.Vector3(0, 9, 11) // follow offset: low, south of the robot
 
-export const CLOSE = new THREE.Vector3(0, 6.5, 7) // auto-director close shot
+export const CLOSE = new THREE.Vector3(0, 3.2, 6.5) // auto-director close shot, eye-level cinematic
 
 export function followRobot(rid, offset = CHASE) {
   shared.pos.copy(shared.target).add(offset)

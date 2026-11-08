@@ -17,6 +17,16 @@ Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Log
 
+### 2026-11-08 09:55 · p3/collapse-geometry · Step 5 camera, night by default, rover glTF loader, short spoken briefing
+- **Did:**
+  - **Step 5, camera:** the default overview is a low perspective from the south-west (about 34 degrees up) with a 42 degree lens instead of the 50 degree plan view; manual follow and the auto-director's close shot sit lower (eye-level cinematic). `0` returns to it.
+  - **Step 4, my part:** night is the scene now (K switches to day for the dry run): night sky photo (CC0 Dikhololo Night) for light and reflections, exposure 1.6, exponential dust-haze fog, drained color (saturation -0.28), a little contrast, film grain, deeper vignette. Light cones draw their outside only, so a camera inside the flood beam is not washed out. The lot runs to the fog (no visible slab edge).
+  - **Step 6, plumbing:** `RoverModel.jsx` (built by a parallel agent, reviewed) loads `/assets/models/robot/robot.glb` when present (HEAD probe, Suspense, per-robot material clones, node names `lidar`, `led*`, `paint*/body*`, `headlight*`, `antenna_tip`), else the procedural rover. Spec in `web/public/assets/models/robot/README.md`. Rayan's pack `robot.glb` is, by his own note, low-poly boxes, so the procedural rover stays the default and the file is not copied in.
+  - **Rayan's ask:** G now speaks only the short briefing: `report.short`, else `report.spoken`, else the first three sentences.
+- **Contract changes:** none. Reads optional `short` / `spoken` on the report if Aziz adds them.
+- **Heads-up for others:** Rayan: thanks for the pack. KTX2 needs a loader swap I don't have time for tonight; if you can regenerate `cracked_concrete_wall`, `cracked_concrete_floor`, `damaged_plaster` as plain 2K JPG (color, normal, roughness) and the decals as PNG with alpha, they drop straight into `web/public/assets/textures/<set>/{diff,nor_gl,rough}.jpg`. The person GLB is more stylised than the sculpted survivors, so those stay too.
+- **Next:** integrate the ceiling, litter and atmosphere modules (steps 2-4), screenshots per step, PR.
+
 ### 2026-11-08 09:40 · p3/collapse-geometry · Step 1 of Rayan's collapse list: every wall broken (fractured meshes)
 - **Did:** `web/src/three/Fracture.jsx`. Every masonry wall is drawn as a fractured slab while standing exactly on the floorplan segment (robots, radio and the demo guard see the same wall):
   - The wall face is split into convex Voronoi cells (`d3-delaunay`, new npm dep): big panels where the wall is intact, small pieces along the break line, around breaches and window edges.
