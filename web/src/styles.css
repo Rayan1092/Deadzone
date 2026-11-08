@@ -195,6 +195,8 @@ button:hover { border-color: var(--teal); }
   font-size: 11px; white-space: nowrap; display: flex; gap: 6px; color: var(--text); }
 .tag span { color: var(--muted); }
 .tag.ghost { opacity: .8; border-style: dashed; }
+.tag.nolink { background: rgba(51,56,63,.92); border-color: rgba(239,68,68,.75); color: #fca5a5; } /* a dark robot: red on grey */
+.tag.nolink span { color: #cbd5e1; }
 .tag.alert { border-color: var(--red); color: #fecaca; }
 .tag.relay { border-color: rgba(245,158,11,.5); }
 .tag.relay.off { border-color: var(--line); color: var(--muted); }

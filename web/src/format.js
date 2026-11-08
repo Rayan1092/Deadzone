@@ -220,3 +220,18 @@ export function planCaption(r, { dispatched = [], plan = null } = {}) {
   if (r.plan_id && r.zone) return { kind: 'zone', text: `${r.name ?? r.id} → ${zoneLabel(r.zone)}` }
   return null
 }
+
+// ------------------------------------------------------------------ robot identity label
+// The floating label over a robot in Reality: "R1 · LINK −76 dBm" while it has a radio route,
+// "R1 · NO LINK · 12 s" once it is dark (seconds since Command last heard from it, Command's own
+// record). `dark` turns the tag red on grey. "R1 · POWERED DOWN" after the mission.
+export function robotTag(r, cmd, time) {
+  if (!r) return { text: '', dark: false }
+  if (r.state === 'SHUTDOWN' || r.lights === false) return { text: `${r.id} · POWERED DOWN`, dark: false }
+  if (r.link?.up) {
+    const dbm = Number.isFinite(r.link.rssi) ? ` ${String(Math.round(r.link.rssi)).replace('-', '−')} dBm` : ''
+    return { text: `${r.id} · LINK${dbm}`, dark: false }
+  }
+  const age = cmd?.last_seen != null ? ` · ${Math.max(0, Math.floor(time - cmd.last_seen))} s` : ''
+  return { text: `${r.id} · NO LINK${age}`, dark: true }
+}
