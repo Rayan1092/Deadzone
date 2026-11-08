@@ -535,6 +535,15 @@ is formatted. Planning, robot telemetry and stored acknowledgements stay intact.
 Maps, geometry and camera bytes bypass text formatting. The same formatting is
 applied to delivered acknowledgement speech before synthesis.
 
+Robot telemetry now includes cumulative `counters` from #190:
+`{detector_calls, detector_rejections, deadlines_met, deadlines_missed,
+scheduler_deadlines_met}`. The scheduler-prefixed key aliases `deadlines_met`.
+Screen `tick.stats` sums `detector_calls`, `detector_rejections` and
+`scheduler_deadlines_met` across complete robot reports. A total is omitted if
+any robot's value is missing or invalid; no zero is invented. These are Reality
+instrumentation totals and do not copy undelivered facts into Command.
+
+
 ### Big screen: `WS /ws/screen`
 
 | Direction | `t` | When | `data` |

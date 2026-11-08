@@ -232,19 +232,21 @@ def test_transport_counts_multihop_expiry_and_destruction_once():
 
 
 def test_robot_owned_diagnostics_only_aggregate_complete_actual_counters(hub, monkeypatch):
-    # Exercise older/incomplete telemetry explicitly, even after Rayan adds counters
-    # to the default report. No guessed zeroes while any robot has not reported.
-    originals = {rid: robot.telemetry for rid, robot in hub.sim.robots.items()}
-    for rid, robot in hub.sim.robots.items():
-        def without_counters(link, original=originals[rid]):
-            report = original(link)
-            return {key: value for key, value in report.items() if key != "counters"}
-        monkeypatch.setattr(robot, "telemetry", without_counters)
-    assert "detector_calls" not in hub.sim.snapshot()["stats"]
-    for index, (rid, robot) in enumerate(hub.sim.robots.items()):
-        original = originals[rid]
+    # Robots report cumulative counters in telemetry (AUDIT #38, rayan.md 03:50): totals are their sums.
+    robots = list(hub.sim.robots.values())
+    stats = hub.sim.snapshot()["stats"]
+    assert stats["detector_calls"] == sum(r.counters["detector_calls"] for r in robots)
+    assert stats["scheduler_deadlines_met"] == sum(r.counters["scheduler_deadlines_met"] for r in robots)
+    originals = [r.telemetry for r in robots]
+
+    def without_counters(original):
+        return lambda link: {k: v for k, v in original(link).items() if k != "counters"}
+    for robot, original in zip(robots, originals):
+        monkeypatch.setattr(robot, "telemetry", without_counters(original))
+    assert "detector_calls" not in hub.sim.snapshot()["stats"], "never invent zeroes"
+    for index, (robot, original) in enumerate(zip(robots, originals)):
         monkeypatch.setattr(robot, "telemetry", lambda link, original=original, index=index:
-            original(link) | {"counters":{"detector_calls":index+1, "scheduler_deadlines_met":10}})
+            without_counters(original)(link) | {"counters":{"detector_calls":index+1, "scheduler_deadlines_met":10}})
         stats = hub.sim.snapshot()["stats"]
         if index < 2:
             assert "detector_calls" not in stats
