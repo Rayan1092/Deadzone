@@ -388,10 +388,12 @@ function FloorLine({ a, b, w = 0.1, color = '#eab308' }) {
 
 // --------------------------------------------------------------- layout
 const DECOY = { radiator: Radiator, engine: Engine, 'coffee machine': CoffeeCart }
+const DECOY_TEMP = { radiator: 48, engine: 70, 'coffee machine': 62 } // thermal.jsx DECOY_C
 function Decoys({ fp, M }) {
   return decoyLayout(fp).map((d) => {
     const Obj = DECOY[d.label]
-    return Obj ? <At key={d.id} x={d.pos[0]} y={d.pos[1]} rot={d.rot}><Obj M={M} /></At> : null
+    // each decoy's temperature for the thermal camera (thermal.jsx): hot, which is why the AI must judge it
+    return Obj ? <At key={d.id} x={d.pos[0]} y={d.pos[1]} rot={d.rot}><group userData={{ thermalTemp: DECOY_TEMP[d.label] ?? 50 }}><Obj M={M} /></group></At> : null
   })
 }
 

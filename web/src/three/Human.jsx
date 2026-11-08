@@ -39,6 +39,10 @@ function outfitMats(id) {
       shoe: new THREE.MeshStandardMaterial({ color: o.shoe, roughness: 0.6, metalness: 0.05 }),
       sole: new THREE.MeshStandardMaterial({ color: '#1a1a1a', roughness: 0.9 }),
     })
+    // body heat for the thermal camera (thermal.jsx): skin hottest, clothes and hair a little cooler, shoes near the floor
+    const m = cache.get(o)
+    m.skin.userData.thermalTemp = 34.5; m.top.userData.thermalTemp = 31; m.legs.userData.thermalTemp = 30.5
+    m.hair.userData.thermalTemp = 30; m.shoe.userData.thermalTemp = 24; m.sole.userData.thermalTemp = 22
   }
   return cache.get(o)
 }
