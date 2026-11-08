@@ -10,6 +10,8 @@ import { materials, tiledSet } from './textures'
 import { ROBOT_SCALE } from './Rover'
 import RoverModel from './RoverModel'
 import Human from './Human'
+import { SeatChair } from './Props'
+import { cropEntry, useCropManifest } from '../crops'
 import { LightBeam } from './NightLights'
 import { CommandRelays, RealityLinks, RealityRelays } from './Network'
 import { CommandRoutes, RealityRoutes } from './Routes'
@@ -141,6 +143,44 @@ export function PersonFigure({ id }) {
       </mesh>
       <Human id={id} angle={lieAngle(id)} />
       <group rotation={[0, lieAngle(id), 0]} scale={1.3}><Pinned /></group>
+    </group>
+  )
+}
+
+// The survivor as the real crop shows them (the crop manifest's `pose`, or the floor plan's own
+// `pose`): crouched, kneeling bent over, slumped in a chair, else lying pinned under a slab.
+// Plain props lit like the rest of the scene: no glow, ring or light (Reality and the robot camera).
+const POSE_OF = { crouching: 'crouching', crouched: 'crouching', bent: 'kneeling', kneeling: 'kneeling', sitting: 'sitting', slumped: 'sitting', lying: 'lying' }
+export function survivorPose(s, manifest) {
+  return POSE_OF[s?.pose ?? cropEntry(manifest, s?.thermal)?.pose] ?? 'lying'
+}
+export function SurvivorFigure({ id, pose = 'lying' }) {
+  return (
+    <group rotation={[0, lieAngle(id), 0]}>
+      {pose === 'sitting' && <SeatChair />}
+      <Human id={id} pose={pose} />
+      {pose === 'lying' && <group scale={1.3}><Pinned /></group>}
+    </group>
+  )
+}
+
+// Reality: every survivor is in the building from sim 0 (it's truth); a plain tag when a robot
+// finds them (and in one view, whether Command has the report yet). No rings, glow or pulse.
+function RealitySurvivor({ id, pos, pose, tag }) {
+  const el = useRef()
+  useFrame(() => {
+    if (!el.current) return
+    const age = tag?.born ? (performance.now() - tag.born) / 1000 : SETTLE_S
+    el.current.style.display = tag && (tag.hold || age < SETTLE_S) ? '' : 'none'
+  })
+  return (
+    <group position={w2t(pos[0], pos[1], 0)}>
+      <SurvivorFigure id={id} pose={pose} />
+      {tag && (
+        <Html position={[0, 1.35, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
+          <div ref={el} className={`tag ${tag.tone === 'pending' ? 'pending' : 'alert'}`}><b>{tag.label}</b></div>
+        </Html>
+      )}
     </group>
   )
 }
@@ -350,9 +390,11 @@ export function RealityActors({ gap = false }) {
   const births = useBirths(survivors_found.map((s) => s.id))
   const reportedIds = (tick?.command.survivors ?? []).map((s) => s.id)
   const reportBirths = useBirths(reportedIds) // when Command learned each (gap view reveal)
+  const manifest = useCropManifest()
   if (!tick || !fp) return null
   const { robots } = tick.reality
   const found = new Set(survivors_found.map((s) => s.id))
+  const foundBy = new Map(survivors_found.map((s) => [s.id, s]))
   return (
     <group>
       {robots.map((r) => (
@@ -373,12 +415,12 @@ export function RealityActors({ gap = false }) {
       <RealityRelays />
       <RealityRoutes gap={gap} />
       {gap && <GapOverlay />}
-      {survivors_found.map((s) => {
-        if (!gap) return <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} found by ${s.by}`} born={births.get(s.id)} />
-        const reported = reportedIds.includes(s.id)
-        return reported
-          ? <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} · reported to command`} born={reportBirths.get(s.id)} burst />
-          : <Survivor key={s.id} id={s.id} pos={s.pos} label={`${s.id} · not reported yet`} tone="pending" hold />
+      {(fp.survivors ?? []).map((s) => {
+        const f = foundBy.get(s.id)
+        const tag = !f ? null : !gap ? { label: `${s.id} found by ${f.by}`, born: births.get(s.id) }
+          : reportedIds.includes(s.id) ? { label: `${s.id} · reported to command`, born: reportBirths.get(s.id) }
+            : { label: `${s.id} · not reported yet`, tone: 'pending', hold: true }
+        return <RealitySurvivor key={s.id} id={s.id} pos={s.pos} pose={survivorPose(s, manifest)} tag={tag} />
       })}
       {showTruth && (fp.survivors ?? []).filter((s) => !found.has(s.id)).map((s) => (
         <TruthMarker key={s.id} pos={s.pos} id={s.id} />

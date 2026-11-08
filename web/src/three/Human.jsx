@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { Fragment, useMemo } from 'react'
 import * as THREE from 'three'
 import { materials, tiledSet } from './textures'
 
@@ -107,8 +107,97 @@ function Shoe({ at, rot, M }) {
   )
 }
 
-export default function Human({ id, angle = 0 }) {
+// ------------------------------------------------------------------ posed survivors
+// The three demo survivors are posed like the real thermal crops the detector judges (the crop
+// manifest's `pose`): S1 crouched low on the floor, S2 kneeling bent over, S3 slumped in a chair.
+// Same body parts as the lying figure. A pose is the hips, the spine and front directions (the
+// torso's frame: x along the spine, y out of the chest, z to their left) and the elbows, hands,
+// knees and ankles in the figure's frame (y up, facing +x, their left is -z). Limb lengths match
+// the lying figure (upper arm ~0.26, forearm ~0.27, thigh ~0.44, shin ~0.44 m).
+const POSES = {
+  crouching: {
+    hips: [-0.12, 0.36, 0], spine: [0.42, 0.9, 0], front: [0.9, -0.42, 0], headRot: [0, 0, 0.45], feet: 'stand',
+    L: { elbow: [0.28, 0.62, -0.26], hand: [0.4, 0.42, -0.1], knee: [0.3, 0.5, -0.14], ankle: [0.08, 0.1, -0.15] },
+    R: { elbow: [0.28, 0.62, 0.26], hand: [0.4, 0.42, 0.1], knee: [0.3, 0.5, 0.14], ankle: [0.08, 0.1, 0.15] },
+  },
+  kneeling: {
+    hips: [-0.12, 0.44, 0], spine: [0.96, 0.27, 0], front: [0.27, -0.96, 0], headRot: [0, 0, 0.35], feet: 'kneel',
+    L: { elbow: [0.42, 0.32, -0.25], hand: [0.5, 0.06, -0.2], knee: [0.02, 0.08, -0.12], ankle: [-0.4, 0.06, -0.13] },
+    R: { elbow: [0.42, 0.32, 0.25], hand: [0.5, 0.06, 0.2], knee: [0.02, 0.08, 0.12], ankle: [-0.4, 0.06, 0.13] },
+  },
+  sitting: {
+    hips: [-0.04, 0.58, 0], spine: [-0.3, 0.95, 0], front: [0.95, 0.3, 0], headRot: [0.5, 0, 0.25], feet: 'stand',
+    L: { elbow: [-0.12, 0.72, -0.27], hand: [0, 0.5, -0.3], knee: [0.4, 0.56, -0.13], ankle: [0.46, 0.1, -0.15] },
+    R: { elbow: [-0.12, 0.72, 0.27], hand: [0, 0.5, 0.3], knee: [0.4, 0.56, 0.13], ankle: [0.46, 0.1, 0.15] },
+  },
+}
+export const HUMAN_POSES = ['lying', ...Object.keys(POSES)]
+
+// rotation taking local x to `xDir` and local y to `yDir` (made perpendicular), z = x × y
+function basis(xDir, yDir) {
+  const x = new THREE.Vector3(...xDir).normalize()
+  const yv = new THREE.Vector3(...yDir)
+  const y = yv.sub(x.clone().multiplyScalar(yv.dot(x))).normalize()
+  return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, x.clone().cross(y)))
+}
+const SHOE_STAND = basis([0, 1, 0], [1, 0, 0])    // sole down, toes forward
+const SHOE_KNEEL = basis([0, -1, 0], [-1, 0, 0])  // kneeling: top of the foot on the floor, sole up, toes back
+
+function Head({ M }) {
+  return (
+    <>
+      <mesh geometry={head()} material={M.skin} castShadow />
+      <mesh position={[0.11, 0.075, 0]} rotation={[0, 0, -Math.PI / 2]} material={M.skin}><coneGeometry args={[0.016, 0.04, 8]} /></mesh>
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[0.11, 0, s * 0.098]} scale={[1, 1.4, 0.4]} material={M.skin}><sphereGeometry args={[0.02, 8, 6]} /></mesh>
+      ))}
+      <mesh position={[0.12, -0.005, 0]} rotation={[0, 0, -Math.PI / 2]} scale={[0.97, 1.05, 1.16]} material={M.hair}>
+        <sphereGeometry args={[0.096, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.6]} />
+      </mesh>
+    </>
+  )
+}
+
+function PosedBody({ M, P }) {
+  const q = useMemo(() => basis(P.spine, P.front), [P])
+  const hips = new THREE.Vector3(...P.hips)
+  const at = (l) => hips.clone().add(new THREE.Vector3(...l).applyQuaternion(q)).toArray()
+  const shoulder = { L: at([0.44, 0.02, 0.19]), R: at([0.44, 0.02, -0.19]) }
+  const hip = { L: at([-0.01, -0.01, 0.09]), R: at([-0.01, -0.01, -0.09]) }
+  const kneel = P.feet === 'kneel'
+  return (
+    <group>
+      <group position={P.hips} quaternion={q}>
+        <mesh geometry={torso()} material={M.top} castShadow receiveShadow />
+        <mesh position={[0.03, 0, 0]} rotation={[0, 0, Math.PI / 2]} scale={[1, 1, 0.64]} material={M.legs} castShadow>
+          <cylinderGeometry args={[0.172, 0.168, 0.1, 24]} />
+        </mesh>
+        <Seg a={[0.55, 0, 0]} b={[0.65, 0.005, 0]} r0={0.05} r1={0.048} m={M.skin} joint={false} />
+        <group position={[0.63, 0.005, 0]} rotation={P.headRot}><Head M={M} /></group>
+      </group>
+      {['L', 'R'].map((s) => {
+        const j = P[s]
+        return (
+          <Fragment key={s}>
+            <Seg a={shoulder[s]} b={j.elbow} r0={0.05} r1={0.042} m={M.top} />
+            <Seg a={j.elbow} b={j.hand} r0={0.042} r1={0.034} m={M.top} />
+            <Hand at={j.hand} rot={[0, 0, 0]} m={M.skin} />
+            <Seg a={hip[s]} b={j.knee} r0={0.085} r1={0.06} m={M.legs} />
+            <Seg a={j.knee} b={j.ankle} r0={0.058} r1={0.042} m={M.legs} />
+            <group position={[j.ankle[0], kneel ? 0.07 : 0.045, j.ankle[2]]} quaternion={kneel ? SHOE_KNEEL : SHOE_STAND}>
+              <mesh material={M.shoe} position={[0.01, 0.07, 0]} scale={[0.8, 1.9, 0.95]} castShadow><sphereGeometry args={[0.055, 14, 10]} /></mesh>
+              <mesh material={M.sole} position={[-0.035, 0.07, 0]}><boxGeometry args={[0.02, 0.24, 0.095]} /></mesh>
+            </group>
+          </Fragment>
+        )
+      })}
+    </group>
+  )
+}
+
+export default function Human({ id, angle = 0, pose = 'lying' }) {
   const M = useMemo(() => outfitMats(id), [id])
+  if (POSES[pose]) return <group rotation={[0, angle, 0]}><PosedBody M={M} P={POSES[pose]} /></group>
   const y = 0.11 // body axis height above the floor when lying on the back
   return (
     <group rotation={[0, angle, 0]}>

@@ -57,3 +57,21 @@ for (const piece of pieces) {
     }
   })
 }
+
+// The survivor figures stand in Reality from sim 0 (posed like their crops): no robot may drive
+// through one either. Reach of each pose from the survivor's spot (Human.jsx; lying includes the
+// slab on the legs), poses from the crop manifest the screen reads.
+const manifest = read('../../ml/crops/runtime/manifest.json')
+const POSE_OF = { crouching: 0.55, crouched: 0.55, bent: 0.8, kneeling: 0.8, sitting: 0.6, slumped: 0.6 }
+for (const s of fp.survivors) {
+  const pose = s.pose ?? manifest.crops.find((c) => c.file === s.thermal)?.pose
+  const reach = POSE_OF[pose] ?? 1.0
+  test(`no robot drives through survivor ${s.id} (${pose ?? 'lying'}, ${reach} m)`, () => {
+    for (const [rid, path] of Object.entries(rec.paths)) {
+      for (const [x, y, t] of path) {
+        const d = Math.hypot(x - s.pos[0], y - s.pos[1]) - reach
+        assert.ok(d >= rec.robot_radius_m + MARGIN_M, `${rid} at sim ${t} s passes ${d.toFixed(2)} m from ${s.id}`)
+      }
+    }
+  })
+}
