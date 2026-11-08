@@ -41,7 +41,7 @@ BEATS = {
 COLLAPSE_AT = 162.5     # collapse_01.json scenario event: collapse near R1
 DIRECTOR = {177.5: ("overcurrent", "R3"), 187.5: ("overload", "R1")}
 END = 230.0
-FLAGS = {"DZ_OBSTACLES": "1", "DZ_SMART_RUBBLE": "1", "DZ_ROBOT_COLLISIONS": "1"}   # the main run's environment (docs/DEMO.md pre-flight step 4)
+FLAGS = {"DZ_OBSTACLES": "1", "DZ_SMART_RUBBLE": "1", "DZ_ROBOT_COLLISIONS": "1", "DZ_COVERAGE_GRID": "1"}   # the main run's environment (docs/DEMO.md pre-flight step 4)
 
 ZW = [[0, 17], [20, 17], [20, 30], [0, 30]]
 ZB = [[20, 17], [32, 17], [32, 30], [20, 30]]
