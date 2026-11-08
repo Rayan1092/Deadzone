@@ -2644,6 +2644,7 @@
    "thermal": "neg_0001.png"
   }
  ],
+ "heat_sources": [{"id": "HS1", "type": "generator", "x": 71.88, "y": 29.88, "temp_c": 65.0, "size_m": 0.9}, {"id": "HS2", "type": "server_rack", "x": 37.88, "y": 6.38, "temp_c": 42.0, "size_m": 0.8}, {"id": "HS3", "type": "space_heater", "x": 54.88, "y": 6.38, "temp_c": 55.0, "size_m": 0.5}, {"id": "HS4", "type": "hot_pipe", "x": 30.38, "y": 6.38, "temp_c": 70.0, "size_m": 1.5}, {"id": "HS5", "type": "laptop", "x": 9.88, "y": 22.38, "temp_c": 35.0, "size_m": 0.35}, {"id": "HS6", "type": "dog", "x": 49.38, "y": 22.38, "temp_c": 38.5, "size_m": 0.7}, {"id": "HS7", "type": "sunlit", "x": 56.12, "y": 59.38, "temp_c": 32.0, "size_m": 1.2}],
  "entry": [
   1.0,
   30.0

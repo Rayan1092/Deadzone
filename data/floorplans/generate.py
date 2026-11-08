@@ -376,6 +376,66 @@ def in_poly(pt, poly):
     return min(xs) <= pt[0] <= max(xs) and min(ys) <= pt[1] <= max(ys)
 
 
+# Heat sources (docs/PLAN.md "Thermal hot spots", used with DZ_HEAT_SOURCES=1): one of each type per
+# building, in a room whose name fits, at a spot that fits the type. (type, temp_c, size_m, room name
+# keywords in order of preference, where in the room)
+HEAT_SOURCES = [
+    ("generator", 65.0, 0.9, ["Warehouse", "Workshop", "Pump", "Electrical", "Loading", "Dock", "Boiler"], "centre"),
+    ("server_rack", 42.0, 0.8, ["Server", "Electrical", "Records", "Archive", "Office", "Lab"], "wall"),
+    ("space_heater", 55.0, 0.5, ["Office", "Reception", "Training", "Meeting", "Records", "Locker"], "wall"),
+    ("hot_pipe", 70.0, 1.5, ["Boiler", "Pump", "Maintenance", "Kitchen", "Canteen", "Storage"], "wall"),
+    ("laptop", 35.0, 0.35, ["Office", "Lab", "Training", "Reception", "Records", "Meeting"], "centre"),
+    ("dog", 38.5, 0.7, ["Break", "Canteen", "Kitchen", "Reception", "Locker", "Hall", "Storage"], "centre"),
+    ("sunlit", 32.0, 1.2, ["Loading", "Dock", "Reception", "Hall", "Warehouse"], "outside"),
+]
+HEAT_CLEAR_M = 2.5        # from survivors, decoys and the other heat sources
+HEAT_ENTRY_M = 3.0
+
+
+def place_heat_sources(data):
+    """One heat source of each type, deterministic and without random draws (so a building's
+    people and disaster script are unchanged): the first room whose name fits the type and is not
+    used yet (any room if none fits), then a reachable cell out of hazards and debris, clear of
+    people and other sources: nearest the room centre ("centre"), against a wall ("wall"), or nearest
+    the outside of the building ("outside")."""
+    fp = FloorPlan(data)
+    reach = reachable(fp)
+    occ = fp.occ | fp.nogo
+    near_wall = planning.dilate(occ, 3) & ~planning.dilate(occ, 1)       # 0.5 to 0.75 m off a wall
+    others = [tuple(p["pos"]) for p in data.get("survivors", []) + data.get("decoys", [])]
+    rooms, used, out = data.get("rooms", []), set(), []
+    for k, (kind, temp, size, keys, where) in enumerate(HEAT_SOURCES):
+        order = [r for key in keys for r in rooms if key.lower() in r["name"].lower() and r["id"] not in used]
+        order += [r for r in rooms if r["id"] not in used and r not in order]
+        for room in order:
+            xs, ys = [q[0] for q in room["poly"]], [q[1] for q in room["poly"]]
+            cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+            cand = []
+            for iy, ix in zip(*np.nonzero(reach)):
+                x, y = fp.to_world(int(ix), int(iy))
+                if not in_poly((x, y), room["poly"]) or math.dist((x, y), fp.entry) < HEAT_ENTRY_M:
+                    continue
+                if any(math.dist((x, y), o) < HEAT_CLEAR_M for o in others + [tuple(h) for h in out_pos(out)]):
+                    continue
+                if where == "wall" and not near_wall[iy, ix]:
+                    continue
+                if where == "outside":
+                    key = min(x, y, fp.W - x, fp.H - y)
+                else:
+                    key = math.dist((x, y), (cx, cy))
+                cand.append((round(key, 3), round(x, 3), round(y, 3)))
+            if cand:
+                _, x, y = min(cand)
+                used.add(room["id"])
+                out.append({"id": f"HS{k + 1}", "type": kind, "x": r1(x), "y": r1(y), "temp_c": temp, "size_m": size})
+                break
+    return out
+
+
+def out_pos(sources):
+    return [(h["x"], h["y"]) for h in sources]
+
+
 def place_people(data, rng, info):
     """Survivors and decoys on reachable cells, out of hazards. One survivor per steel dead zone
     (as deep inside as it gets), the rest spread out; decoys never inside a dead zone."""
@@ -601,6 +661,7 @@ def generate(seed, size=None, plan_id=None, name=None, location=None):
             last = ["could not place survivors / decoys"]
             continue
         data["timeline"] = make_timeline(data, rng, info)
+        data["heat_sources"] = place_heat_sources(data)       # no random draws: people and script unchanged
         last = validate(data)
         if not last:
             if plan_id:
