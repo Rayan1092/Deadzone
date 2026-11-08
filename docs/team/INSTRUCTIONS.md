@@ -54,6 +54,7 @@ Before committing:
 2. Add a log entry at the **top** of `## Log` in your own file (newest first) using the template below.
 3. Rewrite your `## Now` section so it is true after this commit.
 4. Stage the history file with the code. One commit carries both.
+5. **Merge main into your branch immediately before opening a PR, and merge each PR before starting the next branch. The history files conflict otherwise.**
 
 Keep entries short: facts a teammate's Claude needs, not a diary. Leave out code that git already shows.
 

@@ -11,6 +11,12 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 
 ## Log
 
+### 2026-11-08 17:10 · rayan/instructions · INSTRUCTIONS.md Rule 2 gains the PR ordering rule
+- **Did:** Rayan's rule, added as step 5 of Rule 2: merge main into your branch immediately before opening a PR, and merge each PR before starting the next branch; the history files conflict otherwise. Docs only.
+- **Contract changes:** none.
+- **Heads-up for others:** **Aziz, Yusuf:** that is the one step that keeps `docs/team/history/*.md` conflict-free; it applies to every session.
+- **Next:** obstacles-check PR (17:00 entry, on its branch), then hold.
+
 ### 2026-11-08 17:00 · rayan/obstacles-check · Item 3 verdict: seed 7 with `DZ_OBSTACLES=1` does not fit the demo (the plan is rejected, the radio story breaks); obstacles stay off; the generator now exports furniture
 - **Did:** replayed the demo guard's run (seed 7, 3 robots, P-1 rejected then "allow dark", R/F/O at 150/165/175 s) with Yusuf's 25 solid footprints (#119) and `DZ_OBSTACLES=1`, 300 s, and compared every beat with DEMO.md:
 

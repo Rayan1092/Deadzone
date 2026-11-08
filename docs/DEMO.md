@@ -70,7 +70,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | Q / Esc | QR join overlay on / off (Esc also closes the briefing) | live |
 | T | faint truth survivors and decoys on Reality only | live |
 | V | robot's-eye camera of the followed robot (with a Thermal toggle). It also opens by itself on a detection, with the AI box and the robot's steps | live |
-| P | performance mode (no shadows, fewer lidar rays); press it if the big screen stutters | live |
+| P | performance mode (no shadows, fewer lidar rays). **Set it before the demo, never during:** toggling recompiles every material and freezes the screen for several seconds (rayan-ml's profile) | set before |
 | S | save the recording (only when the page was opened with `?record`) | live |
 | O | perception overload on the **followed** robot: deadline misses for 3 s | live |
 | U | resume the followed robot from SAFE_STOP (also the "Send resume command" button on its card). Travels over the radio, so it needs a route to CMD | live |

@@ -163,6 +163,16 @@ function blockers(fp) {
   return segs
 }
 
+// Drives the on-demand robot camera canvas at a fixed rate.
+function EyeRate({ fps }) {
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => {
+    const id = setInterval(() => invalidate(), 1000 / fps)
+    return () => clearInterval(id)
+  }, [invalidate, fps])
+  return null
+}
+
 const corner = new THREE.Vector3()
 function ClassifyBoxes({ robotId, thermal, boxes }) {
   const { camera, size } = useThree()
@@ -319,7 +329,9 @@ export default function RobotEye() {
         <button className={`eye-toggle${thermal ? ' on' : ''}`} onClick={() => set({ eyeThermal: !thermal })}>Thermal</button>
         <button className="eye-close" aria-label="Close camera" onClick={() => set({ eyeRobot: null })}>×</button>
       </div>
-      <Canvas dpr={1} camera={{ fov: 85, near: 0.05, far: 60 }} gl={{ antialias: false, powerPreference: 'low-power' }}>
+      {/* a whole second scene: half resolution, at most 15 frames a second (rayan-ml's profile: opening it halved the fps) */}
+      <Canvas dpr={0.5} frameloop="demand" camera={{ fov: 85, near: 0.05, far: 60 }} gl={{ antialias: false, powerPreference: 'low-power' }}>
+        <EyeRate fps={15} />
         <color attach="background" args={[thermal ? '#030614' : night ? '#07080a' : '#0e1114']} />
         {thermal ? <ambientLight intensity={0.6} /> : night ? (
           <>

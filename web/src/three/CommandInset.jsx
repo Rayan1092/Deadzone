@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
-import { Line } from '@react-three/drei'
+import Line from './FastLine' // drei's Line relinks its shader on every new points array
 import { useSim } from '../store'
 import Building from './Building'
 import Fog from './Fog'
