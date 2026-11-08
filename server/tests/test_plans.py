@@ -87,7 +87,10 @@ def test_exact_polygon_overlap_detects_a_thin_no_go_area():
     data = plan_data(no_go=[{"id": "NG1", "poly": [[4.01, 13.9], [4.02, 13.9], [4.02, 16.1], [4.01, 16.1]]}])
     plans = manager(sim)
     plans.save(SearchPlan.model_validate(data))
-    assert "no_go_overlap" in rules(plans.check("P-1"))
+    result = plans.check("P-1")
+    # detected, but a responder's no-go wins over the zone: a warning, not a refusal
+    assert "no_go_overlap" in {w["rule"] for w in result["warnings"]}
+    assert "no_go_overlap" not in rules(result)
 
 
 def test_known_hazard_overlap_is_rejected():

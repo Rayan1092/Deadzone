@@ -22,6 +22,8 @@ from ..network.dtn import PRIO, make_bundle
 from . import planning
 from .exploration import ProgressExplorer, line_clear
 from .mapping import OccupancyMap
+
+NO_GO_MARGIN_M = 0.5   # kept clear around a plan's no-go areas (robot radius 0.3 m + steering)
 from .belief import EXPECTED_DEFAULT, RANGE_M as SENSOR_REACH_M, Belief
 from .perception import close_crop, filter_hits, get_detector
 from .power import Battery, RESERVE_PCT, wheel_current
@@ -391,10 +393,14 @@ class Robot:
         xs = (np.arange(w) + 0.5) * self.cell
         ys = (np.arange(h) + 0.5) * self.cell
         cx, cy = np.meshgrid(xs, ys)
-        nogo = self.base_nogo.copy()
+        # a responder's no-go area plus a margin, so the robot's body (0.3 m radius, plus a little
+        # steering wobble) stays outside it: cells are free when their centre is outside the
+        # polygon, which let a path hug the edge with the robot half inside
+        plan_mask = np.zeros_like(self.base_nogo)
         for ng in plan.get("no_go", []):
-            nogo |= points_in_poly(cx, cy, ng["poly"])
-        self.nogo = nogo
+            plan_mask |= points_in_poly(cx, cy, ng["poly"])
+        margin = max(1, int(math.ceil(NO_GO_MARGIN_M / self.cell)))
+        self.nogo = self.base_nogo | (planning.dilate(plan_mask, margin) if plan_mask.any() else plan_mask)
         self.zones = []
         for z in sorted((z for z in plan.get("zones", []) if z.get("robot") == self.id),
                         key=lambda z: (z.get("priority", 1), z["id"])):

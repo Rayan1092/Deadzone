@@ -123,6 +123,11 @@ class PublicText:
         area = self.area(item.get("zone"), plan_id)
         robot = self.robots.get(item.get("robot"), "The robot")
         rule, value, limit = item.get("rule"), item.get("value"), item.get("limit")
+        if item.get("level") == "warning":   # the plan is sent; the robot obeys the no-go
+            if rule == "no_go_overlap":
+                return f"{robot} will skip the part of {area.lower()} inside the no-go area."
+            if rule == "zone_unreachable":
+                return f"The no-go area keeps {robot} out of {area.lower()}. It searches what it can reach."
         if rule == "comms_plan":
             return f"{area} may lose radio contact. Add a relay route or allow signal loss for a limited time."
         if rule == "no_go_overlap":
