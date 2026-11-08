@@ -5,7 +5,8 @@ import * as THREE from 'three'
 import { useSim } from '../store'
 import { COLORS, FOG_H, w2t } from './util'
 import { materials, tiledSet } from './textures'
-import Rover, { ROBOT_SCALE } from './Rover'
+import { ROBOT_SCALE } from './Rover'
+import RoverModel from './RoverModel'
 import Human from './Human'
 import { LightBeam } from './NightLights'
 import { CommandRelays, RealityLinks, RealityRelays } from './Network'
@@ -23,7 +24,7 @@ function Headlight() {
       <primitive object={tgt} position={[3, 0, 0]} />
       <spotLight position={[0.3, 0.3, 0]} angle={night ? 0.6 : 0.7} penumbra={0.55} intensity={night ? 22 : 6}
                  distance={night ? 13 : 7} decay={1.5} color="#cffaf5" target={tgt} />
-      {night && <group position={[0.26, 0.14, 0]} quaternion={BEAM_Q}><LightBeam length={3.2} radius={1.2} color="#d9fbff" opacity={0.12} /></group>}
+      {night && <group position={[0.26, 0.14, 0]} quaternion={BEAM_Q}><LightBeam length={3.2} radius={1.2} color="#d9fbff" opacity={0.06} /></group>}
     </>
   )
 }
@@ -59,7 +60,7 @@ function RobotBody({ pose, color, tag, ghost = false, label, sub, headlight = tr
             <meshBasicMaterial color={color} transparent opacity={0.22} blending={THREE.AdditiveBlending} depthWrite={false} />
           </mesh>
         )}
-        <Rover color={color} tag={tag} ghost={ghost} sensor={sensor} linkUp={linkUp} />
+        <RoverModel color={color} tag={tag} ghost={ghost} sensor={sensor} linkUp={linkUp} />
         {!ghost && headlight && !perf && <Headlight />}
       </group>
       {label && (

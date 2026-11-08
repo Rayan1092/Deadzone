@@ -1,7 +1,7 @@
 import { Component, Suspense, useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Environment, Lightformer, OrbitControls } from '@react-three/drei'
-import { Bloom, EffectComposer, N8AO, Noise, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { Bloom, BrightnessContrast, EffectComposer, HueSaturation, N8AO, Noise, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 import * as THREE from 'three'
 import Building from './Building'
@@ -54,18 +54,19 @@ function Lights({ perf, night }) {
   }, [W, H])
   return (
     <>
-      <ambientLight intensity={night ? 0.03 : 0.08} />
-      <hemisphereLight args={night ? ['#6f86b0', '#120f0c', 0.14] : ['#c4d3e6', '#2b2622', 0.35]} />
+      <ambientLight intensity={night ? 0.06 : 0.08} />
+      <hemisphereLight args={night ? ['#7d92bd', '#1a1512', 0.42] : ['#c4d3e6', '#2b2622', 0.35]} />
       <primitive object={target} />
       {/* night: a weak cold moon instead of the afternoon sun */}
-      <directionalLight position={[W / 2 - 17.5, 32, -H / 2 + 15]} target={target} intensity={night ? 0.45 : 2.6} color={night ? '#9db4ff' : '#ffe0b5'}
+      <directionalLight position={[W / 2 - 17.5, 32, -H / 2 + 15]} target={target} intensity={night ? 1.25 : 2.6} color={night ? '#a7bbff' : '#ffe0b5'}
                         castShadow={!perf} shadow-mapSize={[4096, 4096]} shadow-bias={-0.0004} shadow-normalBias={0.03}
                         shadow-camera-left={-34} shadow-camera-right={34}
                         shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-far={100} />
       {/* photo-scanned sky (CC0 HDRI) for light and reflections; soft panels if it can't load */}
       <EnvGuard fallback={<PanelEnv night={night} />}>
         <Suspense fallback={<PanelEnv night={night} />}>
-          <Environment files="/assets/hdri/industrial_sunset_puresky_1k.hdr" environmentIntensity={night ? 0.12 : 0.85} />
+          <Environment files={night ? '/assets/hdri/dikhololo_night_1k.hdr' : '/assets/hdri/industrial_sunset_puresky_1k.hdr'}
+                       environmentIntensity={night ? 3.0 : 0.85} />
         </Suspense>
       </EnvGuard>
     </>
@@ -74,6 +75,13 @@ function Lights({ perf, night }) {
 
 // The building never moves, so render the shadow map only while the scene settles
 // (props, debris, textures) and when the floorplan changes, not every frame.
+// Night pushes the exposure up so the dark scene still reads; the lights stay the story.
+function Exposure({ night }) {
+  const gl = useThree((s) => s.gl)
+  useEffect(() => { gl.toneMappingExposure = night ? 1.6 : 1.1 }, [gl, night])
+  return null
+}
+
 function StaticShadows() {
   const gl = useThree((s) => s.gl)
   const fp = useSim((s) => s.floorplan)
@@ -208,11 +216,13 @@ export default function Pane({ which, title, subtitle }) {
       <DetectionCards side={which} sides={which === 'gap' ? ['command', 'reality'] : undefined} />
       {which !== 'command' && <RobotEye />}
       {which === 'gap' && <CommandInset />}
-      <Canvas shadows={!perf} dpr={perf ? 1 : [1, 1.5]} camera={{ fov: 50, near: 0.1, far: 300 }}
+      <Canvas shadows={!perf} dpr={perf ? 1 : [1, 1.5]} camera={{ fov: 42, near: 0.1, far: 300 }}
               gl={{ toneMapping: THREE.AgXToneMapping, toneMappingExposure: 1.1 }}>
         <color attach="background" args={[night ? '#08090b' : COLORS.bg]} />
-        <fog attach="fog" args={[night ? '#08090b' : COLORS.bg, night ? 60 : 80, night ? 130 : 160]} />
+        {/* night: dust haze thickens with distance; day: plain depth fog */}
+        {night ? <fogExp2 attach="fog" args={['#101216', 0.011]} /> : <fog attach="fog" args={[COLORS.bg, 80, 160]} />}
         <Lights perf={perf} night={night} />
+        <Exposure night={night} />
         {night && which !== 'command' && <NightLights />}
         <StaticShadows />
         {which === 'command' ? (
@@ -240,8 +250,11 @@ export default function Pane({ which, title, subtitle }) {
             <N8AO halfRes quality="performance" aoRadius={1.4} distanceFalloff={1} intensity={2.6} color="#0b0d10" />
             <Bloom mipmapBlur luminanceThreshold={0.95} luminanceSmoothing={0.25} intensity={which === 'command' ? 0.5 : 0.85} />
             <ToneMapping mode={ToneMappingMode.AGX} />
-            <Vignette offset={0.32} darkness={night ? 0.7 : 0.5} />
-            {night && <Noise premultiply opacity={0.5} />}
+            {/* disaster grading: drained color, a little more contrast, film grain */}
+            <HueSaturation saturation={night ? -0.28 : -0.12} />
+            <BrightnessContrast brightness={night ? 0.02 : 0} contrast={night ? 0.08 : 0.05} />
+            <Vignette offset={0.3} darkness={night ? 0.75 : 0.5} />
+            {night && <Noise premultiply opacity={0.65} />}
             <SMAA />
           </EffectComposer>
         )}

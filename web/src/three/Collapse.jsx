@@ -21,7 +21,7 @@ function rng(seed) {
 const hash = (...xs) => xs.reduce((h, x) => (h * 31 + Math.round(x * 100)) % 1000003, 7)
 
 // --------------------------------------------------------------- walls
-const WIN = { w: 1.3, y0: 1.0, y1: 1.85, step: 3.6, margin: 1.6 }
+export const WIN = { w: 1.3, y0: 1.0, y1: 1.85, step: 3.6, margin: 1.6 }
 
 function isOuter(w, W, H) {
   const [ax, ay] = w.a

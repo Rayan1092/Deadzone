@@ -8,6 +8,7 @@ import Debris from './Debris'
 import { CommandPost, GasLeak, Interior, Lot } from './Props'
 import { CollapseLive, CollapseStatic, WallDetails, holedWallGeometry, wallDamage } from './Collapse'
 import { DisasterLive, DisasterStatic } from './Disaster'
+import FracturedWalls from './Fracture'
 
 // Thermal palette for the robot's-eye view: everything cold reads as deep blue.
 const COLD = { floor: '#070b1f', wall: '#1d3a8a', wallGlow: '#0b1d5c' }
@@ -136,21 +137,34 @@ function WallDamageLayer({ walls, damage }) {
   })
 }
 
-function Walls({ walls, mode, damage }) {
-  return walls.map((w, i) => {
-    const [ax, ay] = w.a
-    const [bx, by] = w.b
-    const len = Math.hypot(bx - ax, by - ay)
-    const ang = Math.atan2(by - ay, bx - ax)
-    const thick = THICK[w.material] ?? 0.2
-    return (
-      <group key={i} position={w2t((ax + bx) / 2, (ay + by) / 2, 0)} rotation={[0, ang, 0]}>
-        {w.material === 'metal'
-          ? <FenceWall len={len} mode={mode} />
-          : <SolidWall len={len} thick={thick} material={w.material} mode={mode} damage={damage?.[i]} />}
-      </group>
-    )
-  })
+function Walls({ walls, mode, damage, size }) {
+  // Reality: every masonry wall is drawn fractured (one merged mesh per material); the
+  // cage stays a fence. Command, thermal and blueprint keep the intact slabs.
+  const fractured = mode === 'plain' && damage
+  return (
+    <>
+      {fractured && <FracturedWalls walls={walls} damage={damage} size={size} />}
+      {walls.map((w, i) => {
+        if (fractured && w.material !== 'metal') return null
+        return <WallSegment key={i} w={w} mode={mode} damage={damage?.[i]} />
+      })}
+    </>
+  )
+}
+
+function WallSegment({ w, mode, damage }) {
+  const [ax, ay] = w.a
+  const [bx, by] = w.b
+  const len = Math.hypot(bx - ax, by - ay)
+  const ang = Math.atan2(by - ay, bx - ax)
+  const thick = THICK[w.material] ?? 0.2
+  return (
+    <group position={w2t((ax + bx) / 2, (ay + by) / 2, 0)} rotation={[0, ang, 0]}>
+      {w.material === 'metal'
+        ? <FenceWall len={len} mode={mode} />
+        : <SolidWall len={len} thick={thick} material={w.material} mode={mode} damage={damage} />}
+    </group>
+  )
 }
 
 // --------------------------------------------------------------- doors
@@ -276,7 +290,7 @@ export default function Building({ thermal = false, blueprint = false, props = t
       )}
       {mode === 'plain' && <Slab W={W} H={H} />}
       {mode === 'plain' && fp.rooms.map((r) => <RoomFloor key={r.id} room={r} />)}
-      <Walls walls={fp.walls} mode={mode} damage={damage} />
+      <Walls walls={fp.walls} mode={mode} damage={damage} size={fp.size} />
       {/* aftershock walls are truth geometry: Reality panes only, never Command or the inset */}
       {props && fp.dynamic_walls?.length > 0 && <Walls walls={fp.dynamic_walls} mode={mode} />}
       <Baked deps={[fp, mode, props]}>
