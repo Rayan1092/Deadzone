@@ -61,7 +61,7 @@ function startHeart() {
     if (!token || !s.presenter.held) { stopHeart(); return }
     try { applyTable(await leaseCall('/api/leases/group/heartbeat', { robots: s.presenter.robots })) } catch (e) {
       stopHeart()
-      dropFleet(e.code === 'lease_required' ? 'Presenter control expired: press Unlock to take the robots again' : `Presenter heartbeat failed: ${e.message}`)
+      dropFleet(e.code === 'lease_required' ? 'Console control expired: press Unlock to take the robots again' : `Console heartbeat failed: ${e.message}`)
     }
   }, HEARTBEAT_MS)
 }
@@ -99,6 +99,6 @@ export async function lock() {
 export function presenterLocked() {
   const s = useSim.getState()
   if (!s.leases?.enabled || s.presenter.held) return false
-  note('Presenter controls are locked: press Unlock in the top bar to take the robots first')
+  note('Operator lock is on: press Unlock in the top bar to take the robots first')
   return true
 }

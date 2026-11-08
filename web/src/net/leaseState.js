@@ -1,6 +1,6 @@
 // Pure pieces of the presenter lock (no imports, so Node can test them). See presenter.js.
 
-export const PRESENTER_NAME = 'Presenter'
+export const PRESENTER_NAME = 'Console' // the lease holder name phones see: "Console has control"
 
 // The screen's hello carries this socket's private controller token. Take it out before the
 // frame is recorded or reaches the store: a credential never goes into a recording, a replay,

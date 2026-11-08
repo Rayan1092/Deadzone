@@ -10,7 +10,7 @@ Every number we say on stage, with the file in this repo it comes from. If it ca
 | Street accuracy | **96.7%** accuracy, **97.3%** precision, **96.0%** recall on **1,200 held-out FLIR ADAS v2 val crops** (threshold 0.6; 576 / 24 / 16 / 584 tp / fn / fp / tn) | `ml/results/metrics.json`, `docs/assets/confusion_matrix.png` |
 | Indoor accuracy | **99.6%** accuracy, **100%** precision, **99.2%** recall on **2,273 held-out SDT indoor frames** (people lying, sitting, standing, empty floor; 10 misses, 0 false alarms) | `ml/results/lab.json` (`metrics_indoor`) |
 | Calibration | Expected calibration error **0.6%** street, **0.2%** indoor. A **90%+ confident answer is right 98.9%** of the time on street and **100%** (2,246 of 2,246) indoor. Temperature scaling (T = 1.16) tested, not shipped | `ml/results/calibration.json`, `docs/assets/calibration.png`, `py ml/calibration.py` |
-| Judge test pool | **36 of 40** held-out FLIR val images right (20 people, 20 not), never trained on | `ml/results/judge_pool/manifest.json` (verdict vs truth at threshold 0.6) |
+| Model test held-out set | **36 of 40** held-out FLIR val images right (20 people, 20 not), never trained on | `ml/results/judge_pool/manifest.json` (verdict vs truth at threshold 0.6) |
 | Training | **5 epochs, 13.5 min** on the testing laptop's GPU; 13,266 training crops (FLIR train 3,000 person + 3,000 not, SDT indoor 4,800 person + 3,939 empty floor), 1,473 held out; final holdout accuracy 98.6%; promoted over the previous model (96.67% vs 96.17% on FLIR val) | `ml/results/train_history.json`, `docs/assets/training_curve.png`, `py ml/train.py --history` |
 | Where it looked | Grad-CAM per runtime crop, fused layers, heat on the body | `ml/crops/runtime/heatmaps/`, `py ml/gradcam.py` |
 | ONNX export | `ml/models/detector.onnx` (6.1 MB, opset 17, input 1-N x 3 x 96 x 96). Matches PyTorch on **1,246 images**: largest P(person) difference **0.00001**, **every verdict identical** (40 judge pool, 6 demo crops, 1,200 FLIR held-out) | `ml/results/onnx_benchmark.json` (`match`), `py ml/export_onnx.py` |
@@ -54,7 +54,7 @@ Every number we say on stage, with the file in this repo it comes from. If it ca
 
 | Say | Detail | Source |
 |---|---|---|
-| Teledyne FLIR ADAS v2 | street thermal frames with person boxes: training crops, the 1,200-image held-out test, the judge pool, decoys. License: Teledyne's free dataset terms (not reproduced in this repo): say "Teledyne FLIR ADAS v2", **do not quote license terms** | `ml/prep_crops.py`, `ml/make_judge_pool.py`, `README.md` |
+| Teledyne FLIR ADAS v2 | street thermal frames with person boxes: training crops, the 1,200-image held-out test, the Model test's held-out set, decoys. License: Teledyne's free dataset terms (not reproduced in this repo): say "Teledyne FLIR ADAS v2", **do not quote license terms** | `ml/prep_crops.py`, `ml/make_judge_pool.py`, `README.md` |
 | SDT, Synthetic Depth & Thermal | real indoor split only (FLIR Lepton 3.5 frames), **CC BY 4.0** (the record also says non-commercial research use), Zenodo 4124309 | `ml/prep_sdt.py`, `README.md` |
 | Rappaport | *Wireless Communications: Principles and Practice*, 2nd ed., Table 4.3 (partition losses) | `server/deadzone/floorplan.py` |
 | NIST | Stone, W. C. (1997), *Electromagnetic Signal Attenuation in Construction Materials*, NISTIR 6055 | `docs/assets/benchmark_published.md` |

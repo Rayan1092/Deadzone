@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fmtClock } from '../format'
+import { fieldUnitName, fmtClock, unitName } from '../format'
 import { usePhone } from './store'
 import { DARK_S, HEARTBEAT_MS, ackFor, claim, command, heartbeat, holder, isDark, lastFrame, leaseOf, release } from './control'
 
@@ -70,10 +70,10 @@ export function ControlPanel({ meta }) {
     <div className="control" onClick={(e) => e.stopPropagation()}>
       <div className="control-row">
         {who === 'free' && <span className="muted small">No one is controlling {meta.name}</span>}
-        {who === 'other' && <span className="chip bad">Locked · {lease.controller.name} has control</span>}
+        {who === 'other' && <span className="chip bad">Locked · {unitName(lease.controller.name)} has control</span>}
         {who === 'me' && <span className="chip ok">You have control</span>}
         {who === 'free' && (
-          <button className="filled small" disabled={off || !token} onClick={() => run(() => claim(meta.id, client ?? 'phone', token))}>Take control</button>
+          <button className="filled small" disabled={off || !token} onClick={() => run(() => claim(meta.id, fieldUnitName(leases, client), token))}>Take control</button>
         )}
         {who === 'me' && <button className="text-btn" disabled={off} onClick={() => run(() => release(meta.id, token))}>Release</button>}
       </div>

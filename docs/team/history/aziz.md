@@ -14,6 +14,13 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Log
 
+### 2026-11-08 PT - p2/preflight-d2 - Preserve operator wording in final main merge
+- **Did:** immediate pre-PR sync merged main 34425e1 (#160 Yusuf's UI/doc rename). Resolved DEMO only: kept Operator lock/Console/Field unit language, Mission recording, new key rows, and D2's tunnel-before-phone steps. No backend/scripts changed upstream after the 699-test full pass.
+- **Contract changes:** none from D2; upstream display labels preserved.
+- **Validation:** last full backend 699 passed / 1 skipped (146.08 s) remains valid for identical server/scripts code. Rerunning D2's focused script/runbook tests and latest frontend tests/build after doc resolution; no runtime edits.
+- **Heads-up for others:** cloudflared installed and version confirmed, but no tunnel started; Rayan runs the helper manually. G already merged #156.
+- **Next:** publish/merge the single D2 PR after final focused checks and immediate main merge.
+
 ### 2026-11-08 PT - p2/preflight-d2 - Integrate scenario-event and cross-engine furniture main
 - **Did:** pre-PR sync merged main e66f734 (#157 Rayan scenario events, #158 cross-engine furniture, #159 rubble control client). DEMO changes merged cleanly: preserves scenario flags and D2 manual tunnel step before phone test. Tooling-only D2 diff remains six files; no teammate/protected source edits.
 - **Contract changes:** none from D2. Rayan's events field now drives the collapse by default; leave DZ_SCENARIO_EVENTS unset. Smart-rubble flag is for the Q&A key, not the scripted collapse. Preflight derives the runbook assignments automatically. Manual tunnel invocation uses process-scoped PowerShell execution policy, no machine policy change.

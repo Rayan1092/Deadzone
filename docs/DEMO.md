@@ -68,7 +68,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    # DZ_SMART_RUBBLE=1    # already set in step 4: the smart, no-trap R key for Q&A (rayan.md 22:10)
    # DZ_SCENARIO_EVENTS   # must stay unset: 0 switches off the building's scripted collapse at 2:28 (rayan.md 23:20)
    ```
-   **Don't set `DZ_VOICE`, `DZ_CONTROL_LEASES` or `DZ_EXPLORATION_V2` for the main run.** With control leases on, the top bar shows a **presenter lock**: **B** and **U** stay locked (with a hint) until you press **Unlock**, which takes every robot for the big screen (phones then see them locked; R, F, O and A are not affected). **Lock** releases the robots so phones can take them (Q&A). Unlock fails, naming the holder, while a phone holds a robot. Leases off: no lock, B and U as before. With `DZ_EXPLORATION_V2=1` the robots explore differently and every beat in the beat sheet moves (S3 found at 23.8 s instead of 14.4, S2 found at 106 s instead of 246). `DZ_SENSOR_VIEW=1` is safe: it only adds camera frames to the Reality pane.
+   **Don't set `DZ_VOICE`, `DZ_CONTROL_LEASES` or `DZ_EXPLORATION_V2` for the main run.** With control leases on, the top bar shows the **Operator lock**: **B** and **U** stay locked (with a hint) until you press **Unlock**, which takes every robot for this console ("Console has control"; field units then see the robots locked; R, F, O and A are not affected). **Lock** releases the robots so field units (phones) can take them (Q&A). Unlock fails, naming the holder, while a field unit holds a robot. Leases off: no lock, B and U as before. With `DZ_EXPLORATION_V2=1` the robots explore differently and every beat in the beat sheet moves (S3 found at 23.8 s instead of 14.4, S2 found at 106 s instead of 246). `DZ_SENSOR_VIEW=1` is safe: it only adds camera frames to the Reality pane.
 6. **Before the phone test, Rayan starts the tunnel manually** in a second
    PowerShell terminal from the repo root:
    `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tunnel.ps1`
@@ -87,7 +87,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    the same Wi-Fi/hotspot. `?nointro` keeps the first-visit explainer off the scene;
    the **?** overlay can still show it.
 8. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
-9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped recording, and keep the file on the demo laptop.
+9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped mission recording, and keep the file on the demo laptop.
 10. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
 
 ## Director keys (big screen)
@@ -105,12 +105,16 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | T | faint truth survivors and decoys on Reality only | live |
 | V | robot's-eye camera of the followed robot (with a Thermal toggle). It also opens by itself on a detection, with the AI box and the robot's steps | live |
 | P | performance mode (no shadows, fewer lidar rays). **Set it before the demo, never during:** toggling recompiles every material and freezes the screen for several seconds (rayan-ml's profile) | set before |
-| S | save the recording (only when the page was opened with `?record`) | live |
+| S | save the mission recording (only when the page was opened with `?record`) | live |
 | O | perception overload on the **followed** robot: deadline misses for 3 s | live |
 | U | resume the followed robot from SAFE_STOP (also the "Send resume command" button on its card). Travels over the radio, so it needs a route to CMD | live |
 | B | baseline toggle: every robot switches to "without Deadzone" (stops when its link drops, no relays) and back. Red "Baseline" chip while on. Q&A only, never during the beat sheet | live |
 | A | aftershock: part of the building collapses where the first powered relay is, that relay is destroyed, the network reroutes and robots replan (and reroute rescue routes they see blocked) | needs `DZ_AFTERSHOCK=1`; Q&A only |
-| L | AI Lab overlay: training examples, training curve, confusion matrix, held-out metrics, and the crop a robot just judged with its Grad-CAM | needs `DZ_AI_LAB=1` |
+| L | Model Lab overlay: training examples, training curve, confusion matrix, held-out metrics, and the crop a robot just classified with its Grad-CAM | needs `DZ_AI_LAB=1` |
+| J | Model test: a random held-out thermal sample; guess person or not, then see the model's recorded answer. Q&A only | needs the held-out export |
+| M | one view (Reality with the Command post inset, bottom right) / split view | live |
+| C | one view only: swap the Command post inset and the main view (the reveal) | live |
+| E | Operator view (map first, panels on hover; the default) / Engineering view (every panel) | live |
 | K | night operations lighting (headlights, flood light, strobes) | live, off by default; dry run first |
 | D | auto-director camera (cuts to dark robots, finds, the reveal, aftershocks). Any drag, wheel or 0–9 hands the camera back for 20 s | live, off by default; good for a hands-free video |
 
@@ -183,7 +187,7 @@ The safety check needs the command post to have heard each robot once. Startup a
 | Log says `sim sensor fallback` | Stop. Install CPU torch (pre-flight step 2) and restart the server. Without it there's no AI story (the sensor then emits no decoys, so no false survivors, but no rejection cards either). |
 | Server crashed | Restart it (pre-flight step 3). The browser reconnects by itself. Then reset and dispatch P-2 again. |
 | Phones can't reach the laptop | Move every device to the phone hotspot, or use `cloudflared`. The demo also runs without phones (plan fallback above). |
-| Nothing works | Replay the recording: open `/?replay` and drop the file in (Space pauses, Backspace restarts). It needs no sim, but the detection card images only load if the server is running. |
+| Nothing works | Mission replay: open `/?replay` and drop the mission recording in (Space pauses, Backspace restarts). It needs no sim, but the detection card images only load if the server is running. |
 
 ## Q&A extras (after the close, only what passed a dry run)
 

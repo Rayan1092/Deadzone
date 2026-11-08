@@ -15,7 +15,7 @@ function Crop({ crop, entry }) {
   const heat = !heatFailed && (entry?.heatmap_alpha ?? entry?.heatmap)
   return (
     <div className="det-crop">
-      <img src={`/crops/${crop}`} alt="Thermal crop the detector judged" onError={() => setFailed(true)} />
+      <img src={`/crops/${crop}`} alt="Thermal crop the detector classified" onError={() => setFailed(true)} />
       {heat && <img className="det-heat" src={`/crops/${heat}`} alt="Grad-CAM: where the model looked" onError={() => setHeatFailed(true)} />}
       {heat && <span className="det-heat-tag">where the AI looked</span>}
     </div>
