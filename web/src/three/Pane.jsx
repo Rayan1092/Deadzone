@@ -13,6 +13,7 @@ import { COLORS } from './util'
 import { useSim } from '../store'
 import { fitOverview, shared } from './camera'
 import BeliefLayer from './Belief'
+import CoverageLayer, { CoverageLegend } from './Coverage'
 import DetectionCards from '../panels/DetectionCards'
 import RobotEye from './RobotEye'
 import CommandInset from './CommandInset'
@@ -239,7 +240,7 @@ const PULSE_MS = 900
 function commandSignature(s) {
   const c = s.tick?.command
   return [c ? c.robots.map((r) => r.last_seen).join(',') : '', c?.survivors.length, c?.routes?.length, c?.relays.length, c?.faults?.length,
-    s.maps.commandVersion, shared.rev, s.floorplan, s.night, s.follow, s.beliefOn].join('|')
+    s.maps.commandVersion, shared.rev, s.floorplan, s.night, s.follow, s.beliefOn, s.coverageOn, s.maps.coverage].join('|')
 }
 function CommandRedraw() {
   const invalidate = useThree((s) => s.invalidate)
@@ -289,6 +290,7 @@ export default function Pane({ which, title, subtitle }) {
         <b>{title}</b>
         <span className="muted">{subtitle}</span>
         {which === 'command' && <PaneStats />}
+        {which === 'command' && <CoverageLegend />}
         {follow && <span className="follow-chip">{which === 'command' ? `${follow} last report` : `Following ${follow}`} · 0</span>}
       </div>
       {which === 'gap' && (
@@ -331,6 +333,7 @@ export default function Pane({ which, title, subtitle }) {
             <Building props={false} />
             <Fog which={which} />
             <BeliefLayer which={which === 'command' ? 'command' : 'reality'} />
+            <CoverageLayer />
             <AntennaPulse />
             <PlanZones />
             <CommandActors />

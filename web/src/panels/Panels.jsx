@@ -402,6 +402,10 @@ export function useKeyboard() {
       if (key === 'v' && target) s.set({ eyeRobot: s.eyeRobot === target.id ? null : target.id })
       if (key === 'p') setPerf(!s.perf)
       if (key === 'm') toggleView()
+      if (key === 'w' && !e.repeat) {
+        if (!s.maps.coverage && !s.coverageOn) s.set({ toasts: [...s.toasts, { kind: 'note', msg: "Radio coverage isn't available in this run.", time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
+        else s.set({ coverageOn: !s.coverageOn })
+      }
       if (key === 'c' && !e.repeat) {
         if (s.view === 'gap') s.set({ insetSwap: !s.insetSwap })
         else frameCommandPost() // split view: top-down on the command post, again for the overview
