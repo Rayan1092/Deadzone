@@ -85,6 +85,7 @@ export const useSim = create((set) => ({
   follow: null,        // robot id the cameras follow (keys 1-3), null = overview
   eyeRobot: null,      // robot whose forward camera is open (V key / card button)
   eyeThermal: false,   // thermal palette in the robot's-eye view
+  phoneFrames: null,   // default-off server JPEG upload capability, scoped to the incident
   introOpen: false,    // first-glance explainer (once per session, or from the ? overlay)
   labOpen: false,      // L key: AI Lab overlay
   judgeOpen: false,    // J: held-out thermal judge challenge, after the close
@@ -173,6 +174,7 @@ export function handleMessage(msg) {
         sub: prev.id !== data.floorplan.id || prev.name !== data.floorplan.name ? data.floorplan.name : `${data.floorplan.name} · survivors and decoys shuffled, new seed` } })
       s.set({ floorplan: data.floorplan, grid: data.grid, robotsMeta: data.robots,
               running: data.running, speed: data.speed, mode: data.mode ?? null, time,
+              phoneFrames: data.phone_frames ?? null,
               detector: data.detector ? { mode: data.detector, reason: data.detector_reason } : null,
               ...(data.leases ? { leases: data.leases } : {}),
               // a reset frees every lease on the server: the presenter has to Unlock again

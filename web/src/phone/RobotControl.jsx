@@ -158,6 +158,7 @@ export function RobotCamera({ meta, report }) {
   return (
     <div className={`robot-cam${dark || off ? ' dark' : ''}`}>
       <div className="cam-view">
+        {f?.kind === 'jpeg' && <img style={{ objectFit: 'contain' }} src={`data:image/jpeg;base64,${f.frame.jpeg}`} alt={`${meta.id} last received camera frame`} />}
         {f?.kind === 'frame' && report?.pose && <FrameView frame={f.frame} pose={report.pose} />}
         {f?.kind === 'crop' && <CropImage crop={f.crop.crop} />}
         {!f && <div className="cam-empty">No camera image delivered yet</div>}
@@ -180,6 +181,7 @@ export function RobotCamera({ meta, report }) {
         </ul>
       )}
       <div className="muted small">
+        {f?.kind === 'jpeg' && `Camera frame from ${meta.id}, taken T+${fmtClock(f.t)}`}
         {f?.kind === 'frame' && `Thermal camera frame from ${meta.id}, taken T+${fmtClock(f.t)}${f.frame.hits?.length ? '' : ' · nothing warm in view'}`}
         {f?.kind === 'crop' && `${f.crop.id} · person${f.crop.conf != null ? ` ${Math.round(f.crop.conf * 100)}%` : ''} · last thermal image ${meta.id} delivered, taken T+${fmtClock(f.t)}`}
         {!f && (dark ? `${meta.id} has been out of contact for over ${DARK_S} s` : `Only images that reached the antenna are shown`)}
