@@ -1,9 +1,14 @@
 """Robot onboard software. Everything here only sees the world through `io`.
 
 States: DEPLOYING, EXPLORING, LOST_LINK_EXPLORING, RETURNING_TO_SIGNAL,
-RETURNING_HOME, REPLANNING, FAULT, DONE
+RETURNING_HOME, REPLANNING, FAULT, DONE, plus WAITING_FOR_LINK in baseline mode.
+
+Modes: "deadzone" (default, the real thing) and "baseline" ("without Deadzone": a robot that
+stops and waits when its link drops and carries no relays, like a tethered or teleoperated
+robot). Set at start with DZ_MODE=baseline or live with Robot.set_mode().
 """
 import math
+import os
 
 import numpy as np
 
@@ -76,8 +81,17 @@ HAZARD_COST = 3.0          # ... costs this much extra per cell
 
 # Final contract (telemetry): `state` is one of STATES, `fault` is None or one of FAULTS.
 STATES = ("DEPLOYING", "EXPLORING", "LOST_LINK_EXPLORING", "RETURNING_TO_SIGNAL",
-          "RETURNING_HOME", "REPLANNING", "FAULT", "DONE")
+          "RETURNING_HOME", "REPLANNING", "FAULT", "DONE", "WAITING_FOR_LINK")
 FAULTS = ("OVERCURRENT", "STUCK", "LOW_BATTERY", "TRAPPED", "SAFE_STOP")
+
+# Robot modes. Deadzone is the demo default; baseline is the "without Deadzone" comparison.
+MODES = ("deadzone", "baseline")
+
+
+def default_mode():
+    """DZ_MODE=baseline starts every robot in baseline mode; anything else means deadzone."""
+    mode = os.environ.get("DZ_MODE", "deadzone").strip().lower()
+    return mode if mode in MODES else "deadzone"
 
 
 def resume_command(rid, now):
@@ -164,6 +178,21 @@ class Robot:
         self.low_battery = False
         self.overload_until = None
         self.plan = None             # latest plan bundle payload from CMD (acted on in step A)
+        self.mode = default_mode()
+
+    # ------------------------------------------------------------------ mode toggle
+    def set_mode(self, mode):
+        """Switch between "deadzone" and "baseline" live (Q&A toggle). A baseline robot that is
+        waiting in the dark goes back to normal Deadzone behavior when switched back."""
+        if mode not in MODES:
+            raise ValueError(f"mode must be one of {MODES}")
+        if mode == self.mode:
+            return
+        self.mode = mode
+        self.events.append({"kind": "mode_changed", "robot": self.id, "mode": mode})
+        if mode == "deadzone" and self.state == "WAITING_FOR_LINK":
+            self.path = []
+            self._set_state("LOST_LINK_EXPLORING" if self.dark_declared else "EXPLORING")
 
     # ------------------------------------------------------------------ main step
     def step(self, dt, io):
@@ -323,7 +352,7 @@ class Robot:
         if self._peer_found(rec["id"]):
             return                         # a peer already confirmed this survivor: no 2nd beacon/route
         beacon = None
-        if self.relays_left > 0 and not self.linked:
+        if self.mode == "deadzone" and self.relays_left > 0 and not self.linked:
             try:
                 beacon = io.drop_relay(beacon_for=rec["id"])   # tagged beacon (None if refused)
             except ValueError:
@@ -399,6 +428,8 @@ class Robot:
         Upstream means infrastructure (CMD, relays, phones): robots never forward for others."""
         infra = [r for nid, r in io.radio.neighbors() if not is_robot_id(nid)]
         self.upstream_rssi = max(infra) if infra else None
+        if self.mode == "baseline":
+            return                      # baseline robots carry no relays
         if self.state not in ("EXPLORING", "RETURNING_TO_SIGNAL") or self.relays_left <= 0:
             return
         if not self.linked or self.upstream_rssi is None:
@@ -542,6 +573,18 @@ class Robot:
 
         if s == "REPLANNING":
             self._replanning()
+            return
+
+        if s == "WAITING_FOR_LINK":
+            self.path = []
+            if self.linked or self.mode != "baseline":
+                self._set_state("EXPLORING")
+            return
+        if self.mode == "baseline" and self.dark_declared and s != "DONE":
+            # without Deadzone: no link, no autonomy. Stop where the signal died and wait.
+            self.path = []
+            self._set_state("WAITING_FOR_LINK")
+            self.events.append({"kind": "waiting_for_link", "robot": self.id})
             return
 
         if s in ("EXPLORING", "LOST_LINK_EXPLORING"):
@@ -807,6 +850,7 @@ class Robot:
             "pose": [round(x, 3), round(y, 3), round(th, 3)],
             "v": round(self.v, 2),
             "state": self.state,
+            "mode": self.mode,
             "battery": {"pct": round(self.battery.pct, 1), "wh": round(self.battery.wh, 1),
                         "reserve_needed_pct": round(RESERVE_PCT + self._pct_home(), 1)},
             "link": link,
