@@ -1,9 +1,9 @@
 # Deadzone: Devpost draft
 
 > **Notes for us, delete before submitting**
-> - Only list Gemini under Built with and tick the Gemini prize if Aziz's Gemini briefing ships. Right now G gives a local summary.
-> - Reed-Solomon isn't built, so it's only in "What's next". Add it back if it lands.
-> - Add the demo video link, the repo link, and the 4 screenshots (split view at the S1 burst, phone safety card, scheduler strip during O, ML slide from `docs/assets/`).
+> - Gemini shipped (G briefing and phone Ask, `DZ_GEMINI=1`, dry run passed), so it is under Built with; tick the Gemini prize.
+> - Reed-Solomon is built (`server/deadzone/network/fec.py`) but behind `DZ_FEC=1`, off in the demo run; the text says so.
+> - Add the demo video link and the repo link. Gallery screenshots are in `docs/screenshots/` (live seed-7 run, demo flags): `phone-safety-card.jpg` (the rejected plan), `phone-dispatched.jpg`, `dark-find.jpg` (Robot 2 finds S1 out of contact, Reality only), `s1-burst.jpg` (S1 and its route reach the command post), `scheduler-overload.jpg` (perception misses, safety on time), `model-lab.jpg`, `model-test.jpg`. ML slides: `docs/assets/` (`stats_card.png`, `confusion_matrix.png`, `gradcam_strip.png`, `benchmark_v2.png`).
 > - Prize categories: Best General, Best AI/ML, Most Over Engineered, Best UI/UX (+ MLH Best Use of Gemini API only if Gemini ships).
 
 ## Tagline
@@ -28,10 +28,13 @@ Here's the demo:
 1. A judge plans the search on their phone (just a web page, scan a QR code). They send Robot 2 into the north-east corner. Our safety checker rejects it because the steel cage there is a predicted radio dead zone. They tap "Allow it to go dark" and the plan goes through.
 2. The robots split up the building, map it with lidar, and drop relays right before their signal breaks.
 3. Robot 2 goes into the steel cage and loses signal. On the command post it turns into a grey ghost.
-4. 10 seconds later it finds a survivor in the dark. The AI model on the robot says "person, 100%". Only the Reality side knows. Robot 2 drops a beacon relay next to the survivor and plans the safest route in from the entrance.
-5. It drives back to signal. **14.1 seconds after the find**, the map, the survivor and a 49.7 m rescue route all appear on the command post at once.
+4. 11 seconds later it finds a survivor in the dark. The AI model on the robot says "person, 100%". Only the Reality side knows. Robot 2 drops a beacon relay next to the survivor and plans the safest route in from the entrance.
+5. It drives back to signal. **15.8 seconds after the find**, the map, the survivor and a 49.7 m rescue route all appear on the command post at once.
 6. Along the way the robots look at a radiator, a car engine and a coffee machine. The AI says "not a person" every time, so there are no false alarms.
-7. We drop rubble in front of a robot, jam its wheel and overload its CPU. It stops, backs up, replans, and its safety task never misses a deadline.
+7. A secondary collapse drops rubble on that rescue route. The robots see it, and the route on the command post redraws around the rubble.
+8. We jam one robot's wheel and overload another's CPU. It stops, backs up, replans, and its safety task never misses a deadline.
+9. The last survivor is found with signal, so it reaches the command post instantly. Three for three.
+10. Press G and Gemini writes a short briefing for the incident commander, using only what reached the command post.
 
 Everything runs on a fixed seed, so the story happens on cue. Between cues the robots really are on their own.
 
@@ -39,11 +42,13 @@ Everything runs on a fixed seed, so the story happens on cue. Between cues the r
 
 **Robots.** Each robot only sees the world through its sensors (lidar, thermal camera, odometry) and its radio. It builds its own occupancy grid from lidar, picks frontiers to explore, and drives with A\*. Robots share their targets with each other so they don't all search the same room. Each robot carries 2 relays and drops one when its best upstream link falls between -81 and -76 dBm, at least 4 m from any other relay. That's before the link actually breaks. When a robot goes dark it keeps exploring for up to 60 s, or goes back to its last good spot as soon as it finds someone. Onboard there's a rate monotonic scheduler with 6 tasks (safety, motion, comms, mapping, perception, battery) at 1 ms resolution. Utilization is 0.377, under the 0.735 Liu and Layland bound. The fault protection handles wheel overcurrent, getting stuck, low battery and being trapped, and goes into safe stop after 3 faults in a minute.
 
-**Radio and network.** Signal strength uses a multi-wall path loss model. Every wall the signal crosses costs a fixed amount by material: drywall 4 dB, brick 10, concrete 16, metal 22 (values we picked for the model, not measurements). Links come up above -82 dBm and drop below -88, so they don't flicker. Messages are delay-tolerant bundles with per-hop custody: a node only deletes a bundle after the next node confirms it stored it, so nothing gets lost when a link dies mid-transfer. Survivor reports go first, then faults and routes, then telemetry, then map updates. Robots never forward for each other. Only relays and phones do.
+**Radio and network.** Signal strength uses a multi-wall path loss model. Every wall the signal crosses costs a fixed amount by material: drywall 4 dB, brick 10, concrete 16, metal 22 (values we picked for the model, not measurements). Links come up above -82 dBm and drop below -88, so they don't flicker. Messages are delay-tolerant bundles with per-hop custody: a node only deletes a bundle after the next node confirms it stored it, so nothing gets lost when a link dies mid-transfer. Survivor reports go first, then faults and routes, then telemetry, then map updates. Robots never forward for each other. Only relays and phones do. Bundles can also carry real Reed-Solomon RS(255,223) error correction with a CRC check, so a corrupted transfer is repaired or retried instead of accepted. It's built and tested, but switched off for the demo run.
 
 **Command post.** The command view only changes when a bundle actually arrives. We have a test that fails if it ever knows a survivor or a map cell before the bundle carrying it was delivered. The safety checker only uses what the command post knows. It predicts dead zones, battery reserve and reachability, and rejects unsafe plans with a clear reason.
 
 **Rescue routes.** When a robot confirms a survivor it runs A\* from the entrance to the survivor on its own map. It only uses mapped open floor, never rubble or no-go areas, and keeps to the middle of corridors. The route goes to the command post as a priority-1 bundle, so responders get it the moment it arrives.
+
+**Briefings.** Press G and Gemini writes a short situation briefing from the command post's data only: what was delivered, never what the robots see in Reality. Phones can ask it questions the same way.
 
 **Big screen and phones.** React, three.js and react-three-fiber. Two synced 3D panes with fog of war, lidar rays, relay links, ghost robots, survivor figures, AI detection cards, a live scheduler strip, follow cameras and a robot's-eye thermal view. Phones get the command view only, plan zones with a drag, run the safety check, and can even act as a relay.
 
@@ -51,18 +56,22 @@ Everything runs on a fixed seed, so the story happens on cue. Between cues the r
 
 - **Data:** person boxes from the FLIR ADAS thermal dataset. 96 × 96 crops. Positives are people at least 20 px tall. Negatives are half object-centered (cars, bikes, buses) and half random background. 3,000 per class for training, 600 per class held out for testing.
 - **Indoor data:** street footage has almost no one lying or sitting, so we added real indoor thermal frames from the SDT dataset (FLIR Lepton 3.5, CC BY 4.0): people lying, sitting and standing, plus empty rooms. The last 20% of every recording is held out.
-- **Model:** MobileNetV3-Small pretrained on ImageNet, last layer swapped for person / not person, 5 epochs. The model file is 6 MB, small enough to run on the robot.
+- **Model:** MobileNetV3-Small pretrained on ImageNet, last layer swapped for person / not person, 5 epochs. 1.5 M parameters, a 6.2 MB file, small enough to run on the robot. Exported to ONNX, it scores one crop in 0.50 ms on one laptop CPU core, with the same verdict as PyTorch on all 1,246 test images.
 - **Results on 1,200 held-out images (threshold 0.6):** 96.7% accuracy, 97.3% precision, 96.0% recall. Confusion matrix: 576 people found, 24 missed, 584 backgrounds rejected, 16 false alarms.
 - **Indoor result:** on 2,273 held-out indoor frames, accuracy on people lying and sitting went from 83.9% (street data only) to 99.6% after adding the indoor data; the street-image score went up too, from 96.2% to 96.7%.
+- **Confidence you can trust:** expected calibration error is 0.6% on street images and 0.2% indoors. When the model says it's 90%+ sure, it's right 98.9% of the time on street images and 2,246 of 2,246 times indoors.
+- **Try it yourself:** press J for the Model test: guess "person or not" on held-out thermal images the model never trained on, then see its answer. It gets 36 of 40 right.
 - **In the sim:** every hot spot the thermal camera sees gets cropped and scored on the robot. The survivors and decoys in the building use held-out crops, so the radiator, engine and coffee machine get rejected by the real model, not by a rule. If PyTorch isn't installed the robots fall back to a simple sim sensor and the decoys turn off, so a missing library can never put a radiator on screen as a person.
 
 ## Does it actually help? (in simulation)
 
-We added a "without Deadzone" baseline: the same robots with the same mapping and planning, but each one stops and waits as soon as its link drops and carries no relays, like a tethered or teleoperated robot. Then we ran both versions in our simulator on 20 random survivor layouts (3 robots, 6 minutes of sim time each).
+We added a "without Deadzone" baseline: the same robots with the same mapping and planning, but each one stops and waits as soon as its link drops and carries no relays, like a tethered or teleoperated robot. Press B on the big screen to switch to it live.
 
-**In simulation**, Deadzone got 60 of 60 survivors to the command post and the baseline got 39 of 60. The command post had 90% of the building mapped with Deadzone and 70% with the baseline. On our demo layout the baseline never finds the survivor in the steel cage.
+**In simulation**, on our demo building over 30 random seeds, Deadzone got 88 of 90 survivors to the command post and the baseline got 38 of 90. The command post had 89% of the building mapped with Deadzone and 43% with the baseline.
 
-These are simulation results, not real-world ones. The radio model's wall losses and link thresholds are values we chose, not measurements, so this shows the idea works in our model, not how much it would help in a real collapse. The script and the full table are in the repo (`ml/benchmark.py`, `docs/assets/benchmark.md`).
+Our radio numbers are our own choices, so we checked that the result doesn't hinge on them. We swept 9 radio settings on that building and tried 3 generated buildings: Deadzone came out ahead in all 15 cases, and in none of 330 paired runs did it find fewer survivors than the baseline. With published 2.4 GHz wall losses (NIST) and the ITU-R indoor path-loss exponent, it was ahead in 9 of 9 settings.
+
+These are still simulation results, not real-world ones. They show the idea holds across reasonable radio models, not how much it would help in a real collapse. The scripts and full tables are in the repo (`ml/benchmark_v2.py`, `docs/assets/benchmark_v2.md`, `docs/assets/benchmark_published.md`).
 
 ## Challenges we ran into
 
@@ -76,7 +85,7 @@ These are simulation results, not real-world ones. The radio model's wall losses
 
 - The whole loop works end to end with no fake data path. A survivor found in the dark reaches the command post only when a real bundle gets there.
 - The AI runs where it would in real life, on the robot, and it rejects decoys on its own.
-- 200 automated server tests, including the core story and the "command post never knows early" test.
+- 736 automated server tests and 85 web tests, including a demo guard that replays the whole story and the "command post never knows early" test.
 - The demo is deterministic, so it's the same 3-minute story every time.
 
 ## What we learned
@@ -89,9 +98,9 @@ These are simulation results, not real-world ones. The radio model's wall losses
 
 - Multi-floor buildings.
 - Running the same robot code on real ROS 2 robots. It only talks to `io`, so you'd swap the sim for real drivers.
-- Reed-Solomon error correction on weak links.
+- Reed-Solomon error correction on by default, tuned to how bad the link is.
 - Mesh radios and real phone relays in the field.
 
 ## Built with
 
-Python, FastAPI, numpy, PyTorch, torchvision, React, three.js, react-three-fiber, Vite, zustand.
+Python, FastAPI, numpy, PyTorch, torchvision, ONNX Runtime, Google Gemini API, reedsolo, React, three.js, react-three-fiber, Vite, zustand.
