@@ -62,3 +62,19 @@ test('no "judge" or "presenter" left in user-facing web text', () => {
   }
   assert.deepEqual(bad, [])
 })
+
+test('plan captions: zone assignment, plan pending while dark, holding first', async () => {
+  const { planCaption, zoneLabel, NO_GO_HOLD } = await import('../src/format.js')
+  assert.equal(zoneLabel('Z3'), 'Zone 3')
+  assert.equal(zoneLabel('ZNE'), 'Zone ZNE')
+  const plan = { plan_id: 'P-2', zones: [{ id: 'Z3', robot: 'R2' }] }
+  const r2 = { id: 'R2', name: 'Scout 2', plan_id: 'P-1', zone: 'ZNE', link: { up: false } }
+  assert.deepEqual(planCaption(r2, { dispatched: ['P-1', 'P-2'], plan }), { kind: 'pending', text: 'plan pending · robot dark' })
+  assert.equal(planCaption({ ...r2, link: { up: true } }, { dispatched: ['P-1', 'P-2'], plan }).text, 'plan pending')
+  assert.equal(planCaption({ ...r2, plan_id: 'P-2', zone: 'Z3', link: { up: true } }, { dispatched: ['P-1', 'P-2'], plan }).text, 'Scout 2 → Zone 3')
+  assert.equal(planCaption({ ...r2, state: 'WAITING' }, { dispatched: ['P-2'], plan }).text, NO_GO_HOLD)
+  assert.equal(NO_GO_HOLD, 'Holding · no-go blocks all routes')
+  // a no-go-only plan names no robot: nothing is pending, robots keep their zones
+  assert.equal(planCaption({ ...r2, link: { up: true } }, { dispatched: ['P-1', 'P-3'], plan: { plan_id: 'P-3', zones: [] } }).text, 'Scout 2 → Zone ZNE')
+  assert.equal(planCaption({ id: 'R1', link: { up: true } }), null)
+})

@@ -651,3 +651,7 @@ button:hover { border-color: var(--teal); }
 .app.judge .pane:hover .pane-stats, .app.judge .pane:hover .pane-title .muted { display: inline; }
 .lg-packet { width: 8px; height: 8px; border-radius: 50%; background: #5eead4; box-shadow: 0 0 6px #5eead4; display: inline-block; }
 .rs-cell.missing b { color: #d8b4fe; }
+
+/* plan captions on the robot cards: "Scout 2 → Zone 3", amber while a plan has not reached the robot */
+.plan-line { margin-top: 4px; font-size: 12px; color: rgba(230,237,243,.82); }
+.plan-line.pending { color: #fcd34d; }

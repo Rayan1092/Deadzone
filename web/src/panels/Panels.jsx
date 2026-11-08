@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { setLayout, setNight, setPerf, setView, useSim } from '../store'
 import { control } from '../net/socket'
-import { FAULT_LABEL, describeEvent, fmtClock as fmt, latestRoutes, robotStateLabel, unitName } from '../format'
+import { FAULT_LABEL, describeEvent, fmtClock as fmt, latestRoutes, planCaption, robotStateLabel, unitName } from '../format'
 import { lastContact, linkQuality, linkText } from './robotCard'
 import { FILTERS, eventCategory, feedParts, readFilters, robotIds, saveFilters, visibleEvents } from './eventFeed'
 import { JoinButton } from './JoinPanel'
@@ -157,6 +157,8 @@ export function Sidebar() {
   const cmdRobots = Object.fromEntries((tick?.command.robots ?? []).map((r) => [r.id, r]))
   const leases = useSim((s) => s.leases)
   const leaseHolder = Object.fromEntries((leases?.enabled ? leases.robots : []).filter((l) => l.controller).map((l) => [l.robot, unitName(l.controller.name)]))
+  const dispatched = useSim((s) => s.dispatchedPlans)
+  const plan = useSim((s) => s.plan)
   return (
     <aside className="sidebar">
       <h3>Robots</h3>
@@ -185,6 +187,11 @@ export function Sidebar() {
               </span>
               <Signal link={r.link} />
             </div>
+            {(() => {
+              // the plan in plain words: "Scout 2 → Zone 3", or "plan pending · robot dark" (holding is the state line)
+              const c = planCaption(r, { dispatched, plan })
+              return c && c.kind !== 'holding' ? <div className={`plan-line ${c.kind}`}>{c.text}</div> : null
+            })()}
             {lastContact(r.link, cmd, time) && (
               <div className="last-contact">Out of contact · last report {lastContact(r.link, cmd, time)} ago</div>
             )}
