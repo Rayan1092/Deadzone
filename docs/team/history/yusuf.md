@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/inset-resize-keys` (resizable Command inset, Y/W only with their data), PR next. Then nothing: code freeze moved to 11:40.
+- **Working on:** `p3/inset-resize-keys` (resizable Command inset, Y/W only with their data, K lighting), PR next. Then nothing: code freeze moved to 11:40.
 - **Works on main:** everything through #94: 3D world, AI showcase (route replace, B, AI in the scout camera, phone Ask Gemini, spoken G), collapse look, AI Lab (L), night lighting (K), auto-director (D), disaster site and realism pass, Rayan's collapse list steps 1-6 (walls, ceiling, debris, night atmosphere, camera, rover loader), and the 12:20 AM final-stretch list (Rescue Status strip, captions, judge labels, earthquake v2, banners, generic props, exterior shell, N, Shift+A). Dropped: multi-story interior, voice UI, clinic map.
 - **In flight (not merged):** `p3/inset-resize-keys`. #195 and #197 (Save recording) merged.
 - **Blocked on / need from others:**
@@ -17,6 +17,7 @@ Owns `web/`. Only Yusuf's sessions edit this file.
 ## Log
 ### 2026-11-08 11:28 EST · p3/inset-resize-keys · Command inset smaller and resizable; Y and W say nothing only when there is nothing to show
 - **Did:** one view's Command post inset now opens at 34% x 38% of the pane (was 46% x 48%; about 13% of the screen area, measured 653 x 391 at 1920x1080). Drag the amber corner at its top left (it sits bottom right) to resize, kept between 260 x 180 px and 90% x 85% of the pane; the size is stored as fractions in `localStorage` `dz-inset-size` (each browser keeps its own; a bad value or a private window falls back to the default). C still swaps, and swapping back restores the dragged size. Help (H) lists Y only when the server sends a belief map (`maps.belief` or `maps.belief_command`); W without a coverage grid now shows the one-line toast "Coverage data not enabled". Checked in headless Chrome against a separate server on :8014 (practice :8000 untouched): drag 653x391 to 853x511, the same after a reload, C to full screen and back, W toast, help without Y. 103 frontend tests (new: size clamp/load/save, Y filter), web build.
+- **Also (11:38):** K is back as a lighting toggle, night (default on every load) / day, with a "Lighting: night" / "Lighting: day" toast; help lists it under View as "Lighting: night / day." 103 frontend tests.
 - **Contract changes:** none.
 - **Heads-up for others:** **Rayan:** if the inset was dragged during practice, the demo laptop remembers that size; to reset it, run `localStorage.removeItem('dz-inset-size')` in the console or drag it back.
 - **Next:** stop at the 11:40 freeze.
