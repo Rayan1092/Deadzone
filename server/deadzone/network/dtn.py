@@ -7,6 +7,7 @@ ack packets themselves have no simulated latency or loss yet.
 import itertools
 import json
 import random
+from collections import deque
 from copy import deepcopy
 
 from .propagation import throughput_bps
@@ -42,7 +43,7 @@ def _order(bundle):
 
 
 class DTNNetwork:
-    def __init__(self, fec_enabled=False, seed=7):
+    def __init__(self, fec_enabled=False, seed=7, *, trace_enabled=False):
         self.queues = {}
         self.limits = {}
         self._seen = {}       # receiver -> bid -> expiry, including forwarded bundles
@@ -50,6 +51,10 @@ class DTNNetwork:
         self._progress = {}   # (sender, receiver, bid) -> bytes transmitted
         self.non_forwarding = set()
         self.disabled = set()
+        self.trace_enabled = trace_enabled
+        self._traffic_events = deque(maxlen=512)
+        self._held = {}
+        self._started = {}
         self.fec_enabled = fec_enabled
         self.link_stats = {}
         self._wire = {}
@@ -60,9 +65,26 @@ class DTNNetwork:
                          "bundles_destroyed": 0, "custody_refusals": 0, "corrupted_bytes": 0,
                          "corrected_bytes": 0, "fec_failed_blocks": 0}
         self._counted = {}
+        if trace_enabled:
+            self.counters["traffic_events_dropped"] = 0
         if fec_enabled:
             from .fec import PayloadCodec
             self.codec = PayloadCodec()
+
+    def _traffic(self, kind, **data):
+        if self.trace_enabled:
+            if len(self._traffic_events) == self._traffic_events.maxlen:
+                self.counters["traffic_events_dropped"] += 1
+            self._traffic_events.append({"kind": kind, **data})
+
+    def drain_events(self):
+        events = list(self._traffic_events)
+        self._traffic_events.clear()
+        return events
+
+    def queue_view(self):
+        return {node: {"bundles": len(queue), "bytes": sum(b["size"] for b in queue)}
+                for node, queue in sorted(self.queues.items())}
 
     def register(self, node, outbox=None, capacity_bytes=None, can_forward=True):
         """Attach an existing robot outbox, or create a relay/command queue."""
@@ -158,10 +180,23 @@ class DTNNetwork:
                 self.counters["bundles_created"] += 1
                 self._counted[bundle["bid"]] = bundle["created"] + bundle["ttl"]
         candidates.sort(key=lambda item: (*_order(item[1]), item[0]))
-        budgets, progress, routes, wire = {}, {}, {}, {}
+        budgets, progress, routes, wire, started, held = {}, {}, {}, {}, {}, {}
+        def hold(node, bundle, reason):
+            if not self.trace_enabled:
+                return
+            key = node, bundle["bid"]
+            prev = self._held.get(key)
+            state = {"reason": reason, "held_since": prev["held_since"]
+                     if prev and prev["reason"] == reason else now}
+            held[key] = state
+            if state != prev:
+                self._traffic("bundle_held", bid=bundle["bid"], node=node, src=bundle["src"],
+                              dst=bundle["dst"], bundle_kind=bundle["kind"], bytes=bundle["size"],
+                              prio=bundle["prio"], **state)
         self.link_stats = {}  # counters describe this transport tick, not snapshot calls
         for sender, bundle in candidates:
             if sender in self.disabled:
+                hold(sender, bundle, "disabled")
                 continue
             if bundle["dst"] == sender:
                 continue
@@ -175,12 +210,14 @@ class DTNNetwork:
                 routes[route_key] = links.path(sender, bundle["dst"], avoid=route_key[2])
             path = routes[route_key]
             if not path or len(path) < 2 or path[1] not in self.queues:
+                hold(sender, bundle, "no_route")
                 continue
             receiver = path[1]
             edge = tuple(sorted((sender, receiver)))
             if edge not in budgets:
                 budgets[edge] = throughput_bps(links.link_rssi(*edge)) * dt
             if budgets[edge] <= 0:
+                hold(sender, bundle, "link_busy")
                 continue
             key = sender, receiver, bundle["bid"]
             sent = self._progress.get(key, 0.0)
@@ -196,12 +233,15 @@ class DTNNetwork:
                 size = len(frame[0]) + frame[1]
             elif frame is not None:
                 sent = 0  # changed coding mode: restart the hop
+            began = self._started.get(key, now) if sent > 0 else now
             amount = min(size - sent, budgets[edge])
             self.counters["bytes_transmitted"] += amount
             sent += amount
             budgets[edge] -= amount
             if sent + 1e-9 < size:
                 progress[key] = sent
+                if self.trace_enabled:
+                    started[key] = began
                 if protected:
                     wire[key] = frame
                 continue
@@ -217,11 +257,16 @@ class DTNNetwork:
                 except DecodeFailure as error:
                     stats["corrected_bytes"] += error.corrected
                     stats["fec_failed_blocks"] += error.failed
+                    hold(sender, bundle, "fec_retry")
                     continue  # no custody ack; retry a fresh attempt next tick
                 stats["corrected_bytes"] += corrected
                 received = dict(bundle, payload=payload)  # deliver decoded bytes, never the original object
             if self._accept(receiver, received):
                 self.counters["hop_transfers"] += 1
+                self._traffic("bundle_hop", bid=bundle["bid"], src=bundle["src"], dst=bundle["dst"],
+                              a=sender, b=receiver, bundle_kind=bundle["kind"], bytes=bundle["size"],
+                              wire_bytes=int(size), prio=bundle["prio"], started_t=began, arrived_t=now,
+                              hops=[*bundle["hops"], receiver])
                 # The receiver's successful custody ack is the ONLY place a
                 # transmitted bundle is removed from the sender's outbox.
                 self.queues[sender][:] = [b for b in self.queues[sender]
@@ -229,8 +274,10 @@ class DTNNetwork:
                 self._seen[sender][bundle["bid"]] = bundle["created"] + bundle["ttl"]
             else:
                 self.counters["custody_refusals"] += 1
+                hold(sender, bundle, "custody_refused")
         self._progress = progress  # drop partial hops interrupted by link/route changes
         self._wire = wire
+        self._started, self._held = started, held
         for key in ("corrupted_bytes", "corrected_bytes", "fec_failed_blocks"):
             self.counters[key] += sum(stats[key] for stats in self.link_stats.values())
         delivered = []

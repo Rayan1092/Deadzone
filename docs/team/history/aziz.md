@@ -4,13 +4,22 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** batch 5 p2/global-no-go (moved before 4 to fix the traced phone bug), ready for PR. Main 123c32d includes camera #115, Rayan escape #116, Yusuf phone controls/defaults #112 and display-only belief #117. Full backend 540 passed / 1 skipped (127.81 s); 10 focused no-go cases passed. Traffic/stream is the one remaining batch PR.
-- **Completed:** #108 hard bodies, #111 shelf physics and #115 delivered phone camera merged/confirmed; old branches deleted. All experiment behavior remains default off until testing-laptop dry runs. No robot/web source edited by Aziz.
-- **No-go contract / works:** DZ_GLOBAL_NO_GO=1 at PlanManager/SafetyChecker construction. Every deployed ID from robot_specs receives the full shared no_go list via normal priority-1 DTN plan bundles, filtered zones (possibly empty), including clearing old exclusions. ID immutability/idempotence and safety recheck remain intact. A delivered start inside a new responder exclusion may BFS over non-occupied/non-static-hazard cells to the nearest allowed start in Rayan's 6 m coordinate window; full exit distance counts toward energy. Goals/home stay strict. No live pose/battery/map use and no direct robot mask changes. Flag off preserves old behavior. No-go-only drafts still need a zone to dispatch, as Yusuf's card explains.
-- **Trace evidence:** exact 80-sim-second room replay: no robot enters the exclusion, including unassigned R2/R3. Real-building R3 delivered pose (3.8,10) inside the new area now passes the route estimate. DTN application and later clearing confirmed on all 3 robots; static wall/hazard/home rejection, extra energy, default recipient behavior and Command-only boundary covered.
-- **Coordination:** Rayan owns physical escape (now main #116), Yusuf owns zone defaults/card (now #112). Prior save-order fix is defensive, not the demonstrated root cause. Camera backend ages the producer's supplied t; true capture timestamp preservation is a producer follow-up. Actual shelf footprints are Rayan/Yusuf's work; Gemini key remains deferred.
+- **Working on:** item B only, `p2/network-traffic`, isolated from the inherited traffic/stream WIP on main c6b1812. Item A already merged in #108; phone camera item 3 already merged in #115. C remains preserved locally for its own branch after B merges.
+- **Works on main:** #108 hard bodies, #111 shelf occupancy, #115 delivered phone camera with last_seen_s, #118 global exclusions. All behavior gates remain default off; fixed seed-7 demo stays the acceptance baseline.
+- **Traffic contract:** `DZ_NETWORK_TRAFFIC=1` at Sim reset enables screen-only `bundle_hop {bid,src,dst,a,b,bundle_kind,bytes,wire_bytes,prio,started_t,arrived_t,hops}` after complete custody acknowledgment; `bundle_held {bid,node,src,dst,bundle_kind,bytes,prio,reason,held_since}` on entry/reason change (no_route, disabled, link_busy, custody_refused, fec_retry); `tick.reality.queues[node]={bundles,bytes}`; bounded 512-event diagnostic buffer with `tick.stats.traffic_events_dropped`. No payloads, fabricated positions or Command/phone/Gemini additions. See scripts/TRAFFIC.md.
+- **In flight (not merged):** B traffic code/tests ready for PR; full backend 554 passed / 1 skipped (139.41 s), including the fixed seed-7 guard. No stream optimization in this branch.
+- **Blocked on / need from others:** no blocker for B/C. Yusuf consumes the traffic fields. Furniture radio attenuation and belief/prior wiring are separate follow-ups; DZ_OBSTACLES and DZ_SEARCH_BAYES must remain off for the demo per latest Rayan/test-laptop handoffs.
+- **Promises to others:** one branch/PR per item, merge main immediately before PR, merge B before C. No edits to floorplan.py, command/plan.py, command/safety.py, robot/web/data source or server/.env. Camera is complete; true producer capture timestamp remains Rayan-owned.
 
 ## Log
+
+### 2026-11-08 PT - p2/network-traffic - Isolate item B from inherited combined WIP
+- **Did:** confirmed collision #108 and camera #115 merged, preserved all inherited WIP, integrated main c6b1812 and moved only actual hop/held diagnostics and queue depths into this branch. Added transport and screen/phone boundary checks. C remains uncommitted in the saved WIP for a later branch.
+- **Contract changes:** additive default-off DZ_NETWORK_TRAFFIC fields in Now and scripts/TRAFFIC.md; custody acceptance is the only successful-hop trigger, holds coalesce, and diagnostic overflow never changes transport. No legacy flag-off wire change.
+- **Validation:** full backend 554 passed / 1 skipped (139.41 s), including the fixed seed-7 demo guard; all 11 traffic cases passed. Windows sandbox temp ACLs required normal temp access; no production change for the environment issue.
+- **Heads-up for others:** Yusuf can consume a/b/bid/timing/hops, hold node/reason and Reality queues. No stream compression bundled here. New main includes shelf export/demo caveat, test-laptop refresh and Yusuf's floating scout camera; their source is untouched.
+- **Next:** complete backend/demo guard validation, merge main immediately before opening this one PR, merge/confirm it, then start C separately.
+
 
 ### 2026-11-08 PT - p2/global-no-go - Combined belief/no-go validation green
 - **Did:** final source combination on main 123c32d passed the full backend after belief integration; no-go source unchanged from the focused trace replay.
