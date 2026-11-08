@@ -4,6 +4,9 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
+- **Working on:** batch 1 on `p2/robot-collisions`. #101 is confirmed merged on main f3b8f3a (phone source commit dfc4054 is an ancestor). Closing integration history committed immediately after the concurrent merge is preserved here; old phone branch can be deleted once this integration commits.
+- **Collision contract BEFORE code (proposal for Rayan):** opt in at Sim reset with `DZ_ROBOT_COLLISIONS=1`, default off. Circular robot bodies have radius 0.30 m (0.60 m minimum centre separation). Swept simultaneous motion prevents crossing/tunnelling; conflicting translations stop for the whole tick, rotation still applies. `io.odometry().blocked` is true on a rejected commanded translation and `v` is 0; flag-on odometry adds `blocked_by: [<robot ids>]` sorted, empty for wall/no robot contact. Reality telemetry adds the same blocked/blocked_by plus `body_radius_m`; nothing is copied into Command/phones/Gemini or radio bundles. Blockage is observable on the next robot step, with no yield/autonomy policy change in Aziz's files. Existing flag-off motion, spawn spacing and demo beats remain identical. Rayan's pending contract will be checked before finalizing this PR.
+
 - **New batch queued (Rayan, via Aziz):** one PR each: (1) flagged hard robot collisions/blocked odometry; (2) shelf obstacle occupancy and material radio loss, footprints/data from Yusuf/Rayan; (3) delivered-telemetry-only per-robot phone camera plus last_seen age, keep exclusive leases; (4) actual bundle_hop/bundle_held + node queues and compatible payload optimization; (5) trace-driven investigation of phone zones/no-go dispatch/DTN. No new branch until #101 is merged and confirmed on main. Aziz clarified: no PLAN batch update yet; collision/camera contracts will land in rayan.md, testing trace in rayan-ml.md in about 30 minutes. Continue collision work and team-sync every 30 minutes.
 
 - **Working on:** `p2/phone-sync`, fixing phone/main-app synchronization with Yusuf's approval reported by Aziz. Integrated latest `origin/main` 80f554e (#95–100 detector, crops, judge pool, benchmark, random-quake UI, showcase/variants/counters and fused heatmaps) before the PR. One PR only; no next branch until merged and confirmed on main.
@@ -14,6 +17,12 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 - **Validation:** final combined backend on main 80f554e **477 passed, 1 skipped** (155.80 s), including fixed seed-7 guard; frontend **15 tests passed**, production **754-module build passed**. Explicit demo guard before the last main merge was **10 passed** and is green in the final full run too. Fresh HTTPS screen/phone/mic pages/assets, matching QR origin, screen plus 2 phone WSS pass; local and public phone hello have the same incident epoch and trained detector. Public Ask confirms honest missing_key fallback; judge pool serves 40 actual items. Two old detector-status tests now explicitly consume the newly immediate paused-relay screen tick; full suite green.
 
 ## Log
+
+### 2026-11-07 PT · p2/robot-collisions · Main integration and collision contract before code
+- **Did:** confirmed #101 merged concurrently, included latest main f3b8f3a, preserved the closing history entry, and started only batch 1. No collision implementation yet.
+- **Contract changes:** proposed DZ_ROBOT_COLLISIONS, 0.30 m disc radius, continuous simultaneous collision rejection, blocked/v feedback and optional flag-on blocked_by/body_radius_m as recorded in Now. Default off; no robot policy or Command leak.
+- **Heads-up for others:** Rayan: read the collision proposal in Now; existing blocked boolean stays the primary IO signal, yielding remains your area. Camera/traffic contracts and trace are pending your other sessions; Aziz explicitly said keep going and sync every 30 minutes.
+- **Next:** implement/test swept contacts, reverse motion, crossing, chain blocking, flag-off parity and seed-7 guard, then merge the one collision PR before batch 2.
 
 ### 2026-11-07 PT · p2/phone-sync · Close existing PR before Rayan backend batch
 - **Did:** fetched origin/main 2da65d2 (#102 demo Q&A, #103 calibration assets) and integrated before closing #101. Those commits change no server or web code; the 477-test backend / 15-test frontend / 754-module validation remains applicable, with guard and asset tests rerun below. New five-item batch queued in Now; one PR each, behavior flags default off.

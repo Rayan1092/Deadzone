@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSim } from '../store'
 import { AI_CAPTION, fmtClock } from '../format'
+import { cropCaption, cropEntry, sentence } from '../crops'
 
 // AI Lab (key L): how the onboard person detector was trained and how it scores, plus the
 // crop a robot just judged with its Grad-CAM. Static ML evidence comes from Rayan's exports,
@@ -40,6 +41,20 @@ function Stats({ m }) {
       {tiles.map(([k, v]) => (
         <div key={k} className="lab-stat"><b>{pct(v)}</b><span>{k}</span></div>
       ))}
+    </div>
+  )
+}
+
+// Second test set (Rayan's lab.json `metrics_indoor`): real indoor thermal frames of people
+// lying, sitting and standing, the poses a survivor is found in. Shown only when exported.
+function Indoor({ mi }) {
+  return (
+    <div className="lab-indoor">
+      <b>{pct(mi.accuracy)}</b>
+      <span>
+        on real indoor thermal people lying, sitting or standing
+        <small>{mi.n_test?.toLocaleString()} held-out frames{mi.recall != null ? ` · recall ${pct(mi.recall)}` : ''}{mi.precision != null ? ` · precision ${pct(mi.precision)}` : ''}</small>
+      </span>
     </div>
   )
 }
@@ -123,7 +138,7 @@ function Live({ crops }) {
   const [heat, setHeat] = useState(true)
   if (!last) return <div className="lab-live empty muted">Waiting for a robot to judge a hot spot…</div>
   const person = last.kind === 'survivor_found'
-  const entry = crops?.crops?.find((c) => c.file === last.crop)
+  const entry = cropEntry(crops, last.crop)
   // transparent overlay first, so the toggle shows the crop with and without it
   const heatmap = entry?.heatmap_alpha ?? last.heatmap
   return (
@@ -134,9 +149,9 @@ function Live({ crops }) {
       </div>
       <div className="lab-live-text">
         <span className="muted small">Just judged onboard · {last.robot} · T+{fmtClock(last.time ?? 0)}</span>
-        <span className="det-caption">{AI_CAPTION}</span>
+        <span className="det-caption">{cropCaption(crops, entry)}</span>
         <b className={person ? 'yes' : 'no'}>{person ? 'Person' : 'Not a person'} · {pct(last.conf ?? (person ? 1 : 0), last.conf > 0 && last.conf < 0.01 ? 1 : 0)}</b>
-        <span className="muted small">{person ? `Survivor ${last.survivor}` : `Hot spot ${last.id}${entry?.object ? ` (${entry.object})` : ''}, rejected`}</span>
+        <span className="muted small">{person ? `Survivor ${last.survivor}${entry?.pose ? ` · ${entry.pose}` : ''}` : `Hot spot ${last.id}${entry?.object ? ` (${entry.object})` : ''}, rejected`}</span>
         {heatmap && (
           <label className="lab-toggle">
             <input type="checkbox" checked={heat} onChange={(e) => setHeat(e.target.checked)} />
@@ -153,12 +168,12 @@ function Examples({ lab, crops }) {
     return (
       <section className="lab-examples">
         <h4>Training examples</h4>
-        <p className="det-caption">{AI_CAPTION} Held-out: the model never trained on these; misses are kept on purpose.</p>
+        <p className="det-caption">{sentence(lab.examples[0].caption ?? AI_CAPTION)} Held-out: the model never trained on these; misses are kept on purpose.</p>
         <div className="lab-grid">
           {lab.examples.slice(0, 24).map((ex) => (
             <figure key={ex.file} className={ex.label === ex.predicted ? '' : 'wrong'}>
               <img src={`/ai-lab/results/${ex.file}`} alt={`${ex.label} example`} loading="lazy" />
-              <figcaption>{ex.label}{ex.conf != null ? ` · ${pct(ex.conf, 0)}` : ''}</figcaption>
+              <figcaption>{ex.label}{ex.pose ? ` · ${ex.pose}` : ''}{ex.conf != null ? ` · ${pct(ex.conf, 0)}` : ''}</figcaption>
             </figure>
           ))}
         </div>
@@ -213,6 +228,7 @@ export default function AILab() {
             {m ? (
               <>
                 <Stats m={m} />
+                {lab?.metrics_indoor?.accuracy != null && <Indoor mi={lab.metrics_indoor} />}
                 {m.confusion && <Confusion c={m.confusion} />}
               </>
             ) : (

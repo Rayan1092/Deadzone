@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { rumble } from './audio'
+import { alarm, chime, confirm, ping, rumble } from './audio'
 
 // Events worth a toast on the big screen. replan, deadline_miss and deliveries
 // fire too often and stay in the sidebar feed or the timeline.
@@ -186,6 +186,11 @@ export function handleMessage(msg) {
             sub: ev.destroyed_relay ? `Part of the building came down · relay ${ev.destroyed_relay} crushed · robots rerouting` : 'Part of the building came down · robots rerouting' } })
         rumble(5) // only audible after a user gesture (the A key counts)
       }
+      // sound cues (X turns them off): news only, a repeat sighting stays quiet
+      if (ev.kind === 'survivor_found' && !repeat) ping()
+      if (ev.kind === 'survivor_reported') confirm()
+      if (ev.kind === 'fault') alarm()
+      if (ev.kind === 'link_restored') chime()
       // the robot's own route (Reality knowledge); Command draws only delivered command.routes
       if (ev.kind === 'rescue_route') {
         // a newer route for the same survivor replaces the old one; an older one is ignored

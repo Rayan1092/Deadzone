@@ -209,7 +209,13 @@ button:hover { border-color: var(--teal); }
   border: 1px solid rgba(255,255,255,.12); box-shadow: 0 8px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08); }
 .det-card.person { border-color: rgba(239,68,68,.45); }
 .det-card.rejected { opacity: .72; }
-.det-crop { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; flex: none; background: #000; image-rendering: pixelated; }
+.det-crop { position: relative; width: 84px; height: 84px; border-radius: 10px; overflow: hidden; flex: none; background: #000; }
+.det-crop img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.det-crop .det-heat { opacity: 0; animation: det-heat-in .9s ease-out 1.1s forwards; }
+.det-heat-tag { position: absolute; left: 4px; right: 4px; bottom: 4px; padding: 1px 0; border-radius: 4px; text-align: center;
+  font-size: 8px; letter-spacing: .04em; color: #fed7aa; background: rgba(0,0,0,.55); opacity: 0; animation: det-heat-in .9s ease-out 1.1s forwards; }
+@keyframes det-heat-in { to { opacity: .9; } }
+@media (prefers-reduced-motion: reduce) { .det-crop .det-heat, .det-heat-tag { animation: none; opacity: .9; } }
 .det-crop.empty { display: grid; place-items: center; font-size: 10px; color: #fde68a;
   background: radial-gradient(circle at 50% 45%, #f97316 0, #7c2d12 35%, #1e1b4b 75%); }
 .det-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -398,6 +404,10 @@ button:hover { border-color: var(--teal); }
 .lab-stat { padding: 10px; border-radius: 10px; background: rgba(255,255,255,.04); display: flex; flex-direction: column; gap: 2px; }
 .lab-stat b { font-size: 22px; font-variant-numeric: tabular-nums; }
 .lab-stat span { font-size: 12px; color: var(--muted); }
+.lab-indoor { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding: 10px; border-radius: 10px; background: rgba(255,255,255,.04); }
+.lab-indoor b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.lab-indoor span { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); }
+.lab-indoor small { font-size: 11px; opacity: .8; }
 .lab-confusion { margin-top: 14px; display: grid; grid-template-columns: 22px 78px 1fr 1fr; grid-template-rows: 18px 18px 1fr 1fr;
   gap: 4px; max-width: 420px; }
 .lab-axis { font-size: 11px; color: var(--muted); }
