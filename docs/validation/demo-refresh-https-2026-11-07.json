@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "origin": "https://gibson-launched-quote-said.trycloudflare.com",
+  "checks": [
+    "screen/phone/microphone HTML and built assets over HTTPS",
+    "API and QR join use the same HTTPS origin",
+    "screen + two Command-only phone handshakes over WSS"
+  ],
+  "microphone": "requires manual phone /mic-check test",
+  "venue_wifi": "not established by this probe"
+}

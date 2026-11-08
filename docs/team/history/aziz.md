@@ -4,11 +4,83 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** `p2/sensor-camera`, stacked on routing PR #77. User explicitly requests actual robot-facing camera and further route review; authorizes focused robot/web edits. Estimate 30-45 min; no ML/map/other-history edits. Main `68dcfd2` current; reviewed Yusuf unmerged hyperreal/plan-v4 camera changes rather than merging his visual stack.
-- **Contract BEFORE code:** startup opt-in `DZ_SENSOR_VIEW=1`. Screen-only `hello.sensor_view={enabled:true,range_m:5,fov_rad:2.0943951023931953,height_m:0.4}`; `tick.reality.robots[].camera={t,pose:[x,y,yaw],hits:[{id,pos,crop,verdict:"person"|"rejected",conf:number|null,source:"model"|"sim"}]}` from actual `io.thermal()` plus the actual onboard detector. Empty hits clears boxes. No camera field in robot bundles, Command, phone or Gemini. Default wire payload stays unchanged. Renderer uses frame pose, 120-degree horizontal lens, no independent auto-aim, no manifest-derived guesses; label simulated reconstruction/crop evidence honestly. Flag off keeps existing view until dry run.
-- **Heads-up:** Yusuf's unmerged hyperreal already removes auto-aim; his boxes still infer results from truth positions + manifest/range. New opt-in sensor component and helper will be small/independent for him to integrate. Route PR #77 remains open/default off; inspecting additional route safety without changing demo timing.
+- **Working on:** p2/short-briefing (#89): concise G text implemented and validated, ready for review. Existing {text,generated_at,source}; at most 3 sentences / 45 words, digits; oversized/nonconforming Gemini replies use an honest concise local summary, never truncation. Ask retains question behavior. Same six read-only Command tools / 10 s deadline; no hidden survivor totals. Audit and ordered queue: docs/AZIZ-STATUS-2026-11-07.md.
+- **Role:** Aziz = backend/network/simulation/Command APIs, serving and integration tests. Yusuf = web/camera/phone UX; Rayan = robot policy/ML/maps. No new owner-source implementation in this audit.
+- **Previous item:** `p2/demo-refresh`: refresh stale venue tunnel/backend (10-15 min), then short G briefing. Startup CLI contract before code: add `--no-leases` for the fixed demo, preserving existing launcher defaults; reject `--voice --no-leases` because voice requires leases. Add independent DZ_MIC_CHECK=1 diagnostic gate so mic preflight does not require control leases; launcher sets it in both profiles. No API/message changes. Use current main runtime, AI Lab on, G/Ask enabled for Rayan/user use without making provider calls here; optional experiment flags remain off.
+- **Audit basis:** fetched and merged main `21dd05d`: #88 actual demo refresh and #85 latest visuals/report playback are merged, as are #81/#82 sensor handoffs/backend and #83/#87 assets/review. #89 is the only open PR at this audit. Some old Now/PLAN labels are stale; code/commits and newest logs determine status. No owner frontend/robot/map/ML source edited.
+
+### Backend implemented on main (acceptance tracked separately)
+- [x] Original V2 backend 1-6: Command-only Gemini G + Ask with fallback/deadline, gated aftershock, real Reed-Solomon/link counters, CRDT merge API, delivered-route rescue ordering.
+- [x] Quiet preload save-without-check path, baseline mode and director overload/resume, crop/detector/route/heatmap metadata, read-only AI Lab serving.
+- [x] Full voice backend (STT/intent/safety/DTN/delivered ack/TTS), 15 s exclusive lease APIs and presenter release, one-origin HTTPS tunnel. Backend implementation does not mean phone UI/keyed acceptance is complete.
+- [x] Actual sensor-frame backend (#82), default off; minimal observation hook, no frontend implementation. Exploration #77 is merged/default off, further robot policy stays with Rayan.
+- [x] Venue phone mic check passed (user report); Rayan's latest dry run confirms G returned source gemini. Ask source and ElevenLabs end-to-end acceptance are not confirmed by that G result.
+
+### Remaining Aziz checklist (priority order; estimates before starting each)
+- [x] Refreshed demo/tunnel backend with current main code + launcher fixed-demo profile; HTTPS/API/WSS/AI Lab/quiet preload passed. New origin https://gibson-launched-quote-said.trycloudflare.com (old URL retired). Historical audit gap: Read-only audit: port 8020 has no /api/voice/audio or /api/voice/tts and /ai-lab/results/lab.json is 404; port 8022 has those voice routes and 5 AI Lab curve points. Running services are not automatically updated by git pull. Enable DZ_AI_LAB=1; DZ_AFTERSHOCK=1 only if A is rehearsed. Voice/leases stay off for the fixed demo until the presenter/UI acceptance below.
+- [x] Implement short G text (3 sentences / 45 words, digits), concise local fallback and regression tests in #89 branch. Publication/review and real keyed/playback acceptance are separate; Yusuf's merged consumer already speaks concise text. No additive field.
+- [ ] Resolve the presenter B/U lease flow with Yusuf (30-45 min): backend B validates all robot leases and U validates its target; screen currently has no presenter grant. Preserve exclusive control/no forced takeover. Lease enforcement itself is already built.
+- [ ] Coordinate Rayan's new optional exploration findings: A1 V2 _follow shortcut uses _trav instead of survivor-clear _drive_trav; A2 exhausted reachable views can leave explore_zone active without completed ack. Keep DZ_EXPLORATION_V2=0 for fixed demo; robot source remains Rayan-owned. No renewed robot ownership exception assumed from the earlier #77 task.
+- [ ] Integrate startup floorplan selection and a gated generated-scenario timeline (45-60 min plus owner dry run). Clinic loader review was accepted earlier; no DZ_FLOORPLAN or timeline player is in app.py yet. Generator/headless play belongs to Rayan; clinic map approval also stays with him. Main DEMO layout and preload must stay unchanged.
+- [ ] Complete a paced 20-minute 10x soak (15-25 min including analysis). Scripted stress/memory passed, but last paced artifact is ok:false, 7.654x actual vs 10x requested; this is not complete. Coordinate robot-planner bottlenecks with Rayan, not another Aziz policy rewrite.
+- [ ] Joint device/keyed acceptance after Yusuf's UI: real Ask source gemini, ElevenLabs STT/TTS sources or explicit fallback, two-phone leases/voice/offline merge/rescue-order/link-repair display, and sensor-frame adoption. Rayan supplies keys/test-laptop provider checks; Aziz verifies backend contracts. Mic preflight alone is not this acceptance.
+
+- **Dependencies, not Aziz frontend tasks:** Yusuf owns PTT, robot picker/heartbeat/presenter UI, sensor renderer, repair display and phone co-planning/order UX; Rayan owns route-fitting handoff, reactions, ML and assets. Asset pack is ready; optional extra serving is conditional on Yusuf's integration choice.
+- **Validation baseline:** full backend 413 passed / 1 opt-in soak skipped (91.33 s), including fixed DEMO guard; focused short-briefing/Ask/frontend-contract 69 passed. Latest merged web production build 741 modules passed after installing declared d3-delaunay (no web source/lock changes). Full suite ran outside sandbox after reproducing temp-directory permission errors. Diff check clean; Ruff unavailable in this venv. No real provider/device/active deployment acceptance performed in this audit. Keep optional flags off until dry runs.
 
 ## Log
+
+### 2026-11-07 PT - p2/short-briefing - Implement concise G and audit remaining Aziz work
+- **Did:** synced main 21dd05d (#85/#88), checked plan updates, all team histories, merge/PR status, backend contracts and frontend consumers. Implemented short G and bounded local fallback; added docs/AZIZ-STATUS-2026-11-07.md with the ordered queue and owner dependencies. Existing contract-only #89 gets the implementation after final checks.
+- **Contract changes:** preposted existing report.text now <=3 sentences / 45 words, digits. No short/spoken field. Nonconforming model replies fall back with source local rather than discarding uncertainty; Ask keeps separate response behavior. Same tools/deadline/privacy.
+- **Validation:** full backend **413 passed, 1 opt-in soak skipped** (91.33 s), including fixed DEMO guard; focused **69 passed**; unchanged merged web build **741 modules passed**. Diff check clean. Sandbox temp-file access errors resolved by running suite outside sandbox; Ruff is not installed in this venv. No real provider calls/keys, robot policy changes or frontend source edits.
+- **Heads-up for others:** Yusuf: report.text is concise, your #85 playback works with it. Presenter lease UI, sensor-frame adoption, offline queue, voice and repair/order presentation still depend on your integration. Rayan: read A1/A2, preserved default-off gate; generated-map long-route fitting stays yours. Existing 7.654x paced-soak failure remains open.
+- **Next:** #89 review, then agree the presenter lease flow with Yusuf. Keep deployment/device acceptance separate from git/build completion.
+
+### 2026-11-07 PT - p2/short-briefing - Reserve concise G text before code
+- **Did:** refreshed demo/profile is implemented in PR #88 (an early contract-only #86 merged before implementation push). Starting Rayan's 3-sentence G request, estimate 15-25 min; synced main 309fb9d.
+- **Contract changes:** same response fields; G text at most 3 sentences / 45 words, digits, plain spoken English. Ask keeps question-specific behavior. Same six delivered-Command tools, deadline and source labels; no hidden survivor totals/unreported counts.
+- **Heads-up for others:** Yusuf: keep speaking report.text, no new field or UI implementation needed. Rayan: G shortening follows your ask; real source verification remains testing-laptop work.
+- **Next:** concise local fallback + bounded Gemini briefing, meaningful protocol/fallback/privacy tests, own PR; no actual provider calls.
+
+### 2026-11-07 PT - p2/demo-refresh - Refreshed demo backend and independent mic preflight
+- **Did:** rebuilt latest Yusuf frontend unchanged; replaced only our owned old tunnel/backend. Current API exposes voice audio/TTS routes, trained model live, AI Lab 5-point curve served, three robots paused, P-1 quietly saved (no safety_reject), baseline/deadzone B controls pass. Fixed-demo launch uses --no-leases --gemini with DZ_AI_LAB=1; voice/leases and unaccepted experiments off. No provider call/key inspected.
+- **Contract changes:** preposted --no-leases rejects --voice combination; launcher always enables independent DZ_MIC_CHECK=1 so mic diagnostics need not enable direct controls. Default standalone gate remains off. No API/message shapes changed.
+- **Validation:** final backend **404 passed, 1 skipped** (112.30 s), web build **737 modules passed**, live HTTPS HTML/assets/API/QR + screen/two-phone WSS passed. Local actual mode/reset/quiet preload/AI Lab/mic probes passed; JSON under validation/demo-refresh-*.json. New origin https://gibson-launched-quote-said.trycloudflare.com; phone/mic-check links derive from it. Existing venue mic acceptance was on old origin; physical permission/playback on this origin remains manual.
+- **Heads-up for others:** Rayan/user: G/Ask enabled for your keyed check, no calls made by Aziz; mic preflight alone is not provider acceptance. Yusuf UI untouched. CLI defaults remain leased; use --no-leases for fixed main demo until presenter flow is accepted.
+- **Next:** publish this refresh PR, then short G text (15-25 min) as a separate PR.
+
+### 2026-11-07 PT - p2/demo-refresh - Reserve fixed-demo launcher profile before service refresh
+- **Did:** user authorized continuing the checklist; synced d2cfbde and latest team asks. Starting stale demo deployment, estimate 10-15 min. No owner UI/policy edits.
+- **Contract changes:** CLI-only --no-leases opts out of the old launcher's hardcoded lease setting for the fixed demo; incompatible with --voice. Existing CLI defaults remain. No endpoint or wire changes.
+- **Heads-up for others:** refreshed Quick Tunnel gets a new URL; existing phone mic success is recorded, new-origin phone acceptance remains manual. Real provider source checks stay with Rayan; no key added/read by agent.
+- **Next:** add the opt-out, rebuild current Yusuf frontend unchanged, refresh our owned demo processes and verify HTTPS/API/WSS/AI Lab/quiet preload.
+
+### 2026-11-07 PT - p2/checklist-audit - Refresh Aziz checklist from latest plan, code and live service probes
+- **Did:** read current plan/team asks, pulled d2cfbde, distinguished implemented backend from UI/device/deployment acceptance. Recorded #81/#82 merged and new Rayan asset pack. Read-only port 8020 probe exposed an old running backend (no voice audio/TTS schema; AI Lab 404); no services, keys or feature flags changed.
+- **Contract changes:** none. Queued G shortening, presenter/lease flow, scenario loader/player and unfinished paced soak explicitly; no new frontend/robot policy work assigned to Aziz.
+- **Heads-up for others:** Yusuf owns rendering/PTT/phone integration; asset-pack README uses web/public copy, no new server mount assumed. Rayan owns model/map/policy/provider acceptance; G-only keyed dry run does not confirm Ask/ElevenLabs. Full checklist and estimates are in Now.
+- **Next:** execute the queued backend items with an estimate and contract before each; restart/deployment acceptance remains distinct from merged code.
+
+### 2026-11-07 PT - p2/sensor-camera - Publish implementation after early contract merge; keep handoff history aligned
+- **Did:** fixed PR #81's history-only merge block and preserved all work logs. Detected #78 merged before implementation 6d77051 was pushed; opened a separate implementation follow-up after integrating main 811d17c. Yusuf's merged web and survivor-clearance integration imported unchanged. Same current history on both active Aziz branches prevents a repeat history-only conflict when either PR lands.
+- **Contract changes:** none beyond the preposted actual sensor-frame contract; default off. Backend stream implementation has only the minimal onboard observation hook for Rayan review; no web or further planner policy changes.
+- **Validation:** final full backend **404 passed, 1 skipped** (183.36 s), latest unchanged web build **737 modules passed**, diff check clean. Artifact branch runtime equals main; #81 changes only optional patch files/README and Aziz history.
+- **Heads-up for others:** #78 contains only the early contract; use the new backend implementation PR. Yusuf owns renderer adoption; Rayan owns proposed route fitting. Rayan's request for a 3-sentence G briefing is queued separately, not bundled into this merge fix.
+- **Next:** review/merge the two clearly separated PRs, then the queued backend briefing change.
+
+### 2026-11-07 PT - p2/camera-owner-handoffs - Resolve handoff history overlap with current main
+- **Did:** integrated main 811d17c, retained both the owner-handoff and backend implementation histories, and refreshed Now without restoring the old frontend ownership exception. Final handoff diff is documentation/patch artifacts only; runtime matches main.
+- **Contract changes:** none. Clarified that #78 merged its early contract stage, while implementation 6d77051 still needs a new PR.
+- **Heads-up for others:** Yusuf's merged camera work is imported unchanged; no owner-source edits. New Rayan dry-run G shortening ask read and queued separately.
+- **Next:** push PR #81 resolution and open the backend implementation follow-up.
+
+### 2026-11-07 PT - p2/sensor-camera - Backend-only actual observations; ownership restored
+- **Did:** user clarified Aziz's role. Removed all frontend and extra route-policy edits from this PR, saved optional owner patches on separate p2/camera-owner-handoffs (83a6df3). Backend now exposes actual IO/detector samples on Reality only, with honest sim fallback and geometry-change invalidation; retains only the small robot observation hook for Rayan review. No robot behavior/route policy change.
+- **Contract changes:** preposted DZ_SENSOR_VIEW frame/config contract implemented, default off. Camera is optional after reset/rubble/aftershock until the next normal robot sample; empty hits clears targets. No camera data in Command/phones/Gemini/radio. Yusuf owns the renderer and must integrate the contract himself.
+- **Validation:** final backend **404 passed, 1 skipped** (100.03 s), 12 sensor regressions, camera-on fixed demo guard **10 passed**; restored committed web build passes (733 modules), Ruff/diff check pass. New trained model and plan integrated from main 0c5c823. No key or provider call.
+- **Heads-up for others:** optional prototype/finding handoffs: https://github.com/Rayan1092/Deadzone/tree/p2/camera-owner-handoffs/outputs/handoffs . Yusuf: Ctrl+R can also fire director R in current keyboard handler; please exclude modifiers. Rayan: extra route fitting patch/test shows 60-point thinning can cut walls; no such policy edits in this backend PR. Temporary camera preview stopped; stable phone tunnel untouched.
+- **Next:** backend PR #78 review; Yusuf handles UI and Rayan robot-policy improvements. Do not merge the handoff artifact branch as a feature.
 
 ### 2026-11-07 PT - p2/sensor-camera - Reserve actual sensor-frame camera contract
 - **Did:** audited current and Yusuf's unmerged camera: independent detection pan, lens/range mismatch, and metadata-based inferred classifications. User explicitly asked for robot/web fixes; ownership exception is task-scoped.
@@ -268,3 +340,9 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 - **Contract changes:** see `docs/DTN.md` (new).
 - **Heads-up for others:** none
 - **Next:** phone planning.
+
+### 2026-11-07 PT - p2/camera-owner-handoffs - Restore ownership boundaries
+- **Did:** user clarified Aziz's role; removed all own frontend/proposed extra route-policy edits from backend working tree, preserved them only as optional owner patches. Restored committed frontend build and stopped experimental camera preview. Existing phone tunnel untouched.
+- **Contract changes:** none beyond preposted backend sensor contract. No source code from this handoff branch should merge into main.
+- **Heads-up for others:** Yusuf: modified browser shortcuts can trigger director R; see exact finding in outputs/handoffs/README.md. Rayan: 60-point thinning can cut walls; 4 passing route tests/proposed safe fitter in your patch. Both owner patches pass git apply --check against their stated bases; prototypes require owner integration/dry run.
+- **Next:** finish backend-only #78; owner UI/policy implementation stays with Yusuf/Rayan.

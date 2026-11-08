@@ -831,7 +831,7 @@ def phone_page():
 
 @app.get("/mic-check", include_in_schema=False)
 def microphone_check():
-    if not hub.leases_enabled():
+    if not hub.leases_enabled() and os.environ.get("DZ_MIC_CHECK") != "1":
         raise HTTPException(404)
     return FileResponse(Path(__file__).resolve().parent / "static" / "mic-check.html")
 

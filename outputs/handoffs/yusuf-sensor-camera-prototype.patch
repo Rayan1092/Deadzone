@@ -1,0 +1,449 @@
+diff --git a/web/package.json b/web/package.json
+index 303b7cf..912ee94 100644
+--- a/web/package.json
++++ b/web/package.json
+@@ -4,6 +4,7 @@
+   "version": "0.1.0",
+   "type": "module",
+   "scripts": {
++    "test:camera": "node --test tests/sensor-camera.test.js",
+     "dev": "vite --host",
+     "build": "vite build",
+     "preview": "vite preview --host"
+diff --git a/web/src/store.js b/web/src/store.js
+index 6c84697..de6e461 100644
+--- a/web/src/store.js
++++ b/web/src/store.js
+@@ -68,6 +68,7 @@ export const useSim = create((set) => ({
+   follow: null,        // robot id the cameras follow (keys 1-3), null = overview
+   eyeRobot: null,      // robot whose forward camera is open (V key / card button)
+   eyeThermal: false,   // thermal palette in the robot's-eye view
++  sensorView: null,    // opt-in screen-only geometry; actual frames are on Reality robots
+   labOpen: false,      // L key: AI Lab overlay
+   eyeFocus: null,      // the hot spot the onboard classifier just judged: { kind, subject, robot, pos, conf, linked, born }
+   mode: null,          // 'deadzone' | 'baseline' | 'mixed' from hello/control (Rayan's baseline mode)
+@@ -122,6 +123,7 @@ export function handleMessage(msg) {
+       s.set({ floorplan: data.floorplan, grid: data.grid, robotsMeta: data.robots,
+               running: data.running, speed: data.speed, mode: data.mode ?? null, time,
+               detector: data.detector ? { mode: data.detector, reason: data.detector_reason } : null,
++              sensorView: data.sensor_view ?? null,
+               ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [], detections: [], routes: {}, aftershock: null, eyeFocus: null } : {}) })
+       break
+     }
+diff --git a/web/src/styles.css b/web/src/styles.css
+index c09e0d0..98330fb 100644
+--- a/web/src/styles.css
++++ b/web/src/styles.css
+@@ -214,6 +214,19 @@ button:hover { border-color: var(--teal); }
+   background: var(--glass-strong); box-shadow: 0 12px 32px rgba(0,0,0,.5), var(--glass-hi);
+   backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+ .robot-eye.thermal { border-color: rgba(96,165,250,.5); }
++.robot-eye.sensor-eye { width: min(520px, 48vw); height: 340px; }
++.sensor-eye .sensor-viewport { position: relative; min-height: 0; flex: 1; }
++.sensor-eye .eye-box { top: 0; }
++.sensor-eye .eye-box-label { font-size: 10px; }
++.sensor-hud { position: absolute; left: 8px; top: 6px; right: 8px; display: flex; justify-content: space-between;
++  gap: 12px; pointer-events: none; font: 10px/1.4 var(--mono, monospace); color: #dbeafe;
++  text-shadow: 0 1px 3px #000; }
++.sensor-note { padding: 5px 8px; font-size: 10px; color: #b7c4cf; }
++.sensor-evidence { position: absolute; bottom: 8px; left: 8px; display: flex; gap: 8px; align-items: center;
++  background: rgba(8,10,14,.85); border: 1px solid var(--glass-edge); border-radius: 6px; padding: 5px;
++  font-size: 11px; }
++.sensor-evidence img { width: 54px; height: 54px; object-fit: cover; border-radius: 3px; }
++.sensor-evidence small { display: block; color: #a8b9c8; margin-top: 4px; }
+ .eye-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 10px; font-size: 12px; }
+ .eye-head .swatch { width: 9px; height: 9px; border-radius: 2px; }
+ .eye-head b { margin-right: auto; }
+diff --git a/web/src/three/Building.jsx b/web/src/three/Building.jsx
+index a86101f..cb7888a 100644
+--- a/web/src/three/Building.jsx
++++ b/web/src/three/Building.jsx
+@@ -135,7 +135,7 @@ function WallDamageLayer({ walls, damage }) {
+   })
+ }
+ 
+-function Walls({ walls, mode, damage }) {
++function Walls({ walls, mode, damage, solid = false }) {
+   return walls.map((w, i) => {
+     const [ax, ay] = w.a
+     const [bx, by] = w.b
+@@ -144,7 +144,7 @@ function Walls({ walls, mode, damage }) {
+     const thick = THICK[w.material] ?? 0.2
+     return (
+       <group key={i} position={w2t((ax + bx) / 2, (ay + by) / 2, 0)} rotation={[0, ang, 0]}>
+-        {w.material === 'metal'
++        {w.material === 'metal' && !solid
+           ? <FenceWall len={len} mode={mode} />
+           : <SolidWall len={len} thick={thick} material={w.material} mode={mode} damage={damage?.[i]} />}
+       </group>
+@@ -248,6 +248,15 @@ function Slab({ W, H }) {
+ }
+ 
+ const NO_RUBBLE = []
++function SensorRubble({ rubble, thermal }) {
++  const shape = useMemo(() => new THREE.Shape(rubble.poly.map(([x, y]) => new THREE.Vector2(x, y))), [rubble])
++  return (
++    <mesh rotation={[-Math.PI / 2, 0, 0]}>
++      <extrudeGeometry args={[shape, { depth: rubble.height || 1, bevelEnabled: false }]} />
++      <meshStandardMaterial color={thermal ? COLD.wall : '#69645b'} roughness={1} />
++    </mesh>
++  )
++}
+ const staticCache = new WeakMap()
+ function staticRubble(fp) {
+   if (!staticCache.has(fp)) staticCache.set(fp, (fp.rubble ?? NO_RUBBLE).filter((r) => !r.dynamic))
+@@ -255,18 +264,18 @@ function staticRubble(fp) {
+ }
+ 
+ // `props`: furniture and decoy objects (Reality only; the command post's floorplan has none).
+-export default function Building({ thermal = false, blueprint = false, props = true }) {
++export default function Building({ thermal = false, blueprint = false, props = true, sensor = false }) {
+   const fp = useSim((s) => s.floorplan)
+   const perf = useSim((s) => s.perf)
+   const mode = blueprint ? 'blueprint' : thermal ? 'thermal' : 'plain'
+   // collapse damage is truth: Reality panes only (the Command pane keeps the intact plan)
+-  const damage = useMemo(() => (fp && props && mode === 'plain' ? wallDamage(fp) : null), [fp, props, mode])
++  const damage = useMemo(() => (fp && props && !sensor && mode === 'plain' ? wallDamage(fp) : null), [fp, props, mode, sensor])
+   if (!fp) return null
+   const [W, H] = fp.size
+   const [cx, cy] = fp.command_post.pos
+   return (
+     <group>
+-      {mode === 'plain' ? <Lot W={W} H={H} /> : (
++      {mode === 'plain' && !sensor ? <Lot W={W} H={H} /> : (
+         <mesh rotation={[-Math.PI / 2, 0, 0]} position={w2t(W / 2, H / 2, -0.01)}>
+           <planeGeometry args={[W + 30, H + 30]} />
+           <meshStandardMaterial color={blueprint ? PRINT.floor : COLD.floor} roughness={1} />
+@@ -274,20 +283,21 @@ export default function Building({ thermal = false, blueprint = false, props = t
+       )}
+       {mode === 'plain' && <Slab W={W} H={H} />}
+       {mode === 'plain' && fp.rooms.map((r) => <RoomFloor key={r.id} room={r} />)}
+-      <Walls walls={fp.walls} mode={mode} damage={damage} />
++      <Walls walls={fp.walls} mode={mode} damage={damage} solid={sensor} />
+       {/* aftershock walls are truth geometry: Reality panes only, never Command or the inset */}
+-      {props && fp.dynamic_walls?.length > 0 && <Walls walls={fp.dynamic_walls} mode={mode} />}
+-      <Baked deps={[fp, mode, props]}>
+-        {mode === 'plain' && (fp.doors ?? []).map((d, i) => <Door key={i} door={d} walls={fp.walls} />)}
++      {props && fp.dynamic_walls?.length > 0 && <Walls walls={fp.dynamic_walls} mode={mode} solid={sensor} />}
++      <Baked deps={[fp, mode, props, sensor]}>
++        {mode === 'plain' && !sensor && (fp.doors ?? []).map((d, i) => <Door key={i} door={d} walls={fp.walls} />)}
+         {/* rubble that fell during the run (R key, aftershock) is truth: Reality panes only */}
+-        {!blueprint && <Debris rubble={props ? fp.rubble ?? NO_RUBBLE : staticRubble(fp)} cold={thermal} />}
+-        {props && !blueprint && <Interior fp={fp} cold={thermal} />}
+-        {!blueprint && <CommandPost pos={[cx, cy]} cold={thermal} />}
++        {!blueprint && !sensor && <Debris rubble={props ? fp.rubble ?? NO_RUBBLE : staticRubble(fp)} cold={thermal} />}
++        {sensor && (fp.rubble ?? NO_RUBBLE).map((r, i) => <SensorRubble key={r.id ?? i} rubble={r} thermal={thermal} />)}
++        {props && !blueprint && !sensor && <Interior fp={fp} cold={thermal} />}
++        {!blueprint && !sensor && <CommandPost pos={[cx, cy]} cold={thermal} />}
+         {damage && <WallDamageLayer walls={fp.walls} damage={damage} />}
+         {damage && <CollapseStatic fp={fp} />}
+       </Baked>
+       {damage && <CollapseLive fp={fp} dust={!perf} />}
+-      {mode === 'plain' && (fp.hazards ?? []).map((hz) => <GasLeak key={hz.id} hazard={hz} />)}
++      {mode === 'plain' && !sensor && (fp.hazards ?? []).map((hz) => <GasLeak key={hz.id} hazard={hz} />)}
+       {blueprint && (
+         <mesh position={w2t(cx, cy, 0.5)}>
+           <sphereGeometry args={[0.35, 16, 16]} />
+diff --git a/web/src/three/RobotEye.jsx b/web/src/three/RobotEye.jsx
+index 93ef4c1..834dc1c 100644
+--- a/web/src/three/RobotEye.jsx
++++ b/web/src/three/RobotEye.jsx
+@@ -6,6 +6,7 @@ import { FOCUS_HOLD_MS, useSim } from '../store'
+ import Building from './Building'
+ import { PersonFigure } from './Actors'
+ import { w2t } from './util'
++import SensorEye from './SensorEye'
+ 
+ // Picture-in-picture from a robot's forward camera (V key or the card's Camera
+ // button). Reality pane only: it shows what the robot's own camera sees. A third
+@@ -207,6 +208,7 @@ function FocusPanel({ robotId, boxRef }) {
+ export default function RobotEye() {
+   const robotId = useSim((s) => s.eyeRobot)
+   const thermal = useSim((s) => s.eyeThermal)
++  const sensorView = useSim((s) => s.sensorView)
+   const meta = useSim((s) => s.robotsMeta.find((r) => r.id === s.eyeRobot))
+   const set = useSim((s) => s.set)
+   const focused = useSim((s) => s.eyeFocus?.robot === s.eyeRobot && s.eyeFocus)
+@@ -220,6 +222,7 @@ export default function RobotEye() {
+     return () => clearTimeout(id)
+   }, [live, focused])
+   if (!robotId) return null
++  if (sensorView?.enabled) return <SensorEye key={robotId} robotId={robotId} config={sensorView} />
+   return (
+     <div className={`robot-eye${thermal ? ' thermal' : ''}${live ? ' focus' : ''}`}>
+       <div className="eye-head">
+diff --git a/web/src/three/SensorEye.jsx b/web/src/three/SensorEye.jsx
+new file mode 100644
+--- /dev/null
++++ b/web/src/three/SensorEye.jsx
+@@ -0,0 +1,137 @@
++import { useMemo, useRef } from 'react'
++import { Canvas, useFrame, useThree } from '@react-three/fiber'
++import { Line } from '@react-three/drei'
++import * as THREE from 'three'
++import { useSim } from '../store'
++import Building from './Building'
++import { PersonFigure } from './Actors'
++import { w2t } from './util'
++import { currentFrame, observationLabel, observedHits, projectBox, sensorPose, verticalFov } from './sensorCamera'
++
++function Camera({ robotId, config, boxes }) {
++  const { camera, size } = useThree()
++  const position = useMemo(() => new THREE.Vector3(), [])
++  const target = useMemo(() => new THREE.Vector3(), [])
++  useFrame(() => {
++    const state = useSim.getState()
++    const robot = state.tick?.reality.robots.find((r) => r.id === robotId)
++    const frame = currentFrame(robot, state.time)
++    const pose = sensorPose(frame, config)
++    if (!pose) {
++      for (const el of boxes.current.values()) el.style.display = 'none'
++      return
++    }
++    // Sample pose, lens and boxes update together. No event can steer this camera.
++    camera.fov = verticalFov(config.fov_rad, size.width / size.height)
++    camera.aspect = size.width / size.height
++    camera.updateProjectionMatrix()
++    camera.position.copy(position.fromArray(pose.position))
++    camera.lookAt(target.fromArray(pose.target))
++    camera.updateMatrixWorld()
++    const hits = new Map(observedHits(frame, config).map((hit) => [hit.id, hit]))
++    for (const [id, el] of boxes.current) {
++      const hit = hits.get(id)
++      const rect = hit && projectBox(hit, camera, size.width, size.height)
++      el.style.display = rect ? '' : 'none'
++      if (!rect) continue
++      el.style.transform = `translate(${rect.x}px, ${rect.y}px)`
++      el.style.width = `${rect.width}px`
++      el.style.height = `${rect.height}px`
++    }
++  })
++  return null
++}
++
++function ThermalPerson() {
++  return (
++    <group>
++      <mesh position={[0, .16, 0]} scale={[1.6, .3, .48]}>
++        <sphereGeometry args={[.5, 12, 8]} /><meshBasicMaterial color="#ffe8a3" />
++      </mesh>
++      <mesh position={[.87, .17, 0]}>
++        <sphereGeometry args={[.12, 10, 8]} /><meshBasicMaterial color="#fff7dc" />
++      </mesh>
++    </group>
++  )
++}
++
++function Scene({ robot, frame, config, thermal }) {
++  const fp = useSim((s) => s.floorplan)
++  const hits = observedHits(frame, config)
++  const warm = new Set(hits.map((hit) => hit.id))
++  const people = (fp?.survivors ?? []).filter((p) => !thermal || warm.has(p.id))
++  return (
++    <>
++      <Building thermal={thermal} sensor />
++      {people.map((p) => (
++        <group key={p.id} position={w2t(...p.pos)}>
++          {thermal ? <ThermalPerson /> : <group scale={1 / 1.35}><PersonFigure id={p.id} /></group>}
++        </group>
++      ))}
++      {(fp?.decoys ?? []).filter((p) => !thermal || warm.has(p.id)).map((p) => (
++        <group key={p.id} position={w2t(...p.pos, .3)}>
++          <mesh>
++            <boxGeometry args={[.6, .6, .4]} />
++            {thermal ? <meshBasicMaterial color="#ffb347" /> : <meshStandardMaterial color="#807971" roughness={.6} />}
++          </mesh>
++          {!thermal && Array.from({ length: 6 }, (_, i) => (
++            <mesh key={i} position={[-.25 + i * .1, 0, .22]}>
++              <boxGeometry args={[.035, .5, .045]} /><meshStandardMaterial color="#34383b" />
++            </mesh>
++          ))}
++        </group>
++      ))}
++      {robot?.path?.length > 1 && (
++        <Line points={[w2t(...frame.pose.slice(0, 2), .025), ...robot.path.map((p) => w2t(...p, .025))]}
++              color="#5eead4" lineWidth={1} transparent opacity={.5} />
++      )}
++    </>
++  )
++}
++
++export default function SensorEye({ robotId, config }) {
++  const robot = useSim((s) => s.tick?.reality.robots.find((r) => r.id === robotId))
++  const time = useSim((s) => s.time)
++  const thermal = useSim((s) => s.eyeThermal)
++  const set = useSim((s) => s.set)
++  const frame = currentFrame(robot, time)
++  const hits = observedHits(frame, config)
++  const boxes = useRef(new Map())
++  const evidence = hits.find((hit) => hit.crop && hit.source === 'model')
++  return (
++    <div className={`robot-eye sensor-eye${thermal ? ' thermal' : ''}`}>
++      <div className="eye-head">
++        <i className="swatch" style={{ background: robot?.color }} />
++        <b>{robot?.name ?? robotId} camera</b>
++        <button className={`eye-toggle${thermal ? ' on' : ''}`} onClick={() => set({ eyeThermal: !thermal })}>Thermal</button>
++        <button className="eye-close" aria-label="Close camera" onClick={() => set({ eyeRobot: null })}>×</button>
++      </div>
++      <div className="sensor-viewport">
++        <Canvas dpr={1} camera={{ near: .04, far: 60 }} gl={{ antialias: false, powerPreference: 'low-power' }}>
++          <color attach="background" args={[thermal ? '#030614' : '#171d23']} />
++          <ambientLight intensity={thermal ? .8 : 1.3} />
++          <hemisphereLight args={['#e2e8f0', '#26303d', 1.5]} />
++          {frame && <Scene robot={robot} frame={frame} config={config} thermal={thermal} />}
++          <Camera robotId={robotId} config={config} boxes={boxes} />
++        </Canvas>
++        {hits.map((hit) => (
++          <div key={hit.id} ref={(el) => { if (el) boxes.current.set(hit.id, el); else boxes.current.delete(hit.id) }}
++               className={`eye-box${hit.verdict === 'rejected' ? ' decoy' : ''}`} style={{ display: 'none' }}>
++            <span className="eye-box-label">{observationLabel(hit)}</span>
++          </div>
++        ))}
++        <div className="sensor-hud">
++          <span>{Math.round(config.fov_rad * 180 / Math.PI)}° forward · {config.range_m} m thermal range</span>
++          <span>{frame ? `${frame.t.toFixed(1)} s · ${hits.length ? `${hits.length} observed` : 'no thermal targets'}` : 'Waiting for sensor sample'}</span>
++        </div>
++        {evidence && (
++          <div className="sensor-evidence">
++            <img src={`/crops/${encodeURIComponent(evidence.crop)}`} alt="Thermal crop supplied to the detector" />
++            <span>Classifier input<small>{observationLabel(evidence)}</small></span>
++          </div>
++        )}
++      </div>
++      <span className="sensor-note">Simulated view · boxes mark actual sensor observations</span>
++    </div>
++  )
++}
+diff --git a/web/src/three/sensorCamera.js b/web/src/three/sensorCamera.js
+new file mode 100644
+--- /dev/null
++++ b/web/src/three/sensorCamera.js
+@@ -0,0 +1,57 @@
++import * as THREE from 'three'
++
++// Three's perspective fov is vertical; the robot sensor contract is horizontal.
++export function verticalFov(horizontal, aspect) {
++  return THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(horizontal / 2) / aspect))
++}
++
++export function sensorPose(frame, config) {
++  if (!frame?.pose || !frame.pose.every(Number.isFinite)) return null
++  const [x, y, yaw] = frame.pose
++  return {
++    position: [x, config.height_m, -y],
++    target: [x + Math.cos(yaw), config.height_m, -(y + Math.sin(yaw))],
++  }
++}
++
++export function currentFrame(robot, now) {
++  const frame = robot?.camera
++  // Never carry another robot's view or an older observation through a reset,
++  // replay seek or interrupted stream. Pausing simulation preserves the sample.
++  return frame && now >= frame.t && now - frame.t < .25 ? frame : null
++}
++
++export function observedHits(frame, config) {
++  if (!frame?.pose) return []
++  const [x, y, yaw] = frame.pose
++  return (frame.hits ?? []).filter((hit) => {
++    if (!hit.pos?.every(Number.isFinite)) return false
++    const dx = hit.pos[0] - x, dy = hit.pos[1] - y
++    const angle = Math.atan2(Math.sin(Math.atan2(dy, dx) - yaw), Math.cos(Math.atan2(dy, dx) - yaw))
++    return Math.hypot(dx, dy) <= config.range_m + 1e-6 && Math.abs(angle) <= config.fov_rad / 2 + 1e-6
++  })
++}
++
++export function observationLabel(hit) {
++  if (hit.source !== 'model' || !Number.isFinite(hit.conf)) return 'Hot spot · sim sensor'
++  const verdict = hit.verdict === 'person' ? 'Person' : 'Not a person'
++  return `${verdict} · ${(hit.conf * 100).toFixed(1)}%`
++}
++
++// Boxes mark the sampled object's position; the classifier only scores a crop.
++export function projectBox(hit, camera, width, height) {
++  const center = new THREE.Vector3(hit.pos[0], .3, -hit.pos[1]).applyMatrix4(camera.matrixWorldInverse)
++  if (center.z >= -camera.near) return null
++  let left = Infinity, right = -Infinity, top = -Infinity, bottom = Infinity
++  for (const dx of [-.65, .65]) for (const dy of [0, .65]) for (const dz of [-.4, .4]) {
++    const p = new THREE.Vector3(hit.pos[0] + dx, dy, -hit.pos[1] + dz).project(camera)
++    if (p.z < -1 || p.z > 1) continue
++    left = Math.min(left, p.x); right = Math.max(right, p.x)
++    bottom = Math.min(bottom, p.y); top = Math.max(top, p.y)
++  }
++  if (!Number.isFinite(left) || right < -1 || left > 1 || top < -1 || bottom > 1) return null
++  const clamp = (n) => Math.max(-1, Math.min(1, n))
++  const x = (clamp(left) + 1) * width / 2, y = (1 - clamp(top)) * height / 2
++  return { x, y, width: (clamp(right) - clamp(left)) * width / 2,
++    height: (clamp(top) - clamp(bottom)) * height / 2 }
++}
+diff --git a/web/tests/sensor-camera.test.js b/web/tests/sensor-camera.test.js
+new file mode 100644
+--- /dev/null
++++ b/web/tests/sensor-camera.test.js
+@@ -0,0 +1,66 @@
++import test from 'node:test'
++import assert from 'node:assert/strict'
++import * as THREE from 'three'
++import { currentFrame, observationLabel, observedHits, projectBox, sensorPose, verticalFov } from '../src/three/sensorCamera.js'
++
++const config = { enabled: true, range_m: 5, fov_rad: 2 * Math.PI / 3, height_m: .4 }
++const frame = { t: 10, pose: [4, 4, 0], hits: [] }
++
++function cameraFor(sample, aspect = 2) {
++  const camera = new THREE.PerspectiveCamera(verticalFov(config.fov_rad, aspect), aspect, .04, 60)
++  const pose = sensorPose(sample, config)
++  camera.position.fromArray(pose.position)
++  camera.lookAt(new THREE.Vector3(...pose.target))
++  camera.updateMatrixWorld()
++  return camera
++}
++
++test('horizontal sensor cone stays 120 degrees as the viewport resizes', () => {
++  for (const aspect of [.7, 1, 2.5]) {
++    const camera = cameraFor(frame, aspect)
++    for (const degrees of [-61, -59, 0, 59, 61]) {
++      const angle = degrees * Math.PI / 180
++      const point = new THREE.Vector3(4 + 3 * Math.cos(angle), .4, -(4 + 3 * Math.sin(angle))).project(camera)
++      assert.equal(Math.abs(point.x) < 1, Math.abs(degrees) < 60)
++    }
++  }
++})
++
++test('sample yaw determines view in all directions including the wrap boundary', () => {
++  for (const yaw of [0, Math.PI / 2, Math.PI - .01, -Math.PI + .01]) {
++    const camera = cameraFor({ ...frame, pose: [4, 4, yaw] })
++    const direction = camera.getWorldDirection(new THREE.Vector3())
++    assert.ok(Math.abs(direction.x - Math.cos(yaw)) < 1e-10)
++    assert.ok(Math.abs(direction.z + Math.sin(yaw)) < 1e-10)
++  }
++})
++
++test('expired and future samples do not survive replay seek or reset', () => {
++  assert.equal(currentFrame({ camera: frame }, 10), frame)
++  assert.equal(currentFrame({ camera: frame }, 10.1), frame)
++  assert.equal(currentFrame({ camera: frame }, 10.5), null)
++  assert.equal(currentFrame({ camera: frame }, .1), null)
++  assert.equal(currentFrame({}, 10), null)
++})
++
++test('boxes only use current sensor hits inside range and cone', () => {
++  const hit = { id: 'seen', pos: [7, 4] }
++  const sample = { ...frame, hits: [hit, { id: 'behind', pos: [3, 4] }, { id: 'far', pos: [10, 4] }] }
++  assert.deepEqual(observedHits(sample, config), [hit])
++  assert.deepEqual(observedHits({ ...frame, hits: [] }, config), [])
++})
++
++test('projected box disappears when robot faces away from the observation', () => {
++  const hit = { pos: [7, 4] }
++  const rect = projectBox(hit, cameraFor(frame), 520, 300)
++  assert.ok(rect && rect.width > 0 && rect.height > 0)
++  assert.ok(rect.height < 100) // a distant object must not fill the whole viewport
++  assert.equal(projectBox(hit, cameraFor({ ...frame, pose: [4, 4, Math.PI] }), 520, 300), null)
++})
++
++test('sensor fallback is never labelled as model confidence', () => {
++  assert.equal(observationLabel({ source: 'sim', conf: .99, verdict: 'person' }), 'Hot spot · sim sensor')
++  assert.equal(observationLabel({ source: 'model', conf: null }), 'Hot spot · sim sensor')
++  assert.equal(observationLabel({ source: 'model', conf: .963, verdict: 'person' }), 'Person · 96.3%')
++  assert.equal(observationLabel({ source: 'model', conf: .012, verdict: 'rejected' }), 'Not a person · 1.2%')
++})

@@ -70,8 +70,11 @@ def main():
     parser.add_argument("--install-only", action="store_true")
     parser.add_argument("--voice", action="store_true", help="opt in to the voice pipeline for a keyed dry run")
     parser.add_argument("--gemini", action="store_true", help="opt in to keyed G/Ask briefings")
+    parser.add_argument("--no-leases", action="store_true", help="fixed demo without direct-command leases; incompatible with --voice")
     parser.add_argument("--duration", type=float, help="optional seconds after readiness, for a smoke run")
     args = parser.parse_args()
+    if args.voice and args.no_leases:
+        parser.error("--voice requires control leases; do not combine it with --no-leases")
     LOCAL.mkdir(exist_ok=True)
     binary = install_cloudflared()
     if args.install_only:
@@ -107,7 +110,8 @@ def main():
             raise RuntimeError("No Quick Tunnel URL after 60s; inspect .demo/cloudflared.log and venue firewall")
         env = os.environ.copy()
         env.update(DZ_PUBLIC_URL=origin, DZ_AUTOSTART="0", DZ_ROBOTS="3", DZ_SEED="7", DZ_SPEED="2",
-                   DZ_CONTROL_LEASES="1", DZ_VOICE="1" if args.voice else "0", DZ_GEMINI="1" if args.gemini else "0")
+                   DZ_CONTROL_LEASES="0" if args.no_leases else "1", DZ_MIC_CHECK="1",
+                   DZ_VOICE="1" if args.voice else "0", DZ_GEMINI="1" if args.gemini else "0")
         env["DZ_PRESENTER_TOKEN"] = env.get("DZ_PRESENTER_TOKEN") or secrets.token_urlsafe(32)
         private_path = LOCAL / "presenter-token.txt"
         fd = os.open(private_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)

@@ -5,6 +5,7 @@ import math
 import os
 import random
 import re
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -19,6 +20,7 @@ from .robot.lidar import raycast
 from .robot.power import wheel_current
 from .robot.perception import get_detector
 from .robot.robot import BATTERY_TIME_SCALE, PEER_FRESH_S, Robot
+from .sensors import THERMAL_FOV, THERMAL_RANGE, camera_config
 
 DT = 0.1
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,8 +31,6 @@ ROBOT_DEFS = [
     ("R2", "Scout 2", "#38bdf8"),
     ("R3", "Scout 3", "#a78bfa"),
 ]
-THERMAL_RANGE = 5.0
-THERMAL_FOV = math.radians(120)
 
 
 class RadioIO:
@@ -117,6 +117,7 @@ class Sim:
         self.reset()
 
     def reset(self):
+        self.sensor_view = os.environ.get("DZ_SENSOR_VIEW") == "1"
         random.seed(self.seed)
         np.random.seed(self.seed)
         self.fp = FloorPlan.load(self.plan_path)
@@ -327,7 +328,12 @@ class Sim:
                 [x[1] for x in self.links.neighbors(rid)] + [self.links.link_rssi(rid, "CMD")])
             link = {"up": path is not None, "via": via, "rssi": round(rssi, 1),
                     "to_cmd_hops": len(path) - 1 if path else None}
-            robots.append(r.telemetry(link))
+            robot = r.telemetry(link)
+            if self.sensor_view and r.camera_frame is not None:
+                # Local instrument view only. Never put this in a radio bundle,
+                # CommandPost, phone state or the Gemini tool surface.
+                robot["camera"] = deepcopy(r.camera_frame)
+            robots.append(robot)
         found = [rec for r in self.robots.values() for rec in r.found.values()]
         links = self.links.as_list()
         for link in links:
@@ -352,6 +358,7 @@ class Sim:
 
     def hello(self):
         return {
+            **({"sensor_view": camera_config()} if self.sensor_view else {}),
             "floorplan": self.fp.data,
             "grid": {"w": self.fp.w, "h": self.fp.h, "cell": self.fp.cell},
             "robots": [{"id": r.id, "name": r.name, "color": r.color} for r in self.robots.values()],
@@ -385,6 +392,7 @@ class Sim:
         self.fp.add_rubble(poly)
         self.fp.data.setdefault("rubble", []).append(rubble)
         self.fp.add_wall(wall)
+        self._invalidate_camera_frames()
         lost = 0
         if relay:
             node = self.relays[relay]
@@ -406,4 +414,15 @@ class Sim:
         self.fp.add_rubble(poly)
         self.fp.data.setdefault("rubble", []).append({"id": f"RBX{len(self.fp.data['rubble'])}",
                                                        "poly": poly, "height": 1.0, "dynamic": True})
+        self._invalidate_camera_frames()
         self.events.append({"kind": "rubble_fall", "poly": poly})
+
+    def _invalidate_camera_frames(self):
+        """Changed world geometry needs a fresh IO sample, even while paused.
+
+        Never manufacture a perception decision during a director action. The
+        next normal robot step restores the frame from actual sensor input.
+        """
+        if self.sensor_view:
+            for robot in self.robots.values():
+                robot.camera_frame = None
