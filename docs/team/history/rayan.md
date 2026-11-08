@@ -17,7 +17,7 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 - **Tests:** `tests/test_zone_priority.py`: a mid-run plan sends R1 from Storage toward an east zone "Z3" (target jumps over 5 m closer to the zone, plan_state "heading to Z3", arrives and clears), flag unset unchanged, an owner already in its zone does not head.
 - **Contract changes:** `plan_state` gains the value `"heading to <zone>"`; new event `heading_to_zone`.
 - **Heads-up for others:** **Yusuf:** show `plan_state` on the robot card (both texts).
-- **Next:** batch item 3, heat_sources in the buildings (Aziz's typed heat sources from #?? are on main; I'll use his schema).
+- **Next:** batch item 3, heat_sources in the buildings (Aziz's opt-in typed heat sources, commit 294ed53, are on main; I'll use his schema).
 
 ### 2026-11-09 00:40 · rayan/crop-pool-handoff · Batch item 1 (crop pool: crouching, kneeling, slumped, lying only) needs the SDT frames: handed to the testing laptop
 - **Checked here:** the six demo crops are already in the kept poses: S1 `pos_0001` crouching, S2 `pos_0002` kneeling bent over, S3 `pos_0003` slumped in a chair (SDT indoor); D1–D3 are objects. Model Lab examples (`lab.json`): 12 people, all lying, crouching or sitting. **`gradcam_strip.png` shows only those six, so it does not change.**
