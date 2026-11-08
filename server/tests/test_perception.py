@@ -38,13 +38,23 @@ def test_model_accepts_survivors_rejects_decoys():
     assert det.mode == "model"
     names = sorted(p.name for p in perception.CROP_DIR.glob("*.png"))
     assert any(n.startswith("pos_") for n in names) and any(n.startswith("neg_") for n in names)
+    def person(n):
+        return n.startswith(("pos_", "unsure_person"))
+
+    def doubtful(n):                                   # distant view of an "unsure, moving closer" pair
+        return n.startswith("unsure_") and not n.endswith("_close.png")
+
     for n in names:
         s = det.score(n)
         assert s is not None
-        if n.startswith("pos_"):
+        if doubtful(n):
+            assert 0.35 <= s < 0.75, (n, s)
+        elif person(n):
             assert s >= det.threshold, (n, s)
         else:
             assert s < det.threshold, (n, s)
     hits = [{**HIT, "id": n, "crop": n} for n in names]
     kept = {h["id"] for h in perception.filter_hits(hits, det)}
-    assert kept == {n for n in names if n.startswith("pos_")}
+    assert kept == {n for n in names if det.score(n) >= det.threshold}
+    assert {n for n in names if person(n) and not doubtful(n)} <= kept
+    assert not any(n.startswith("neg_") for n in kept)

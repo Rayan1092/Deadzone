@@ -31,8 +31,11 @@ def test_manifest_lists_every_runtime_crop():
         assert {"id", "file", "heatmap", "heatmap_alpha", "label", "conf"} <= set(e)
         assert (RUNTIME / e["heatmap"]).is_file() and (RUNTIME / e["heatmap_alpha"]).is_file()
         assert e["id"] == uses.get(e["file"])
-        assert e["label"] == ("person" if e["file"].startswith("pos") else "not person")
-        assert e["predicted"] == e["label"]        # the runtime props behave as the slide says
+        assert e["label"] == ("person" if e["file"].startswith(("pos", "unsure_person")) else "not person")
+        if e["file"].startswith("unsure_") and not e["file"].endswith("_close.png"):
+            assert 0.35 <= e["conf"] < 0.75         # deliberately doubtful from a distance ("moving closer")
+        else:
+            assert e["predicted"] == e["label"]    # the runtime props behave as the slide says
         assert 0.0 <= e["conf"] <= 1.0
 
 
