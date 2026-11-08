@@ -68,7 +68,8 @@ current Command epoch; no arbitrary text or voice ID accepted. Returns
 or `{source:"browser",robot,cmd_id,status,t,text}` for labelled browser speech when
 the key/voice is missing, provider times out or synthesis fails. Unknown/undelivered
 ack is 404, reset during synthesis 409. This is read-only and needs no robot lease.
-Short server cache is bounded; subtitles always use returned text/status.
+Server cache holds at most 32 delivered ack versions per reset epoch; subtitles
+always use returned text/status.
 
 Config: ignored `server/.env` / process-only `ELEVENLABS_API_KEY`,
 `ELEVENLABS_VOICE_R1`, `_R2`, `_R3` (distinct server-selected voice IDs). Default
@@ -83,3 +84,8 @@ Provider interfaces checked against official [ElevenLabs STT](https://elevenlabs
 Yusuf owns push-to-talk, transcript/parsed command card, pending/locked state,
 labelled fallbacks and playback. Full keyed pipeline/two-phone UI dry run remains
 required before enabling on stage.
+
+Tunnel launcher opt-in (contract before code): `--voice` sets DZ_VOICE=1 for a
+keyed dry run; `--gemini` independently enables G/Ask. Defaults keep both off.
+Only Rayan/testing laptop supplies the ignored keys and reports real provider
+sources; no agent key insertion or keyed provider call is part of this validation.
