@@ -386,6 +386,19 @@ cells, contain a model prediction. Dimensions/resolution match the occupancy map
 
 ### Thermal hot spots (`DZ_HEAT_SOURCES`, default off)
 
+Schema, as agreed (Rayan, verbatim):
+`{"id","type":"generator|space_heater|hot_pipe|server_rack|dog|laptop|sunlit","x","y","temp_c","size_m"}`;
+thermal hits carry `kind` (`"survivor"|"decoy"`), `type`, `source_id`, `temp_c`; missing `kind` means survivor.
+
+Every shipped building carries one source of each type in a room that fits it
+(`collapse_01`, its five variants, `showcase_01`, `generated/gen_1..3`):
+`collapse_01` has a generator on the warehouse floor, a space heater in Office B,
+a hot pipe on the Storage wall shared with the boiler room, a server rack in the
+Loading Office, a dog in the Break Room, a laptop in Office A and a sunlit patch on
+the warehouse's loading side; variants inherit these; `generate.py`
+(`place_heat_sources`) picks rooms by name and spots by type for generated buildings,
+with no random draws.
+
 The floor-plan producer supplies the user-agreed optional array (Rayan owns the
 floor-plan data/schema):
 
