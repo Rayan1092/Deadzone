@@ -1,5 +1,6 @@
 """What the command post knows. Updated ONLY by bundles delivered through the network."""
 from copy import deepcopy
+from collections import deque
 
 import numpy as np
 from pydantic import ValidationError
@@ -19,6 +20,10 @@ class CommandPost:
         self.routes = {}      # survivor id -> latest delivered route
         self.delivered = 0
         self.events = []
+        # Bounded, delivered-only evidence for read-only briefings. Sim.events
+        # contains Reality events and must never be passed to an AI tool.
+        self.receipt_history = deque(maxlen=200)
+        self.event_history = deque(maxlen=200)
         self._seen = {}
 
     def receive(self, b, now):
@@ -38,6 +43,7 @@ class CommandPost:
                 return False
         self._seen[b["bid"]] = b["created"] + b["ttl"]
         self.delivered += 1
+        event_start = len(self.events)
         p = b["payload"]
         k = b["kind"]
         if k == "telemetry" and p.get("node_type") == "relay":
@@ -80,6 +86,16 @@ class CommandPost:
                 self.survivors[p["id"]] = rec
                 self.events.append({"kind": "survivor_reported", "survivor": p["id"], "by": p["by"],
                                     "pos": p["pos"], "delay_s": rec["delay_s"]})
+        self.receipt_history.append({"src": b["src"], "kind": k, "hops": list(b["hops"]),
+                                     "reported_t": round(now, 1), "delay_s": round(now - b["created"], 3)})
+        for event in self.events[event_start:]:
+            self.event_history.append(deepcopy(event) | {"received_at": round(now, 1)})
+        if k == "fault":
+            self.event_history.append({"kind": "fault_reported", "robot": p["robot"],
+                                       "fault": p["fault"], "received_at": round(now, 1)})
+        elif k == "telemetry" and p.get("node_type") == "relay":
+            self.event_history.append({"kind": "relay_reported", "id": p["id"],
+                                       "received_at": round(now, 1)})
         return True
 
     def view(self, now):

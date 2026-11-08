@@ -11,11 +11,19 @@ owners. Existing screen messages and robot behavior continue to work.
 | `GET /api/floorplan` | none | Public planning floorplan; hidden survivors and collapse rubble are omitted |
 | `GET /api/join` | none | `{ "url": "http://<laptop>:5173/phone" }` in development, or the configured public frontend URL |
 | `POST /api/plan` | Search plan below | Save the shared draft, broadcast `plan_state`, run safety and return its result |
+| `POST /api/plan?check=false` | Search plan below | Quiet save: `{saved:true, plan_id, checked:false}`; broadcasts only `plan_state`, performs no safety check or dispatch |
 | `POST /api/dispatch` | `{ "plan_id": "P-1" }` | Recheck current knowledge; return `{ok: true, plan_id}` and queue plan bundles, or return safety violations |
 | `POST /api/fault` | `{type: "rubble", at: [x,y]}` or `{type: "overcurrent", robot: "R1"}` | Validated director fault injection |
 | `GET /api/report` | none | `{text, generated_at, source}` briefing, also broadcast to screens |
 
+For the opt-in Gemini briefing setup, tool boundary and local fallback, see
+[`GEMINI.md`](GEMINI.md). Source is `gemini` only after a successful tool-grounded
+model reply; otherwise `local`. A reset during generation returns 409 `report_reset`.
+
 Safety rejection is HTTP 200 with `ok: false`, so the UI can show the violation card.
+Use `?check=false` to preload the demo draft without a phone `safety` message or
+screen `safety_reject` event. `saved:true` means stored, not safety-approved.
+The default remains `check=true`; explicit phone checks and dispatch always check.
 Malformed data is 422, an unknown plan is 404, and changing an already dispatched
 plan ID is 409. Error bodies are `{ "detail": { "code": "...", "msg": "..." } }`,
 with an `issues` array on request validation errors. Full request schemas are also
