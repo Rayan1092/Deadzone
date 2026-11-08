@@ -34,6 +34,9 @@ class Passthrough:
     def score(self, crop_name):
         return None
 
+    def heatmap(self, crop_name):
+        return None   # no model, so nothing to explain
+
 
 class Detector:
     mode = "model"
@@ -71,6 +74,14 @@ class Detector:
         s = round(float(self._common.predict_pos_prob(self.model, x)[0]), 3)
         self.cache[crop_name] = s
         return s
+
+    def heatmap(self, crop_name):
+        """Grad-CAM image for this crop, relative to /crops ("heatmaps/pos_0001.png"), or None.
+        Precomputed by ml/gradcam.py with this same model, so it shows where it looked."""
+        if not crop_name:
+            return None
+        name = f"heatmaps/{Path(crop_name).stem}.png"
+        return name if (self.crop_dir / name).is_file() else None
 
 
 _detector = None

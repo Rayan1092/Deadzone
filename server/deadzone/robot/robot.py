@@ -324,19 +324,21 @@ class Robot:
             self.rejected.add(h["id"])    # the robot only knows "hot, but not a person"
             self.events.append({"kind": "hotspot_rejected", "robot": self.id, "id": h["id"],
                                 "pos": [round(h["pos"][0], 2), round(h["pos"][1], 2)],
-                                "crop": h.get("crop"), "conf": get_detector().score(h.get("crop"))})
+                                "crop": h.get("crop"), "conf": get_detector().score(h.get("crop")),
+                                "heatmap": get_detector().heatmap(h.get("crop"))})
         for s in kept:
             if s["id"] in self.found:
                 continue
             rec = {"id": s["id"], "pos": [round(s["pos"][0], 2), round(s["pos"][1], 2)],
-                   "by": self.id, "t": round(self.t, 1), "conf": s.get("conf", 0.99), "crop": s.get("crop")}
+                   "by": self.id, "t": round(self.t, 1), "conf": s.get("conf", 0.99), "crop": s.get("crop"),
+                   "heatmap": get_detector().heatmap(s.get("crop"))}
             self.found[s["id"]] = rec
             if not self.linked and not self._peer_found(s["id"]):
                 self.found_while_dark = True    # new news: go back to signal and report it
             self.outbox.append(make_bundle(self.id, "CMD", "survivor", rec, self.t, 400))
             self.events.append({"kind": "survivor_found", "robot": self.id, "survivor": s["id"],
                                 "pos": rec["pos"], "linked": self.linked,
-                                "crop": rec["crop"], "conf": rec["conf"]})
+                                "crop": rec["crop"], "conf": rec["conf"], "heatmap": rec["heatmap"]})
             self._on_survivor_confirmed(io, rec)
 
     # ------------------------------------------------------------------ rescue route
