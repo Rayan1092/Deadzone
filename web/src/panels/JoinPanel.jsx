@@ -34,14 +34,14 @@ function QR({ value, size }) {
 }
 
 // Slim top-bar button; the full-screen overlay (Q) has the planner and relay QR codes.
-export function JoinButton() {
+export function JoinButton({ icon = null }) {
   const error = useJoinLoader()
   const url = useSim((s) => s.joinUrl)
   const set = useSim((s) => s.set)
   return (
-    <button className="join-btn" disabled={!url} title={url ? 'Phone QR codes (Q)' : error || 'Loading join link'}
+    <button className="join-btn tb-btn" disabled={!url} title={url ? 'Join from a phone: show the QR codes (Q)' : error || 'Getting the join link…'}
             onClick={() => set({ joinOpen: true })}>
-      Join on phone
+      {icon}<span>Phone</span>
     </button>
   )
 }

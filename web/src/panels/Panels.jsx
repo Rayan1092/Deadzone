@@ -19,7 +19,7 @@ export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
   ['R', 'rubble ahead of the followed robot (R1 on the overview)'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
   ['U', 'resume after safe stop'], ['A', 'aftershock at a random spot (server needs DZ_AFTERSHOCK=1)'], ['⇧A', 'strong aftershock: three areas, two relays'], ['N', 'new random building (Q&A)'], ['⇧N', 'back to the main building'], ['B', 'baseline: robots without Deadzone (with control leases on: Unlock first)'], ['L', 'Model Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
-  ['M', 'one view / split view'], ['C', 'one view: swap the Command post inset and the main view · split view: top-down on the command post'], ['Y', 'belief map: where survivors may still be'], ['E', 'Operator view / Engineering view (sidebar, scheduler, legends)'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save the mission recording (open with ?record)'],
+  ['M', 'one view / split view'], ['C', 'one view: swap the Command post inset and the main view · split view: top-down on the command post'], ['Y', 'belief map: where survivors may still be'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save the mission recording (open with ?record)'],
   ['J', 'Model test: a held-out sample (Q&A)'], ['I', 'under the hood (Q&A)'], ['?replay', 'mission replay: plays a saved mission recording, no server'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
 ]
@@ -38,7 +38,6 @@ export function RescueStatus() {
   // the command post's own estimate (what it can act on); the tooltip has the team's too
   const missing = useSim((s) => s.maps.missing)
   const unaccounted = missingPeople(missing?.command ?? missing?.reality)
-  const time = useSim((s) => s.time)
   const found = useSim((s) => s.tick?.reality.survivors_found ?? NONE_LIST)
   const reported = useSim((s) => s.tick?.command.survivors.length ?? 0)
   const routes = useSim((s) => latestRoutes(s.tick?.command.routes ?? NONE_LIST).length)
@@ -55,7 +54,6 @@ export function RescueStatus() {
           <b className="mono">≈{unaccounted}</b><span>still<br />unaccounted for</span>
         </div>
       )}
-      <div className="rs-cell time"><b className="mono">{fmt(time)}</b><span>since collapse</span></div>
     </div>
   )
 }
@@ -83,6 +81,49 @@ function PresenterLock() {
   )
 }
 
+// Small inline icons for the top bar (stroke = currentColor)
+const Icon = {
+  phone: <svg viewBox="0 0 24 24" aria-hidden><rect x="7" y="2.5" width="10" height="19" rx="2.2" /><path d="M11 18.5h2" /></svg>,
+  brief: <svg viewBox="0 0 24 24" aria-hidden><path d="M6 3.5h9l3 3V20.5H6z" /><path d="M9 10h6M9 13.5h6M9 17h4" /></svg>,
+  panels: <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M15 4v16" /></svg>,
+  lock: <svg viewBox="0 0 24 24" aria-hidden><rect x="5" y="11" width="14" height="9.5" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>,
+}
+
+// One chip per robot in its own colour: name and link in words; click to follow it.
+function RobotChip({ r }) {
+  const follow = useSim((s) => s.follow)
+  const q = linkQuality(r.link)
+  const off = r.state === 'SHUTDOWN'
+  const word = off ? 'Off' : q.word
+  return (
+    <button className={`tb-robot ${off ? 'off' : q.cls}${follow === r.id ? ' on' : ''}`} style={{ '--c': r.color }}
+            title={`${r.name}: ${robotStateLabel(r)}${q.dbm != null ? `, link ${q.dbm} dBm` : ''}. Click to follow`}
+            onClick={() => (follow === r.id ? overview() : followRobot(r.id))}>
+      <i /><b>{r.name}</b><span>{word}</span>
+    </button>
+  )
+}
+
+function MissionClock() {
+  const time = useSim((s) => s.time)
+  return (
+    <div className="tb-clock" title="Time since the collapse (simulated)">
+      <span>Mission time</span><b className="mono">{fmt(time)}</b>
+    </div>
+  )
+}
+
+function BriefingButton() {
+  const loading = useSim((s) => s.report?.loading)
+  const open = useSim((s) => Boolean(s.report && !s.report.loading))
+  return (
+    <button className={`tb-btn${open ? ' on' : ''}`} disabled={loading} title="A short situation briefing, written only from what reached the command post (G)"
+            onClick={() => (open ? useSim.getState().set({ report: null }) : requestReport())}>
+      {Icon.brief}<span>{loading ? 'Writing…' : 'Briefing'}</span>
+    </button>
+  )
+}
+
 export function TopBar() {
   const fp = useSim((s) => s.floorplan)
   const connected = useSim((s) => s.connected)
@@ -94,38 +135,44 @@ export function TopBar() {
   const view = useSim((s) => s.view)
   const mode = useSim((s) => s.mode)
   const night = useSim((s) => s.night)
+  const layout = useSim((s) => s.layout)
+  const robots = useSim((s) => s.tick?.reality.robots) ?? NONE_LIST
+  const full = layout !== 'judge' // 'judge' is the stored id of the Operator view
   return (
     <header className="topbar">
       <div className="brand">DEADZONE</div>
-      <div className="incident">{fp ? fp.name : 'Waiting for sim'}</div>
-      {/* the run clock lives in the Rescue Status strip ("since collapse"); one clock on screen */}
-      {detector && (
-        <span className={`detector-chip ${detector.mode}`} title={detector.reason ?? ''}>
-          Detector: {detector.mode === 'model' ? 'AI model' : 'sim fallback'}
-        </span>
-      )}
-      <ReplayChip />
-      <PresenterLock />
-      {perf && <span className="perf-chip" title="Press P to turn off">Performance mode</span>}
-      {night && <span className="perf-chip" title="Press K to turn off">Night ops</span>}
+      <div className="incident" title={fp?.name}>{fp ? fp.name : 'Connecting…'}</div>
       {mode === 'baseline' && (
         <span className="baseline-chip" title="Press B to switch Deadzone back on">Baseline · without Deadzone</span>
       )}
-      <div className="controls">
-        <button onClick={() => control(running ? 'pause' : 'start')}>{running ? 'Pause' : 'Start'}</button>
-        <button onClick={() => control('speed', speed / 2)}>-</button>
-        <span className="mono">{speed}x</span>
-        <button onClick={() => control('speed', speed * 2)}>+</button>
-        <button onClick={() => control('reset')}>Reset</button>
-        <button className="view-btn" title="Switch layout (M)" onClick={toggleView}>
-          {view === 'gap' ? 'One view' : 'Split view'}
-        </button>
-        {!REPLAY && <JoinButton />}
+      <div className="tb-robots">{robots.map((r) => <RobotChip key={r.id} r={r} />)}</div>
+      <MissionClock />
+      <PresenterLock />
+      <ReplayChip />
+      {/* run controls: always in the Engineering view, on hover in the Operator view */}
+      <div className="controls tb-secondary">
+        {detector && (
+          <span className={`detector-chip ${detector.mode}`} title={detector.reason ?? ''}>
+            {detector.mode === 'model' ? 'AI model' : 'Simulated detector'}
+          </span>
+        )}
+        {perf && <span className="perf-chip" title="Press P to turn off">Performance mode</span>}
+        {night && <span className="perf-chip">Night</span>}
+        <button onClick={() => control(running ? 'pause' : 'start')} title="Start or pause the run (Space)">{running ? 'Pause' : 'Start'}</button>
+        <button onClick={() => control('speed', speed / 2)} title="Slower (−)">−</button>
+        <span className="mono" title="Simulation speed">{speed}×</span>
+        <button onClick={() => control('speed', speed * 2)} title="Faster (+)">+</button>
+        <button onClick={() => control('reset')} title="Back to the start of this scenario (Backspace)">Reset</button>
+        <button className="view-btn" title="One view or split view (M)" onClick={toggleView}>{view === 'gap' ? 'One view' : 'Split view'}</button>
         <button className="icon-btn" title="Keys (?)" onClick={() => set({ helpOpen: true })}>?</button>
-        <button title="Model test on a held-out thermal sample (J)" onClick={() => set({ judgeOpen: true, hoodOpen: false, labOpen: false })}>J · Model test</button>
-        <button title="Live diagnostic counters (I)" onClick={() => set({ hoodOpen: true, judgeOpen: false, labOpen: false })}>I · Counters</button>
-        {!REPLAY && <span className={connected ? 'conn ok' : 'conn bad'}>{connected ? 'live' : 'offline'}</span>}
+        <button title="Model test on a held-out thermal sample (J)" onClick={() => set({ judgeOpen: true, hoodOpen: false, labOpen: false })}>Model test</button>
+        <button title="Live counters (I)" onClick={() => set({ hoodOpen: true, judgeOpen: false, labOpen: false })}>Counters</button>
       </div>
+      {!REPLAY && <JoinButton icon={Icon.phone} />}
+      <BriefingButton />
+      {!REPLAY && <span className={`tb-conn ${connected ? 'ok' : 'bad'}`} title={connected ? 'Connected to the simulation' : 'Not connected: reconnecting to the simulation'}><i />{connected ? 'Live' : 'Offline'}</span>}
+      <button className={`tb-icon${full ? ' on' : ''}`} aria-pressed={full} title={full ? 'Hide the side panels' : 'Show the side panels (robots, events, scheduler)'}
+              onClick={() => setLayout(full ? 'judge' : 'full')}>{Icon.panels}</button>
     </header>
   )
 }
@@ -354,11 +401,6 @@ export function useKeyboard() {
         else frameCommandPost() // split view: top-down on the command post, again for the overview
       }
       if (key === 'y') { const on = !s.beliefOn; try { localStorage.setItem('dz-belief', on ? '1' : '0') } catch { /* session only */ } s.set({ beliefOn: on }) }
-      if (key === 'e') {
-        const next = s.layout === 'judge' ? 'full' : 'judge' // 'judge' is the stored id of the Operator view
-        setLayout(next)
-        s.set({ toasts: [...s.toasts, { kind: 'note', msg: next === 'judge' ? 'Operator view: map first, panels on hover' : 'Engineering view: every panel', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
-      }
       if (key === 'x') {
         setSound(!soundOn())
         s.set({ toasts: [...s.toasts, { kind: 'note', msg: soundOn() ? 'Sound cues on' : 'Sound cues off', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
