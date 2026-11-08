@@ -415,5 +415,129 @@
   ]
  },
  "paths": "file paths are relative to /ai-lab/results/ (DZ_AI_LAB=1); runtime paths start with /crops/",
- "note": "Examples and metrics are held-out FLIR images (val and video test splits), never used in training. Examples are curated for a collapsed-building search: one person in a sitting, crouching or bent pose, or a warm object filling the frame."
+ "note": "Examples and metrics are held-out FLIR images (val and video test splits), never used in training. Examples are curated for a collapsed-building search: one person in a sitting, crouching or bent pose, or a warm object filling the frame.",
+ "decoys": {
+  "threshold": 0.6,
+  "n": 74,
+  "false_alarms": 3,
+  "false_alarm_rate": 0.0405,
+  "source": "Teledyne FLIR ADAS v2 thermal, images_thermal_val + video_thermal_test (never trained on); frames used by the runtime crops, unsure pairs and the held-out test set excluded",
+  "note": "dog and sunlit are real counterparts; the other five are stand-ins (warmest crops of the closest labelled class), named as such in each caption",
+  "per_type": {
+   "dog": {
+    "n": 2,
+    "false_alarms": 0,
+    "false_alarm_rate": 0.0,
+    "max_p_person": 0.121,
+    "real": true
+   },
+   "sunlit": {
+    "n": 12,
+    "false_alarms": 0,
+    "false_alarm_rate": 0.0,
+    "max_p_person": 0.005,
+    "real": true
+   },
+   "generator": {
+    "n": 12,
+    "false_alarms": 2,
+    "false_alarm_rate": 0.167,
+    "max_p_person": 0.82,
+    "real": false
+   },
+   "space_heater": {
+    "n": 12,
+    "false_alarms": 0,
+    "false_alarm_rate": 0.0,
+    "max_p_person": 0.562,
+    "real": false
+   },
+   "hot_pipe": {
+    "n": 12,
+    "false_alarms": 0,
+    "false_alarm_rate": 0.0,
+    "max_p_person": 0.127,
+    "real": false
+   },
+   "server_rack": {
+    "n": 12,
+    "false_alarms": 0,
+    "false_alarm_rate": 0.0,
+    "max_p_person": 0.175,
+    "real": false
+   },
+   "laptop": {
+    "n": 12,
+    "false_alarms": 1,
+    "false_alarm_rate": 0.083,
+    "max_p_person": 0.993,
+    "real": false
+   }
+  },
+  "examples": [
+   {
+    "file": "lab/decoys/dog_02.png",
+    "type": "dog",
+    "real": true,
+    "shows": "dog, real FLIR thermal frame",
+    "conf": 0.121,
+    "verdict": "not a person",
+    "card": "Not a person \u00b7 88% sure"
+   },
+   {
+    "file": "lab/decoys/sunlit_01.png",
+    "type": "sunlit",
+    "real": true,
+    "shows": "sun-warmed pavement or wall, real FLIR thermal frame (no label: a bright patch away from every labelled object)",
+    "conf": 0.005,
+    "verdict": "not a person",
+    "card": "Not a person \u00b7 100% sure"
+   },
+   {
+    "file": "lab/decoys/generator_10.png",
+    "type": "generator",
+    "real": false,
+    "shows": "running truck engine and machinery (stand-in for a generator)",
+    "conf": 0.82,
+    "verdict": "person",
+    "card": "Person \u00b7 18% sure"
+   },
+   {
+    "file": "lab/decoys/space_heater_11.png",
+    "type": "space_heater",
+    "real": false,
+    "shows": "warm car front (stand-in for a space heater)",
+    "conf": 0.562,
+    "verdict": "not a person",
+    "card": "Not a person \u00b7 44% sure"
+   },
+   {
+    "file": "lab/decoys/hot_pipe_03.png",
+    "type": "hot_pipe",
+    "real": false,
+    "shows": "lamp post or light housing (stand-in for a hot pipe)",
+    "conf": 0.127,
+    "verdict": "not a person",
+    "card": "Not a person \u00b7 87% sure"
+   },
+   {
+    "file": "lab/decoys/server_rack_04.png",
+    "type": "server_rack",
+    "real": false,
+    "shows": "boxy warm bus panel (stand-in for a server rack)",
+    "conf": 0.175,
+    "verdict": "not a person",
+    "card": "Not a person \u00b7 82% sure"
+   },
+   {
+    "file": "lab/decoys/laptop_06.png",
+    "type": "laptop",
+    "real": false,
+    "shows": "small warm panel (stand-in for a laptop)",
+    "conf": 0.993,
+    "verdict": "person",
+    "card": "Person \u00b7 1% sure"
+   }
+  ]
+ }
 }

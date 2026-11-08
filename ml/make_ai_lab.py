@@ -189,6 +189,11 @@ def main():
                  "training. Examples are curated for a collapsed-building search: one person in a sitting, "
                  "crouching or bent pose, or a warm object filling the frame."),
     }
+    previous = RESULTS / "lab.json"
+    if previous.exists():                    # the decoy pool block is written by ml/make_decoy_pool.py
+        decoys = json.loads(previous.read_text(encoding="utf-8")).get("decoys")
+        if decoys:
+            lab["decoys"] = decoys
     (RESULTS / "lab.json").write_text(json.dumps(lab, indent=1), encoding="utf-8")
     right = sum(e["label"] == e["predicted"] for e in examples)
     print(f"wrote {RESULTS / 'lab.json'}: {len(examples)} examples ({right} right), "
