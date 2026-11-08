@@ -3,6 +3,11 @@
 Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`. Only Aziz's sessions edit this file.
 
 ## Now
+- **Version 2 sync:** main `eae96ef` includes PLAN v2 (#34), pitch assets (#33), tagged beacons (#32), replay (#31), and Yusuf's quiet-preload UI/declutter (#35). All Version 1 backend scope from #28 is merged. The older Now bullets below describe that completed milestone.
+- **Working on next:** `p2/quiet-preload`: explicit opt-in quiet REST save before Gemini. No Version 2 backend implementation was present at this sync: report is local, FEC is a visual flag only, drafts use last-write-wins, and aftershock/rescue ordering/soak are not implemented.
+- **Rayan offers accepted:** yes to reviewing merged PR #28 against your robot contracts; yes to writing the soak test in `server/tests/test_soak.py`. Please own that file so we do not duplicate it: 1,200 simulated seconds, 3 robots, 10x pacing, no exceptions, process memory <500 MB, report wall time and peak memory; distinguish simulated-time coverage from a 20-minute wall-clock soak. Keep the demo guard first. I will integrate/run your soak and address backend findings. Beacon tagging is done on main; no further call-site change needed.
+- **Quiet preload contract (posted before code):** `POST /api/plan?check=false` validates/saves/broadcasts `plan_state` only and returns `{saved:true,plan_id:"P-1",checked:false}`. It emits neither phone `safety` nor screen `safety_reject`; it never grants safety approval or dispatches. Default `check=true` preserves the existing response/check behavior. `plan_submit` and dispatch still perform full fresh checks. Yusuf's #35 UI fix remains compatible; use the query option for a truly silent wire/recording. DEMO.md preload will use it; dispatch fallback still checks.
+- **Pending contracts:** Gemini/Ask, aftershock, FEC, CRDT and rescue-order contracts will be posted here before their separate feature implementations. Yusuf owns all web design/UI; Rayan owns robot reactions. New behavior remains opt-in until the testing laptop dry run.
 - **Working on:** `p2/detector-rescue-backend`, Added scope backend, based on main `45d18bd` including Rayan's rescue PR #25 and Yusuf's M7 PR #26. Tests: 198 passed with the model and 198 with DETECTOR=sim; current frontend build passes.
 - **Works on main:** DTN/custody, peer telemetry, planning/safety APIs, phone relay lifecycle, local report and all PR #22 controls/decoy safety/delivered plan status. PR #22 is merged; Yusuf's O/U controls and phone labels are merged too. Rayan's route generation is on main; this branch supplies the missing receive side.
 - **In flight (not merged):** `/crops/<file>`, screen/phone `hello.detector` and optional reason, priority-1 route delivery/storage/events, dark-only tagged beacon IO and delivered beacon metadata. Canonical route fields plus PR #25 aliases are supported; long legacy polylines are compacted only along straight forward segments.
@@ -25,6 +30,12 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
   - Reported faults in `command.faults` / phone `cmd_view.faults` are delivered history, not live fault flags. No Command/phone truth fallback.
 
 ## Log
+
+### 2026-11-07 PT · p2/quiet-preload · Version 2 audit and quiet-save contract before implementation
+- **Did:** pulled and read PLAN v2 and teammate histories; audited backend against all seven requested Version 2 items. Existing DTN, delivered routes/plan state, detector status/crops, overload/resume and phone relays are present. Gemini, Ask, aftershock, real RS, CRDT, rescue ordering and soak are still pending. Yusuf already hides preload results in the UI (#35); explicit backend quiet-save avoids emitting them at all.
+- **Contract changes:** the opt-in `POST /api/plan?check=false` contract in Now above is reserved before implementation. Default callers unchanged.
+- **Heads-up for others:** Rayan: accepted both your #28 contract review and soak-test offer (file/scope in Now). Yusuf: quiet preload is additive; no web files changed. Browser replay already covers the backup recorder requirement.
+- **Next:** implement/test quiet save, publish its own PR, then Gemini/Ask per priority unless the user explicitly chooses all other backend features first.
 
 ### 2026-11-07 15:26 PT · p2/detector-rescue-backend · Detection assets/status and delivered rescue route integration
 - **Did:** added crop static serving, active detector metadata to both hello variants, priority-1 rescue transport/Command storage and dark-only beacon IO metadata. Pulled merged rescue/visual PRs #25/#26 and tested the real source together: full suite 198 passed with the CPU model, 198 passed with DETECTOR=sim; latest production web build passed. No robot/ML/floorplan/frontend source edits by Aziz.
