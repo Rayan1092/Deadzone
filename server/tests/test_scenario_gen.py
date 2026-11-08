@@ -129,7 +129,8 @@ def test_showcase_building_on_disk_matches_its_generator_and_plan():
     g = data["generator"]
     again = generate.generate(g["seed"], size=tuple(data["size"]), plan_id=data["id"], name=data["name"],
                               location="showcase_01")
-    assert json.dumps(again, sort_keys=True) == json.dumps(data, sort_keys=True)
+    assert json.dumps(again, sort_keys=True) == json.dumps(generate.strip_export(data), sort_keys=True)
+    assert data.get("obstacles"), "the showcase carries Yusuf's furniture footprints for DZ_OBSTACLES=1"
     assert generate.validate(data) == [] and len(generate.steel_rooms(data)) == 2
     assert data["size"] == [80.0, 60.0] and sum(e["do"] == "aftershock" for e in data["timeline"]) == 3
     assert data["default_plan"] == "data/plans/showcase_01.plan.json"
@@ -145,7 +146,7 @@ def test_showcase_building_on_disk_matches_its_generator_and_plan():
 
 
 def test_variants_of_the_demo_building_keep_the_dark_survivor_and_shuffle_the_rest(tmp_path):
-    base = json.loads((ROOT / "data" / "floorplans" / "collapse_01.json").read_text(encoding="utf-8"))
+    base = generate.strip_export(json.loads((ROOT / "data" / "floorplans" / "collapse_01.json").read_text(encoding="utf-8")))
     inherited = set(generate.validate(base))                     # collapse_01's own geometry findings
     cage = next(r for r in base["rooms"] if r["id"] == "E2")
     original = tuple(tuple(p["pos"]) for p in base["survivors"] + base["decoys"])
@@ -169,8 +170,8 @@ def test_variants_of_the_demo_building_keep_the_dark_survivor_and_shuffle_the_re
     for e in index["variants"]:                                  # shipped files match the generator
         assert e["scenario"] == f"variants/{e['id']}"           # the id GET /api/scenarios lists (has "variant")
         on_disk = json.loads((ROOT / e["file"]).read_text(encoding="utf-8"))
-        again = generate.variant_of(base, on_disk["generator"]["seed"])
-        assert json.dumps(on_disk, sort_keys=True) == json.dumps(again, sort_keys=True)
+        again = generate.variant_of(generate.strip_export(base), on_disk["generator"]["seed"])
+        assert json.dumps(generate.strip_export(on_disk), sort_keys=True) == json.dumps(again, sort_keys=True)
         assert (ROOT / e["default_plan"]).exists()
     v1 = generate.variant_of(base, 1)
     path = tmp_path / "v1.json"
