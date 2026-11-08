@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "origin": "https://chair-challenge-large-plant.trycloudflare.com",
+  "checks": [
+    "screen/phone/microphone HTML and built assets over HTTPS",
+    "API and QR join use the same HTTPS origin",
+    "screen + two Command-only phone handshakes over WSS",
+    "exclusive lease/heartbeat/broadcast and non-holder manual+voice rejection through HTTPS"
+  ],
+  "microphone": "requires manual phone /mic-check test",
+  "venue_wifi": "not established by this probe"
+}

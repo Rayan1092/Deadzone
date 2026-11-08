@@ -16,6 +16,7 @@ ml/*.pt
 .DS_Store
 .env
 *.log
+.demo/
 
 # FLIR extraction leftovers (safety net, dataset lives in ml/data/flir)
 ml/images_*/

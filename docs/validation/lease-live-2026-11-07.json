@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "expiry_wall_s": 15.031,
+  "simulation_paused": true,
+  "heartbeat_cannot_reclaim": true,
+  "presenter_override": "tested separately on loopback only",
+  "venue_wifi": "not established",
+  "phone_microphone": "not tested",
+  "presenter_override_frees_only": true,
+  "holder_socket_survives_override": true,
+  "explicit_reclaim_required": true,
+  "presenter_credential_sent_to_cloudflare": false,
+  "launcher_cleanup": "verified both child PIDs stopped; private/live state files removed",
+  "approval_review": "public presenter bearer test rejected; override verified through loopback instead",
+  "full_suite_passed": 329,
+  "full_suite_skipped": 1,
+  "full_suite_wall_s": 166.82,
+  "focused_passed": 46,
+  "frontend_build": "passed; 728 modules",
+  "synced_main": "a7acb0a"
+}
