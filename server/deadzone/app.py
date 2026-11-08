@@ -239,7 +239,10 @@ class Hub:
         self.require_leases()
         self.leases.require(robot, token)
         is_voice = intent is None
-        if is_voice or intent.action != "resume":
+        # Only spoken input needs the voice services (transcription, Gemini). A phone button
+        # (hold, resume, return home, explore a zone) is built and safety-checked locally, so
+        # control leases alone are enough: the phone shows these buttons whenever leases are on.
+        if is_voice:
             self.require_voice()
         post, grant = self.sim.post, self.leases.leases[robot]
         book = self.command_requests
