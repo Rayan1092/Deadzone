@@ -1,5 +1,5 @@
 import { Fragment, useEffect } from 'react'
-import { setNight, setPerf, setView, useSim } from '../store'
+import { setLayout, setNight, setPerf, setView, useSim } from '../store'
 import { control } from '../net/socket'
 import { FAULT_LABEL, STATE_LABEL, describeEvent, fmtClock as fmt, latestRoutes } from '../format'
 import { JoinButton } from './JoinPanel'
@@ -16,7 +16,7 @@ export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
   ['R', 'rubble ahead of the robot'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
   ['U', 'resume after safe stop'], ['A', 'aftershock at a random spot (server needs DZ_AFTERSHOCK=1)'], ['⇧A', 'strong aftershock: three areas, two relays'], ['N', 'new random building (Q&A)'], ['⇧N', 'back to the main building'], ['B', 'baseline: robots without Deadzone (with control leases on: Unlock first)'], ['L', 'AI Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
-  ['M', 'one view / split view'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
+  ['M', 'one view / split view'], ['E', 'judge layout / all panels (sidebar, scheduler, legends)'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
   ['J', 'judge test (Q&A)'], ['I', 'under the hood (Q&A)'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
 ]
@@ -283,6 +283,7 @@ export function useKeyboard() {
       if (key === 'v' && target) s.set({ eyeRobot: s.eyeRobot === target.id ? null : target.id })
       if (key === 'p') setPerf(!s.perf)
       if (key === 'm') toggleView()
+      if (key === 'e') setLayout(s.layout === 'judge' ? 'full' : 'judge')
       if (key === 'x') {
         setSound(!soundOn())
         s.set({ toasts: [...s.toasts, { kind: 'note', msg: soundOn() ? 'Sound cues on' : 'Sound cues off', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })

@@ -558,3 +558,28 @@ button:hover { border-color: var(--teal); }
 .lock-chip small { color: rgba(230,237,243,.7); font-size: 11px; }
 .lock-chip button { padding: 2px 10px; font-size: 12px; border-radius: 999px; }
 .lease-holder { font-size: 11px; color: #fde68a; margin: 2px 0; }
+
+/* ---------------------------------------------------------------- judge-first layout (E)
+   The map, robots, survivors and the Rescue Status strip. The sidebar and the scheduler slide in
+   from the right and bottom edges on hover; the top bar shows only the building (and the
+   baseline chip, part of the story) until hovered; legends and pane counters show on pane hover.
+   Event pop-ups (AI cards, banners, toasts, the scout camera) still appear. */
+/* grid items may shrink below their canvases' last pixel size (switching back to all panels) */
+.split, .pane { min-width: 0; }
+.app.judge { grid-template-columns: 1fr; grid-template-rows: 52px 1fr; grid-template-areas: 'top' 'split'; }
+.app.judge .sidebar, .app.judge .timeline { position: fixed; z-index: 30; transition: transform .22s ease, opacity .22s ease; }
+.app.judge .sidebar { top: 52px; right: 0; bottom: 0; width: 300px; transform: translateX(100%); opacity: 0; box-shadow: -16px 0 40px rgba(0,0,0,.45); }
+.app.judge .timeline { left: 0; right: 0; bottom: 0; transform: translateY(100%); opacity: 0; box-shadow: 0 -16px 40px rgba(0,0,0,.45); }
+.app.judge .side-peek:hover + .sidebar, .app.judge .sidebar:hover, .app.judge .sidebar:focus-within,
+.app.judge .time-peek:hover + .timeline, .app.judge .timeline:hover, .app.judge .timeline:focus-within { transform: none; opacity: 1; }
+.side-peek, .time-peek { display: none; }
+.app.judge .side-peek { display: block; position: fixed; z-index: 29; top: 52px; right: 0; bottom: 0; width: 14px; }
+.app.judge .time-peek { display: block; position: fixed; z-index: 29; left: 0; right: 0; bottom: 0; height: 12px; }
+.app.judge .topbar > :not(.brand):not(.incident):not(.baseline-chip) { opacity: 0; transition: opacity .2s ease; }
+.app.judge .topbar:hover > :not(.brand):not(.incident):not(.baseline-chip),
+.app.judge .topbar:focus-within > :not(.brand):not(.incident):not(.baseline-chip) { opacity: 1; }
+.app.judge .pane-legend { opacity: 0; transition: opacity .2s ease; }
+.app.judge .pane:hover .pane-legend { opacity: 1; }
+/* collapsed (not just transparent) so the title pill is only as wide as its title */
+.app.judge .pane-stats, .app.judge .pane-title .muted { display: none; }
+.app.judge .pane:hover .pane-stats, .app.judge .pane:hover .pane-title .muted { display: inline; }
