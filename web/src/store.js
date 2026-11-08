@@ -72,7 +72,8 @@ export const useSim = create((set) => ({
   robotsMeta: [],
   time: 0,
   tick: null,          // { reality, command, stats }
-  maps: { reality: null, command: null, version: 0, commandVersion: 0 }, // commandVersion: only when Command's map changed
+  maps: { reality: null, command: null, version: 0, commandVersion: 0, belief: null, beliefCommand: null, missing: null, beliefVersion: 0 }, // commandVersion: only when Command's map changed
+  beliefOn: (() => { try { return localStorage.getItem('dz-belief') === '1' } catch { return false } })(), // Y: belief heat layer
   events: [],          // newest first, capped
   toasts: [],          // { id, kind, ... } oldest first, removed by Toasts after a few seconds
   joinOpen: false,     // full screen QR overlay (Q key)
@@ -148,6 +149,7 @@ export function useStable(selector, keyOf = JSON.stringify) {
 
 export function decodeMap(b64) {
   if (b64 instanceof Uint8Array) return b64
+  if (Array.isArray(b64)) return Uint8Array.from(b64)
   const bin = atob(b64)
   const out = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
@@ -195,8 +197,16 @@ export function handleMessage(msg) {
       const command = decodeMap(data.command)
       const old = s.maps.command
       const same = old && old.length === command.length && old.every((v, i) => v === command[i])
+      // Rayan's belief map, when the server sends it: the team's grid, Command's grid, and the
+      // expected survivors still unaccounted for in each view
+      const belief = data.belief ? decodeMap(data.belief) : null
+      const beliefCommand = data.belief_command ? decodeMap(data.belief_command) : null
+      const oldB = s.maps.beliefCommand
+      const sameB = !beliefCommand || (oldB && oldB.length === beliefCommand.length && oldB.every((v, i) => v === beliefCommand[i]))
       s.set({ maps: { reality: decodeMap(data.reality), command, version: s.maps.version + 1,
-                      commandVersion: same ? s.maps.commandVersion : s.maps.commandVersion + 1 } })
+                      commandVersion: same && (sameB || !s.beliefOn) ? s.maps.commandVersion : s.maps.commandVersion + 1,
+                      belief, beliefCommand, missing: data.missing ?? null,
+                      beliefVersion: belief || beliefCommand ? s.maps.beliefVersion + 1 : s.maps.beliefVersion } })
       break
     }
     case 'event': {
