@@ -146,6 +146,10 @@ Robots compute every path live (frontier exploration plus A\* on their own map).
 - **Yusuf's cut list tonight:** multi-story interior, voice UI, clinic map. **Handed to Aziz with Yusuf's OK:** the judge test overlay (J) and the Under the hood panel (I), both data panels.
 - **Aziz's queue:** short G briefing, B/U presenter fix, earthquake strength, floor plan switch and timeline player, counters in `tick.stats`, judge pool serving, then J and I panels.
 
+Aziz's implemented API/panel contract and acceptance status:
+[FINAL-STRETCH-BACKEND.md](FINAL-STRETCH-BACKEND.md). The judge pool and optional
+detector/met-deadline instrumentation remain Rayan-owned exports.
+
 **Priority against the 7:30 AM freeze:** live judge test and captions first (cheap, highest trust), Rescue Status strip second, Under the hood third. These rank above multi-story, voice UI and the clinic map. The main run stays exactly as `DEMO.md`; J and I are for after the close and Q&A.
 
 ### Owners and priorities

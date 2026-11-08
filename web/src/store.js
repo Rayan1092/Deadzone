@@ -70,6 +70,8 @@ export const useSim = create((set) => ({
   eyeThermal: false,   // thermal palette in the robot's-eye view
   introOpen: false,    // first-glance explainer (once per session, or from the ? overlay)
   labOpen: false,      // L key: AI Lab overlay
+  judgeOpen: false,    // J: held-out thermal judge challenge, after the close
+  hoodOpen: false,     // I: actual simulator counters, after the close
   eyeFocus: null,      // the hot spot the onboard classifier just judged: { kind, subject, robot, pos, conf, linked, born }
   mode: null,          // 'deadzone' | 'baseline' | 'mixed' from hello/control (Rayan's baseline mode)
   aftershock: null,    // { at, born } of the latest aftershock, for the shake and dust

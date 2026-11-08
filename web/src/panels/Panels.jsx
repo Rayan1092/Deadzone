@@ -13,6 +13,7 @@ export const KEYS = [
   ['R', 'rubble ahead of the robot'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
   ['U', 'resume after safe stop'], ['A', 'aftershock (server needs DZ_AFTERSHOCK=1)'], ['B', 'baseline: robots without Deadzone'], ['L', 'AI Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
   ['M', 'one view / split view'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
+  ['J', 'judge test (Q&A)'], ['I', 'under the hood (Q&A)'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
 ]
 
@@ -66,6 +67,8 @@ export function TopBar() {
         </button>
         {!REPLAY && <JoinButton />}
         <button className="icon-btn" title="Keys (?)" onClick={() => set({ helpOpen: true })}>?</button>
+        <button title="Held-out thermal judge test (J)" onClick={() => set({ judgeOpen: true, hoodOpen: false, labOpen: false })}>J · Test</button>
+        <button title="Live diagnostic counters (I)" onClick={() => set({ hoodOpen: true, judgeOpen: false, labOpen: false })}>I · Counters</button>
         {!REPLAY && <span className={connected ? 'conn ok' : 'conn bad'}>{connected ? 'live' : 'offline'}</span>}
       </div>
     </header>
@@ -180,15 +183,19 @@ export function HelpOverlay() {
 export function useKeyboard() {
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.tagName === 'INPUT') return
+      if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable="true"]')) return
       const s = useSim.getState()
       const robots = s.tick?.reality.robots ?? []
       // director keys act on the followed robot, else the first one
       const target = robots.find((r) => r.id === s.follow) ?? robots[0]
       const key = e.key.toLowerCase()
+      // A modal's buttons keep their native Space/Enter behavior; data panels never drive the sim.
+      if ((s.judgeOpen || s.hoodOpen) && !['escape', 'j', 'i'].includes(key)) return
       if (key === 'q') s.set({ joinOpen: !s.joinOpen })
-      if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null, helpOpen: false, labOpen: false, introOpen: false })
-      if (key === 'l') s.set({ labOpen: !s.labOpen })
+      if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null, helpOpen: false, labOpen: false, introOpen: false, judgeOpen: false, hoodOpen: false })
+      if (key === 'l') s.set({ labOpen: !s.labOpen, judgeOpen: false, hoodOpen: false })
+      if (key === 'j' && !e.repeat) s.set({ judgeOpen: !s.judgeOpen, hoodOpen: false, labOpen: false })
+      if (key === 'i' && !e.repeat) s.set({ hoodOpen: !s.hoodOpen, judgeOpen: false, labOpen: false })
       if (key === 'k') setNight(!s.night)
       if (key === 'd') { if (s.director) overview(); s.set({ director: !s.director, shot: null }) }
       if (e.key === '?' || key === 'h') s.set({ helpOpen: !s.helpOpen })

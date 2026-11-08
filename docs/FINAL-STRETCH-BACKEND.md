@@ -1,9 +1,10 @@
 # Final-stretch backend contract
 
 Rayan's next list was relayed by the user. G shortening is merged in #89; the
-remaining backend additions extend #90. The presenter UI and J/I data panels
-require Yusuf's integration/agreement. Rayan announces the freeze. No web, robot
-policy, ML or map source is modified by these additions.
+remaining additions extend #90. Main 34cc4c5 now explicitly records Yusuf's OK
+for Aziz to build J/I, and both panels are implemented in this branch. The
+presenter lease UI remains Yusuf's integration. Rayan announces the freeze.
+No robot policy, ML or map source is modified by these additions.
 
 ## G and presenter B/U
 
@@ -87,12 +88,14 @@ screen data, never phone `cmd_view`, Command knowledge or Gemini tools.
 | `survivors_reported`, `rescue_routes_delivered` | Current unique delivered Command survivors/routes. |
 | `bundles_created` | Unique source-owned bundle IDs first seen by transport, including separate peer unicast copies. |
 | `hop_transfers`, `transport_delivered` | Accepted per-hop custody transfers and final deliveries to all destinations, including peer robots. Existing `delivered` remains the Command accepted-bundle count. |
+| `command_delivery_hops`, `hops_per_delivery` | Lifetime hop sum and mean for accepted Command deliveries only; deduplicated by the existing receive path. |
 | `bytes_transmitted` | Cumulative simulated hop bytes, including parity, partial/interrupted attempts and retries; bandwidth is continuous, so this can be fractional. Not measured physical traffic. |
 | `bundles_expired`, `bundles_evicted`, `bundles_destroyed`, `custody_refusals` | Actual TTL expiries, storage evictions, destroyed custody and rejected completed custody attempts. |
 | `corrupted_bytes`, `corrected_bytes`, `fec_failed_blocks` | Lifetime sums of actual seeded channel/RS results. Per-link values still describe only the latest transport tick. |
 | `queued_bytes`, `relays_destroyed` | Current stored bundle-byte estimates and physically destroyed relay count. |
 | `deadline_misses`, `safety_deadline_misses` | Cumulative actual scheduler miss counters; these include the scheduler's skipped-release policy. |
 | `exploration_searches` | V2 explorer graph-search counter; 0 with V2 disabled. This is not a count of every A* call. |
+| `detector_calls`, `detector_rejections`, `scheduler_deadlines_met` | Optional sums of actual same-name `robot.telemetry().counters` integer fields supplied by Rayan. Omitted unless every deployed robot supplies the counter; missing is not zero. |
 | `aftershock_areas` | Actual collapse areas applied, including delayed ones. |
 | `timeline_events_played`, `timeline_events_failed`, `timeline_events_total` | Successful, failed and scheduled script events. |
 
@@ -107,9 +110,37 @@ pool/manifest/image returns 404. No placeholder dataset, fabricated judge score,
 or new inference API is created here. The actual pool is not present in this
 checkout yet; Rayan owns that export.
 
-Yusuf can build I from tick.stats and J from the exported pool contract. The user
-said Aziz can implement those web data panels if Yusuf agrees. Until agreement
-is recorded, the current backend-only boundary applies. Physical browser/GPU,
-keyed Gemini/ElevenLabs and two-phone acceptance remain distinct from automated
-backend tests. The separate paced 10x soak remains a performance task, not a pass
-implied by these counters or tests.
+J and I are now implemented under the explicit handoff in PLAN.md's final-stretch
+decisions. They start closed; key J/I and top-bar buttons open them, Esc closes.
+Modal keyboard input cannot trigger director controls or start/reset the sim.
+J loads the exported evidence, selects random crops without replacement, hides
+truth/model result until a guess, reveals recorded P(person) without rounding
+near-certainty up to 100%, and tracks both tallies. It labels results as recorded
+export results, not new inference. I shows actual counters and "Awaiting counter"
+for omitted instrumentation. Closing either restores focus to the previous UI.
+
+Judge manifest contract (supports the existing lab-style `conf` = P(person) alias,
+plus `samples`/`items` arrays and `path` for file):
+
+```json
+{"split":"val","model":{"name":"MobileNetV3-Small","threshold":0.6},
+ "examples":[{"file":"crops/001.png","label":"person","p_person":0.913}]}
+```
+
+`held_out:true` can replace the split declaration. A recorded `predicted` label
+can replace the model threshold. Missing/invalid scores, duplicate files, unsafe
+image paths, or unverified split metadata show an error instead of inventing
+evidence. Assets must be PNG/JPG/WebP in the same-origin pool. No runtime demo
+crops are substituted for the absent held-out pool. Rayan: export this metadata
+with the actual pool; the ready panel will consume it when files arrive.
+
+Validation: 454 backend tests passed / 1 opt-in soak skipped; 6 Node judge-pool
+tests passed; web production build passed (745 modules). Live owned preview on
+8030 serves the actual J/I build and screen stats/WS correctly; evidence is in
+validation/final-stretch-preview-2026-11-07.json. The actual judge manifest is 404
+pending Rayan's export. Browser automation was stopped by the user's physical
+Escape key before final panel visual QA; no further UI input was issued.
+
+Physical browser/GPU, keyed Gemini/ElevenLabs and two-phone acceptance remain
+distinct from automated tests. The separate paced 10x soak remains a performance
+task, not a pass implied by these counters or tests.

@@ -202,6 +202,8 @@ def test_sensor_and_transport_counters_are_actual_work_not_snapshot_calls(hub):
     assert stats["lidar_scans"] > 0 and stats["lidar_rays"] > stats["lidar_scans"]
     assert stats["thermal_scans"] > 0 and stats["hop_transfers"] > 0
     assert stats["bytes_transmitted"] > 0 and stats["transport_delivered"] >= stats["delivered"]
+    assert stats["command_delivery_hops"] >= stats["delivered"]
+    assert stats["hops_per_delivery"] == round(stats["command_delivery_hops"] / stats["delivered"], 3)
     assert sim.snapshot()["stats"] == stats
     assert "stats" not in hub.phone_view()
     assert "bytes_transmitted" not in json.dumps(CommandTools(sim.post, sim.time).call("get_network", {}))
@@ -227,6 +229,19 @@ def test_transport_counts_multihop_expiry_and_destruction_once():
     assert net.counters["bundles_destroyed"] == 1
     net.destroy("RL1")
     assert net.counters["bundles_destroyed"] == 1
+
+
+def test_robot_owned_diagnostics_only_aggregate_complete_actual_counters(hub, monkeypatch):
+    assert "detector_calls" not in hub.sim.snapshot()["stats"]
+    for index, robot in enumerate(hub.sim.robots.values()):
+        original = robot.telemetry
+        monkeypatch.setattr(robot, "telemetry", lambda link, original=original, index=index:
+            original(link) | {"counters":{"detector_calls":index+1, "scheduler_deadlines_met":10}})
+        stats = hub.sim.snapshot()["stats"]
+        if index < 2:
+            assert "detector_calls" not in stats
+    assert stats["detector_calls"] == 6 and stats["scheduler_deadlines_met"] == 30
+    assert "detector_rejections" not in stats
 
 
 def test_judge_pool_nested_assets_arrive_after_mount_and_are_read_only(tmp_path, monkeypatch):

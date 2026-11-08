@@ -373,6 +373,8 @@ class Sim:
         stats.update(self.counters)
         stats.update(self.network.counters)
         stats.update(ticks=self.tick_n, sim_s=self.time,
+                     command_delivery_hops=self.post.delivery_hops_total,
+                     hops_per_delivery=round(self.post.delivery_hops_total / self.post.delivered, 3) if self.post.delivered else 0,
                      relays_destroyed=sum(bool(r.get("destroyed")) for r in self.relays.values()),
                      survivors_reported=len(self.post.survivors), rescue_routes_delivered=len(self.post.routes),
                      deadline_misses=sum(sum(r.scheduler.misses.values()) for r in self.robots.values()),
@@ -382,6 +384,11 @@ class Sim:
                      timeline_events_played=self.timeline.played if self.timeline else 0,
                      timeline_events_failed=self.timeline.failed if self.timeline else 0,
                      timeline_events_total=len(self.timeline.events) if self.timeline else 0)
+        # Rayan owns these instrumentation hooks. Omit incomplete totals rather than invent zeroes.
+        for key in ("detector_calls", "detector_rejections", "scheduler_deadlines_met"):
+            values = [robot.get("counters", {}).get(key) for robot in robots]
+            if values and all(type(value) is int and value >= 0 for value in values):
+                stats[key] = sum(values)
         return {"reality": reality, "command": self.post.view(self.time), "stats": stats}
 
     def maps(self):
