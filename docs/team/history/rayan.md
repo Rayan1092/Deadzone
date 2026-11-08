@@ -11,6 +11,11 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 
 ## Log
 
+### 2026-11-08 19:35 · rayan/strip-fix · Fix: `make_slide_assets.py` had an unterminated string from the 19:20 commit; strip captions wrapped
+- **Did:** my 19:20 commit left `ml/make_slide_assets.py` with a broken line (a newline escaped into the source while wrapping the Grad-CAM captions), so the script did not parse and the strip went in with truncated captions. Fixed; `gradcam_strip.png` regenerated with two-line captions at 150 dpi (0.95 MB). Nothing else changed; the guard and gradcam tests do not import this script, which is why they stayed green.
+- **Contract changes:** none.
+- **Next:** hold.
+
 ### 2026-11-08 19:20 · rayan/slide-assets · Slide assets regenerated from current results; Grad-CAM strip of the six demo crops
 - **Did:** `ml/make_slide_assets.py` gains three sections: `calibration` (replots `ml/results/calibration.json` through `ml/calibration.py`'s chart, no re-scoring), `benchmark` (runs `benchmark_v2.py --replot` and `benchmark_published.py --replot`), and `gradcam` (**new `docs/assets/gradcam_strip.png`**: S1–S3 and D1–D3, thermal crop above, Grad-CAM below, verdict and score from `ml/crops/runtime/manifest.json`). Regenerated from current results: `training_curve.png` (the fine-tuned run: 5 epochs, 13,266 crops), `calibration.png`, `stats_card.png` (96.7 / 97.3 / 96.0), `benchmark_v2.png`, `benchmark_published.png`; `confusion_matrix.png` unchanged. `crops_grid.png` / `pipeline.png` need the SDT frames (testing laptop) and were left as they are. FACTS.md lists every image with its section and source data.
 - **Contract changes:** none.
