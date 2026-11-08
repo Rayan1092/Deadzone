@@ -11,7 +11,7 @@ import { followRobot, overview, resetOverview } from '../three/camera'
 export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
   ['R', 'rubble ahead of the robot'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
-  ['U', 'resume after safe stop'], ['A', 'aftershock (server needs DZ_AFTERSHOCK=1)'], ['B', 'baseline: robots without Deadzone'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
+  ['U', 'resume after safe stop'], ['A', 'aftershock (server needs DZ_AFTERSHOCK=1)'], ['B', 'baseline: robots without Deadzone'], ['L', 'AI Lab: how the detector was trained'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
   ['M', 'one view / split view'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
 ]
@@ -184,7 +184,8 @@ export function useKeyboard() {
       const target = robots.find((r) => r.id === s.follow) ?? robots[0]
       const key = e.key.toLowerCase()
       if (key === 'q') s.set({ joinOpen: !s.joinOpen })
-      if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null, helpOpen: false })
+      if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null, helpOpen: false, labOpen: false })
+      if (key === 'l') s.set({ labOpen: !s.labOpen })
       if (e.key === '?' || key === 'h') s.set({ helpOpen: !s.helpOpen })
       if (key === 'v' && target) s.set({ eyeRobot: s.eyeRobot === target.id ? null : target.id })
       if (key === 'p') setPerf(!s.perf)

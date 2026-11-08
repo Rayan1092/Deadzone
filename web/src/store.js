@@ -58,6 +58,7 @@ export const useSim = create((set) => ({
   follow: null,        // robot id the cameras follow (keys 1-3), null = overview
   eyeRobot: null,      // robot whose forward camera is open (V key / card button)
   eyeThermal: false,   // thermal palette in the robot's-eye view
+  labOpen: false,      // L key: AI Lab overlay
   eyeFocus: null,      // the hot spot the onboard classifier just judged: { kind, subject, robot, pos, conf, linked, born }
   mode: null,          // 'deadzone' | 'baseline' | 'mixed' from hello/control (Rayan's baseline mode)
   aftershock: null,    // { at, born } of the latest aftershock, for the shake and dust

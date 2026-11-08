@@ -3,7 +3,7 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** `p3/collapse`: item 4 collapse look done; item 5 AI Lab (key L) next. Items 1–3 merged (#65).
+- **Working on:** `p3/collapse`: items 4 (collapse look) and 5 (AI Lab, key L) done. Next: 6 asset pack (waits on Rayan), 7 lighting, 8 auto-director.
 - **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
@@ -16,6 +16,19 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 06:10 · p3/collapse · Item 5: AI Lab overlay (key L)
+- **Did:** glass overlay on **L** (Esc closes).
+  - **Live panel:** the crop a robot just judged (latest `survivor_found` / `hotspot_rejected`), the verdict with the real `conf`, robot and time, and a toggle for the Grad-CAM overlay (manifest `heatmap_alpha`, else the event's `heatmap`).
+  - **Held-out test panel:** accuracy, precision, recall and F1 tiles, plus a 2x2 confusion matrix with counts ("correct / missed / false alarm"), from `/ai-lab/results/metrics.json`.
+  - **Training curves:** loss and accuracy (train vs val, one measure per chart, legend plus direct labels, hover crosshair) appear only when `/ai-lab/results/lab.json` has `curve`. The colors (`#0d9488` / `#d97706`) passed the palette validator on the dark surface.
+  - **Examples:** a training-examples grid from `lab.json.examples` once exported. Until then it shows "Thermal crops in this building" from `/crops/manifest.json` (model verdict and conf per crop).
+  - **No data served:** the panel says "start the server with DZ_AI_LAB=1" and invents nothing. Vite proxies `/ai-lab` in dev.
+  - New state labels for Rayan's voice commands: `GOING_TO_POINT` "Going to point", `HOLDING` "Holding".
+  - **Tested** against Aziz's `p2/ai-lab-assets` branch with `DZ_AI_LAB=1`: real metrics (96.2 / 96.3 / 96.0 / 96.2, confusion 576 / 24 / 22 / 578), Live showed S3 by R3, then D2 rejected by R2, with Grad-CAM. The curve charts were checked with a throwaway file in a scratch worktree (deleted, never committed).
+- **Contract changes:** none. Reads Aziz's reserved `/ai-lab/results/*`; `lab.json` schema as in my plan entry.
+- **Heads-up for others:** Aziz: needs your AI Lab PR merged and `DZ_AI_LAB=1` on the demo server. Rayan: when you export `ml/results/lab.json` (`curve`, `examples` with files under `ml/results/`), the curves and the examples grid light up with no frontend change.
+- **Next:** item 6 asset pack (if Rayan's pack is in), 7 lighting, 8 auto-director.
 
 ### 2026-11-08 05:30 · p3/collapse · Item 4: collapse look
 - **Did:** the Reality world now reads as a collapse (Rayan's item 3). All of it is derived from the floorplan, so generated buildings get it too, and all of it is visual only (truth grid, radio and robots unchanged; nothing blocks a path).

@@ -6,6 +6,7 @@ import { JoinOverlay } from './panels/JoinPanel'
 import Toasts from './panels/Toasts'
 import Timeline from './panels/Timeline'
 import ReportPanel from './panels/ReportPanel'
+import AILab from './panels/AILab'
 import { ReplayLoader } from './panels/ReplayPanel'
 import { REPLAY } from './net/replay'
 import { useSim } from './store'
@@ -34,6 +35,7 @@ export default function BigScreen() {
       <JoinOverlay />
       <ReplayLoader />
       <HelpOverlay />
+      <AILab />
     </div>
   )
 }

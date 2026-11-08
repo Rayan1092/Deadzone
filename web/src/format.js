@@ -9,6 +9,8 @@ export const STATE_LABEL = {
   REPLANNING: 'Replanning',
   FAULT: 'Fault',
   DONE: 'Done',
+  GOING_TO_POINT: 'Going to point',
+  HOLDING: 'Holding',
   WAITING_FOR_LINK: 'No link, waiting', // baseline mode: no Deadzone, the robot stops until it hears CMD
 }
 
