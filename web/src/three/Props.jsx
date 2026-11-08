@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { MAST_H, w2t } from './util'
 import { materials, signTexture, tiledSet } from './textures'
+import { N, S, W, furnitureLayout } from './furniture'
 
 // Set dressing for the Reality world: furniture against the walls, the decoy heat
 // sources as the real objects they are, boilers in the (no-go) boiler room, the command
@@ -381,12 +382,6 @@ function FloorLine({ a, b, w = 0.1, color = '#eab308' }) {
 }
 
 // --------------------------------------------------------------- layout
-const N = 0           // back to the north wall, facing south
-const S = Math.PI     // back to the south wall
-const W = Math.PI / 2 // back to the west wall, facing east
-const E = -Math.PI / 2
-
-// Decoy heat sources as the real objects they are, wherever the floorplan puts them.
 const DECOY = { radiator: Radiator, engine: Engine, 'coffee machine': CoffeeCart }
 function Decoys({ fp, M }) {
   return (fp.decoys ?? []).map((d, i) => {
@@ -397,88 +392,28 @@ function Decoys({ fp, M }) {
 
 // Furniture is laid out by hand for the demo building; other maps get the decoys and the
 // collapse dressing (debris, damage) without furniture.
-// --------------------------------------------------------------- any building
-// Furniture for a floor plan we have never seen: each room is read from its name and
-// furnished along its walls (desks and cabinets in offices, shelving and pallets in storage,
-// a counter in break rooms, boilers in plant rooms, nothing in corridors), with a default
-// for rooms we cannot classify. Everything hugs a wall (centre <= 0.5 m from the wall line),
-// stays 1.2 m clear of door openings and 0.8 m from corners, so no robot path is touched.
-const KIND = [
-  [/corridor|hall|spine|stair|lobby|entry|passage/i, 'corridor'],
-  [/office|admin|reception|loading office|meeting|ward|clinic|theatre|radiology/i, 'office'],
-  [/storage|store|warehouse|stock|cage|supply|lab|pharm|archive/i, 'storage'],
-  [/break|kitchen|canteen|cafe|waiting|staff/i, 'break'],
-  [/boiler|plant|mechanical|utility|electrical|server/i, 'plant'],
-]
-function roomKind(name = '') {
-  return (KIND.find(([re]) => re.test(name)) ?? [null, 'default'])[1]
-}
-function prng(seed) {
-  let s = (seed % 2147483647) || 1
-  return () => (s = (s * 16807) % 2147483647) / 2147483647
-}
-// Free spots along one side of a room, away from doors and corners. side: 'N' | 'S' | 'E' | 'W'.
-function wallSlots(room, side, doors, step, inset) {
-  const xs = room.poly.map((p) => p[0])
-  const ys = room.poly.map((p) => p[1])
-  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
-  const horiz = side === 'N' || side === 'S'
-  const lo = (horiz ? x0 : y0) + 0.8
-  const hi = (horiz ? x1 : y1) - 0.8
-  const out = []
-  for (let t = lo + step / 2; t <= hi - step / 2; t += step) {
-    const x = horiz ? t : side === 'W' ? x0 + inset : x1 - inset
-    const y = horiz ? (side === 'S' ? y0 + inset : y1 - inset) : t
-    if (doors.some((d) => Math.hypot(d.at[0] - x, d.at[1] - y) < 1.2 + step / 2)) continue
-    out.push({ x, y, rot: side === 'N' ? N : side === 'S' ? S : side === 'W' ? W : E })
-  }
-  return out
-}
-function GenericRoom({ room, fp, M }) {
-  const kind = roomKind(room.name)
-  if (kind === 'corridor') return null
-  const xs = room.poly.map((p) => p[0])
-  const ys = room.poly.map((p) => p[1])
-  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
-  const r = prng(Math.round(x0 * 7 + y0 * 13 + x1 * 3 + y1 * 5) + 101)
-  const doors = fp.doors ?? []
-  const sides = ['N', 'E', 'S', 'W'].sort(() => r() - 0.5)
-  const items = []
-  const take = (side, step, inset, n, make) => {
-    const slots = wallSlots(room, side, doors, step, inset)
-    for (let i = 0; i < n && slots.length; i++) {
-      const s = slots.splice(Math.floor(r() * slots.length), 1)[0]
-      items.push({ ...s, el: make(i) })
-    }
-  }
-  const area = (x1 - x0) * (y1 - y0)
-  if (kind === 'office') {
-    take(sides[0], 1.8, 0.45, Math.max(1, Math.round(area / 30)), (i) => <Desk M={M} key={`d${i}`} />)
-    take(sides[1], 0.7, 0.4, 2, (i) => <FilingCabinet M={M} key={`c${i}`} />)
-    take(sides[2], 2.0, 0.3, 1, () => <Bookshelf M={M} len={1.6} />)
-    items.push({ x: (x0 + x1) / 2 + (r() - 0.5) * 2, y: (y0 + y1) / 2 + (r() - 0.5) * 2, rot: 0, el: <Papers M={M} n={6} seed={Math.round(x0 * 11 + y0)} /> })
-  } else if (kind === 'storage') {
-    take(sides[0], 2.2, 0.42, Math.max(1, Math.round(area / 25)), (i) => <Shelving M={M} seed={i * 7 + 31} />)
-    take(sides[1], 2.2, 0.42, Math.max(1, Math.round(area / 40)), (i) => <Shelving M={M} seed={i * 11 + 61} />)
-    if (area > 80) take(sides[2], 3.0, 0.5, 1, () => <PalletRack M={M} seed={83} />)
-    else take(sides[2], 1.4, 0.5, 1, () => <Pallet M={M} seed={91} />)
-  } else if (kind === 'break') {
-    take(sides[0], 3.2, 0.42, 1, () => <Counter M={M} len={2.8} />)
-    take(sides[1], 1.0, 0.45, 1, () => <Fridge M={M} />)
-    take(sides[2], 1.2, 0.5, 1, () => <Vending M={M} />)
-    take(sides[3], 0.8, 0.5, 2, (i) => <Chair M={M} tipped={i === 0} />)
-  } else if (kind === 'plant') {
-    take(sides[0], 3.4, 0.9, Math.max(1, Math.round(area / 60)), () => <Boiler M={M} />)
-    const len = Math.min(x1 - x0, y1 - y0) - 1.5
-    items.push({ x: (x0 + x1) / 2, y: y0 + 0.3, rot: S, el: <PipeRun M={M} len={Math.max(2, (x1 - x0) - 1.5)} /> })
-    if (len > 3) items.push({ x: x0 + 0.25, y: (y0 + y1) / 2, rot: W, el: <PipeRun M={M} len={(y1 - y0) - 1.5} /> })
-  } else {
-    // unknown room: a desk, a shelf and a cabinet is enough to say "people used this"
-    take(sides[0], 1.8, 0.45, 1, () => <Desk M={M} />)
-    take(sides[1], 2.2, 0.42, 1, () => <Shelving M={M} seed={47} />)
-    take(sides[2], 0.7, 0.4, 1, () => <FilingCabinet M={M} />)
-  }
-  return items.map((it, i) => <At key={i} x={it.x} y={it.y} rot={it.rot}>{it.el}</At>)
+// --------------------------------------------------------------- placement
+// Where each piece goes, and the footprints the sim treats as solid (DZ_OBSTACLES=1), live in
+// furniture.js: one layout for the picture and the physics. This only draws it.
+const RENDER = {
+  desk: (M) => <Desk M={M} />,
+  chair: (M, o) => <Chair M={M} tipped={o.tipped} />,
+  filing: (M) => <FilingCabinet M={M} />,
+  filingToppled: (M) => <group rotation={[0, 0, -Math.PI / 2]} position={[0.66, 0.3, 0]}><FilingCabinet M={M} /></group>,
+  bookshelf: (M, o) => <Bookshelf M={M} len={o.len} />,
+  bookshelfToppled: (M, o) => <group rotation={[Math.PI / 2, 0, 0]} position={[0, 0.17, -0.2]}><Bookshelf M={M} len={o.len} /></group>,
+  whiteboard: (M) => <Whiteboard M={M} />,
+  boxes: (M, o) => <Boxes M={M} n={o.n} seed={o.seed} />,
+  shelving: (M, o) => <Shelving M={M} len={o.len} depth={o.depth} seed={o.seed} />,
+  pallet: (M, o) => <Pallet M={M} seed={o.seed} />,
+  palletRack: (M, o) => <PalletRack M={M} seed={o.seed} />,
+  forklift: (M) => <Forklift M={M} />,
+  counter: (M, o) => <Counter M={M} len={o.len} />,
+  fridge: (M) => <Fridge M={M} />,
+  vending: (M) => <Vending M={M} />,
+  boiler: (M) => <Boiler M={M} />,
+  pipeRun: (M, o) => <PipeRun M={M} len={o.len} />,
+  papers: (M, o) => <Papers M={M} n={o.n} seed={o.seed} spread={o.spread} />,
 }
 
 // ?generic=1 shows the generic furnishing on the demo building too (to compare)
@@ -486,71 +421,26 @@ const FORCE_GENERIC = (() => { try { return new URLSearchParams(location.search)
 
 export function Interior({ fp, cold: isCold = false }) {
   const M = isCold ? cold() : mats()
-  if (fp?.id !== 'collapse_01' || FORCE_GENERIC) {
-    return (
-      <group>
-        <Decoys fp={fp} M={M} />
-        {(fp?.rooms ?? []).map((room) => <GenericRoom key={room.id} room={room} fp={fp} M={M} />)}
-      </group>
-    )
-  }
+  const items = useMemo(() => furnitureLayout(fp, { generic: FORCE_GENERIC }), [fp])
+  const demo = !FORCE_GENERIC && /^collapse_01(_v\d+)?$/.test(fp?.id ?? '')
   return (
     <group>
       <Decoys fp={fp} M={M} />
-      {/* Office A */}
-      <At x={2.2} y={29.5} rot={N}><Desk M={M} /></At>
-      <At x={7.4} y={29.5} rot={N}><Desk M={M} /></At>
-      <At x={2.4} y={28.75} rot={N}><Chair M={M} /></At>
-      <At x={7.0} y={28.5} rot={N + 0.6}><Chair M={M} tipped /></At>
-      <At x={0.45} y={21.6} rot={W}><FilingCabinet M={M} /></At>
-      <At x={0.45} y={22.1} rot={W}><FilingCabinet M={M} /></At>
-      <At x={9.72} y={23} rot={E}><Bookshelf M={M} /></At>
-      <At x={4} y={23.5}><Papers M={M} n={7} seed={11} spread={2.2} /></At>
-      {/* Office B */}
-      <At x={19.5} y={21.6} rot={E}><Desk M={M} /></At>
-      <At x={19.5} y={25.6} rot={E}><Desk M={M} /></At>
-      <At x={18.75} y={21.4} rot={E}><Chair M={M} /></At>
-      <At x={18.5} y={26.2} rot={E + 1}><Chair M={M} tipped /></At>
-      <At x={10.11} y={23.5} rot={W}><Whiteboard M={M} /></At>
-      {/* bookshelf toppled face down off the north wall */}
-      <At x={12.6} y={29.4} rot={N}><group rotation={[Math.PI / 2, 0, 0]} position={[0, 0.17, -0.2]}><Bookshelf M={M} len={1.8} /></group></At>
-      <At x={16.5} y={21}><Papers M={M} n={5} seed={23} /></At>
-      {/* Break room */}
-      <At x={25.5} y={29.55} rot={N}><Counter M={M} len={3.6} /></At>
-      <At x={31.45} y={29.45} rot={N}><Fridge M={M} /></At>
-      <At x={20.58} y={20.2} rot={W}><Vending M={M} /></At>
-      <At x={23.4} y={24.6} rot={1.2}><Chair M={M} tipped /></At>
-      {/* Storage */}
-      {[3, 5.2, 9.6].map((y, i) => <At key={y} x={0.42} y={y} rot={W}><Shelving M={M} seed={31 + i * 7} /></At>)}
-      {[3.4, 9.4].map((x, i) => <At key={x} x={x} y={0.42} rot={S}><Shelving M={M} seed={61 + i * 7} /></At>)}
-      <At x={11.4} y={12.35}><Boxes M={M} n={5} seed={71} /></At>
-      <At x={10.8} y={0.9}><Boxes M={M} n={3} seed={79} /></At>
-      {/* Boiler room (gas no-go: robots never enter) */}
-      <At x={15.5} y={5.2} rot={Math.PI / 2}><Boiler M={M} /></At>
-      <At x={20.5} y={5.2} rot={Math.PI / 2}><Boiler M={M} /></At>
-      <At x={18} y={0.3} rot={S}><PipeRun M={M} len={11.4} /></At>
-      <At x={12.25} y={6.5} rot={W}><PipeRun M={M} len={12.4} /></At>
-      {/* Loading office */}
-      <At x={31.5} y={10.2} rot={E}><Desk M={M} /></At>
-      <At x={30.4} y={9.5} rot={E + 0.8}><Chair M={M} tipped /></At>
-      <At x={24.45} y={2} rot={W}><FilingCabinet M={M} /></At>
-      <At x={24.9} y={3.4} rot={W + 0.3}><group rotation={[0, 0, -Math.PI / 2]} position={[0.66, 0.3, 0]}><FilingCabinet M={M} /></group></At>
-      <At x={27} y={8}><Papers M={M} n={6} seed={41} /></At>
-      {/* Corridor */}
-      <At x={8} y={13.1} rot={S}><Extinguisher M={M} /></At>
-      <At x={30} y={16.9} rot={N}><Extinguisher M={M} /></At>
-      <At x={19.4} y={13.11} rot={S}><Sign lines={['DANGER', 'GAS LEAK']} bg="#facc15" fg="#111111" w={0.62} h={0.42} /></At>
-      <At x={0.16} y={16.9} rot={W}><Sign lines={['EXIT']} bg="#15803d" fg="#ffffff" w={0.5} h={0.2} y={2.05} /></At>
-      {/* Warehouse */}
-      <At x={39.45} y={16.5} rot={E}><PalletRack M={M} seed={83} /></At>
-      <At x={33.3} y={1.6} rot={0}><Forklift M={M} /></At>
-      <At x={32.85} y={29.2} rot={W}><Pallet M={M} seed={91} /></At>
-      <At x={39.6} y={27.4} rot={E}><Shelving M={M} len={2.4} depth={0.45} seed={97} /></At>
-      {!isCold && (
+      {items.map((it) => <At key={it.id} x={it.x} y={it.y} rot={it.rot}>{RENDER[it.kind](M, it.opts ?? {})}</At>)}
+      {demo && (
         <>
-          <FloorLine a={[32.6, 9.6]} b={[32.6, 20.6]} />
-          <FloorLine a={[38.4, 9.6]} b={[38.4, 13.6]} />
-          <FloorLine a={[32.6, 9.6]} b={[36, 9.6]} />
+          {/* corridor dressing, never in a robot's way */}
+          <At x={8} y={13.1} rot={S}><Extinguisher M={M} /></At>
+          <At x={30} y={16.9} rot={N}><Extinguisher M={M} /></At>
+          <At x={19.4} y={13.11} rot={S}><Sign lines={['DANGER', 'GAS LEAK']} bg="#facc15" fg="#111111" w={0.62} h={0.42} /></At>
+          <At x={0.16} y={16.9} rot={W}><Sign lines={['EXIT']} bg="#15803d" fg="#ffffff" w={0.5} h={0.2} y={2.05} /></At>
+          {!isCold && (
+            <>
+              <FloorLine a={[32.6, 9.6]} b={[32.6, 20.6]} />
+              <FloorLine a={[38.4, 9.6]} b={[38.4, 13.6]} />
+              <FloorLine a={[32.6, 9.6]} b={[36, 9.6]} />
+            </>
+          )}
         </>
       )}
     </group>
