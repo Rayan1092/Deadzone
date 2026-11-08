@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { alarm, chime, confirm, ping, rumble } from './audio'
+import { lostFleet, newerTable } from './net/leaseState'
 
 // Events worth a toast on the big screen. replan, deadline_miss and deliveries
 // fire too often and stay in the sidebar feed or the timeline.
@@ -78,6 +79,8 @@ export const useSim = create((set) => ({
   mode: null,          // 'deadzone' | 'baseline' | 'mixed' from hello/control (Rayan's baseline mode)
   aftershock: null,    // { at, born, rubble } of the latest aftershock, for the shake, slabs and dust
   banner: null,        // { title, sub, tone, at }: AFTERSHOCK / NEW SCENARIO over the main view
+  leases: null,        // public control-lease table (DZ_CONTROL_LEASES=1): { enabled, revision, robots: [{ robot, controller }] }
+  presenter: { held: false, robots: [], pending: false }, // this screen's own fleet claim (net/presenter.js)
   report: null,        // briefing from /api/report: { text, generated_at, source } | { loading } | { error }
   detector: null,      // { mode: 'model' | 'sim', reason } from hello, null until the server sends it
   detections: [],      // AI detection cards: { eid, side: 'reality' | 'command', verdict, crop, conf, ... }
@@ -142,7 +145,10 @@ export function handleMessage(msg) {
       s.set({ floorplan: data.floorplan, grid: data.grid, robotsMeta: data.robots,
               running: data.running, speed: data.speed, mode: data.mode ?? null, time,
               detector: data.detector ? { mode: data.detector, reason: data.detector_reason } : null,
-              ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [], detections: [], routes: {}, aftershock: null, eyeFocus: null } : {}) })
+              ...(data.leases ? { leases: data.leases } : {}),
+              // a reset frees every lease on the server: the presenter has to Unlock again
+              ...(reset ? { events: [], toasts: [], tick: null, plan: null, dispatchedPlans: [], detections: [], routes: {}, aftershock: null, eyeFocus: null,
+                            presenter: { held: false, robots: [], pending: false } } : {}) })
       break
     }
     case 'tick': {
@@ -234,6 +240,14 @@ export function handleMessage(msg) {
       }
       s.set({ events: events.slice(0, 40),
               ...(TOAST_KINDS.has(ev.kind) && !repeat ? { toasts: [...s.toasts, { ...ev, at: Date.now() }].slice(-8) } : {}) })
+      break
+    }
+    case 'leases': {
+      // newest revision wins; the presenter's claim ends when one of its robots shows free or taken
+      if (!newerTable(s.leases, data)) break
+      const lost = lostFleet(s.presenter, data)
+      s.set({ leases: data, ...(lost ? { presenter: { held: false, robots: [], pending: false },
+        toasts: [...s.toasts, { kind: 'note', msg: 'Presenter control ended: press Unlock to take the robots again', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) } : {}) })
       break
     }
     case 'report':

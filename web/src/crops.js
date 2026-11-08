@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AI_CAPTION } from './format'
+import { AI_CAPTION } from './format.js'
 
 // Rayan's runtime crop manifest (/crops/manifest.json): for each thermal crop a robot can
 // judge, the model's score, its Grad-CAM, what the real image shows and a caption. Fetched
@@ -7,16 +7,20 @@ import { AI_CAPTION } from './format'
 let manifest = null
 const ready = fetch('/crops/manifest.json').then((r) => (r.ok ? r.json() : null)).then((j) => { manifest = j; return j }).catch(() => null)
 
+// Calls back with the manifest once it is loaded, also when it already is. The #121 bug: the
+// fetch finished between the cards' first render and their effect (the 3D panes compile their
+// shaders in between), the effect saw it loaded and skipped the update, and the cards stayed on
+// the fallback caption with no Grad-CAM for the whole run. Returns an unsubscribe.
+export function onManifest(cb) {
+  let live = true
+  ready.then((j) => { if (live) cb(j) })
+  return () => { live = false }
+}
+export const manifestReady = ready
+
 export function useCropManifest() {
   const [m, setM] = useState(manifest)
-  // always subscribe: the fetch can finish between the first render and this effect (the
-  // 3D panes compile their shaders in between), and a skipped update left the cards on the
-  // fallback caption with no Grad-CAM for the whole run
-  useEffect(() => {
-    let live = true
-    ready.then((j) => { if (live) setM(j) })
-    return () => { live = false }
-  }, [])
+  useEffect(() => onManifest(setM), [])
   return m
 }
 

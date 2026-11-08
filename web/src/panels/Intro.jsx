@@ -6,6 +6,9 @@ import { useSim } from '../store'
 // this" button); closes on click, Esc, or by itself once the robots get going.
 const AUTO_CLOSE_MS = 14000
 
+// ?nointro (the demo URL) never opens it by itself; the ? overlay's button still does
+const NO_INTRO = (() => { try { return new URLSearchParams(location.search).has('nointro') } catch { return false } })()
+
 function seen() {
   try { return sessionStorage.getItem('dz-intro') === '1' } catch { return false }
 }
@@ -14,7 +17,7 @@ export default function Intro() {
   const open = useSim((s) => s.introOpen)
   const set = useSim((s) => s.set)
   const view = useSim((s) => s.view)
-  useEffect(() => { if (!seen()) set({ introOpen: true }) }, [set])
+  useEffect(() => { if (!seen() && !NO_INTRO) set({ introOpen: true }) }, [set])
   const [shownAt, setShownAt] = useState(0)
   useEffect(() => {
     if (!open) return
