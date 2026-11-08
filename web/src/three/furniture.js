@@ -68,20 +68,21 @@ function rectPoly(item, [x0, x1, z0, z1]) {
 // Decoys are thermal targets at fixed sim positions (their hot spot) and are never solid (a
 // footprint would block the sim's line of sight to them). The prop drawn for one must still not
 // stand on a path a robot drives in the main run, or the robot visibly drives through it: in
-// collapse_01, R1 crosses the engine's spot at sim 215-218 s (web/tests/fixtures/seed7-paths.json),
-// so its model stands beside that path, along it. The camera box and tags follow the model.
+// collapse_01 robots pass the engine's spot on both sides (with robot collisions on, R1 and R3 at
+// sim 172-238 s, web/tests/fixtures/seed7-paths.json), so a compact engine (60%) stands 0.85 m
+// north-west of it, clear of every path. The camera box and tags follow the model.
 export const DECOY_HALF = { radiator: [0.48, 0.12], engine: [0.8, 0.45], 'coffee machine': [0.4, 0.3] } // Props.jsx half extents (x, z)
-const MAIN_RUN_DECOY_MOVES = { D2: { at: [37, 12], x: 38.25, y: 12, rot: Math.PI / 2 } }
+const MAIN_RUN_DECOY_MOVES = { D2: { at: [37, 12], x: 36.35, y: 12.55, rot: Math.PI / 2, scale: 0.6 } }
 export function decoyLayout(fp) {
   const main = fp?.id === 'collapse_01'
   return (fp?.decoys ?? []).map((d, i) => {
     const mv = main ? MAIN_RUN_DECOY_MOVES[d.id] : null
     const moved = Boolean(mv) && mv.at[0] === d.pos[0] && mv.at[1] === d.pos[1]
-    return { ...d, hotspot: d.pos, pos: moved ? [mv.x, mv.y] : d.pos, rot: moved ? mv.rot : 0.15 + i * 0.1 }
+    return { ...d, hotspot: d.pos, pos: moved ? [mv.x, mv.y] : d.pos, rot: moved ? mv.rot : 0.15 + i * 0.1, scale: moved ? mv.scale ?? 1 : 1 }
   })
 }
 export function decoyFootprint(d) {
-  const [hx, hz] = DECOY_HALF[d.label] ?? [0.4, 0.4]
+  const [hx, hz] = (DECOY_HALF[d.label] ?? [0.4, 0.4]).map((v) => v * (d.scale ?? 1))
   return rectPoly({ x: d.pos[0], y: d.pos[1], rot: d.rot }, [-hx, hx, -hz, hz]).poly
 }
 
@@ -107,7 +108,7 @@ function demoLayout(mainRun) {
   add('papers', 4, 23.5, 0, { n: 7, seed: 11, spread: 2.2 })
   // Office B
   add('desk', 19.5, 21.6, E); add('desk', 19.5, 25.6, E)
-  add('chair', 18.75, 21.4, E); add('chair', 18.5, 26.2, E + 1, { tipped: true })
+  add('chair', 18.75, 21.4, E); add('chair', 10.4, 29.4, W, { tipped: true }) // tipped one in the corner: with robot collisions on, R3 passes its old spot
   add('whiteboard', 10.11, 23.5, W)
   add('bookshelfToppled', 12.6, 29.4, N, { len: 1.8 })   // face down off the north wall
   add('papers', 16.5, 21, 0, { n: 5, seed: 23 })

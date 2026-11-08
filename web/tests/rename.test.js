@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describeEvent, fieldUnitName, isScenarioEvent, radioFailBanner, scheduledScenario, unitName } from '../src/format.js'
 import { PRESENTER_NAME } from '../src/net/leaseState.js'
 
@@ -46,10 +47,10 @@ test('scenario events: the scripted collapse always, timeline disasters unless t
 test('no "judge" or "presenter" left in user-facing web text', () => {
   const files = []
   const walk = (d) => readdirSync(d).forEach((f) => { const p = join(d, f); statSync(p).isDirectory() ? walk(p) : /\.(jsx?|html)$/.test(f) && files.push(p) })
-  walk(new URL('../src', import.meta.url).pathname)
+  walk(fileURLToPath(new URL('../src', import.meta.url))) // not URL.pathname: that is /C:/... on Windows
   const bad = []
   for (const f of files) {
-    readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
+    readFileSync(f, 'utf8').split(/\r?\n/).forEach((line, i) => { // CRLF checkouts (core.autocrlf on Windows)
       const code = line.replace(/\/\/.*$/, '').replace(/^\s*\*.*$/, '').replace(/\{\/\*.*?\*\/\}/g, '')
       // quoted strings and JSX text between tags
       const texts = [...code.matchAll(/'([^']*)'|"([^"]*)"|`([^`]*)`|>([^<>{}]+)</g)].map((m) => m[1] ?? m[2] ?? m[3] ?? m[4])
