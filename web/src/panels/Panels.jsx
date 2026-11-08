@@ -2,6 +2,7 @@ import { Fragment, useEffect } from 'react'
 import { setLayout, setNight, setPerf, setView, useSim } from '../store'
 import { control } from '../net/socket'
 import { FAULT_LABEL, describeEvent, fmtClock as fmt, latestRoutes, robotStateLabel } from '../format'
+import { lastContact, linkQuality, linkText } from './robotCard'
 import { JoinButton } from './JoinPanel'
 import { requestReport } from './ReportPanel'
 import { ReplayChip } from './ReplayPanel'
@@ -134,9 +135,11 @@ function bars(link) {
 
 function Signal({ link }) {
   const n = bars(link)
+  const q = linkQuality(link)
   return (
-    <span className={`sig${n ? "" : " none"}`} title={link.up ? `${link.rssi} dBm` : 'No link'}>
-      {n ? [1, 2, 3, 4].map((i) => <i key={i} className={i <= n ? 'on' : ''} />) : 'no link'}
+    <span className={`link-q ${q.cls}`} title="Best radio link to the command post">
+      {n > 0 && <span className="sig">{[1, 2, 3, 4].map((i) => <i key={i} className={i <= n ? 'on' : ''} />)}</span>}
+      <span className="link-word">{linkText(link)}</span>
     </span>
   )
 }
@@ -171,13 +174,18 @@ export function Sidebar() {
                       onClick={(e) => { e.stopPropagation(); useSim.getState().set({ eyeRobot: eye === r.id ? null : r.id }) }}>
                 Camera
               </button>
-              <Signal link={r.link} />
             </div>
             {leaseHolder[r.id] && <div className="lease-holder">{leaseHolder[r.id]} has control</div>}
             <div className="state">
-              {robotStateLabel(r)}
-              {r.fault && <span className={`fault-pill ${r.fault === 'SAFE_STOP' ? 'stop' : ''}`}>{FAULT_LABEL[r.fault] ?? r.fault}</span>}
+              <span className="state-text">
+                {robotStateLabel(r)}
+                {r.fault && <span className={`fault-pill ${r.fault === 'SAFE_STOP' ? 'stop' : ''}`}>{FAULT_LABEL[r.fault] ?? r.fault}</span>}
+              </span>
+              <Signal link={r.link} />
             </div>
+            {lastContact(r.link, cmd, time) && (
+              <div className="last-contact">Out of contact · last report {lastContact(r.link, cmd, time)} ago</div>
+            )}
             {r.fault === 'SAFE_STOP' && (
               // goes out as a radio command bundle; the robot needs a route to CMD to get it
               <button className="resume-btn" onClick={(e) => { e.stopPropagation(); if (!presenterLocked()) control('director', { do: 'resume', robot: r.id }) }}>
