@@ -1,8 +1,9 @@
-import { Fragment, useEffect } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { setLayout, setNight, setPerf, setView, useSim } from '../store'
 import { control } from '../net/socket'
 import { FAULT_LABEL, describeEvent, fmtClock as fmt, latestRoutes, robotStateLabel } from '../format'
 import { lastContact, linkQuality, linkText } from './robotCard'
+import { FILTERS, eventCategory, feedParts, readFilters, robotIds, saveFilters, visibleEvents } from './eventFeed'
 import { JoinButton } from './JoinPanel'
 import { requestReport } from './ReportPanel'
 import { ReplayChip } from './ReplayPanel'
@@ -212,16 +213,56 @@ export function Sidebar() {
           </div>
         )
       })}
-      <h3>Events</h3>
+      <EventFeed events={events} />
+    </aside>
+  )
+}
+
+// Plain-English event lines with each robot's name in its own colour, filtered by group.
+function EventFeed({ events }) {
+  const meta = useSim((s) => s.robotsMeta)
+  const [active, setActive] = useState(readFilters)
+  const toggle = (id) => {
+    const next = new Set(active)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    saveFilters(next)
+    setActive(next)
+  }
+  const counts = {}
+  for (const e of events) {
+    const c = eventCategory(e.kind)
+    if (c) counts[c] = (counts[c] ?? 0) + 1
+  }
+  const shown = visibleEvents(events, active)
+  return (
+    <>
+      <div className="feed-head">
+        <h3>Events</h3>
+        <div className="feed-chips" role="group" aria-label="Filter events">
+          {FILTERS.map((f) => (
+            <button key={f.id} className={`feed-chip ${f.id}${active.has(f.id) ? ' on' : ''}`} aria-pressed={active.has(f.id)}
+                    onClick={(e) => { e.stopPropagation(); toggle(f.id) }}>
+              {f.label}{counts[f.id] ? <small>{counts[f.id]}</small> : null}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="events">
-        {events.slice(0, 10).map((e) => (
-          <div key={e.eid} className={`event ${e.kind}`}>
-            <i /><span className="mono muted">{fmt(e.time)}</span> {describeEvent(e)}
+        {shown.length === 0 && <div className="muted small">{active.size ? 'Nothing in these groups yet' : 'Pick a group to see its events'}</div>}
+        {shown.map((e) => (
+          <div key={e.eid} className={`event ${e.kind} cat-${eventCategory(e.kind) ?? 'note'}`}>
+            <i /><span className="mono muted">{fmt(e.time)}</span>
+            <span className="ev-text">
+              {feedParts(describeEvent(e), robotIds(e), meta).map((p, i) => (p.robot
+                ? <b key={i} className="ev-robot" style={{ '--c': p.robot.color }}>{p.robot.name}</b>
+                : <Fragment key={i}>{p.text}</Fragment>))}
+            </span>
             {e.count > 1 && <span className="count">×{e.count}</span>}
           </div>
         ))}
       </div>
-    </aside>
+    </>
   )
 }
 

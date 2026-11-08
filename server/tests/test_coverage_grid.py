@@ -239,4 +239,5 @@ def test_flag_off_screen_and_phone_shapes(data, monkeypatch, tmp_path):
     sim = Sim(plan_path=path, n_robots=1)
     api = importlib.import_module("deadzone.app")
     assert set(sim.maps()) == {"w", "h", "cell", "reality", "command"}
-    assert "coverage" not in api.Hub.phone_view(SimpleNamespace(sim=sim))
+    assert "coverage" not in api.Hub.phone_view(SimpleNamespace(
+        sim=sim, phone_frames=SimpleNamespace(enabled=False)))

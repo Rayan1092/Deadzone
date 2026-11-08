@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { decodeMap } from '../store'
 import { phoneHelloState } from './sync'
+import { retainPhoneFrames } from './control'
 
 // Phone state. Phones only ever receive the Command view, never Reality.
 export const usePhone = create((set) => ({
@@ -40,7 +41,8 @@ export function handlePhoneMessage(msg) {
       break
     case 'cmd_view': {
       const { map, ...view } = data
-      s.set({ view, map: decodeMap(map), mapVersion: s.mapVersion + 1, time })
+      s.set({ view: retainPhoneFrames(s.view, view, Boolean(s.hello?.phone_frames), time),
+              map: decodeMap(map), mapVersion: s.mapVersion + 1, time })
       break
     }
     case 'plan_state': {

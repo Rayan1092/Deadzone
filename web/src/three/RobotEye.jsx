@@ -11,6 +11,24 @@ import { ROBOT_SCALE } from './Rover'
 import RoverModel from './RoverModel'
 import { w2t } from './util'
 import { decoyLayout } from './furniture'
+import { captureJpeg, createFrameSender } from '../net/phoneFrames'
+
+function PhoneFrameUploader({ robotId }) {
+  const sender = useRef(null)
+  useEffect(() => {
+    const target = document.createElement('canvas')
+    const active = createFrameSender({ getState: useSim.getState, capture: (source) => captureJpeg(source, target) })
+    sender.current = active
+    return () => { active.close(); if (sender.current === active) sender.current = null }
+  }, [robotId])
+  // With this opt-in component mounted, own the normal render and capture before
+  // WebGL clears its drawing buffer. No extra render or preserveDrawingBuffer.
+  useFrame(({ gl, scene, camera }) => {
+    gl.render(scene, camera)
+    void sender.current?.send(robotId, gl.domElement)
+  }, 1)
+  return null
+}
 
 // Picture-in-picture from a robot's forward camera (V key or the card's Camera
 // button). Reality pane only: it shows what the robot's own camera sees. A third
@@ -371,6 +389,7 @@ function useFloating() {
 export default function RobotEye() {
   const robotId = useSim((s) => s.eyeRobot)
   const thermal = useSim((s) => s.eyeThermal)
+  const frames = useSim((s) => s.phoneFrames)
   const night = useSim((s) => s.night)
   const meta = useSim((s) => s.robotsMeta.find((r) => r.id === s.eyeRobot))
   const set = useSim((s) => s.set)
@@ -415,6 +434,7 @@ export default function RobotEye() {
         <Robots robotId={robotId} thermal={thermal} />
         <EyeCamera robotId={robotId} />
         <ClassifyBoxes robotId={robotId} thermal={thermal} boxes={boxes} />
+        {frames && <PhoneFrameUploader key={`${robotId}:${frames.epoch}`} robotId={robotId} />}
       </Canvas>
       {Array.from({ length: MAX_BOXES }, (_, i) => (
         <div key={i} ref={(el) => { boxes.current[i] = el }} className="eye-box" style={{ display: 'none' }}><span className="eye-box-label" /></div>
