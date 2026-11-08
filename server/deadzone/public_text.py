@@ -109,9 +109,9 @@ class PublicText:
         text = re.sub(r"\bS(\d+)\b", r"Survivor \1", text)
         text = re.sub(r"\b(?:R\d+|RL\d+|CMD|P-[\w.-]+)\b", "the robot" if code == "lease_required" else "the selected item", text)
         text = re.sub(r"\b(?:phone|judge)-[\w.-]+\b|\bPresenter\b", "another operator", text, flags=re.I)
-        text = text.replace("lost_link_ok", "allowing signal loss").replace("telemetry", "robot reports")
-        text = text.replace("SAFE_STOP", "safe stop").replace("OVERCURRENT", "a motor overload").replace("LOW_BATTERY", "low battery")
-        text = text.replace("STUCK", "a blocked robot").replace("TRAPPED", "a trapped robot")
+        text = text.replace("lost_link_ok", "allowing signal loss").replace("robot telemetry", "robot reports").replace("telemetry", "robot reports")
+        text = text.replace("SAFE_STOP", "safe stop").replace("OVERCURRENT", "motor overload").replace("LOW_BATTERY", "low battery")
+        text = text.replace("STUCK", "stuck").replace("TRAPPED", "trapped").replace("historical faults", "past faults")
         text = text.replace("Request validation failed", "Check your entries and try again.")
         text = text.replace("Message must be valid JSON", "The update could not be read. Reconnect and try again.")
         if re.search(r"/api/|request_id|plan_id|WebSocket|\b(?:base64|KiB)\b", text):
