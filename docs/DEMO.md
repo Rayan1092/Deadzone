@@ -67,6 +67,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    # DZ_OBSTACLES=1       # already set in step 4: required, every beat below depends on it (rayan.md 20:30)
    # DZ_SMART_RUBBLE=1    # already set in step 4: the smart, no-trap R key for Q&A (rayan.md 22:10)
    # DZ_SCENARIO_EVENTS   # must stay unset: 0 switches off the building's scripted collapse at 2:28 (rayan.md 23:20)
+   # DZ_ZONE_PRIORITY     # must stay unset for the main run: robots head straight for their zones and the story runs earlier (R2 dark 48.7 s, S1 found 59.5, S2 193.2; rayan.md 00:55)
    ```
    **Don't set `DZ_VOICE`, `DZ_CONTROL_LEASES` or `DZ_EXPLORATION_V2` for the main run.** With control leases on, the top bar shows the **Operator lock**: **B** and **U** stay locked (with a hint) until you press **Unlock**, which takes every robot for this console ("Console has control"; field units then see the robots locked; R, F, O and A are not affected). **Lock** releases the robots so field units (phones) can take them (Q&A). Unlock fails, naming the holder, while a field unit holds a robot. Leases off: no lock, B and U as before. With `DZ_EXPLORATION_V2=1` the robots explore differently and every beat in the beat sheet moves (S3 found at 23.8 s instead of 14.4, S2 found at 106 s instead of 246). `DZ_SENSOR_VIEW=1` is safe: it only adds camera frames to the Reality pane.
 6. **Before the phone test, Rayan starts the tunnel manually** in a second

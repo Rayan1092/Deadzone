@@ -92,6 +92,9 @@ CLOSE_LOOK_STANDOFF_M = 1.4  # drive to this distance from the hot spot, never o
 CLOSE_LOOK_TIMEOUT_S = 20.0  # could not get close: decide on the distant view
 
 ZONE_PULL_PER_M = 0.7      # before the zone is on our map: score falls with distance to the zone
+# DZ_ZONE_PRIORITY=1: on plan receipt a zone owner outside its zone drops its current frontier and
+# heads straight for the zone (the frontier closest to it wins, whatever its size or distance from
+# us) until it is in the zone or a frontier touches it. Telemetry plan_state: "heading to <zone>".
 VOICE_ZONE_PULL_PER_M = 2.0  # a spoken "explore X" outweighs nearby frontiers (distance costs 1/m)
 ZONE_DONE_KNOWN = 0.8      # stop pulling once this share of the zone's cells is mapped
 
@@ -215,6 +218,8 @@ class Robot:
         # Phase 2, opt-in: frontiers are scored by the expected missing mass of this robot's own
         # belief within sensor reach, divided by travel time. Off: the legacy score, unchanged.
         self.search_bayes = os.environ.get("DZ_SEARCH_BAYES") == "1"
+        self.zone_priority = os.environ.get("DZ_ZONE_PRIORITY") == "1"
+        self.heading_zone = None   # zone id we are driving to under DZ_ZONE_PRIORITY
         self.belief_t = -99.0
         self.zones = []                     # this robot's dispatched zones, highest priority first
         self.battery = Battery()
@@ -401,6 +406,15 @@ class Robot:
             self.lost_budget = float(plan["lost_link_budget_s"])
         self.path = []                       # replan under the new plan right away
         self.last_plan_t = -99.0             # (also from WAITING: a plan edit is retried on the next step)
+        self.heading_zone = None
+        if self.zone_priority:
+            zone = self._active_zone()
+            if zone is not None and not self._in_zone(zone):
+                self.heading_zone = zone["id"]
+                self.goal_cell = None        # abandon the current frontier, no keep-going bonus
+                self.last_telemetry_t = -99.0
+                self.events.append({"kind": "heading_to_zone", "robot": self.id, "zone": zone["id"],
+                                    "plan_id": plan.get("plan_id")})
         if self.explorer is not None:
             self.explorer.reset_goal()
         self.events.append({"kind": "plan_applied", "robot": self.id, "plan_id": plan.get("plan_id"),
@@ -412,6 +426,20 @@ class Robot:
             if not self._zone_complete(z):
                 return z
         return None
+
+    def _in_zone(self, zone):
+        ix, iy = self._cell(*self.pose[:2])
+        h, w = zone["near"].shape
+        return 0 <= ix < w and 0 <= iy < h and bool(zone["near"][iy, ix])
+
+    def _heading(self):
+        """The zone id we are heading to (DZ_ZONE_PRIORITY), or None once we are there."""
+        if self.heading_zone is None:
+            return None
+        zone = self._active_zone()
+        if zone is None or zone["id"] != self.heading_zone or self._in_zone(zone):
+            self.heading_zone = None
+        return self.heading_zone
 
     def _zone_complete(self, zone):
         if (self.map.grid[zone["mask"]] != UNKNOWN).mean() < ZONE_DONE_KNOWN:
@@ -1378,16 +1406,23 @@ class Robot:
         # zone shows up on our map, pull toward it; once it is mapped, help anywhere
         zone = self._active_zone()
         pull = None
+        heading = self._heading()
         if zone is not None:
             inside = [c for c in clusters if any(zone["near"][y, x] for x, y in c["cells"])]
             if inside:
                 clusters = inside
+                if heading is not None:      # the zone is on our map and reachable: we have arrived
+                    self.heading_zone = heading = None
             else:
                 pull = zone["center"]
 
         # score: prefer big frontiers that are close, keep going the same way,
         # stay away from frontiers a higher-priority peer already claimed
         def score(c):
+            if heading is not None and pull is not None:
+                # DZ_ZONE_PRIORITY: straight for the zone, the frontier closest to it wins
+                gx, gy = (c["goal"][0] + 0.5) * self.cell, (c["goal"][1] + 0.5) * self.cell
+                return -math.dist((gx, gy), pull)
             s = min(c["size"], 40) * 0.25 - c["dist"] * self.cell * 1.0
             if self.goal_cell and abs(c["goal"][0] - self.goal_cell[0]) + abs(c["goal"][1] - self.goal_cell[1]) < 8:
                 s += 2.0
@@ -1399,7 +1434,7 @@ class Robot:
                 s -= per_m * math.dist((gx, gy), pull)
             return s
 
-        if self.search_bayes:
+        if self.search_bayes and heading is None:
             # DZ_SEARCH_BAYES: expected missing mass within sensor reach of the frontier, per second
             # of travel; the peer claim and the zone pull become factors
             mass = self.belief.missing_grid()
@@ -1574,7 +1609,8 @@ class Robot:
             "link": link,
             "relays_left": self.relays_left,
             "plan_id": self.plan.get("plan_id") if self.plan else None,
-            "plan_state": WAITING_PLAN_STATE if self.state == "WAITING" else None,
+            "plan_state": WAITING_PLAN_STATE if self.state == "WAITING" else
+                          (f"heading to {self._heading()}" if self._heading() else None),
             "zone": (self._active_zone() or {}).get("id"),
             "target": self.target,
             "path": [[round(px, 2), round(py, 2)] for px, py in self.path[:60]],
