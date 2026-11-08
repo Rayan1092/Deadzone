@@ -216,6 +216,9 @@ export default function AILab() {
             ) : (
               <p className="muted small">{loaded ? 'Test results not served: start the server with DZ_AI_LAB=1.' : 'Loading…'}</p>
             )}
+            {!curve && lab && (
+              <p className="muted small lab-note">Training curve pending{lab.curve_note ? `: ${lab.curve_note}` : ''}</p>
+            )}
             {curve && (
               <div className="lab-curves">
                 <Curve curve={curve} title="Loss" fmt={(v) => v.toFixed(2)}
@@ -224,6 +227,8 @@ export default function AILab() {
                        keys={[['train_acc', TRAIN, 'train'], ['val_acc', VAL, 'val']]} />
               </div>
             )}
+            {/* where the curve comes from (e.g. a logged retrain with the same recipe) */}
+            {curve && lab.curve_note && <p className="muted small lab-note">{lab.curve_note}</p>}
           </section>
         </div>
       </div>

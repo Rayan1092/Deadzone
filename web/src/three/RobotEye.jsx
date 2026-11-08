@@ -1,23 +1,19 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Billboard } from '@react-three/drei'
 import * as THREE from 'three'
 import { FOCUS_HOLD_MS, useSim } from '../store'
 import Building from './Building'
 import { PersonFigure } from './Actors'
+import Rover, { ROBOT_SCALE } from './Rover'
 import { w2t } from './util'
 
 // Picture-in-picture from a robot's forward camera (V key or the card's Camera
 // button). Reality pane only: it shows what the robot's own camera sees. A third
 // WebGL canvas, so it only exists while open and renders small at dpr 1.
-const EYE_H = 0.4 // m, camera height on the robot
-
-// While the classifier's verdict is on screen the camera turns from straight ahead to
-// the judged hot spot, then back.
-function focusFor(robotId) {
-  const f = useSim.getState().eyeFocus
-  return f && f.robot === robotId && performance.now() - f.born < FOCUS_HOLD_MS ? f : null
-}
+// the camera head on the drawn rover (Rover.jsx, scaled): lens height and how far forward
+const EYE_H = 0.56
+const EYE_FWD = 0.36
 
 function EyeCamera({ robotId }) {
   const { camera } = useThree()
@@ -27,15 +23,13 @@ function EyeCamera({ robotId }) {
     const r = useSim.getState().tick?.reality.robots.find((x) => x.id === robotId)
     if (!r) return
     const [x, y, th] = r.pose
-    const goal = new THREE.Vector3(...w2t(x, y, EYE_H))
-    const f = focusFor(robotId)
-    const ahead = f
-      ? new THREE.Vector3(...w2t(f.pos[0], f.pos[1], 0.2))
-      : new THREE.Vector3(...w2t(x + Math.cos(th), y + Math.sin(th), EYE_H - 0.05))
+    const goal = new THREE.Vector3(...w2t(x + Math.cos(th) * EYE_FWD, y + Math.sin(th) * EYE_FWD, EYE_H))
+    // a chassis-mounted camera: it always looks where the robot is heading
+    const ahead = new THREE.Vector3(...w2t(x + Math.cos(th) * 2, y + Math.sin(th) * 2, EYE_H - 0.3))
     if (!at.current) { at.current = goal.clone(); look.current.copy(ahead) }
     const k = Math.min(1, dt * 8) // 10 Hz poses, smoothed to the frame rate
     at.current.lerp(goal, k)
-    look.current.lerp(ahead, f ? Math.min(1, dt * 3) : k)
+    look.current.lerp(ahead, k)
     camera.position.copy(at.current)
     camera.lookAt(look.current)
   })
@@ -100,48 +94,126 @@ function HotSpots({ thermal }) {
   )
 }
 
-function OtherRobots({ robotId, thermal }) {
-  const robots = useSim((s) => s.tick?.reality.robots)
-  return (robots ?? []).filter((r) => r.id !== robotId).map((r) => (
-    <mesh key={r.id} position={w2t(r.pose[0], r.pose[1], 0.16)} rotation={[0, r.pose[2], 0]}>
-      <boxGeometry args={[0.5, 0.2, 0.36]} />
-      {thermal ? <meshBasicMaterial color="#f97316" /> : <meshStandardMaterial color={r.color} emissive={r.color} emissiveIntensity={0.4} />}
-    </mesh>
-  ))
+// Every robot in this camera is the same rover model as on the 3D map, at the same drawn
+// scale, smoothed toward its streamed pose. The camera's own robot
+// is left out: when the camera pans to a hot spot its own mast would fill the frame.
+function EyeRover({ r, thermal }) {
+  const g = useRef()
+  const sensor = useRef()
+  useFrame((_, dt) => {
+    if (!g.current) return
+    const [x, y, th] = r.pose
+    g.current.position.lerp(new THREE.Vector3(...w2t(x, y, 0)), Math.min(1, dt * 10))
+    let d = th - g.current.rotation.y
+    d = Math.atan2(Math.sin(d), Math.cos(d))
+    g.current.rotation.y += d * Math.min(1, dt * 10)
+    if (sensor.current) sensor.current.rotation.y += dt * 6
+  })
+  return (
+    <group ref={g} position={w2t(r.pose[0], r.pose[1], 0)} rotation={[0, r.pose[2], 0]}>
+      <group scale={ROBOT_SCALE}>
+        <Rover color={r.color} tag={r.id} thermal={thermal} sensor={sensor} linkUp={r.link?.up ?? true} />
+      </group>
+    </group>
+  )
 }
 
-// Screen box around the judged object: its known extent projected through the robot
-// camera. The classifier scores a crop; it does not localize, so the box only marks the
-// object that was judged.
+function Robots({ robotId, thermal }) {
+  const robots = useSim((s) => s.tick?.reality.robots)
+  return (robots ?? []).filter((r) => r.id !== robotId).map((r) => <EyeRover key={r.id} r={r} thermal={thermal} />)
+}
+
+// Every warm object in this camera's view gets a box: the hot spots the thermal camera
+// passes to the onboard person classifier (survivors and decoys). The score is the model's
+// output for that object's real FLIR crop (/crops/manifest.json, the same crops the robot
+// scores). Within the thermal camera's 5 m range it is judged; farther away it is only
+// "warm". Cold things (walls, furniture, debris) never reach the classifier. Hidden
+// behind a wall or rubble = not boxed. The classifier scores crops, it doesn't localize:
+// the box is the object's known extent projected through this camera.
+const THERMAL_RANGE = 5   // m, matches the sim's thermal camera
+const MAX_BOXES = 6
+// fetched once when the app loads, so the first camera view already has every score
+let manifest = null
+const manifestReady = fetch('/crops/manifest.json').then((r) => (r.ok ? r.json() : null)).then((j) => { manifest = j; return j }).catch(() => null)
+function useManifest() {
+  const [m, setM] = useState(manifest)
+  useEffect(() => { if (!manifest) manifestReady.then(setM) }, [])
+  return m
+}
+
+// 2D segment intersection, for line of sight against walls and rubble edges.
+function crosses([ax, ay], [bx, by], [cx, cy], [dx, dy]) {
+  const d = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx)
+  if (Math.abs(d) < 1e-9) return false
+  const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / d
+  const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / d
+  return t > 0.02 && t < 0.98 && u >= 0 && u <= 1
+}
+function blockers(fp) {
+  const segs = [...fp.walls, ...(fp.dynamic_walls ?? [])].map((w) => [w.a, w.b])
+  for (const rb of fp.rubble ?? []) rb.poly.forEach((p, i) => segs.push([p, rb.poly[(i + 1) % rb.poly.length]]))
+  return segs
+}
+
 const corner = new THREE.Vector3()
-function FocusBox({ robotId, thermal, boxRef }) {
+function ClassifyBoxes({ robotId, thermal, boxes }) {
   const { camera, size } = useThree()
+  const fp = useSim((s) => s.floorplan)
+  const m = useManifest()
+  const segs = useMemo(() => (fp ? blockers(fp) : []), [fp])
+  const objects = useMemo(() => {
+    if (!fp) return []
+    const score = Object.fromEntries((m?.crops ?? []).map((c) => [c.file, c.conf]))
+    const threshold = m?.threshold ?? 0.6
+    return [...(fp.survivors ?? []), ...(fp.decoys ?? [])].map((o) => ({
+      ...o, conf: score[o.thermal], person: score[o.thermal] != null ? score[o.thermal] >= threshold : null,
+      lying: !o.label,
+    }))
+  }, [fp, m])
   useFrame(() => {
-    const el = boxRef.current
-    if (!el) return
-    const f = focusFor(robotId)
-    if (!f) { el.style.display = 'none'; return }
-    const person = f.kind === 'person'
-    const r = thermal ? 0.55 : person ? 0.85 : 0.6
-    const [y0, y1] = thermal ? [0.05, 1.15] : person ? [0, 0.45] : [0, 1.1]
-    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity
-    let behind = false
-    for (const dx of [-r, r]) for (const dz of [-r, r]) for (const y of [y0, y1]) {
-      corner.set(f.pos[0] + dx, y, -(f.pos[1] + dz)).project(camera)
-      if (corner.z > 1) behind = true
-      x0 = Math.min(x0, corner.x); x1 = Math.max(x1, corner.x)
-      z0 = Math.min(z0, corner.y); z1 = Math.max(z1, corner.y)
+    const r = useSim.getState().tick?.reality.robots.find((x) => x.id === robotId)
+    let used = 0
+    if (r) {
+      const eye = [r.pose[0], r.pose[1]]
+      for (const o of objects) {
+        if (used >= MAX_BOXES) break
+        const dist = Math.hypot(o.pos[0] - eye[0], o.pos[1] - eye[1])
+        if (dist > 16 || segs.some(([a, b]) => crosses(eye, o.pos, a, b))) continue
+        const rx = thermal ? 0.55 : o.lying ? 0.85 : 0.6
+        const [y0, y1] = thermal ? [0.05, 1.15] : o.lying ? [0, 0.5] : [0, 1.1]
+        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, behind = false
+        for (const dx of [-rx, rx]) for (const dz of [-rx, rx]) for (const y of [y0, y1]) {
+          corner.set(o.pos[0] + dx, y, -(o.pos[1] + dz)).project(camera)
+          if (corner.z > 1) behind = true
+          x0 = Math.min(x0, corner.x); x1 = Math.max(x1, corner.x)
+          z0 = Math.min(z0, corner.y); z1 = Math.max(z1, corner.y)
+        }
+        if (behind || x1 < -0.98 || x0 > 0.98 || z1 < -0.98 || z0 > 0.98) continue
+        const el = boxes.current[used++]
+        if (!el) continue
+        const clamp = (v) => Math.max(-1, Math.min(1, v))
+        const left = ((clamp(x0) + 1) / 2) * size.width
+        const right = ((clamp(x1) + 1) / 2) * size.width
+        const top = ((1 - clamp(z1)) / 2) * size.height
+        const bottom = ((1 - clamp(z0)) / 2) * size.height
+        const judged = dist <= THERMAL_RANGE && o.conf != null
+        const kind = !judged ? 'warm' : o.person ? 'person' : 'decoy'
+        el.className = `eye-box ${kind}`
+        el.style.display = ''
+        el.style.transform = `translate(${left}px, ${top}px)`
+        el.style.width = `${Math.max(20, right - left)}px`
+        el.style.height = `${Math.max(20, bottom - top)}px`
+        const label = el.firstChild
+        const text = !judged ? `WARM · ${dist.toFixed(0)} m · come closer to classify`
+          : `${o.person ? 'PERSON' : 'NOT A PERSON'} ${pct(o.conf)}`
+        const sub = judged ? (o.person ? 'onboard AI' : 'onboard AI · rejected') : ''
+        if (label.dataset.t !== text + sub) {
+          label.dataset.t = text + sub
+          label.innerHTML = sub ? `${text}<small>${sub}</small>` : text
+        }
+      }
     }
-    if (behind || x1 < -1 || x0 > 1) { el.style.display = 'none'; return }
-    const clamp = (v) => Math.max(-1, Math.min(1, v))
-    const left = ((clamp(x0) + 1) / 2) * size.width
-    const right = ((clamp(x1) + 1) / 2) * size.width
-    const top = ((1 - clamp(z1)) / 2) * size.height
-    const bottom = ((1 - clamp(z0)) / 2) * size.height
-    el.style.display = ''
-    el.style.transform = `translate(${left}px, ${top}px)`
-    el.style.width = `${Math.max(24, right - left)}px`
-    el.style.height = `${Math.max(24, bottom - top)}px`
+    for (let i = used; i < MAX_BOXES; i++) if (boxes.current[i]) boxes.current[i].style.display = 'none'
   })
   return null
 }
@@ -172,7 +244,7 @@ function steps(f, events) {
   return out
 }
 
-function FocusPanel({ robotId, boxRef }) {
+function FocusPanel({ robotId }) {
   const f = useSim((s) => (s.eyeFocus?.robot === robotId ? s.eyeFocus : null))
   const events = useSim((s) => s.events)
   const [, tick] = useState(0)
@@ -185,14 +257,6 @@ function FocusPanel({ robotId, boxRef }) {
   const person = f?.kind === 'person'
   return (
     <>
-      <div ref={boxRef} className={`eye-box ${person ? 'person' : 'decoy'}`} style={{ display: 'none' }}>
-        {f && (
-          <span className="eye-box-label">
-            {person ? `PERSON ${pct(f.conf ?? 1)}` : `NOT A PERSON ${pct(f.conf ?? 0)}`}
-            <small>{person ? 'onboard AI' : 'rejected'}</small>
-          </span>
-        )}
-      </div>
       {live && (
         <ol className={`eye-steps ${person ? 'person' : 'decoy'}`}>
           {steps(f, events).map((st, i) => (
@@ -211,7 +275,7 @@ export default function RobotEye() {
   const set = useSim((s) => s.set)
   const focused = useSim((s) => s.eyeFocus?.robot === s.eyeRobot && s.eyeFocus)
   const [, rerender] = useState(0)
-  const boxRef = useRef()
+  const boxes = useRef([])
   // grow while a verdict is on screen, then shrink back to the corner
   const live = focused && performance.now() - focused.born < FOCUS_HOLD_MS
   useEffect(() => {
@@ -228,7 +292,7 @@ export default function RobotEye() {
         <button className={`eye-toggle${thermal ? ' on' : ''}`} onClick={() => set({ eyeThermal: !thermal })}>Thermal</button>
         <button className="eye-close" aria-label="Close camera" onClick={() => set({ eyeRobot: null })}>×</button>
       </div>
-      <Canvas dpr={1} camera={{ fov: 75, near: 0.05, far: 60 }} gl={{ antialias: false, powerPreference: 'low-power' }}>
+      <Canvas dpr={1} camera={{ fov: 85, near: 0.05, far: 60 }} gl={{ antialias: false, powerPreference: 'low-power' }}>
         <color attach="background" args={[thermal ? '#030614' : '#0e1114']} />
         {thermal ? <ambientLight intensity={0.6} /> : (
           <>
@@ -237,16 +301,19 @@ export default function RobotEye() {
           </>
         )}
         {!thermal && <fog attach="fog" args={['#0e1114', 8, 26]} />}
-        <Building thermal={thermal} />
+        <Building thermal={thermal} lite />
         <HotSpots thermal={thermal} />
-        <OtherRobots robotId={robotId} thermal={thermal} />
+        <Robots robotId={robotId} thermal={thermal} />
         <EyeCamera robotId={robotId} />
-        <FocusBox robotId={robotId} thermal={thermal} boxRef={boxRef} />
+        <ClassifyBoxes robotId={robotId} thermal={thermal} boxes={boxes} />
       </Canvas>
-      <FocusPanel robotId={robotId} boxRef={boxRef} />
+      {Array.from({ length: MAX_BOXES }, (_, i) => (
+        <div key={i} ref={(el) => { boxes.current[i] = el }} className="eye-box" style={{ display: 'none' }}><span className="eye-box-label" /></div>
+      ))}
+      <FocusPanel robotId={robotId} />
       <span className="eye-note">
-        {live ? 'Box marks the hot spot the onboard classifier judged from its thermal crop'
-          : thermal ? 'Thermal: walls cold, people and hot objects glow' : 'Forward camera'}
+        {thermal ? 'Thermal camera · warm objects are scored by the onboard person classifier'
+          : 'Forward camera · every warm object is scored by the onboard person classifier from its thermal crop'}
       </span>
     </div>
   )

@@ -41,8 +41,8 @@ export function TopBar() {
       <div className="incident">{fp ? fp.name : 'Waiting for sim'}</div>
       <div className="clock mono">T+{fmt(time)}</div>
       <div className="survivor-count" title="Found by robots vs known at the command post">
-        <span><b>{found}</b> found</span>
-        <span className={reported < found ? 'gap' : ''}><b>{reported}</b> reported</span>
+        <span>Survivors: <b>{found}</b> found</span>
+        <span className={reported < found ? 'gap' : ''}><b>{reported}</b> at command</span>
       </div>
       {detector && (
         <span className={`detector-chip ${detector.mode}`} title={detector.reason ?? ''}>
@@ -170,6 +170,7 @@ export function HelpOverlay() {
         <div className="keys">
           {KEYS.map(([k, what]) => <Fragment key={k}><kbd>{k}</kbd><span>{what}</span></Fragment>)}
         </div>
+        <button className="text-link" onClick={(e) => { e.stopPropagation(); set({ helpOpen: false, introOpen: true }) }}>How to read this screen</button>
         <span className="muted small">Click anywhere or press Esc to close</span>
       </div>
     </div>
@@ -186,7 +187,7 @@ export function useKeyboard() {
       const target = robots.find((r) => r.id === s.follow) ?? robots[0]
       const key = e.key.toLowerCase()
       if (key === 'q') s.set({ joinOpen: !s.joinOpen })
-      if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null, helpOpen: false, labOpen: false })
+      if (e.key === 'Escape') s.set({ joinOpen: false, report: null, eyeRobot: null, helpOpen: false, labOpen: false, introOpen: false })
       if (key === 'l') s.set({ labOpen: !s.labOpen })
       if (key === 'k') setNight(!s.night)
       if (key === 'd') { if (s.director) overview(); s.set({ director: !s.director, shot: null }) }

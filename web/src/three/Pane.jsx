@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { Component, Suspense, useEffect, useMemo, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Environment, Lightformer, OrbitControls } from '@react-three/drei'
 import { Bloom, EffectComposer, N8AO, Noise, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
@@ -23,28 +23,51 @@ const GAP_COLUMN_PX = 330 // Command inset (300) + margins
 // sky fill, and image-based light from a few soft panels (no HDR download) so metal,
 // glass and polished concrete have something to reflect. The shadow frustum covers the
 // whole site.
+class EnvGuard extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { failed: false }
+  }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() { return this.state.failed ? this.props.fallback : this.props.children }
+}
+
+// Soft light panels instead of a sky photo (no download needed).
+function PanelEnv({ night }) {
+  return (
+    <Environment resolution={128} frames={1} environmentIntensity={night ? 0.16 : 0.55}>
+      <Lightformer form="rect" intensity={1.6} color="#e6eefb" scale={[40, 40]} position={[0, 20, 0]} rotation-x={Math.PI / 2} />
+      <Lightformer form="rect" intensity={2.2} color="#ffd2a1" scale={[30, 8]} position={[-25, 6, 10]} rotation-y={Math.PI / 2} />
+      <Lightformer form="rect" intensity={0.8} color="#9cc3ff" scale={[30, 8]} position={[25, 6, -10]} rotation-y={-Math.PI / 2} />
+      <Lightformer form="ring" intensity={1.2} color="#ffffff" scale={6} position={[0, 8, 25]} />
+    </Environment>
+  )
+}
+
 function Lights({ perf, night }) {
+  const fp = useSim((s) => s.floorplan)
+  const [W, H] = fp?.size ?? [40, 30]
   const target = useMemo(() => {
     const t = new THREE.Object3D()
-    t.position.set(19.5, 0, -15)
+    t.position.set(W / 2, 0, -H / 2)
     return t
-  }, [])
+  }, [W, H])
   return (
     <>
       <ambientLight intensity={night ? 0.03 : 0.08} />
       <hemisphereLight args={night ? ['#6f86b0', '#120f0c', 0.14] : ['#c4d3e6', '#2b2622', 0.35]} />
       <primitive object={target} />
       {/* night: a weak cold moon instead of the afternoon sun */}
-      <directionalLight position={[2, 32, 0]} target={target} intensity={night ? 0.45 : 2.6} color={night ? '#9db4ff' : '#ffe0b5'}
+      <directionalLight position={[W / 2 - 17.5, 32, -H / 2 + 15]} target={target} intensity={night ? 0.45 : 2.6} color={night ? '#9db4ff' : '#ffe0b5'}
                         castShadow={!perf} shadow-mapSize={[4096, 4096]} shadow-bias={-0.0004} shadow-normalBias={0.03}
                         shadow-camera-left={-34} shadow-camera-right={34}
                         shadow-camera-top={30} shadow-camera-bottom={-30} shadow-camera-far={100} />
-      <Environment resolution={128} frames={1} environmentIntensity={night ? 0.16 : 0.55}>
-        <Lightformer form="rect" intensity={1.6} color="#e6eefb" scale={[40, 40]} position={[0, 20, 0]} rotation-x={Math.PI / 2} />
-        <Lightformer form="rect" intensity={2.2} color="#ffd2a1" scale={[30, 8]} position={[-25, 6, 10]} rotation-y={Math.PI / 2} />
-        <Lightformer form="rect" intensity={0.8} color="#9cc3ff" scale={[30, 8]} position={[25, 6, -10]} rotation-y={-Math.PI / 2} />
-        <Lightformer form="ring" intensity={1.2} color="#ffffff" scale={6} position={[0, 8, 25]} />
-      </Environment>
+      {/* photo-scanned sky (CC0 HDRI) for light and reflections; soft panels if it can't load */}
+      <EnvGuard fallback={<PanelEnv night={night} />}>
+        <Suspense fallback={<PanelEnv night={night} />}>
+          <Environment files="/assets/hdri/industrial_sunset_puresky_1k.hdr" environmentIntensity={night ? 0.12 : 0.85} />
+        </Suspense>
+      </EnvGuard>
     </>
   )
 }
@@ -84,11 +107,14 @@ function SyncedControls({ id }) {
   }, [camera, size.width, size.height, reserve])
 
   // Fit once the canvas has a real size (a fresh canvas can report 0 on its first render).
+  // A different map (or the floorplan arriving) needs a fresh fit too.
+  const mapId = useSim((s) => s.floorplan?.id)
   useEffect(() => {
+    if (shared.map !== mapId) { shared.home = null; shared.map = mapId }
     if (shared.home || !size.width || !size.height) return
     fitOverview(camera, Math.max(0.5, (size.width - reserve) / size.height))
     shared.rev++
-  }, [camera, size.width, size.height, reserve])
+  }, [camera, size.width, size.height, reserve, mapId])
 
   useEffect(() => {
     camera.position.copy(shared.pos)

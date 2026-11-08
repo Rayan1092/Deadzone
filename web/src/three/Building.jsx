@@ -7,6 +7,7 @@ import Baked from './Baked'
 import Debris from './Debris'
 import { CommandPost, GasLeak, Interior, Lot } from './Props'
 import { CollapseLive, CollapseStatic, WallDetails, holedWallGeometry, wallDamage } from './Collapse'
+import { DisasterLive, DisasterStatic } from './Disaster'
 
 // Thermal palette for the robot's-eye view: everything cold reads as deep blue.
 const COLD = { floor: '#070b1f', wall: '#1d3a8a', wallGlow: '#0b1d5c' }
@@ -238,11 +239,11 @@ function RoomFloor({ room }) {
 
 // Polished concrete slab under everything, 4 m saw-cut panels.
 function Slab({ W, H }) {
-  const surf = useMemo(() => tiledSet(materials().floor, W / 4, H / 4), [W, H])
+  const surf = useMemo(() => tiledSet(materials().floor, W / 2.5, H / 2.5), [W, H])
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={w2t(W / 2, H / 2, 0)} receiveShadow>
       <planeGeometry args={[W, H]} />
-      <meshStandardMaterial {...surf} color="#c4c8cc" roughness={0.62} metalness={0.05} normalScale={[0.7, 0.7]} />
+      <meshStandardMaterial {...surf} color="#e2e2e0" roughness={0.9} metalness={0} normalScale={[0.9, 0.9]} />
     </mesh>
   )
 }
@@ -255,7 +256,8 @@ function staticRubble(fp) {
 }
 
 // `props`: furniture and decoy objects (Reality only; the command post's floorplan has none).
-export default function Building({ thermal = false, blueprint = false, props = true }) {
+// `lite`: the robot camera's copy (indoors only: no outside ruins, smoke or airborne dust).
+export default function Building({ thermal = false, blueprint = false, props = true, lite = false }) {
   const fp = useSim((s) => s.floorplan)
   const perf = useSim((s) => s.perf)
   const mode = blueprint ? 'blueprint' : thermal ? 'thermal' : 'plain'
@@ -282,11 +284,13 @@ export default function Building({ thermal = false, blueprint = false, props = t
         {/* rubble that fell during the run (R key, aftershock) is truth: Reality panes only */}
         {!blueprint && <Debris rubble={props ? fp.rubble ?? NO_RUBBLE : staticRubble(fp)} cold={thermal} />}
         {props && !blueprint && <Interior fp={fp} cold={thermal} />}
-        {!blueprint && <CommandPost pos={[cx, cy]} cold={thermal} />}
+        {!blueprint && <CommandPost pos={[cx, cy]} entry={fp.entry} cold={thermal} />}
         {damage && <WallDamageLayer walls={fp.walls} damage={damage} />}
         {damage && <CollapseStatic fp={fp} />}
+        {damage && <DisasterStatic fp={fp} outside={!lite} />}
       </Baked>
-      {damage && <CollapseLive fp={fp} dust={!perf} />}
+      {damage && <CollapseLive fp={fp} dust={!perf && !lite} />}
+      {damage && !perf && !lite && <DisasterLive fp={fp} />}
       {mode === 'plain' && (fp.hazards ?? []).map((hz) => <GasLeak key={hz.id} hazard={hz} />)}
       {blueprint && (
         <mesh position={w2t(cx, cy, 0.5)}>
