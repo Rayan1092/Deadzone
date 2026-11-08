@@ -12,14 +12,14 @@ export function poolImageUrl(file) {
   const relative = file.startsWith(POOL_ROOT) ? file.slice(POOL_ROOT.length) : file
   if (!relative || /[:\\?#]/.test(relative) || relative.startsWith('/') ||
       relative.split('/').some((part) => !part || part.startsWith('.')) ||
-      !/\.(png|jpe?g|webp)$/i.test(relative)) throw new Error('Crop must be an image inside the judge pool.')
+      !/\.(png|jpe?g|webp)$/i.test(relative)) throw new Error('Crop must be an image inside the held-out test set.')
   return POOL_ROOT + relative.split('/').map(encodeURIComponent).join('/')
 }
 
 export function readJudgePool(raw) {
   const examples = raw?.examples ?? raw?.samples ?? raw?.items
   if (!Array.isArray(examples) || !examples.length || examples.length > 2000)
-    throw new Error('Judge pool needs 1–2000 exported examples.')
+    throw new Error('The held-out test set needs 1–2000 exported examples.')
   const split = raw.split ?? raw.dataset?.split
   const heldOut = raw.held_out === true || /^(val|validation|test|held[_ -]out)$/i.test(split ?? '')
   if (!heldOut) throw new Error('The manifest must identify a held-out validation/test split.')
@@ -27,7 +27,7 @@ export function readJudgePool(raw) {
   const seen = new Set()
   const items = examples.map((row) => {
     const url = poolImageUrl(row.file ?? row.path)
-    if (seen.has(url)) throw new Error('Judge pool contains duplicate crop files.')
+    if (seen.has(url)) throw new Error('The held-out test set contains duplicate crop files.')
     seen.add(url)
     // `conf` is P(person), matching Rayan's existing lab.json convention.
     const score = row.p_person ?? row.score ?? row.conf

@@ -10,10 +10,10 @@ const MAX_LEN = 1000
 const TIMEOUT_MS = 15000
 const UNAVAILABLE = {
   disabled: 'Gemini is turned off on the server.',
-  missing_key: 'Gemini needs an API key configured on the server. Ask the presenter to finish setup.',
+  missing_key: 'Gemini needs an API key configured on the server. Ask the operator to finish setup.',
   invalid_model: 'The server’s Gemini model setting needs fixing.',
   timeout: 'Gemini took too long. Try again.',
-  provider_error: 'Gemini could not answer. The presenter should check the server’s API access and quota.',
+  provider_error: 'Gemini could not answer. The operator should check the server’s API access and quota.',
   invalid_response: 'Gemini did not return a complete answer grounded in Command data. Try again.',
 }
 

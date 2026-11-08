@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { gated, heldByOthers, lostFleet, newerTable, redactHello } from '../src/net/leaseState.js'
+import { gated, heldByOthers, lostFleet, newerTable, redactHello, PRESENTER_NAME } from '../src/net/leaseState.js'
 
 const table = (rev, holders) => ({ enabled: true, revision: rev, robots: ['R1', 'R2', 'R3'].map((robot) => ({ robot, controller: holders[robot] ? { client: 'x', name: holders[robot] } : null })) })
 
@@ -22,7 +22,7 @@ test('an older lease table never overwrites a newer one', () => {
 
 test('the presenter keeps the fleet only while every robot shows it as holder', () => {
   const held = { held: true, robots: ['R1', 'R2', 'R3'] }
-  const all = { R1: 'Presenter', R2: 'Presenter', R3: 'Presenter' }
+  const all = { R1: PRESENTER_NAME, R2: PRESENTER_NAME, R3: PRESENTER_NAME }   // "Console"
   assert.equal(lostFleet(held, table(3, all)), false)
   assert.equal(lostFleet(held, table(4, { ...all, R2: null })), true)          // expired or reset
   assert.equal(lostFleet(held, table(4, { ...all, R3: 'phone-ab12' })), true)  // taken over

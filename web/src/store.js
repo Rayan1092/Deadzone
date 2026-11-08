@@ -3,7 +3,7 @@ import { useRef } from 'react'
 import { alarm, chime, confirm, ping, rumble } from './audio'
 import { lostFleet, newerTable } from './net/leaseState'
 import { pushTraffic, resetTraffic } from './net/traffic'
-import { polyCenter, rubbleBanner } from './format'
+import { SCENARIO_TAG, isScenarioEvent, polyCenter, radioFailBanner, rubbleBanner, scheduledScenario } from './format'
 
 // Events worth a toast on the big screen. replan, deadline_miss and deliveries
 // fire too often and stay in the sidebar feed or the timeline.
@@ -96,6 +96,8 @@ export const useSim = create((set) => ({
   aftershock: null,    // { at, born, rubble } of the latest aftershock, for the shake, slabs and dust
   banner: null,        // { title, sub, tone, size, ms, at }: AFTERSHOCK / NEW SCENARIO / SECONDARY COLLAPSE / RUBBLE over the main view
   rubbleAimed: null,   // { robot, at }: the robot the last R press was aimed at (banner fallback)
+  pressedAt: {},       // { aftershock, rubble }: when this console last asked for one (scenario-event banners)
+  scenarioTimeline: false, // hello.scenario.timeline: the floor plan's disaster timeline is playing
   traffic: false,      // network traffic events seen (DZ_NETWORK_TRAFFIC): packets and live line widths
   leases: null,        // public control-lease table (DZ_CONTROL_LEASES=1): { enabled, revision, robots: [{ robot, controller }] }
   presenter: { held: false, robots: [], pending: false }, // this screen's own fleet claim (net/presenter.js)
@@ -177,6 +179,7 @@ export function handleMessage(msg) {
       s.set({ floorplan: data.floorplan, grid: data.grid, robotsMeta: data.robots,
               running: data.running, speed: data.speed, mode: data.mode ?? null, time,
               phoneFrames: data.phone_frames ?? null,
+              ...(data.scenario ? { scenarioTimeline: Boolean(data.scenario.timeline) } : {}),
               detector: data.detector ? { mode: data.detector, reason: data.detector_reason } : null,
               ...(data.leases ? { leases: data.leases } : {}),
               // a reset frees every lease on the server: the presenter has to Unlock again
@@ -257,15 +260,22 @@ export function handleMessage(msg) {
       const events = fold ? [{ ...ev, count: (top.count ?? 1) + 1 }, ...s.events.slice(1)] : [ev, ...s.events]
       if (ev.kind === 'plan_dispatched') s.set({ dispatchedPlans: [...s.dispatchedPlans, ev.plan_id] })
       // the 3D view shakes and throws up a dust cloud where the ceiling came down (Reality only)
+      // scenario events (the floor plan's `events`, the timeline player): banners say so
+      const scheduled = scheduledScenario(ev, time, s.floorplan?.events)
+      const pressed = (k) => Date.now() - (s.pressedAt[k] ?? 0) < 4000
+      const scenario = isScenarioEvent(ev, { timeline: s.scenarioTimeline, scheduled,
+        pressedRecently: ev.kind === 'aftershock' ? pressed('aftershock') : pressed('rubble') || pressed('aftershock') })
+      if (ev.kind === 'radio_fail') s.set({ banner: { ...radioFailBanner(ev, scheduled?.label), at: Date.now() } })
       if (ev.kind === 'aftershock') {
+        const what = ev.destroyed_relay ? `Part of the building came down · relay ${ev.destroyed_relay} crushed · robots rerouting` : 'Part of the building came down · robots rerouting'
         s.set({ aftershock: { at: ev.at, born: performance.now(), rubble: ev.rubble ?? [] },
-          banner: { title: 'AFTERSHOCK', tone: 'alert', at: Date.now(),
-            sub: ev.destroyed_relay ? `Part of the building came down · relay ${ev.destroyed_relay} crushed · robots rerouting` : 'Part of the building came down · robots rerouting' } })
+          banner: { title: 'AFTERSHOCK', tone: 'alert', at: Date.now(), sub: scenario ? `${SCENARIO_TAG} · ${what}` : what } })
         rumble(5) // only audible after a user gesture (the A key counts)
       }
       // Rayan's secondary collapse (no key) and R presses: a banner naming the robot; the collapse
       // also brings a short shake with slabs and dust where it came down (Reality only)
-      const rb = rubbleBanner(ev, aimed)
+      // an aftershock's own rubble is announced by its AFTERSHOCK banner
+      const rb = rubbleBanner(ev, aimed, scenario && scheduled?.type !== 'aftershock' && !pressed('aftershock'))
       if (rb) {
         const at = polyCenter(ev.poly)
         s.set({ banner: { ...rb, at: Date.now() },
@@ -319,7 +329,7 @@ export function handleMessage(msg) {
       if (!newerTable(s.leases, data)) break
       const lost = lostFleet(s.presenter, data)
       s.set({ leases: data, ...(lost ? { presenter: { held: false, robots: [], pending: false },
-        toasts: [...s.toasts, { kind: 'note', msg: 'Presenter control ended: press Unlock to take the robots again', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) } : {}) })
+        toasts: [...s.toasts, { kind: 'note', msg: 'Console control ended: press Unlock to take the robots again', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) } : {}) })
       break
     }
     case 'report':
