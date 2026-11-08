@@ -93,14 +93,14 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    hotspot or the tunnel if another device still cannot connect. `?nointro` keeps the first-visit explainer off the scene;
    the **?** overlay can still show it.
 8. Preload **P-1** so it appears on every phone. Use the first two commands in "Plan fallback" below: send `$p1` to `/api/plan` only, don't dispatch.
-9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, press **S** to save the gzipped mission recording, and keep the file on the demo laptop.
+9. Record a backup run once (after the last code change): open `http://localhost:8000/?record`, run the whole demo, save the gzipped mission recording, and keep the file on the demo laptop.
 10. Charger in, notifications off, browser zoom set. Second tab: `ml/results/confusion_matrix.png`. Third tab: the GitHub repo.
 
 ## Director keys (big screen)
 
 | Key | Action | Status |
 |---|---|---|
-| Space | start / pause | live |
+| Space | start / pause. The page opens on the street shot outside the building; the first Space dives into the building and starts the run | live |
 | Backspace | reset to seed 7, paused | live |
 | `+` / `-` | sim speed ×2 / ÷2 | live |
 | 1–3 / 0 | follow robot 1–3 (or click its card) / back to overview. Command follows the robot's last *reported* pose | live |
@@ -108,10 +108,8 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | F | wheel overcurrent on the **followed** robot (R1 if none) | live |
 | G | **Gemini briefing** from Command data only (`source: "gemini"`, about **6 s** to generate, then read aloud; Voice on/off toggle). Press it ~6 s before you want to talk over it | live with `DZ_GEMINI=1` (dry run passed) |
 | Q / Esc | QR join overlay on / off (Esc also closes the briefing) | live |
-| T | faint truth survivors and decoys on Reality only | live |
 | V | robot's-eye camera of the followed robot (with a Thermal toggle). It also opens by itself on a detection, with the AI box and the robot's steps | live |
 | P | performance mode (no shadows, fewer lidar rays). **Set it before the demo, never during:** toggling recompiles every material and freezes the screen for several seconds (rayan-ml's profile) | set before |
-| S | save the mission recording (only when the page was opened with `?record`) | live |
 | O | perception overload on the **followed** robot: deadline misses for 3 s | live |
 | U | resume the followed robot from SAFE_STOP (also the "Send resume command" button on its card). Travels over the radio, so it needs a route to CMD | live |
 | B | baseline toggle: every robot switches to "without Deadzone" (stops when its link drops, no relays) and back. Red "Baseline" chip while on. Q&A only, never during the beat sheet | live |
@@ -119,16 +117,15 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 | L | Model Lab overlay: training examples, training curve, confusion matrix, held-out metrics, and the crop a robot just classified with its Grad-CAM | needs `DZ_AI_LAB=1` |
 | J | Model test: a random held-out thermal sample; guess person or not, then see the model's recorded answer. Q&A only | needs the held-out export |
 | M | one view (Reality with the Command post inset, bottom right) / split view | live |
-| C | one view only: swap the Command post inset and the main view (the reveal) | live |
-| E | Operator view (map first, panels on hover; the default) / Engineering view (every panel) | live |
-| K | night operations lighting (headlights, flood light, strobes) | live, off by default; dry run first |
+| C | one view: swap the Command post inset and the main view (the reveal). In split view: the camera looks down on the Command post | live |
+| H | help: the key list | live |
 | D | auto-director camera (cuts to dark robots, finds, the reveal, aftershocks). Any drag, wheel or 0–9 hands the camera back for 20 s | live, off by default; good for a hands-free video |
 
 REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/fault -ContentType application/json -Body '{"type":"overcurrent","robot":"R3"}'`, G `Invoke-RestMethod http://127.0.0.1:8000/api/report` (check `source` says `gemini`).
 
 ## Beat sheet
 
-Space is pressed at **0:40**. Times after it come from the demo guard's headless seed-7 run (`server/tests/test_demo_guard.py`: P-1 rejected, fixed, dispatched; `DZ_OBSTACLES=1`, `DZ_ROBOT_COLLISIONS=1`, `DZ_SMART_RUBBLE=1`; the scenario event in `collapse_01.json`, a collapse on S1's route at 162.5; F / O at sim 177.5 / 187.5). Clock = 0:40 + sim seconds / 1.5. They are exact until the first director key is pressed. Re-check them at every rehearsal and update this table and the guard together if they drift.
+Space is pressed at **0:40**. The mission clock is in the top bar. Times after it come from the demo guard's headless seed-7 run (`server/tests/test_demo_guard.py`: P-1 rejected, fixed, dispatched; `DZ_OBSTACLES=1`, `DZ_ROBOT_COLLISIONS=1`, `DZ_SMART_RUBBLE=1`; the scenario event in `collapse_01.json`, a collapse on S1's route at 162.5; F / O at sim 177.5 / 187.5). Clock = 0:40 + sim seconds / 1.5. They are exact until the first director key is pressed. Re-check them at every rehearsal and update this table and the guard together if they drift.
 
 | Clock | After Space (sim s) | On screen | Who | What to say |
 |---|---|---|---|---|
