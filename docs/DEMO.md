@@ -54,10 +54,10 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
    binds `0.0.0.0:8000` so phones can connect.
    ```powershell
    cd server
-   $env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=1.5; $env:DZ_OBSTACLES=1; $env:DZ_ROBOT_COLLISIONS=1; $env:DZ_SMART_RUBBLE=1
+   $env:DZ_ROBOTS=3; $env:DZ_SEED=7; $env:DZ_SPEED=1.5; $env:DZ_OBSTACLES=1; $env:DZ_ROBOT_COLLISIONS=1; $env:DZ_SMART_RUBBLE=1; $env:DZ_COVERAGE_GRID=1
    python -m deadzone
    ```
-   `DZ_OBSTACLES=1` and `DZ_ROBOT_COLLISIONS=1` are **required** for the main run (the demo guard runs with both on). Without `DZ_OBSTACLES` the beat sheet below is wrong: S1 is found at 129.0 s instead of 102.7. Without `DZ_ROBOT_COLLISIONS` the robots can drive through each other and S2 lands at 3:06 (sim 219.4) instead of 3:04.8. `DZ_SMART_RUBBLE=1` makes the R key a no-trap drop for Q&A. The secondary collapse at 2:28 (sim 162.5) is a scenario event in `collapse_01.json` and runs with no flag; leave `DZ_SCENARIO_EVENTS` unset.
+   `DZ_OBSTACLES=1` and `DZ_ROBOT_COLLISIONS=1` are **required** for the main run (the demo guard runs with both on). Without `DZ_OBSTACLES` the beat sheet below is wrong: S1 is found at 129.0 s instead of 102.7. Without `DZ_ROBOT_COLLISIONS` the robots can drive through each other and S2 lands at 3:06 (sim 219.4) instead of 3:04.8. `DZ_SMART_RUBBLE=1` makes the R key a no-trap drop for Q&A. `DZ_COVERAGE_GRID=1` lets **W** show the command post's predicted radio coverage (Command view only; no robot behaviour changes, the guard runs with it on). The secondary collapse at 2:28 (sim 162.5) is a scenario event in `collapse_01.json` and runs with no flag; leave `DZ_SCENARIO_EVENTS` unset.
 5. The server log must say `survivor detector: trained model, threshold 0.60`. If it says `sim sensor fallback (...)`, fix torch before going on stage. The top-bar detector chip shows the same thing.
    Optional features are off unless their flag is set before starting the server (only turn on what passed a dry run):
    ```powershell

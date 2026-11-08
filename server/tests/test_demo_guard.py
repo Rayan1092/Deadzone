@@ -41,7 +41,10 @@ BEATS = {
 COLLAPSE_AT = 162.5     # collapse_01.json scenario event: collapse near R1
 DIRECTOR = {177.5: ("overcurrent", "R3"), 187.5: ("overload", "R1")}
 END = 230.0
-FLAGS = {"DZ_OBSTACLES": "1", "DZ_SMART_RUBBLE": "1", "DZ_ROBOT_COLLISIONS": "1"}   # the main run's environment (docs/DEMO.md pre-flight step 4)
+FLAGS = {"DZ_OBSTACLES": "1", "DZ_SMART_RUBBLE": "1", "DZ_ROBOT_COLLISIONS": "1"}
+# Command-view-only flags of the main run: applied too, kept apart from FLAGS because they never
+# change robot behaviour (web/scripts/record-seed7-paths.py records robot paths from FLAGS)
+VIEW_FLAGS = {"DZ_COVERAGE_GRID": "1"}   # the main run's environment (docs/DEMO.md pre-flight step 4)
 
 ZW = [[0, 17], [20, 17], [20, 30], [0, 30]]
 ZB = [[20, 17], [32, 17], [32, 30], [20, 30]]
@@ -58,7 +61,7 @@ def demo_plan(plan_id, ne_comms):
 @pytest.fixture(scope="module")
 def run():
     with pytest.MonkeyPatch.context() as env:
-        for k, v in FLAGS.items():
+        for k, v in {**FLAGS, **VIEW_FLAGS}.items():
             env.setenv(k, v)
         return _run()
 

@@ -18,6 +18,12 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 - **Measured:** repro after the fix: no faults, all three exploring at 120 s (before: R1 TRAPPED 37.4). **Guard green, every beat unchanged.** New `tests/test_peer_not_a_wall.py` (2).
 - **Contract changes:** none.
 - **Next:** stop.
+### 2026-11-09 11:20 · rayan/trapped-fix · A robot parked beside a survivor can always leave; TRAPPED needs a real enclosure; `DZ_COVERAGE_GRID=1` in the main run
+- **Did (tester's bug, trace not in yet):** a robot parked inside a found survivor's 0.5 m clearance (after the find, or a look-closer stop) had only its own cell open, so with furniture and collision bodies around, A* found no departure and TRAPPED fired after 10 s. Now `_drive_trav` blocks, for a disk the robot stands in, only the cells **closer to the person than the robot already is**: it can always back away, never move toward them; outside the disk the full clearance stands. TRAPPED is raised only when `_enclosed()`: the free space the robot stands in (its map, walls, no-go areas, no survivor clearance) reaches no frontier and not the entrance. New `tests/test_parked_by_survivor.py` (3). When the tester's trace arrives I'll replay it against this.
+- **Also (Rayan):** `DZ_COVERAGE_GRID=1` added to DEMO.md's required step-4 flags (Aziz's preflight reads them from there) so **W** shows the command post's predicted coverage; Command view only. The guard runs with it on: **every beat unchanged**.
+- **Contract changes:** none on the wire; main run adds `DZ_COVERAGE_GRID=1`.
+- **Heads-up for others:** **Yusuf:** the coverage grid is in a separate `VIEW_FLAGS` in the guard (it never changes robot behaviour), so your path test's `FLAGS` and recorded paths stay valid.
+- **Next:** stop (code freeze 11:40).
 
 ### 2026-11-09 10:45 · rayan/readme-keys · README key table matches the screen's help (H) and DEMO.md
 - **Did:** the README key table now follows the web's own help list (`web/src/panels/keys.js`, key H) and DEMO.md: E, T, K, S and `?` removed; H (help), Esc, I (under-the-hood counters) and W (predicted radio coverage) added; C described for both views; Shift+N "back to the main scenario"; Space opens from the street shot. The README no longer mentions T or S elsewhere. Recording, from Yusuf's file: open the page with `?record`, then click the **REC** chip ("Save the mission recording"); that sentence is now in DEMO.md's recording step and the README. The mission clock is mentioned in the top bar.

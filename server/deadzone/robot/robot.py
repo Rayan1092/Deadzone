@@ -1319,8 +1319,38 @@ class Robot:
             return
         if self.replan_fail_since is None:
             self.replan_fail_since = self.t
-        elif self.t - self.replan_fail_since >= TRAPPED_AFTER_S and self.fault != "TRAPPED":
-            self._raise_fault("TRAPPED")
+        elif self.t - self.replan_fail_since >= TRAPPED_AFTER_S and self.fault != "TRAPPED" and self._enclosed():
+            self._raise_fault("TRAPPED")      # only a real enclosure, not a planner hiccup
+
+    def _enclosed(self):
+        """TRAPPED is only true when the free space we stand in (our map, walls and no-go areas,
+        no survivor clearance) reaches neither the entrance nor any frontier."""
+        trav = self._trav()
+        h, w = trav.shape
+        start = self._cell(*self.pose[:2])
+        if not (0 <= start[0] < w and 0 <= start[1] < h):
+            return True
+        if not trav[start[1], start[0]]:
+            near = planning.nearest_traversable(trav, start)
+            if near is None:
+                return True
+            start = near
+        clusters, _, _ = planning.frontier_clusters(self.map.grid, trav, start, ())
+        if clusters:
+            return False
+        ex, ey = self._cell(*self.entry)
+        seen = np.zeros_like(trav)
+        seen[start[1], start[0]] = True
+        queue = [start]
+        while queue:
+            x, y = queue.pop()
+            if (x, y) == (ex, ey):
+                return False
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if 0 <= nx < w and 0 <= ny < h and trav[ny, nx] and not seen[ny, nx]:
+                    seen[ny, nx] = True
+                    queue.append((nx, ny))
+        return True
 
     def _escape_blocked_cell(self):
         """Standing where motion plans may not start (a no-go area drawn over us by a new plan, or a
@@ -1435,6 +1465,12 @@ class Robot:
             if x0 >= x1 or y0 >= y1:
                 continue
             sub = disk[y0 - (cy - r):y1 - (cy - r), x0 - (cx - r):x1 - (cx - r)]
+            d_me = (mx - cx) ** 2 + (my - cy) ** 2
+            if d_me <= r * r:
+                # parked inside this survivor's clearance (after the find, or a look-closer stop):
+                # block only the cells closer to the person than we are, so we can always back away
+                gy, gx = np.ogrid[y0 - cy:y1 - cy, x0 - cx:x1 - cx]
+                sub = sub & (gx * gx + gy * gy < d_me)
             trav[y0:y1, x0:x1] &= ~sub
         if keep is not None:
             trav[my, mx] = keep
