@@ -12,6 +12,7 @@ import JudgeTest from './panels/JudgeTest'
 import UnderHood from './panels/UnderHood'
 import { DirectorChip, useDirector } from './panels/Director'
 import Banner from './panels/Banner'
+import Connection from './panels/Connection'
 import { ReplayLoader } from './panels/ReplayPanel'
 import { REPLAY } from './net/replay'
 import { useSim } from './store'
@@ -29,15 +30,16 @@ export default function BigScreen() {
       <TopBar />
       <main className={view === 'gap' ? 'split single' : 'split'}>
         {view === 'gap' ? (
-          <Pane which="gap" title="Inside the building" subtitle="amber = the command post hasn't heard this yet" />
+          <Pane which="gap" title="Inside the building" subtitle="Amber: not reported to the command post yet" />
         ) : (
           <>
-            <Pane which="reality" title="What's really happening" subtitle="robots, survivors, radio links" />
-            <Pane which="command" title="What the command post knows" subtitle="only what reached its antenna" />
+            <Pane which="reality" title="What's really happening" subtitle="Robots, survivors and radio links" />
+            <Pane which="command" title="What the command post knows" subtitle="Only what reached its antenna" />
           </>
         )}
         <RescueStatus />
         <Banner />
+        <Connection />
         <Toasts />
         <DirectorChip />
         <ReportPanel />

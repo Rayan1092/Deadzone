@@ -29,7 +29,7 @@ test("scenario events from the floor plan's events list are matched by type and 
   assert.equal(scheduledScenario({ kind: 'relay_destroyed', cause: 'radio_fail' }, 240, events)?.type, 'radio_fail')
   assert.ok(isScenarioEvent({ kind: 'aftershock' }, { scheduled: events[1] }))
   const b = radioFailBanner({ kind: 'radio_fail', relay: 'RL2', lost_bundles: 3 }, 'Relay RL2 floods')
-  assert.deepEqual([b.title, b.sub], ['RADIO FAILURE', 'Scenario event · Relay RL2 floods · 3 bundles lost'])
+  assert.deepEqual([b.title, b.sub], ['Radio failure', 'Scenario event · Relay RL2 floods · 3 reports lost'])
   assert.equal(describeEvent({ kind: 'radio_fail', relay: 'RL1' }), "Relay RL1's radio failed")
 })
 
@@ -85,4 +85,18 @@ test('robot identity label: link in dBm, then NO LINK with seconds since Command
   assert.deepEqual(robotTag({ id: 'R1', link: { up: true, rssi: -75.6 } }, null, 10), { text: 'R1 · LINK −76 dBm', dark: false })
   assert.deepEqual(robotTag({ id: 'R2', link: { up: false } }, { last_seen: 88 }, 100.4), { text: 'R2 · NO LINK · 12 s', dark: true })
   assert.equal(robotTag({ id: 'R3', state: 'SHUTDOWN', link: { up: true, rssi: -50 } }, null, 0).text, 'R3 · POWERED DOWN')
+})
+
+test('copy: event lines and server wording read as plain sentences, no internal names', async () => {
+  const { describeEvent, plainText } = await import('../src/format.js')
+  assert.equal(plainText('Zone ZNE predicts a dead zone; use a relay chain or lost_link_ok'), 'Zone ZNE predicts a dead zone; use a relay chain or allowed to go dark')
+  assert.doesNotMatch(plainText('Enable DZ_AFTERSHOCK=1 for an aftershock dry run'), /DZ_/)
+  assert.equal(plainText('route to CMD'), 'route to the command post')
+  const samples = [
+    { kind: 'deadline_miss', robot: 'R1', task: 'perception' }, { kind: 'control_error', code: 'feature_disabled' },
+    { kind: 'fault_injected', type: 'overcurrent', robot: 'R3' }, { kind: 'relay_destroyed', id: 'RL1', lost_bundles: 2 },
+    { kind: 'link_restored', robot: 'R2', dark_s: 12.4 }, { kind: 'some_new_kind' },
+  ]
+  for (const e of samples) assert.doesNotMatch(describeEvent(e), /DZ_|server|bundle|Director|_/, describeEvent(e))
+  assert.equal(describeEvent({ kind: 'deadline_miss', robot: 'R1', task: 'perception' }), "R1's Thermal task missed its deadline")
 })

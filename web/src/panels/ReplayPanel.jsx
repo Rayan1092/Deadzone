@@ -44,7 +44,7 @@ export function ReplayLoader() {
          onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files[0]) load(e.dataTransfer.files[0]) }}>
       <div className="replay-box">
         <b>Replay mode</b>
-        <span className="muted">Plays a recorded run with no server. Drop a <span className="mono">.json.gz</span> recording here.</span>
+        <span className="muted">Plays a saved mission recording on this screen. Drop the recording file here.</span>
         <label className="replay-pick">
           {busy ? 'Loading…' : 'Choose recording'}
           <input type="file" accept=".json,.gz,application/json,application/gzip" hidden

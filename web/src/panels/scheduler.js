@@ -3,7 +3,7 @@
 export const TASK_INFO = {
   safety: { label: 'Lidar scan', period: 50, wcet: 2, why: 'reads the lidar and stops the robot before it touches anything; highest priority, never misses' },
   motion: { label: 'Plan', period: 100, wcet: 8, why: 'follows the planned path and steers the wheels' },
-  comms: { label: 'Radio', period: 200, wcet: 10, why: 'sends and forwards data bundles toward the command post, stores them while the link is down' },
+  comms: { label: 'Radio', period: 200, wcet: 10, why: 'sends and forwards reports toward the command post, and keeps them while the link is down' },
   mapping: { label: 'Map update', period: 200, wcet: 25, why: 'adds the latest lidar scan to the robot\'s map and picks the next frontier' },
   perception: { label: 'Thermal', period: 500, wcet: 40, why: 'runs the onboard person classifier on warm spots from the thermal camera; first to miss when the CPU is overloaded' },
   battery: { label: 'Battery', period: 1000, wcet: 2, why: 'checks the charge left against the energy needed to drive home' },
