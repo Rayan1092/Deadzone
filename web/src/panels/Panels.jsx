@@ -361,16 +361,12 @@ export function useKeyboard() {
       if (/^[1-9]$/.test(e.key) && robots[Number(e.key) - 1]) followRobot(robots[Number(e.key) - 1].id)
       if (e.key === '0') overview()
       if (key === 'r' && !e.repeat) {
-        // rubble ahead of the robot the camera follows (1-3), R1 on the overview. The control
-        // contract (PLAN.md director keys; RubbleFault takes `at` only) has no robot field: the
-        // spot 1.5 m ahead of it makes the server credit that robot (nearest), and with
-        // DZ_SMART_RUBBLE=1 move the drop onto its planned path. The banner names the server's robot.
-        const aim = robots.find((r) => r.id === s.follow) ?? robots.find((r) => r.id === 'R1') ?? robots[0]
-        if (aim) {
-          const [x, y, th] = aim.pose
-          s.set({ rubbleAimed: { robot: aim.id, at: Date.now() } })
-          control('director', { do: 'rubble', at: [x + Math.cos(th) * 1.5, y + Math.sin(th) * 1.5] })
-        }
+        // rubble ahead of the robot the camera follows (1-3): Rayan's control {action: 'rubble',
+        // robot}; on the overview no robot (the server means R1). With DZ_SMART_RUBBLE=1 it lands on
+        // that robot's planned path 3-4 m ahead at a spot that traps nobody.
+        const followed = robots.find((r) => r.id === s.follow)
+        s.set({ rubbleAimed: { robot: followed?.id ?? 'R1', at: Date.now() } })
+        control('rubble', undefined, followed ? { robot: followed.id } : {})
       }
       if (key === 'f' && target) control('director', { do: 'overcurrent', robot: target.id })
       if (key === 'o' && target) control('director', { do: 'overload', robot: target.id })
