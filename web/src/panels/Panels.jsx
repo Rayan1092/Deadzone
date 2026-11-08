@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { setLayout, setPerf, setView, useSim } from '../store'
+import { setLayout, setPerf, setView, useSim, setNight } from '../store'
 import { control } from '../net/socket'
 import { FAULT_LABEL, describeEvent, fmtClock as fmt, latestRoutes, planCaption, robotStateLabel, unitName } from '../format'
 import { lastContact, linkQuality, linkText } from './robotCard'
@@ -402,6 +402,10 @@ export function useKeyboard() {
       if (key === 'h') s.set({ helpOpen: !s.helpOpen })
       if (key === 'v' && target) s.set({ eyeRobot: s.eyeRobot === target.id ? null : target.id })
       if (key === 'p') setPerf(!s.perf)
+      if (key === 'k' && !e.repeat) {
+        setNight(!s.night)
+        s.set({ toasts: [...s.toasts, { kind: 'note', msg: !s.night ? 'Lighting: night' : 'Lighting: day', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
+      }
       if (key === 'm') toggleView()
       if (key === 'w' && !e.repeat) {
         if (!s.maps.coverage && !s.coverageOn) s.set({ toasts: [...s.toasts, { kind: 'note', msg: 'Coverage data not enabled', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })

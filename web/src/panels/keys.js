@@ -19,6 +19,7 @@ export const KEY_GROUPS = [
     ['V', "Open the followed robot's camera."],
     ['D', 'Let the camera follow the action by itself.'],
     ['P', 'Use lighter graphics on a slower computer.'],
+    ['K', 'Lighting: night / day.'],
   ] },
   { title: 'Scenario', keys: [
     ['R', 'Drop rubble in front of the followed robot (Scout 1 if none).'],
