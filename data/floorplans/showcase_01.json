@@ -2717,6 +2717,7 @@
   }
  ],
  "default_plan": "data/plans/showcase_01.plan.json",
+ "expected_survivors": 4,
  "validation": {
   "ok": true,
   "checks": [

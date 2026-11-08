@@ -1421,6 +1421,7 @@
   "people": 3
  },
  "default_plan": "data/plans/variants/collapse_01_v3.plan.json",
+ "expected_survivors": 3,
  "validation": {
   "ok": true,
   "checks": [

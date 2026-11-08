@@ -19,6 +19,7 @@ from ..network.dtn import PRIO, make_bundle
 from . import planning
 from .exploration import ProgressExplorer, line_clear
 from .mapping import OccupancyMap
+from .belief import Belief
 from .perception import close_crop, filter_hits, get_detector
 from .power import Battery, RESERVE_PCT, wheel_current
 from .scheduler import Scheduler
@@ -58,6 +59,7 @@ REPLAN_PAUSE_S = 0.6       # stop briefly in REPLANNING so the replan is visible
 REPLAN_COOLDOWN_S = 5.0    # repeat obstacles this soon after a replan are replanned silently
 TRAPPED_AFTER_S = 10.0     # no route for this long raises a TRAPPED fault to the command post
 ESCAPE_M = 6.0             # walk at most this far out of a no-go area drawn over the robot
+BELIEF_PERIOD_S = 0.5      # the survivor belief takes one camera look per perception period
 ROUTE_CHECK_PERIOD = 2.0   # s between "is the rescue route I sent still open on my map?" checks
 COLLAPSE_MARGINS_CELLS = (4, 2)  # rescue routes stay 1 m (else 0.5 m) clear of fresh collapse
 ROUTE_MAX_POINTS = 60      # Command's RescueRoute cap (Aziz, PR #28)
@@ -194,6 +196,10 @@ class Robot:
         self.nogo = nogo if nogo is not None else np.zeros((h, w), dtype=bool)
         self.base_nogo = self.nogo.copy()   # hazards known at deploy; plan no-go areas add to it
         self.escaping = False     # walking out of a cell plans may not start from (no-go drawn over us)
+        # survivor belief evidence from this robot's own camera (display only, Phase 1): the miss
+        # grid, confirmations and rejections; the team view merges them with the building prior
+        self.belief = Belief(np.ones((h, w), dtype=np.float32), cell)
+        self.belief_t = -99.0
         self.zones = []                     # this robot's dispatched zones, highest priority first
         self.battery = Battery()
         self.state = "DEPLOYING"
@@ -604,6 +610,9 @@ class Robot:
         # every hot spot goes through the trained detector (sim sensor fallback if no model)
         hits = io.thermal()
         all_hits = hits                                   # everything in the camera cone, for the camera views
+        if self.t - self.belief_t >= BELIEF_PERIOD_S:     # the camera looked: lower the belief where it saw nobody
+            self.belief_t = self.t
+            self.belief.observe(self.pose, self.map.grid == OCC, exclude=[h["pos"] for h in all_hits])
         hits, finals = self._triage_unsure(hits)
         kept = filter_hits(hits) + [h for h, conf in finals if conf >= get_detector().threshold]
         hits = hits + [h for h, _ in finals]
@@ -624,6 +633,7 @@ class Robot:
             if h["id"] in kept_ids or h["id"] in self.rejected or h["id"] in self.found:
                 continue                  # (a person confirmed from close up still scores low from afar)
             self.rejected.add(h["id"])    # the robot only knows "hot, but not a person"
+            self.belief.reject(h["id"], h["pos"])
             self.counters["detector_calls"] += 1
             self.counters["detector_rejections"] += 1
             self.events.append({"kind": "hotspot_rejected", "robot": self.id, "id": h["id"],
@@ -638,6 +648,7 @@ class Robot:
                    "by": self.id, "t": round(self.t, 1), "conf": s.get("conf", 0.99), "crop": s.get("crop"),
                    "heatmap": get_detector().heatmap(s.get("crop"))}
             self.found[s["id"]] = rec
+            self.belief.confirm(s["id"], rec["pos"])
             self.counters["detector_calls"] += 1
             self.counters["detector_persons"] += 1
             if not self.linked and not self._peer_found(s["id"]):
