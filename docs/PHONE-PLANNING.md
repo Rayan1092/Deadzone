@@ -19,6 +19,7 @@ owners. Existing screen messages and robot behavior continue to work.
 | `PUT /api/plan-sync` | Search plan | Explicitly seed a new offline epoch (DZ_CRDT=1) |
 | `GET /api/plan-sync?plan_id=P-1` | none | `{epoch,plan,ops,valid,issues}` |
 | `POST /api/plan-sync` | `{epoch,plan_id,ops}` | Merge stamped fields; valid plans broadcast `plan_state`, all candidates broadcast phone `plan_sync` |
+| `GET /api/rescue-order` | none | Opt-in `{generated_at,source:"command",survivors:[{survivor,by,length_m,risk,reasons,reported_t}]}` from delivered routes only |
 
 For the opt-in Gemini briefing setup, tool boundary and local fallback, see
 [`GEMINI.md`](GEMINI.md). Source is `gemini` only after a successful tool-grounded

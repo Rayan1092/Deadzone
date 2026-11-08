@@ -28,6 +28,7 @@ from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
 from .command.crdt import MergeBatch, PlanSync
 from .command.controls import AskQuestion, FaultRequest, RelayPlace, RelayPower, director_adapter
 from .command.reports import command_report
+from .command.rescue_order import rescue_order
 from .command.safety import SafetyChecker
 from .robot.robot import resume_command
 from .robot.perception import CROP_DIR, get_detector
@@ -439,6 +440,13 @@ async def ask(question: AskQuestion):
     if post is not hub.sim.post:
         raise PlanError("report_reset", "Simulation reset during answer; ask again", 409)
     return result  # private HTTP reply; no screen-wide report broadcast
+
+
+@app.get("/api/rescue-order")
+async def ordered_rescues():
+    if os.environ.get("DZ_RESCUE_ORDER") != "1":
+        raise PlanError("feature_disabled", "Enable DZ_RESCUE_ORDER=1 for a rescue-order dry run", 409)
+    return rescue_order(hub.sim.post, hub.sim.time, hub.sim.prior)
 
 
 @app.post("/api/control")
