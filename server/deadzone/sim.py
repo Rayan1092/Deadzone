@@ -23,6 +23,7 @@ from .robot.perception import get_detector
 from .robot.planning import dilate
 from .robot.robot import BATTERY_TIME_SCALE, PEER_FRESH_S, Robot
 from .sensors import THERMAL_FOV, THERMAL_RANGE, camera_config
+from .thermal import heat_spots, thermal_metadata
 
 DT = 0.1
 ROBOT_RADIUS_M = 0.30
@@ -105,6 +106,10 @@ class RobotIO:
         spots = list(self.sim.fp.data.get("survivors", []))
         if get_detector().mode == "model":
             spots.extend(self.sim.fp.data.get("decoys", []))
+        if self.sim.heat_sources_enabled:
+            survivor_ids = {s["id"] for s in self.sim.fp.data.get("survivors", [])}
+            spots = [dict(s, kind="survivor" if s["id"] in survivor_ids else "decoy") for s in spots]
+            spots.extend(self.sim.heat_spots)
         for s in spots:
             sx, sy = s["pos"]
             d = math.dist((b["x"], b["y"]), (sx, sy))
@@ -114,7 +119,8 @@ class RobotIO:
             if abs(bearing) > THERMAL_FOV / 2:
                 continue
             if self.sim.line_of_sight((b["x"], b["y"]), (sx, sy)):
-                out.append({"id": s["id"], "pos": (sx, sy), "crop": s.get("thermal"), "conf": 0.99})
+                out.append({"id": s["id"], "pos": (sx, sy), "crop": s.get("thermal"), "conf": 0.99,
+                            **(thermal_metadata(s) if self.sim.heat_sources_enabled else {})})
         self.sim.counters["thermal_hits"] += len(out)
         return out
 
@@ -143,6 +149,8 @@ class Sim:
         np.random.seed(self.seed)
         self.fp = FloorPlan.load(self.plan_path)
         self.prior = FloorPlan(self.fp.planning_data())
+        self.heat_sources_enabled = os.environ.get("DZ_HEAT_SOURCES") == "1"
+        self.heat_spots = heat_spots(self.fp, self.seed) if self.heat_sources_enabled else []
         if self.smart_rubble_on:
             default = "162.5" if self.fp.data.get("id") == "collapse_01" else "0"
             at = float(os.environ.get("DZ_COLLAPSE_AT", default).strip() or "0")
