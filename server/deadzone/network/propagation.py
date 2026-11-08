@@ -116,3 +116,21 @@ def coverage_map(fp, src, tx=20.0, step=1.0):
         for i, x in enumerate(xs):
             out[j, i] = rssi(fp, src, (x, y), tx)
     return out
+
+
+def rssi_grid(fp, src, tx=20.0):
+    """The same wall-crossing model at every map cell center.
+
+    Broadcast one row against the wall segments at a time, keeping temporary
+    arrays bounded rather than allocating cells x walls for the entire map.
+    This is a prediction utility; it never reads or changes LinkGraph state.
+    """
+    cx, cy = fp.cell_centers()
+    out = np.empty((fp.h, fp.w), dtype=float)
+    for j in range(fp.h):
+        points = np.column_stack((cx[j], cy[j]))
+        d = np.maximum(np.linalg.norm(points - src, axis=1), 1.0)
+        walls = count_crossings(src, points.T[:, :, None], fp.segs)
+        wall_loss = walls @ fp.seg_loss if len(fp.segs) else 0.0
+        out[j] = tx - (L0_DB + 10 * PATH_EXP * np.log10(d) + wall_loss)
+    return out

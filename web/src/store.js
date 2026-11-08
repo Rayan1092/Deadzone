@@ -33,7 +33,7 @@ function readView() {
 // Command doesn't know yet drawn on it (Version 2 plan). M toggles.
 export function setView(view) {
   try { localStorage.setItem('dz-view', view) } catch { /* storage blocked: session only */ }
-  useSim.getState().set({ view })
+  useSim.getState().set({ view, insetSwap: false })
 }
 
 // K key: night operations lighting (dark interior, headlights, emergency lights). Off by
@@ -105,6 +105,7 @@ export const useSim = create((set) => ({
   shot: null,          // { caption, at } of the director's current shot
   night: readNight(),  // night operations lighting is the default scene; K switches to day
   perf: readPerf(),    // P key: lighter rendering for a slow demo laptop (remembered per browser)
+  insetSwap: false,   // C key, one view only: the Command post inset and the main view swap places
   view: readView(),    // M key: 'split' (two panes) or 'gap' (one view + Command gap), remembered
   layout: readLayout(), // E key: 'judge' (map first, chrome on hover) or 'full'
   recorder: null,      // ?record: { frames, ms, bytes } of the captured stream

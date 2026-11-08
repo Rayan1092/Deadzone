@@ -1,0 +1,63 @@
+{
+ "machine": {
+  "cpu": "AMD Ryzen 7 6800H with Radeon Graphics",
+  "logical_cores": 16,
+  "os": "Windows-11-10.0.26200-SP0",
+  "onnxruntime": "1.31.1",
+  "torch": "2.6.0+cu124"
+ },
+ "model": {
+  "file": "ml/models/detector.onnx",
+  "bytes": 6089232,
+  "input": "crop: N x 3 x 96 x 96",
+  "output": "logits: N x 2",
+  "threshold": 0.6,
+  "opset": 17
+ },
+ "match": {
+  "judge pool (40)": {
+   "n": 40,
+   "max_abs_diff": 5.185604095458984e-06,
+   "same_verdicts": 40
+  },
+  "demo crops (6)": {
+   "n": 6,
+   "max_abs_diff": 4.470348358154297e-07,
+   "same_verdicts": 6
+  },
+  "FLIR held-out (1200)": {
+   "n": 1200,
+   "max_abs_diff": 9.715557098388672e-06,
+   "same_verdicts": 1200
+  }
+ },
+ "latency_batch1": {
+  "onnxruntime, 1 thread": {
+   "mean_ms": 0.52,
+   "median_ms": 0.499,
+   "p95_ms": 0.622
+  },
+  "PyTorch, 1 thread": {
+   "mean_ms": 4.352,
+   "median_ms": 4.319,
+   "p95_ms": 4.592
+  },
+  "onnxruntime, 4 threads": {
+   "mean_ms": 0.384,
+   "median_ms": 0.364,
+   "p95_ms": 0.5
+  },
+  "PyTorch, 4 threads": {
+   "mean_ms": 4.796,
+   "median_ms": 4.514,
+   "p95_ms": 5.96
+  }
+ },
+ "budget": {
+  "perception_period_ms": 500,
+  "perception_budget_ms": 40,
+  "crops_per_budget_onnx_1_thread_here": 80
+ },
+ "runs": 1000,
+ "warmup": 50
+}

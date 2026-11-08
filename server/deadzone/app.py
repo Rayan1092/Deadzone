@@ -432,7 +432,7 @@ class Hub:
     def phone_view(self):
         # Do not call snapshot() here: phones need no Reality objects at all.
         return self.sim.post.view(self.sim.time) | {
-            "map": base64.b64encode(self.sim.post.map.tobytes()).decode()}
+            "map": base64.b64encode(self.sim.post.map.tobytes()).decode()} | self.sim.post.coverage()
 
     async def check_plan(self, plan_id, epoch=None):
         async with self.plan_lock:

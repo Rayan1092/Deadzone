@@ -17,7 +17,7 @@ export const KEYS = [
   ['Space', 'start / pause'], ['1–3', 'follow robot (or click its card)'], ['0', 'overview'],
   ['R', 'rubble ahead of the robot'], ['F', 'wheel overcurrent'], ['O', 'perception overload'],
   ['U', 'resume after safe stop'], ['A', 'aftershock at a random spot (server needs DZ_AFTERSHOCK=1)'], ['⇧A', 'strong aftershock: three areas, two relays'], ['N', 'new random building (Q&A)'], ['⇧N', 'back to the main building'], ['B', 'baseline: robots without Deadzone (with control leases on: Unlock first)'], ['L', 'AI Lab: how the detector was trained'], ['K', 'night operations lighting'], ['D', 'auto camera (director)'], ['V', "robot's camera"], ['G', 'briefing'], ['T', 'truth overlay'],
-  ['M', 'one view / split view'], ['Y', 'belief map: where survivors may still be'], ['E', 'judge layout / all panels (sidebar, scheduler, legends)'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
+  ['M', 'one view / split view'], ['C', 'one view: swap the Command post inset and the main view'], ['Y', 'belief map: where survivors may still be'], ['E', 'judge layout / all panels (sidebar, scheduler, legends)'], ['X', 'sound cues on / off'], ['P', 'performance mode'], ['Q', 'phone join QR'], ['S', 'save recording (?record)'],
   ['J', 'judge test (Q&A)'], ['I', 'under the hood (Q&A)'],
   ['+ / −', 'speed'], ['⌫', 'reset'], ['?', 'this list'],
 ]
@@ -292,6 +292,10 @@ export function useKeyboard() {
       if (key === 'v' && target) s.set({ eyeRobot: s.eyeRobot === target.id ? null : target.id })
       if (key === 'p') setPerf(!s.perf)
       if (key === 'm') toggleView()
+      if (key === 'c' && !e.repeat) {
+        if (s.view === 'gap') s.set({ insetSwap: !s.insetSwap })
+        else s.set({ toasts: [...s.toasts, { kind: 'note', msg: 'C swaps the Command post inset in one view: press M first', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
+      }
       if (key === 'y') { const on = !s.beliefOn; try { localStorage.setItem('dz-belief', on ? '1' : '0') } catch { /* session only */ } s.set({ beliefOn: on }) }
       if (key === 'e') setLayout(s.layout === 'judge' ? 'full' : 'judge')
       if (key === 'x') {
