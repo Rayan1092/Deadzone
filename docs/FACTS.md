@@ -60,4 +60,16 @@ Every number we say on stage, with the file in this repo it comes from. If it ca
 
 ## Slide assets
 
-`docs/assets/`: `training_curve.png`, `calibration.png`, `confusion_matrix.png`, `crops_grid.png`, `pipeline.png`, `stats_card.png`, `benchmark.png`, `benchmark_v2.png`, `benchmark_published.png`. Rebuild with `py ml/make_slide_assets.py` (see its docstring for which script owns which image).
+All in `docs/assets/`, rebuilt with `py ml/make_slide_assets.py` (`--only <section>` to pick):
+
+| Image | Shows | Section / source data |
+|---|---|---|
+| `training_curve.png` | loss and accuracy per epoch, training vs held-out | `curve`, `ml/results/train_history.json` |
+| `calibration.png` | reliability diagram, street and indoor | `calibration`, replot of `ml/results/calibration.json` (`py ml/calibration.py` scores) |
+| `confusion_matrix.png` | 1,200 held-out FLIR crops at threshold 0.6 | `confusion`, copied from `ml/results/` (`py ml/eval.py`) |
+| `benchmark_v2.png` | Deadzone vs baseline across the radio sweep | `benchmark`, `py ml/benchmark_v2.py --replot` |
+| `benchmark_published.png` | the same at NIST / ITU-R values | `benchmark`, `py ml/benchmark_published.py --replot` |
+| `gradcam_strip.png` | the six demo hot spots: crop, Grad-CAM, verdict and score | `gradcam`, `ml/crops/runtime/manifest.json` (`py ml/gradcam.py`) |
+| `stats_card.png` | accuracy / precision / recall card | `stats`, `ml/results/metrics.json` |
+| `crops_grid.png`, `pipeline.png` | held-out examples and the pipeline diagram | `crops`; needs the FLIR val split and the SDT frames, so it is rebuilt on the testing laptop |
+| `benchmark.png` | the first (v1) benchmark | `py ml/benchmark.py`, kept for the record; say v2 numbers |
