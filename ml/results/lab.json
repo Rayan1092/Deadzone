@@ -3,7 +3,7 @@
   "name": "MobileNetV3-Small",
   "input_px": 96,
   "params": 1519906,
-  "onboard_ms": 6.6,
+  "onboard_ms": 4.7,
   "size_mb": 6.2,
   "threshold": 0.6,
   "trained_on": "FLIR ADAS v2 thermal, person vs not-person 96 px crops"
@@ -31,56 +31,92 @@
    ]
   ]
  },
- "curve": [],
- "curve_note": "Training curve pending: logged retrain not run yet.",
+ "curve": [
+  {
+   "epoch": 1,
+   "train_loss": 0.3901,
+   "val_loss": 0.6683,
+   "train_acc": 0.7974,
+   "val_acc": 0.815
+  },
+  {
+   "epoch": 2,
+   "train_loss": 0.1309,
+   "val_loss": 0.247,
+   "train_acc": 0.9465,
+   "val_acc": 0.9183
+  },
+  {
+   "epoch": 3,
+   "train_loss": 0.0819,
+   "val_loss": 0.1524,
+   "train_acc": 0.9689,
+   "val_acc": 0.945
+  },
+  {
+   "epoch": 4,
+   "train_loss": 0.0641,
+   "val_loss": 0.1,
+   "train_acc": 0.9754,
+   "val_acc": 0.965
+  },
+  {
+   "epoch": 5,
+   "train_loss": 0.0522,
+   "val_loss": 0.087,
+   "train_acc": 0.9787,
+   "val_acc": 0.9683
+  }
+ ],
+ "curve_note": "Curve of the shipped model (logged retrain, promoted because it scored equal or better).",
  "examples": [
   {
    "file": "lab/pos_01.png",
    "label": "person",
    "predicted": "person",
-   "conf": 1.0
+   "conf": 0.992
   },
   {
    "file": "lab/pos_02.png",
    "label": "person",
    "predicted": "person",
-   "conf": 0.99
+   "conf": 0.996
   },
   {
    "file": "lab/pos_03.png",
    "label": "person",
    "predicted": "person",
-   "conf": 1.0
+   "conf": 0.998
   },
   {
    "file": "lab/pos_04.png",
    "label": "person",
-   "predicted": "not person",
-   "conf": 0.0
+   "predicted": "person",
+   "conf": 0.996
   },
   {
    "file": "lab/pos_05.png",
    "label": "person",
    "predicted": "person",
-   "conf": 1.0
+   "conf": 0.821
   },
   {
    "file": "lab/pos_06.png",
    "label": "person",
-   "predicted": "not person",
-   "conf": 0.333
+   "predicted": "person",
+   "conf": 1.0
   },
   {
    "file": "lab/pos_07.png",
    "label": "person",
    "predicted": "person",
-   "conf": 1.0
+   "conf": 0.998
   },
   {
    "file": "lab/pos_08.png",
    "label": "person",
    "predicted": "person",
-   "conf": 1.0
+   "conf": 0.818
   },
   {
    "file": "lab/pos_09.png",
@@ -92,25 +128,25 @@
    "file": "lab/pos_10.png",
    "label": "person",
    "predicted": "person",
-   "conf": 1.0
+   "conf": 0.981
   },
   {
    "file": "lab/pos_11.png",
    "label": "person",
    "predicted": "person",
-   "conf": 0.998
+   "conf": 1.0
   },
   {
    "file": "lab/pos_12.png",
    "label": "person",
    "predicted": "person",
-   "conf": 0.996
+   "conf": 0.993
   },
   {
    "file": "lab/neg_01.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.001
+   "conf": 0.0
   },
   {
    "file": "lab/neg_02.png",
@@ -127,50 +163,50 @@
   {
    "file": "lab/neg_04.png",
    "label": "not person",
-   "predicted": "person",
-   "conf": 0.967
+   "predicted": "not person",
+   "conf": 0.01
   },
   {
    "file": "lab/neg_05.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.001
+   "conf": 0.0
   },
   {
    "file": "lab/neg_06.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.067
+   "conf": 0.004
   },
   {
    "file": "lab/neg_07.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.004
+   "conf": 0.0
   },
   {
    "file": "lab/neg_08.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.0
+   "conf": 0.177
   },
   {
    "file": "lab/neg_09.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.02
+   "conf": 0.0
   },
   {
    "file": "lab/neg_10.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.0
+   "conf": 0.021
   },
   {
    "file": "lab/neg_11.png",
    "label": "not person",
    "predicted": "not person",
-   "conf": 0.028
+   "conf": 0.0
   },
   {
    "file": "lab/neg_12.png",
