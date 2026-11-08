@@ -712,8 +712,9 @@ class Sim:
                                     "scheduled_t": ev["t"], "reason": str(error)})
 
     def secondary_collapse(self, robot="R1", size=1.4, at=None):
-        """Scenario event `collapse`: rubble at `at`, or 1.5 m ahead of `robot`. When that spot
-        would wall a robot in, the nearest safe spot on the robot's planned path; none: refused."""
+        """Scenario event `collapse`: rubble exactly at `at`, or 1.5 m ahead of `robot` (the old
+        R-key spot). The scenario's author owns the spot: it is never moved (a moved collapse
+        missed S1's rescue route with robot collisions on, rayan.md 23:50)."""
         rid = robot if robot in self.robots else next(iter(self.robots), None)
         if at is None:
             if rid is None:
@@ -722,11 +723,6 @@ class Sim:
             at = (x + math.cos(th) * 1.5, y + math.sin(th) * 1.5)
         s = size / 2
         at = (min(max(at[0], s), self.fp.W - s), min(max(at[1], s), self.fp.H - s))
-        if not self._rubble_is_safe(at, size):
-            spot = self._smart_rubble_spot(rid, size) if rid is not None else None
-            if spot is None:
-                raise ValueError("No collapse spot that keeps every robot's space connected")
-            at = spot
         self.drop_rubble(at, size, cause="collapse", robot=rid)
         return list(at)
 

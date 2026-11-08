@@ -75,7 +75,7 @@
     {"id": "D2", "label": "engine",         "pos": [37.0, 12.0], "thermal": "neg_0002.png"},
     {"id": "D3", "label": "coffee machine", "pos": [22.0, 28.0], "thermal": "neg_0003.png"}
   ],
-  "events": [{"t": 162.5, "type": "collapse", "near": "R1", "label": "secondary collapse on the rescue corridor"}],
+  "events": [{"t": 162.5, "type": "collapse", "near": "R1", "at": [25.31, 15.65], "label": "secondary collapse on the rescue corridor"}],
   "entry": [1.0, 15.0],
   "command_post": {"pos": [-2.0, 15.0], "tx_dbm": 20},
   "obstacles": [
