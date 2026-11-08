@@ -86,9 +86,6 @@ export default function PlanEditor() {
       {mode === 'view' && !zones.length && !noGo.length && (
         <p className="hint">Draw a search zone on the map and assign a robot to it.</p>
       )}
-      {mode === 'view' && !zones.length && noGo.length > 0 && (
-        <p className="hint">No-go areas are shared. Add a search zone to check and dispatch the plan.</p>
-      )}
 
       {[...zones].sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id)).map((z) => (
         <button key={z.id} className={`region-row${z.id === selected ? ' on' : ''}`} style={{ '--c': colors[z.robot] }}

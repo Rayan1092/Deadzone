@@ -18,6 +18,8 @@ _seq = itertools.count(1)
 
 
 def make_bundle(src, dst, kind, payload, created, size, ttl=900.0):
+    if kind == "telemetry" and isinstance(payload, dict) and "camera" in payload:
+        payload = dict(payload, camera=deepcopy(payload["camera"]))
     if kind in ("rescue_route", "command_ack"):
         size = max(size, len(json.dumps(payload, separators=(",", ":")).encode()) + 64)
     return {

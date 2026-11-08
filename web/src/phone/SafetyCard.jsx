@@ -9,7 +9,20 @@ export default function SafetyCard() {
   const checking = usePhone((s) => s.checking)
   const connected = usePhone((s) => s.connected)
   const dispatched = usePhone((s) => s.dispatched)
-  if (!draft?.zones.length) return null
+  const set = usePhone((s) => s.set)
+  // no-go areas travel to robots inside a dispatched plan, and a plan needs a search zone
+  if (!draft?.zones.length) {
+    if (!draft?.no_go?.length) return null
+    return (
+      <section className="m3-card safety">
+        <b>No-go areas are not sent to robots yet</b>
+        <span className="muted small">They reach the robots inside a dispatched plan, and a plan needs at least one search zone. Add a zone, then check and dispatch: the no-go goes with it.</span>
+        <div className="actions">
+          <button className="filled" onClick={() => set({ mode: 'zone', selected: null })}>Add a search zone</button>
+        </div>
+      </section>
+    )
+  }
 
   const result = safety?.plan_id === draft.plan_id ? safety : null
   const robots = [...new Set(draft.zones.map((z) => z.robot))].sort().join(', ')
@@ -48,9 +61,14 @@ export default function SafetyCard() {
             <div><b>{RULE_LABEL[v.rule] ?? v.rule}</b> <span className="muted">{v.robot} · {v.zone}</span></div>
             <div className="small">{v.msg}</div>
             {v.rule === 'comms_plan' && (
-              <button className="text-btn" onClick={() => updateZone(v.zone, { comms: 'lost_link_ok' })}>
-                Allow {v.zone} to go dark
-              </button>
+              <>
+                <div className="small muted">Let {v.robot} go dark there: it keeps searching and reports when it is back in range.</div>
+                {/* one tap: change the zone and run the check again, so the fix is visible */}
+                <button className="filled tonal" disabled={!connected || checking}
+                        onClick={() => { updateZone(v.zone, { comms: 'lost_link_ok' }); checkPlan() }}>
+                  Allow {v.zone} to go dark and check again
+                </button>
+              </>
             )}
           </div>
         ))}

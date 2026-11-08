@@ -81,20 +81,21 @@ function glow(m, color, emissive, k) {
   if (m.toneMapped) { m.toneMapped = false; m.needsUpdate = true }
 }
 
-function tint(m, role, color, linkUp) {
-  if (role === 'led') glow(m, color, color, 2.5)
+function tint(m, role, color, linkUp, powered) {
+  if (!powered && (role === 'led' || role === 'lamp' || role === 'tip')) glow(m, '#2a2f35', '#000000', 0)
+  else if (role === 'led') glow(m, color, color, 2.5)
   else if (role === 'paint') m.color?.set(color)
   else if (role === 'lamp') glow(m, '#ffffff', '#eafcff', 3.2)
   else if (role === 'tip') glow(m, linkUp ? '#4ade80' : '#ef4444', linkUp ? '#22c55e' : '#ef4444', 3)
 }
 
-function applyLook(rig, color, ghost, thermal, linkUp, label) {
+function applyLook(rig, color, ghost, thermal, linkUp, label, powered = true) {
   for (const { mesh, own, role } of rig.parts) {
     if (ghost) { mesh.material = GHOST; continue }
     if (thermal) { mesh.material = HOT; continue }
     if (role === 'tag' && label) { mesh.material = label; continue }
     mesh.material = own
-    for (const m of [].concat(own)) tint(m, role, color, linkUp)
+    for (const m of [].concat(own)) tint(m, role, color, linkUp, powered)
   }
 }
 
@@ -162,12 +163,12 @@ const setRef = (ref, value) => {
   else if (ref) ref.current = value
 }
 
-function GltfRover({ color, tag, ghost = false, thermal = false, sensor, linkUp = true }) {
+function GltfRover({ color, tag, ghost = false, thermal = false, sensor, linkUp = true, powered = true }) {
   const { scene } = useGLTF(MODEL)
   const fit = useMemo(() => fitOf(scene), [scene])
   const rig = useMemo(() => buildRig(scene), [scene])
   const label = tag && !ghost && !thermal ? tagMat(tag) : null
-  useLayoutEffect(() => applyLook(rig, color, ghost, thermal, linkUp, label), [rig, color, ghost, thermal, linkUp, label])
+  useLayoutEffect(() => applyLook(rig, color, ghost, thermal, linkUp, label, powered), [rig, color, ghost, thermal, linkUp, label, powered])
   useLayoutEffect(() => {
     setRef(sensor, rig.spin) // the parent spins whatever this points at
     return () => setRef(sensor, null)

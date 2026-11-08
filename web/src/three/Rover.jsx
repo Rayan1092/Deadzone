@@ -99,6 +99,8 @@ const tips = {
   up: new THREE.MeshStandardMaterial({ color: '#4ade80', emissive: '#22c55e', emissiveIntensity: 3, toneMapped: false }),
   down: new THREE.MeshStandardMaterial({ color: '#ef4444', emissive: '#ef4444', emissiveIntensity: 3, toneMapped: false }),
 }
+// powered down (Rayan's SHUTDOWN, `lights: false`): lamps, LEDs and the link tip go dark
+const UNLIT = new THREE.MeshStandardMaterial({ color: '#2a2f35', roughness: 0.6, metalness: 0.2 })
 const decals = new Map()
 function decal(tag) {
   if (!decals.has(tag)) {
@@ -110,14 +112,15 @@ function decal(tag) {
   return decals.get(tag)
 }
 
-export default function Rover({ color, tag, ghost = false, thermal = false, sensor, linkUp = true }) {
+export default function Rover({ color, tag, ghost = false, thermal = false, sensor, linkUp = true, powered = true }) {
   const B = baseMats()
   const C = colorMats(color)
   const M = useMemo(() => {
     const one = ghost ? B.ghost : thermal ? B.hot : null
     if (one) return new Proxy({}, { get: () => one })
+    if (!powered) return { ...B, ...C, lamp: UNLIT, bar: UNLIT, led: UNLIT, tip: UNLIT }
     return { ...B, ...C, tip: linkUp ? tips.up : tips.down }
-  }, [B, C, ghost, thermal, linkUp])
+  }, [B, C, ghost, thermal, linkUp, powered])
   const label = tag && !ghost && !thermal ? decal(tag) : null
   return (
     <group>
