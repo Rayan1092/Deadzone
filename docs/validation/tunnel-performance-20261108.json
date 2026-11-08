@@ -1,0 +1,371 @@
+{
+  "paint": [
+    {
+      "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/?nointro&lite=0",
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 504
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 1204
+        }
+      ],
+      "resources": [
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-tERCIjSy.css",
+          "transfer": 11367,
+          "encoded": 11067
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-BjWm1fhZ.js",
+          "transfer": 46741,
+          "encoded": 46441
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/BigScreen-Cr6E4ynv.js",
+          "transfer": 544867,
+          "encoded": 544567
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/socket-DJGv_MqT.js",
+          "transfer": 12252,
+          "encoded": 11952
+        }
+      ],
+      "phase": "before",
+      "cache": "cold",
+      "trial": 0
+    },
+    {
+      "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/?nointro&lite=0",
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 3164
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 3364
+        }
+      ],
+      "resources": [
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-BjWm1fhZ.js",
+          "transfer": 46741,
+          "encoded": 46441
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-tERCIjSy.css",
+          "transfer": 11367,
+          "encoded": 11067
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/BigScreen-Cr6E4ynv.js",
+          "transfer": 544867,
+          "encoded": 544567
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/socket-DJGv_MqT.js",
+          "transfer": 12252,
+          "encoded": 11952
+        }
+      ],
+      "phase": "before",
+      "cache": "cold",
+      "trial": 1
+    },
+    {
+      "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/?nointro&lite=0",
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 248
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 272
+        }
+      ],
+      "resources": [
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-BjWm1fhZ.js",
+          "transfer": 0,
+          "encoded": 46441
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-tERCIjSy.css",
+          "transfer": 0,
+          "encoded": 11067
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/BigScreen-Cr6E4ynv.js",
+          "transfer": 0,
+          "encoded": 544567
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/socket-DJGv_MqT.js",
+          "transfer": 0,
+          "encoded": 11952
+        }
+      ],
+      "phase": "before",
+      "cache": "warm",
+      "trial": 2
+    },
+    {
+      "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/?nointro&lite=0",
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 148
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 204
+        }
+      ],
+      "resources": [
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-BjWm1fhZ.js",
+          "transfer": 0,
+          "encoded": 46441
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-tERCIjSy.css",
+          "transfer": 0,
+          "encoded": 11067
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/BigScreen-Cr6E4ynv.js",
+          "transfer": 0,
+          "encoded": 544567
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/socket-DJGv_MqT.js",
+          "transfer": 0,
+          "encoded": 11952
+        }
+      ],
+      "phase": "before",
+      "cache": "warm",
+      "trial": 3
+    },
+    {
+      "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/?nointro&lite=0",
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 728
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 1396
+        }
+      ],
+      "resources": [
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-DiZG0lvn.js",
+          "transfer": 46835,
+          "encoded": 46535
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-tERCIjSy.css",
+          "transfer": 11464,
+          "encoded": 11164
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/BigScreen-zlHAnYqO.js",
+          "transfer": 546016,
+          "encoded": 545716
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/socket-CR_ShNJQ.js",
+          "transfer": 12443,
+          "encoded": 12143
+        }
+      ],
+      "phase": "after",
+      "cache": "cold",
+      "trial": 0
+    },
+    {
+      "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/?nointro&lite=0",
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 2472
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 2616
+        }
+      ],
+      "resources": [
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-DiZG0lvn.js",
+          "transfer": 46835,
+          "encoded": 46535
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-tERCIjSy.css",
+          "transfer": 11464,
+          "encoded": 11164
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/BigScreen-zlHAnYqO.js",
+          "transfer": 546016,
+          "encoded": 545716
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/socket-CR_ShNJQ.js",
+          "transfer": 12443,
+          "encoded": 12143
+        }
+      ],
+      "phase": "after",
+      "cache": "cold",
+      "trial": 1
+    },
+    {
+      "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/?nointro&lite=0",
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 1448
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 1524
+        }
+      ],
+      "resources": [
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-DiZG0lvn.js",
+          "transfer": 0,
+          "encoded": 46535
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-tERCIjSy.css",
+          "transfer": 0,
+          "encoded": 11164
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/BigScreen-zlHAnYqO.js",
+          "transfer": 0,
+          "encoded": 545716
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/socket-CR_ShNJQ.js",
+          "transfer": 0,
+          "encoded": 12143
+        }
+      ],
+      "phase": "after",
+      "cache": "warm",
+      "trial": 2
+    },
+    {
+      "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/?nointro&lite=0",
+      "paint": [
+        {
+          "name": "first-paint",
+          "ms": 200
+        },
+        {
+          "name": "first-contentful-paint",
+          "ms": 272
+        }
+      ],
+      "resources": [
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-DiZG0lvn.js",
+          "transfer": 0,
+          "encoded": 46535
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/index-tERCIjSy.css",
+          "transfer": 0,
+          "encoded": 11164
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/BigScreen-zlHAnYqO.js",
+          "transfer": 0,
+          "encoded": 545716
+        },
+        {
+          "url": "https://ant-unions-anatomy-distinction.trycloudflare.com/assets/socket-CR_ShNJQ.js",
+          "transfer": 0,
+          "encoded": 12143
+        }
+      ],
+      "phase": "after",
+      "cache": "warm",
+      "trial": 3
+    }
+  ],
+  "stream": [
+    {
+      "phase": "before",
+      "lite": false,
+      "seconds": 60.02,
+      "messages_s": 36.07,
+      "app_bytes_s": 381462,
+      "ws_frame_bytes_s": 380423,
+      "ticks": 1201,
+      "lidar_points": 36
+    },
+    {
+      "phase": "before",
+      "lite": true,
+      "seconds": 60.02,
+      "messages_s": 36.07,
+      "app_bytes_s": 381462,
+      "ws_frame_bytes_s": 380423,
+      "ticks": 1201,
+      "lidar_points": 36
+    },
+    {
+      "phase": "after",
+      "lite": true,
+      "seconds": 60.02,
+      "messages_s": 25.28,
+      "app_bytes_s": 80357,
+      "ws_frame_bytes_s": 80457,
+      "ticks": 600,
+      "lidar_points": 0
+    },
+    {
+      "phase": "after",
+      "lite": false,
+      "seconds": 60.02,
+      "messages_s": 35.27,
+      "app_bytes_s": 173303,
+      "ws_frame_bytes_s": 173103,
+      "ticks": 1200,
+      "lidar_points": 36
+    }
+  ],
+  "origin": "https://ant-unions-anatomy-distinction.trycloudflare.com",
+  "method": {
+    "baseline_commit": "c0f6f9a",
+    "protocol": "http2",
+    "same_tunnel": true,
+    "stream_seconds": 60,
+    "seed": 7,
+    "robots": 3,
+    "speed": 2,
+    "wire_definition": "WebSocket frame bytes received after TLS decryption; excludes TLS/IP overhead.",
+    "browser": "Chrome headless, Intel Arc B390 / D3D11, 1638x1000",
+    "cold_trials": 2,
+    "warm_trials": 2,
+    "phone_frame_source": false
+  },
+  "limitations": [
+    "Baseline already served web/dist, not Vite; both used four startup JS/CSS resources.",
+    "The public WebSocket path negotiated no compression extension; localhost negotiated PerMessageDeflate.",
+    "Cold-paint timings are noisy; warm-after had one slow HTML navigation despite zero JS/CSS transfer. No instant-paint guarantee.",
+    "Screenshots were compared visually with lite=0; map decoding and drawn lidar equivalence are covered by tests. Lite deliberately omits lidar."
+  ]
+}

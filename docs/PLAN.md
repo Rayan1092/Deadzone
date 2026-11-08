@@ -555,6 +555,29 @@ instrumentation totals and do not copy undelivered facts into Command.
 | server to screen | `report` | after `/api/report` | `text`, `generated_at` |
 | screen to server | `control` | keyboard and buttons | `action`: `start`, `pause`, `reset`, `speed`, `director` + `value`; **`rubble` + `robot`** (`{t:"control", data:{action:"rubble", robot:"R2"}}`, REST `POST /api/control {action:"rubble", robot:"R2"}`: the R key on the followed robot, missing `robot` means R1; with `DZ_SMART_RUBBLE=1` the rubble lands on that robot's planned path 3-4 m ahead at a spot that traps nobody, otherwise 1.5 m ahead of it) |
 
+#### Remote observer profile (`/ws/screen?lite`)
+
+A screen may opt into `?lite` or `?lite=1` (combine with `map_deltas=1`).
+`lite=0` / `lite=false` retain the complete profile. Lite changes only that
+connection: every other periodic tick is omitted, and each delivered tick has
+`reality.robots[].lidar: []`. Initial and forced snapshots are immediate; maps,
+map patches, events, errors and control receipts keep their existing cadence.
+The simulation, phone telemetry, safety and other screen connections are unchanged.
+Lite hello messages add `screen_profile: {lite:true,tick_stride:2,lidar_max_points:0}`.
+The web selects lite for public HTTPS origins, retaining full rate on localhost
+and private LAN addresses. Page `?lite` forces it; page `?lite=0` overrides the
+automatic selection. Reconnects retain the page's choice. Full local rendering
+keeps the same map cells and drawn lidar endpoints with compact streaming on.
+
+#### Production HTTP delivery
+
+The server serves `web/dist` at `/`; Vite is for local development only.
+HTTP responses of at least 1000 bytes negotiate gzip. Vite-generated hashed
+files directly under `/assets/` have `Cache-Control: public, max-age=31536000,
+immutable`, including 304 responses. HTML entry points revalidate (`no-cache`),
+and unhashed models/textures and API responses do not gain immutable caching.
+WebSocket frames use their own negotiated compression, independent of HTTP gzip.
+
 #### Optional RSSI field (`DZ_COVERAGE_GRID`, default off)
 
 When `DZ_COVERAGE_GRID=1` at CommandPost construction/reset, screen `maps.data`
@@ -575,10 +598,10 @@ are cached until the delivered source positions/on states change. It is absent
 from per-tick `command` and AI tools. With the flag off the field is absent and
 no prediction work occurs. Frontend rendering is a separate follow-up.
 
-#### Compact screen maps (`DZ_COMPACT_STREAM`, default off)
+#### Compact screen maps (`DZ_COMPACT_STREAM`, default on)
 
-At Hub construction, `DZ_COMPACT_STREAM=1` enables lossless map deltas for screens
-that advertise `/ws/screen?map_deltas=1`. The web advertises this only when native
+At Hub construction, unset `DZ_COMPACT_STREAM` (or `=1`) enables lossless map deltas for screens
+that advertise `/ws/screen?map_deltas=1`. Set `DZ_COMPACT_STREAM=0` to opt out. The web advertises this only when native
 `DecompressionStream` is available; ordinary clients and the flag-off server keep
 the existing base64 `maps` messages. Phones do not receive this screen protocol.
 This gate does not enable the older `DZ_STREAM_OPTIMIZE` tick-rate cap. Tick/event

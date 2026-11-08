@@ -23,6 +23,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
@@ -47,6 +48,8 @@ from .public_text import PublicText
 from .network.dtn import make_bundle
 from .network.stream import StreamState, compact_message, stream_profile, thin_tick
 from .network.map_delta import DRAWN_LIDAR_POINTS, MapDeltaState
+from .network.lite import LiteScreen
+from .web_assets import ProductionFiles
 from .scenarios import ResetScenario, prepare_scenario, scenario_catalog
 
 MAPS_EVERY = 5
@@ -82,8 +85,9 @@ class Hub:
         self.seq = 0
         self.stream = StreamState(enabled=os.environ.get("DZ_STREAM_OPTIMIZE") == "1")
         self.compact_clients = set()
-        self.compact_stream = os.environ.get("DZ_COMPACT_STREAM") == "1"
+        self.compact_stream = os.environ.get("DZ_COMPACT_STREAM", "1") == "1"
         self.delta_screens = {}
+        self.lite_screens = {}
         self.plan_lock = asyncio.Lock()  # survives reset: old publications finish first
         self.lease_lock = asyncio.Lock()
         self.leases = LeaseTable(self.sim.robots)
@@ -110,20 +114,25 @@ class Hub:
         return json.dumps({"t": t, "seq": self.seq, "time": self.sim.time, "data": display},
                           separators=(",", ":"))
 
-    async def send_all(self, clients, msg):
+    async def send_all(self, clients, msg, *, force_tick=False):
         dead = []
-        compact = None
+        compact = {}
         for ws in list(clients):
             try:
                 wire = msg
+                if ws in self.lite_screens:
+                    wire = self.lite_screens[ws].transform(wire, initial=force_tick)
+                    if wire is None:
+                        continue
                 if ws in self.delta_screens:
-                    wire = self.delta_screens[ws].transform(msg)
+                    wire = self.delta_screens[ws].transform(wire)
                     if wire is None:
                         continue
                 elif ws in self.compact_clients:
-                    if compact is None:
-                        compact = compact_message(msg)
-                    wire = compact
+                    profile = ws in self.lite_screens
+                    if profile not in compact:
+                        compact[profile] = compact_message(wire)
+                    wire = compact[profile]
                 await ws.send_text(wire)
             except Exception:
                 dead.append(ws)
@@ -131,8 +140,11 @@ class Hub:
             clients.discard(ws)
             self.compact_clients.discard(ws)
             self.delta_screens.pop(ws, None)
+            self.lite_screens.pop(ws, None)
 
     async def send_one(self, ws, msg):
+        if ws in self.lite_screens:
+            msg = self.lite_screens[ws].transform(msg, initial=True)
         if ws in self.delta_screens:
             msg = self.delta_screens[ws].transform(msg)
         elif ws in self.compact_clients:
@@ -398,7 +410,7 @@ class Hub:
 
     async def publish_paused_relay_view(self):
         if not self.running:
-            await self.send_all(self.screens, self.envelope("tick", self.screen_snapshot()))
+            await self.send_all(self.screens, self.envelope("tick", self.screen_snapshot()), force_tick=True)
 
     async def plan_state(self, state):
         message = self.envelope("plan_state", state)
@@ -509,7 +521,7 @@ class Hub:
 
     async def broadcast_tick(self, force_maps=False):
         if self.stream.tick_due(force_maps):
-            await self.send_all(self.screens, self.envelope("tick", self.screen_snapshot()))
+            await self.send_all(self.screens, self.envelope("tick", self.screen_snapshot()), force_tick=force_maps)
         if force_maps or self.sim.tick_n % MAPS_EVERY == 0:
             maps = self.screen_maps()
             if self.stream.maps_due(maps, force_maps):
@@ -687,6 +699,7 @@ class PublicJSONResponse(JSONResponse):
 
 app = FastAPI(title="Deadzone sim", lifespan=lifespan, default_response_class=PublicJSONResponse)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 
 
 def validation_issues(error):
@@ -948,10 +961,12 @@ async def control(body: dict, request: Request):
 
 
 @app.websocket("/ws/screen")
-async def ws_screen(ws: WebSocket, compact: bool = False, map_deltas: bool = False):
+async def ws_screen(ws: WebSocket, compact: bool = False, map_deltas: bool = False, lite: str | None = None):
     if not await hub.accept_socket(ws, compact):
         return
     hub.screens.add(ws)
+    if lite is not None and lite.lower() not in ("0", "false"):
+        hub.lite_screens[ws] = LiteScreen()
     if map_deltas and hub.compact_stream:
         hub.delta_screens[ws] = MapDeltaState(hub.plan_epoch)
     hub.register_controller(ws, "screen")
@@ -983,6 +998,7 @@ async def ws_screen(ws: WebSocket, compact: bool = False, map_deltas: bool = Fal
         hub.screens.discard(ws)
         hub.compact_clients.discard(ws)
         hub.delta_screens.pop(ws, None)
+        hub.lite_screens.pop(ws, None)
         await hub.disconnect_controller(ws)
 
 
@@ -1036,7 +1052,7 @@ def phone_page():
     index = WEB_DIST / "index.html"
     if not index.exists():
         raise HTTPException(503, "Build the frontend or use the Vite frontend address")
-    return FileResponse(index)
+    return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/mic-check", include_in_schema=False)
@@ -1054,4 +1070,4 @@ app.mount("/ai-lab/slides", AILabAssets(directory=REPO_DIR / "docs" / "assets"),
 
 
 if WEB_DIST.exists():
-    app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")
+    app.mount("/", ProductionFiles(directory=WEB_DIST, html=True), name="web")
