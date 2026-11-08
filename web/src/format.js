@@ -12,6 +12,7 @@ export const STATE_LABEL = {
   GOING_TO_POINT: 'Going to point',
   HOLDING: 'Holding',
   WAITING_FOR_LINK: 'No link, waiting', // baseline mode: no Deadzone, the robot stops until it hears CMD
+  SHUTDOWN: 'Back at command, powered down', // Rayan's SHUTDOWN after DONE
 }
 
 export const FAULT_LABEL = {
@@ -66,6 +67,10 @@ export function describeEvent(e) {
     case 'relay_destroyed': return `Relay ${e.id} destroyed${e.lost_bundles ? `, ${e.lost_bundles} bundles lost with it` : ''}`
     case 'control_error': return e.code === 'feature_disabled' ? 'Aftershock is off: start the server with DZ_AFTERSHOCK=1' : e.msg
     case 'note': return e.msg
+    case 'robot_shutdown': return `${e.robot} back at command, ${(e.found ?? []).length} survivor${(e.found ?? []).length === 1 ? '' : 's'} found, powered down`
+    case 'robot_contact': return `${e.a} and ${e.b} bumped into each other and stopped`
+    case 'command_received': return `${e.robot} got the ${String(e.cmd).replace(/_/g, ' ')} command: ${e.say}`
+    case 'command_ack_reported': return `${e.robot}'s answer reached command: ${e.status} ${String(e.cmd).replace(/_/g, ' ')}${e.delay_s != null ? ` (${e.delay_s}s)` : ''}`
     case 'plan_dispatched': return `Plan ${e.plan_id} dispatched to the robots`
     case 'plan_applied': return `${e.robot} is following ${e.plan_id}${e.zones?.length ? ` (${e.zones.join(', ')})` : ''}`
     case 'resumed': return `${e.robot} resumed after safe stop`

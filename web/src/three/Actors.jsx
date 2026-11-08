@@ -30,7 +30,7 @@ function Headlight() {
 }
 
 
-function RobotBody({ pose, color, tag, ghost = false, label, sub, headlight = true, linkUp = true }) {
+function RobotBody({ pose, color, tag, ghost = false, label, sub, headlight = true, linkUp = true, powered = true }) {
   const perf = useSim((s) => s.perf)
   const group = useRef()
   const sensor = useRef()
@@ -47,21 +47,21 @@ function RobotBody({ pose, color, tag, ghost = false, label, sub, headlight = tr
     d = Math.atan2(Math.sin(d), Math.cos(d))
     yaw.current += d * Math.min(1, dt * 10)
     g.rotation.y = yaw.current
-    if (sensor.current && !ghost) sensor.current.rotation.y += dt * 6
+    if (sensor.current && !ghost && powered) sensor.current.rotation.y += dt * 6
   })
 
   return (
     <group ref={group} position={target.current.toArray()}>
       <group scale={ROBOT_SCALE}>
-        {!ghost && (
+        {!ghost && powered && (
           // colored pool of light under the robot so it reads from across the room
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
             <circleGeometry args={[0.42, 32]} />
             <meshBasicMaterial color={color} transparent opacity={0.22} blending={THREE.AdditiveBlending} depthWrite={false} />
           </mesh>
         )}
-        <RoverModel color={color} tag={tag} ghost={ghost} sensor={sensor} linkUp={linkUp} />
-        {!ghost && headlight && !perf && <Headlight />}
+        <RoverModel color={color} tag={tag} ghost={ghost} sensor={sensor} linkUp={linkUp} powered={powered} />
+        {!ghost && headlight && powered && !perf && <Headlight />}
       </group>
       {label && (
         <Html position={[0, 0.8 * ROBOT_SCALE, 0]} center zIndexRange={[1, 0]} style={{ pointerEvents: 'none' }}>
@@ -354,8 +354,10 @@ export function RealityActors({ gap = false }) {
     <group>
       {robots.map((r) => (
         <group key={r.id}>
-          <RobotBody pose={r.pose} color={r.color} tag={r.id} label={r.name} sub={r.link.up ? null : 'no link'} linkUp={r.link.up} />
-          <Lidar robot={r} />
+          {/* Rayan's SHUTDOWN: back at command, powered down (lights, lidar and camera off) */}
+          <RobotBody pose={r.pose} color={r.color} tag={r.id} label={r.name} linkUp={r.link.up} powered={r.lights !== false}
+                     sub={r.state === 'SHUTDOWN' ? 'powered down' : r.link.up ? null : 'no link'} />
+          {r.lights !== false && <Lidar robot={r} />}
           {r.path.length > 1 && (
             <Line points={[[r.pose[0], 0.06, -r.pose[1]], ...r.path.map(([px, py]) => [px, 0.06, -py])]}
                   color={r.color} lineWidth={1.2} dashed dashSize={0.25} gapSize={0.15} transparent opacity={0.45} />

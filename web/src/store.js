@@ -5,7 +5,8 @@ import { alarm, chime, confirm, ping, rumble } from './audio'
 // fire too often and stay in the sidebar feed or the timeline.
 const TOAST_KINDS = new Set(['survivor_found', 'survivor_reported', 'link_lost', 'link_restored',
   'relay_dropped', 'fault', 'rubble_fall', 'safety_reject', 'plan_dispatched', 'plan_applied', 'resumed',
-  'rescue_route', 'rescue_route_reported', 'aftershock', 'relay_destroyed', 'mode_changed', 'rescue_route_blocked'])
+  'rescue_route', 'rescue_route_reported', 'aftershock', 'relay_destroyed', 'mode_changed', 'rescue_route_blocked',
+  'robot_shutdown', 'robot_contact', 'command_ack_reported'])
 const COLLAPSE_KINDS = new Set(['replan', 'deadline_miss'])
 // Deliveries worth an antenna pulse; telemetry and map patches arrive several times a second.
 const BIG_DELIVERIES = new Set(['survivor', 'rescue_route', 'fault'])
