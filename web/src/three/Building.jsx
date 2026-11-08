@@ -5,7 +5,7 @@ import { WALL_H, w2t } from './util'
 import { materials, tiledSet } from './textures'
 import Baked from './Baked'
 import Debris from './Debris'
-import { CommandPost, GasLeak, Interior, Lot } from './Props'
+import { Ambulance, CommandPost, GasLeak, Interior, Lot } from './Props'
 import { CollapseLive, CollapseStatic, WallDetails, holedWallGeometry, wallDamage } from './Collapse'
 import { DisasterLive, DisasterStatic } from './Disaster'
 import FracturedWalls from './Fracture'
@@ -306,6 +306,7 @@ export default function Building({ thermal = false, blueprint = false, props = t
         {!blueprint && <Debris rubble={props ? fp.rubble ?? NO_RUBBLE : staticRubble(fp)} cold={thermal} />}
         {props && !blueprint && <Interior fp={fp} cold={thermal} />}
         {!blueprint && <CommandPost pos={[cx, cy]} entry={fp.entry} cold={thermal} />}
+        {damage && !lite && <Ambulance fp={fp} cold={thermal} />}
         {damage && <WallDamageLayer walls={fp.walls} damage={damage} />}
         {damage && <CollapseStatic fp={fp} />}
         {damage && <DisasterStatic fp={fp} outside={!lite} />}
