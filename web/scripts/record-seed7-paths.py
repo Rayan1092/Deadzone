@@ -1,5 +1,5 @@
-"""Record every robot's path in the main run (the demo guard's exact replay: seed 7, 3 robots,
-DZ_OBSTACLES=1, DZ_SMART_RUBBLE=1, plan P-1 fixed to lost_link_ok, F at 177.5 s, O at 187.5 s)
+"""Record every robot's path in the main run (the demo guard's exact replay: seed 7, 3 robots, the
+guard's FLAGS, plan P-1 fixed to lost_link_ok, its director presses, the floor plan's scenario events)
 into web/tests/fixtures/seed7-paths.json, for the web test that no visual-only prop in
 collapse_01 sits on a path a robot drives (the picture must never show a robot phasing).
 
@@ -13,9 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "server"))
 sys.path.insert(0, str(ROOT / "server" / "tests"))
-os.environ.update({"DZ_OBSTACLES": "1", "DZ_SMART_RUBBLE": "1"})
 
 import test_demo_guard as guard  # noqa: E402  (FLAGS, DIRECTOR, demo_plan: one source)
+os.environ.update(guard.FLAGS)   # the main run's environment, whatever the guard says it is today
 from deadzone.command.plan import PlanManager, SearchPlan  # noqa: E402
 from deadzone.command.safety import SafetyChecker  # noqa: E402
 from deadzone.robot import perception  # noqa: E402

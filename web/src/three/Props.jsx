@@ -393,7 +393,7 @@ function Decoys({ fp, M }) {
   return decoyLayout(fp).map((d) => {
     const Obj = DECOY[d.label]
     // each decoy's temperature for the thermal camera (thermal.jsx): hot, which is why the AI must judge it
-    return Obj ? <At key={d.id} x={d.pos[0]} y={d.pos[1]} rot={d.rot}><group userData={{ thermalTemp: DECOY_TEMP[d.label] ?? 50 }}><Obj M={M} /></group></At> : null
+    return Obj ? <At key={d.id} x={d.pos[0]} y={d.pos[1]} rot={d.rot}><group scale={d.scale ?? 1} userData={{ thermalTemp: DECOY_TEMP[d.label] ?? 50 }}><Obj M={M} /></group></At> : null
   })
 }
 
