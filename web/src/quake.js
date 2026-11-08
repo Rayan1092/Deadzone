@@ -175,3 +175,6 @@ export function pickAftershock(s) {
   }
   return {}
 }
+
+// The truth-grid helpers, shared with the obstacle export (scripts/export-obstacles.mjs).
+export { fillPoly, flood, nearest, rasterSegment, traversable, truthGrid }
