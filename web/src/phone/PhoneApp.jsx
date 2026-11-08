@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FAULT_LABEL, STATE_LABEL, fmtClock } from '../format'
+import { FAULT_LABEL, fmtClock, robotStateLabel } from '../format'
 import { usePhone } from './store'
 import { connectPhone, roleFromUrl } from './socket'
 import { forkDispatched } from './plan'
@@ -97,7 +97,7 @@ function RobotList() {
         </div>
         {r ? (
           <>
-            <div className="robot-state">{STATE_LABEL[r.state] ?? r.state}</div>
+            <div className="robot-state">{robotStateLabel(r)}</div>
             {r.plan_id && (
               <div className="following small">Following {r.plan_id}{r.zone ? ` · zone ${r.zone}` : ''} (last report)</div>
             )}
@@ -141,6 +141,20 @@ function Survivors() {
   ))
 }
 
+// The server refused a plan: a red banner that stays until it is tapped, so it cannot be missed.
+function RefusalBanner() {
+  const refusal = usePhone((s) => s.refusal)
+  const set = usePhone((s) => s.set)
+  if (!refusal) return null
+  return (
+    <button className="refusal-banner" role="alert" onClick={() => set({ refusal: null })}>
+      <b>Plan refused</b>
+      <span>{refusal.msg}</span>
+      <small>Tap to dismiss</small>
+    </button>
+  )
+}
+
 function Snackbar() {
   const error = usePhone((s) => s.error)
   const [shown, setShown] = useState(null)
@@ -173,6 +187,7 @@ function Shell({ role }) {
         <span className={`chip ${connected ? 'ok' : 'bad'}`}>{connected ? 'Live' : 'Offline'}</span>
       </header>
 
+      <RefusalBanner />
       {role === 'relay' && <RelayPanel />}
 
       <section className="m3-card map-card">

@@ -13,6 +13,16 @@ export const STATE_LABEL = {
   HOLDING: 'Holding',
   WAITING_FOR_LINK: 'No link, waiting', // baseline mode: no Deadzone, the robot stops until it hears CMD
   SHUTDOWN: 'Back at command, powered down', // Rayan's SHUTDOWN after DONE
+  WAITING: 'Holding: no-go blocks all routes', // Rayan's P0: a no-go left nothing reachable; it resumes when the no-go changes
+}
+
+// A robot's state in judge words. Holding because a no-go left it nothing reachable says so,
+// so it reads as obeying the responders, not as a frozen robot.
+export const NO_GO_HOLD = 'Holding: no-go blocks all routes'
+export function robotStateLabel(r) {
+  if (!r) return ''
+  if (r.state === 'WAITING' || /no reachable area/i.test(r.plan_state ?? '')) return NO_GO_HOLD
+  return STATE_LABEL[r.state] ?? r.state
 }
 
 export const FAULT_LABEL = {
