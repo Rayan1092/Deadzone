@@ -145,7 +145,8 @@ class Sim:
                          "lidar_scans": 0, "lidar_rays": 0, "thermal_scans": 0, "thermal_hits": 0,
                          "drive_calls": 0}
         self.links = LinkGraph()
-        self.network = DTNNetwork(fec_enabled=os.environ.get("DZ_FEC") == "1", seed=self.seed)
+        self.network = DTNNetwork(fec_enabled=os.environ.get("DZ_FEC") == "1", seed=self.seed,
+                                  trace_enabled=os.environ.get("DZ_NETWORK_TRAFFIC") == "1")
         self.network.register("CMD")
         self.relays = {}
         self.relay_revisions = {}
@@ -369,7 +370,9 @@ class Sim:
 
     def _move_bundles(self, dt):
         """Only destination deliveries may update a consumer's knowledge."""
-        for bundle in self.network.step(self.links, dt, self.time):
+        arrivals = self.network.step(self.links, dt, self.time)
+        self.events.extend(self.network.drain_events())
+        for bundle in arrivals:
             if bundle["dst"] == "CMD":
                 if self.post.receive(bundle, self.time):
                     self.events.append({"kind": "bundle_delivered",
@@ -420,6 +423,8 @@ class Sim:
             link["fec"] = bool(self.network.fec_enabled and link["up"] and -88 <= self.links.link_rssi(*edge) <= -80)
         relays = [dict(relay, queue=len(self.network.queues[rid])) for rid, relay in self.relays.items()]
         reality = {"robots": robots, "relays": relays, "links": links, "survivors_found": found}
+        if self.network.trace_enabled:
+            reality["queues"] = self.network.queue_view()
         stats = {"robots": len(self.robots), "relays": len(relays),
                  "links_up": sum(1 for l in links if l["up"]),
                  "delivered": self.post.delivered, "in_flight": sum(map(len, self.network.queues.values()))}
