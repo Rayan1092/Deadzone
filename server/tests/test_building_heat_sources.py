@@ -47,3 +47,15 @@ def test_generated_buildings_place_heat_sources_without_random_draws():
     data = generate.generate(2)
     assert data["heat_sources"] == generate.place_heat_sources(data)
     assert sorted(s["type"] for s in data["heat_sources"]) == sorted(HEAT_TYPES)
+
+
+@pytest.mark.parametrize("name", BUILDINGS)
+def test_user_facing_text(name):
+    """Deployment data pass (Rayan, 2026-11-09): the screen shows names, never file ids."""
+    data = json.loads((ROOT / "data" / "floorplans" / f"{name}.json").read_text(encoding="utf-8"))
+    assert data["name"] and data["description"] and "_" not in data["name"] and data["name"] != data["id"]
+    assert len(data["description"]) <= 220 and "\n" not in data["description"]
+    for s in data["survivors"]:
+        assert s["id"].startswith("S") and s["descriptor"] and len(s["descriptor"]) <= 60
+    for e in data.get("events", []) + data.get("timeline", []):
+        assert e.get("label"), f"{name}: every scripted event has banner text"

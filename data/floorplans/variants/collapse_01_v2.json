@@ -1,6 +1,7 @@
 {
  "id": "collapse_01_v2",
- "name": "Eastside Warehouse Collapse, variant 2",
+ "name": "Riverside Block C, variant 2",
+ "description": "Riverside Block C with the people moved: same walls and damage, survivors and warm decoys in new places, one survivor still deep in the steel dead zone",
  "size": [
   40,
   30
@@ -672,6 +673,7 @@
  "survivors": [
   {
    "id": "S1",
+   "descriptor": "Crouched low in the steel storage cage",
    "pos": [
     38.88,
     22.88
@@ -680,6 +682,7 @@
   },
   {
    "id": "S2",
+   "descriptor": "Kneeling, bent over in Office B",
    "pos": [
     16.88,
     17.62
@@ -688,6 +691,7 @@
   },
   {
    "id": "S3",
+   "descriptor": "Partly hidden in the storage",
    "pos": [
     9.12,
     9.62
