@@ -327,9 +327,11 @@ def floorplan():
 
 
 @app.post("/api/plan")
-async def save_plan(plan: SearchPlan):
+async def save_plan(plan: SearchPlan, check: bool = True):
     state = hub.plans.save(plan)
     await hub.plan_state(state)
+    if not check:
+        return {"saved": True, "plan_id": plan.plan_id, "checked": False}
     return await hub.check_plan(plan.plan_id)
 
 

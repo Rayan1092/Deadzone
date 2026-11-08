@@ -109,8 +109,8 @@ $p1 = '{"plan_id":"P-1","author":"judge-phone","lost_link_budget_s":60,"no_go":[
  {"id":"ZW","robot":"R1","priority":1,"comms":"relay","poly":[[0,17],[20,17],[20,30],[0,30]]},
  {"id":"ZNE","robot":"R2","priority":1,"comms":"relay","poly":[[32,17],[40,17],[40,30],[32,30]]},
  {"id":"ZB","robot":"R3","priority":1,"comms":"relay","poly":[[20,17],[32,17],[32,30],[20,30]]}]}'
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/plan -ContentType application/json -Body $p1
-# rejected with comms_plan for ZNE
+Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:8000/api/plan?check=false' -ContentType application/json -Body $p1
+# saved quietly; the judge's Run safety check produces the first ZNE rejection
 
 $p2 = $p1.Replace('"P-1"', '"P-2"').Replace('"ZNE","robot":"R2","priority":1,"comms":"relay"', '"ZNE","robot":"R2","priority":1,"comms":"lost_link_ok"')
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/plan -ContentType application/json -Body $p2
