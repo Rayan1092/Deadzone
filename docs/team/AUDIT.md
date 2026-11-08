@@ -21,13 +21,13 @@ Owners: `web/src/three/` = Yusuf, `web/src/panels/` = rayan-ml (testing laptop),
 | 11 | `web/src/panels/JudgeTest.jsx:78` | Footnote "MobileNetV3-Small · val split · recorded model results from the export. This panel does not run new inference.": "val split", "export", "inference" | rayan-ml | fixed (rayan-ml/audit-panels) |
 | 12 | `web/src/panels/UnderHood.jsx:32` | Footnote "Missing detector/deadline counters stay marked as awaiting their export.": developer note | rayan-ml | fixed (rayan-ml/audit-panels) |
 | 13 | `web/src/format.js:80` | Event line "Aftershock is off: start the server with DZ_AFTERSHOCK=1": flag name | Yusuf | done (p3/copy: "Aftershocks aren't switched on for this run.") |
-| 14 | `web/src/phone/RobotControl.jsx:96` | Phone: "Hold, Return home and Explore need DZ_VOICE=1.": flag name | Aziz | open |
-| 15 | `web/src/phone/AskCard.jsx:13-14` | Phone: "Gemini needs an API key configured on the server", "The server's Gemini model setting needs fixing.": setup detail for a judge's phone; "Ask is not available right now" reads better, keep the detail for the operator | Aziz | open |
-| 16 | `server/deadzone/app.py:161,224,523,604,821,916` | Error texts "Enable DZ_CONTROL_LEASES=1 ...", "Enable DZ_VOICE=1 ...", "Enable DZ_SCENARIO_TIMELINE=1 ...", "Enable DZ_AFTERSHOCK=1 for an aftershock dry run", "Enable DZ_CRDT=1 ...", "Enable DZ_RESCUE_ORDER=1 ...": these reach screens and phones verbatim (e.g. the A key toast); flag names and "dry run" | Aziz | open |
-| 17 | `server/deadzone/scenarios.py:100` | "Enable DZ_AFTERSHOCK=1 for this disaster timeline": flag name | Aziz | open |
-| 18 | `server/deadzone/app.py:885,888` | "Set DZ_PUBLIC_URL to ...": shown when the join link fails (Join overlay, `panels/JoinPanel.jsx:16` displays `detail` as is) | Aziz | open |
-| 19 | `server/deadzone/app.py:200` | "Presenter credential required": "presenter" (the screen says Operator lock / console) | Aziz | open |
-| 20 | `server/deadzone/command/leases.py:90,126` | "{robot} is controlled by {name}": `name` is the raw client label (e.g. "judge-phone", "Presenter"); the screen maps labels to "Field unit N" / "Console", this message does not | Aziz | open |
+| 14 | `web/src/phone/RobotControl.jsx:96` | Phone: "Hold, Return home and Explore need DZ_VOICE=1.": flag name | Aziz | fixed (#186) |
+| 15 | `web/src/phone/AskCard.jsx:13-14` | Phone: "Gemini needs an API key configured on the server", "The server's Gemini model setting needs fixing.": setup detail for a judge's phone; "Ask is not available right now" reads better, keep the detail for the operator | Aziz | fixed (#186) |
+| 16 | `server/deadzone/app.py:161,224,523,604,821,916` | Error texts "Enable DZ_CONTROL_LEASES=1 ...", "Enable DZ_VOICE=1 ...", "Enable DZ_SCENARIO_TIMELINE=1 ...", "Enable DZ_AFTERSHOCK=1 for an aftershock dry run", "Enable DZ_CRDT=1 ...", "Enable DZ_RESCUE_ORDER=1 ...": these reach screens and phones verbatim (e.g. the A key toast); flag names and "dry run" | Aziz | fixed (#191) |
+| 17 | `server/deadzone/scenarios.py:100` | "Enable DZ_AFTERSHOCK=1 for this disaster timeline": flag name | Aziz | fixed (#191) |
+| 18 | `server/deadzone/app.py:885,888` | "Set DZ_PUBLIC_URL to ...": shown when the join link fails (Join overlay, `panels/JoinPanel.jsx:16` displays `detail` as is) | Aziz | fixed (#191) |
+| 19 | `server/deadzone/app.py:200` | "Presenter credential required": "presenter" (the screen says Operator lock / console) | Aziz | fixed (#191) |
+| 20 | `server/deadzone/command/leases.py:90,126` | "{robot} is controlled by {name}": `name` is the raw client label (e.g. "judge-phone", "Presenter"); the screen maps labels to "Field unit N" / "Console", this message does not | Aziz | fixed (#191) |
 | 41 | `web/src/panels/AILab.jsx:243` | Model Lab without results: "Test results not served: start the server with DZ_AI_LAB=1.": flag name (missed in the first pass) | rayan-ml | fixed (rayan-ml/audit-panels) |
 
 ## Wording, grammar, consistency
@@ -46,17 +46,17 @@ Owners: `web/src/three/` = Yusuf, `web/src/panels/` = rayan-ml (testing laptop),
 | 30 | `web/src/panels/AILab.jsx:200` | Crop caption "model: person 100%" starts lowercase, the rest of the panel is sentence case | rayan-ml | fixed (rayan-ml/audit-panels) |
 | 31 | `web/src/panels/JudgeTest.jsx:66` vs `AILab.jsx` | Two captions for the same kind of image: "Real thermal camera image, Teledyne FLIR dataset: the same input ..." (Model test) and "Real FLIR thermal frame, same input as the AI" (Model Lab) | rayan-ml | fixed (rayan-ml/audit-panels) |
 | 32 | `web/src/panels/UnderHood.jsx:9` | "FEC blocks that failed": abbreviation; "Error-correction blocks that failed" | rayan-ml | fixed (rayan-ml/audit-panels) |
-| 33 | `server/deadzone/app.py:472,944,500,557,599` | "Expected an envelope with object data", "Unsupported phone message: {kind}", "mode and value must agree" (lowercase), "Director value must use do, not type": protocol wording if it ever reaches a screen | Aziz | open |
-| 34 | `server/deadzone/command/frames.py:61` | "Expected a valid base64 JPEG no larger than 320x180 / 128 KiB": protocol wording on the phone camera upload | Aziz | open |
-| 35 | `web/src/phone/zones.js:22` | Fallback "the server did not accept this plan": fine, but lowercase after a colon while other phone errors are sentences | Aziz | open |
+| 33 | `server/deadzone/app.py:472,944,500,557,599` | "Expected an envelope with object data", "Unsupported phone message: {kind}", "mode and value must agree" (lowercase), "Director value must use do, not type": protocol wording if it ever reaches a screen | Aziz | fixed (#191) |
+| 34 | `server/deadzone/command/frames.py:61` | "Expected a valid base64 JPEG no larger than 320x180 / 128 KiB": protocol wording on the phone camera upload | Aziz | fixed (#191) |
+| 35 | `web/src/phone/zones.js:22` | Fallback "the server did not accept this plan": fine, but lowercase after a colon while other phone errors are sentences | Aziz | fixed (#191) |
 
 ## Missing or confusing states
 
 | # | Where | Problem | Owner | Status |
 |---|---|---|---|---|
 | 36 | `web/src/panels/Panels.jsx:104-127` | **Server down:** the big screen keeps every control enabled (Start, speed, Reset, Unlock) and the detector chip still says "AI model"; the only sign is the small "offline" chip. Clicking does nothing, silently. Needs a clear "Server disconnected, reconnecting…" state and disabled controls | rayan-ml | fixed (rayan-ml/audit-panels) |
-| 37 | `web/src/phone/PhoneApp.jsx` (landing) | **Server down:** the phone landing page ("Join the rescue", two buttons) shows no offline state; the Live / Offline chip (`PhoneApp.jsx:187`) only appears after a role is picked | Aziz | open |
-| 38 | `web/src/panels/UnderHood.jsx:29` + `server/deadzone/sim.py:497` | "Detector calls" and "Deadlines met" always read "Awaiting counter": `sim.py` sums them from each robot's telemetry `counters`, but `robot.py:276-280` keeps the counters off telemetry, so the totals never exist | Aziz (sim aggregation) / Rayan (robot telemetry) | open |
+| 37 | `web/src/phone/PhoneApp.jsx` (landing) | **Server down:** the phone landing page ("Join the rescue", two buttons) shows no offline state; the Live / Offline chip (`PhoneApp.jsx:187`) only appears after a role is picked | Aziz | fixed (#186) |
+| 38 | `web/src/panels/UnderHood.jsx:29` + `server/deadzone/sim.py:497` | "Detector calls" and "Deadlines met" always read "Awaiting counter": `sim.py` sums them from each robot's telemetry `counters`, but `robot.py:276-280` keeps the counters off telemetry, so the totals never exist | Aziz (sim aggregation) / Rayan (robot telemetry) | fixed (#190 telemetry; #191 verified totals) |
 | 39 | `web/src/panels/Timeline.jsx:126` | Scheduler status line is an empty string when no robots are reporting yet (no "Waiting for robots") | rayan-ml | fixed (rayan-ml/audit-panels) |
 | 40 | `web/src/panels/JudgeTest.jsx:58` | Tally shows "0 of 0" instead of a prompt before the first round (see #27) | rayan-ml | fixed (rayan-ml/audit-panels) |
 

@@ -26,6 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .ai_lab import AILabAssets
 from .command.plan import EpochPlanRef, PlanDraft, PlanError, PlanManager, PlanRef, SearchPlan
@@ -42,6 +43,7 @@ from .robot.robot import resume_command
 from .robot.perception import CROP_DIR, get_detector
 from .sim import DT, ROBOT_DEFS, Sim
 from .lan import lan_ipv4
+from .public_text import PublicText
 from .network.dtn import make_bundle
 from .network.stream import StreamState, compact_message, stream_profile, thin_tick
 from .network.map_delta import DRAWN_LIDAR_POINTS, MapDeltaState
@@ -99,10 +101,13 @@ class Hub:
         self.command_requests = {}
         self.speech_cache = {}
         self.phone_frames = PhoneFrames(os.environ.get("DZ_PHONE_FRAMES") == "1", self.plan_epoch)
+        self.public_text = PublicText({r.id: r.name for r in self.sim.robots.values()},
+                                      self.sim.prior.data.get("rooms", []), self.plans.saved)
 
     def envelope(self, t, data):
         self.seq += 1
-        return json.dumps({"t": t, "seq": self.seq, "time": self.sim.time, "data": data},
+        display = data if t in {"maps", "map_patch", "plan_state", "leases", "relay_state"} else self.public_text.payload(data)
+        return json.dumps({"t": t, "seq": self.seq, "time": self.sim.time, "data": display},
                           separators=(",", ":"))
 
     async def send_all(self, clients, msg):
@@ -314,7 +319,7 @@ class Hub:
             if post is not self.sim.post:
                 raise PlanError("voice_reset", "Simulation reset during speech", 409)
             if entry["result"] is None:
-                result = await voice_services.speech(ack)
+                result = await voice_services.speech(self.public_text.payload(ack))
                 if post is not self.sim.post:
                     raise PlanError("voice_reset", "Simulation reset during speech", 409)
                 entry["result"] = result
@@ -672,29 +677,44 @@ async def lifespan(app):
             await task
 
 
-app = FastAPI(title="Deadzone sim", lifespan=lifespan)
+class PublicJSONResponse(JSONResponse):
+    def render(self, content):
+        return super().render(hub.public_text.payload(content))
+
+
+app = FastAPI(title="Deadzone sim", lifespan=lifespan, default_response_class=PublicJSONResponse)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
 def validation_issues(error):
     # Do not echo arbitrary input, NaN or non-serializable validator contexts.
-    return [{"loc": list(issue["loc"]), "msg": issue["msg"]} for issue in error.errors()]
+    friendly = {"missing": "Complete the missing value and try again.",
+                "extra_forbidden": "This update contains an unsupported setting.",
+                "string_pattern_mismatch": "This name contains unsupported characters.",
+                "json_invalid": "The update could not be read. Please try again."}
+    return [{"loc": list(issue["loc"]), "msg": friendly.get(issue["type"], issue["msg"])} for issue in error.errors()]
 
 
 @app.exception_handler(PlanError)
 async def plan_error(request, error):
-    return JSONResponse(status_code=error.status, content={"detail": {"code": error.code, "msg": str(error)}})
+    return PublicJSONResponse(status_code=error.status, content={"detail": {"code": error.code, "msg": str(error)}})
 
 
 @app.exception_handler(RequestValidationError)
 async def request_error(request, error):
-    return JSONResponse(status_code=422, content={"detail": {"code": "invalid_request",
+    return PublicJSONResponse(status_code=422, content={"detail": {"code": "invalid_request",
                         "msg": "Request validation failed", "issues": validation_issues(error)}})
 
 
 @app.exception_handler(ValidationError)
 async def control_validation_error(request, error):
     return await request_error(request, error)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request, error):
+    detail = {404: "This page or resource is unavailable.", 405: "This action is unavailable on this page."}.get(error.status_code, error.detail)
+    return PublicJSONResponse(status_code=error.status_code, content={"detail": detail}, headers=error.headers)
 
 
 @app.post("/api/frames/{robot_id}")

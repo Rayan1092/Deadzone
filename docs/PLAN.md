@@ -526,6 +526,24 @@ Two WebSockets carry everything live: `/ws/screen` for the big screen and `/ws/p
 {"t": "tick", "seq": 812, "time": 81.2, "data": {}}
 ```
 
+Public display strings (`msg`, `say`, report `text`, `plan_state` and
+`detector_reason`) use sentence-case English and public robot/area names at the
+HTTP/WebSocket presentation boundary. Error `code`, `rule`, `reason` enums,
+identifiers, positions, timestamps and all envelope/response shapes are unchanged.
+Safety messages retain the real violation values and outcomes; only their prose
+is formatted. Planning, robot telemetry and stored acknowledgements stay intact.
+Maps, geometry and camera bytes bypass text formatting. The same formatting is
+applied to delivered acknowledgement speech before synthesis.
+
+Robot telemetry now includes cumulative `counters` from #190:
+`{detector_calls, detector_rejections, deadlines_met, deadlines_missed,
+scheduler_deadlines_met}`. The scheduler-prefixed key aliases `deadlines_met`.
+Screen `tick.stats` sums `detector_calls`, `detector_rejections` and
+`scheduler_deadlines_met` across complete robot reports. A total is omitted if
+any robot's value is missing or invalid; no zero is invented. These are Reality
+instrumentation totals and do not copy undelivered facts into Command.
+
+
 ### Big screen: `WS /ws/screen`
 
 | Direction | `t` | When | `data` |
