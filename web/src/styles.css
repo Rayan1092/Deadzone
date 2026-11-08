@@ -781,3 +781,11 @@ button:hover { border-color: var(--teal); }
 .intro-foot .intro-hint { margin: 0; }
 .intro-never { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: rgba(230,237,243,.8); cursor: pointer; }
 .intro-never input { accent-color: #2dd4bf; width: 15px; height: 15px; }
+
+/* the phone camera relay's hidden canvas: rendered and read back, never shown */
+.frame-relay { position: fixed; left: -400px; top: 0; width: 320px; height: 180px; pointer-events: none; opacity: 0; }
+
+/* W: predicted radio coverage legend (Coverage.jsx), two words over a strong-to-dead gradient */
+.coverage-legend { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(230,237,243,.85); }
+.coverage-legend i { width: 60px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #2dd4bf, #f59e0b 50%, #ef4444); opacity: .85; }
+.coverage-legend.in-inset { margin-left: 8px; font-size: 12px; }

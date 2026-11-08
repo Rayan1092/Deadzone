@@ -36,7 +36,8 @@ Optional configuration belongs in **server/.env**. Copy [server/.env.example](se
 | `DZ_SPEED` | Simulation speed | 2 |
 | `DZ_FLOORPLAN` | Building | `collapse_01` |
 | `DZ_AI_LAB=1` | Enable Model Lab | Off |
-| `DZ_PHONE_FRAMES=1` | Share the scout camera with linked phones | Off |
+| `DZ_PHONE_FRAMES=1` | Share scout camera views with linked phones | Off |
+| `DZ_COVERAGE_GRID=1` | Predicted Command radio coverage, toggled with W | Off |
 | `DZ_CONTROL_LEASES=1` | Enable robot control locks | Off |
 | `DZ_VOICE=1` | Additional robot instructions and optional speech | Off |
 | `DZ_GEMINI=1` | Optional briefing and questions with `GEMINI_API_KEY` | Off |

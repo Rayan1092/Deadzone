@@ -100,7 +100,7 @@ P-1 starts with ZNE set to `relay`. The safety checker rejects it, and that reje
 
 | Key | Action | Status |
 |---|---|---|
-| Space | start / pause | live |
+| Space | start / pause. The page opens on the street shot outside the building; the first Space dives into the building and starts the run | live |
 | Backspace | reset to seed 7, paused | live |
 | `+` / `-` | sim speed ×2 / ÷2 | live |
 | 1–3 / 0 | follow robot 1–3 (or click its card) / back to overview. Command follows the robot's last *reported* pose | live |
@@ -126,7 +126,7 @@ REST fallbacks if a key misbehaves: F `Invoke-RestMethod -Method Post -Uri http:
 
 ## Beat sheet
 
-Space is pressed at **0:40**. Times after it come from the demo guard's headless seed-7 run (`server/tests/test_demo_guard.py`: P-1 rejected, fixed, dispatched; `DZ_OBSTACLES=1`, `DZ_ROBOT_COLLISIONS=1`, `DZ_SMART_RUBBLE=1`; the scenario event in `collapse_01.json`, a collapse on S1's route at 162.5; F / O at sim 177.5 / 187.5). Clock = 0:40 + sim seconds / 1.5. They are exact until the first director key is pressed. Re-check them at every rehearsal and update this table and the guard together if they drift.
+Space is pressed at **0:40**. The mission clock is in the top bar. Times after it come from the demo guard's headless seed-7 run (`server/tests/test_demo_guard.py`: P-1 rejected, fixed, dispatched; `DZ_OBSTACLES=1`, `DZ_ROBOT_COLLISIONS=1`, `DZ_SMART_RUBBLE=1`; the scenario event in `collapse_01.json`, a collapse on S1's route at 162.5; F / O at sim 177.5 / 187.5). Clock = 0:40 + sim seconds / 1.5. They are exact until the first director key is pressed. Re-check them at every rehearsal and update this table and the guard together if they drift.
 
 | Clock | After Space (sim s) | On screen | Who | What to say |
 |---|---|---|---|---|

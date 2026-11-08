@@ -5,6 +5,7 @@ import { Html } from '@react-three/drei'
 import Line from './FastLine' // drei's Line relinks its shader on every new points array
 import { useSim } from '../store'
 import Building from './Building'
+import CoverageLayer, { CoverageLegend } from './Coverage'
 import { w2t } from './util'
 import { latestRoutes, lastContact, CONTACT_STALE_S, freshDelivery } from '../format'
 
@@ -174,6 +175,7 @@ export default function CommandInset({ big = false }) {
       <div className="inset-head">
         <i className="dot command" />
         <b>Command post</b><span>· knows only what was delivered</span>
+        <CoverageLegend className="in-inset" />
         <button type="button" className="inset-swap" onClick={swap}
                 title={big ? 'Back to the building view (C)' : 'Show the command post view full screen (C)'}>⇄ <kbd>C</kbd></button>
       </div>
@@ -192,6 +194,7 @@ export default function CommandInset({ big = false }) {
         <color attach="background" args={['#081325']} />
         <ambientLight intensity={1.1} />
         <CommandMap />
+        <CoverageLayer />
         <Building blueprint />
         <Known />
         <TopDown big={big} />

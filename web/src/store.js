@@ -3,6 +3,7 @@ import { useRef } from 'react'
 import { alarm, chime, confirm, ping, rumble } from './audio'
 import { lostFleet, newerTable } from './net/leaseState'
 import { pushTraffic, resetTraffic } from './net/traffic'
+import { inflate } from './net/mapStream'
 import { SCENARIO_TAG, isScenarioEvent, polyCenter, radioFailBanner, rubbleBanner, scheduledScenario } from './format'
 
 // Events worth a toast on the big screen. replan, deadline_miss and deliveries
@@ -19,6 +20,7 @@ const BIG_DELIVERIES = new Set(['survivor', 'rescue_route', 'fault'])
 const SKIP_KINDS = new Set(['link_up', 'link_down', 'bundle_delivered'])
 let eventId = 0
 let planSavedAt = 0
+let coverageData = null // last coverage payload decoded
 const PRELOAD_WINDOW_MS = 1000
 export const FOCUS_HOLD_MS = 12000 // how long the robot camera stays on a judged hot spot
 
@@ -74,6 +76,7 @@ export const useSim = create((set) => ({
   time: 0,
   tick: null,          // { reality, command, stats }
   maps: { reality: null, command: null, version: 0, commandVersion: 0, belief: null, beliefCommand: null, missing: null, beliefVersion: 0 }, // commandVersion: only when Command's map changed
+  coverageOn: false,   // W: predicted radio coverage on the Command side (off by default)
   beliefOn: (() => { try { return localStorage.getItem('dz-belief') === '1' } catch { return false } })(), // Y: belief heat layer
   events: [],          // newest first, capped
   toasts: [],          // { id, kind, ... } oldest first, removed by Toasts after a few seconds
@@ -200,6 +203,16 @@ export function handleMessage(msg) {
       break
     }
     case 'maps': {
+      // Aziz's predicted Command coverage (DZ_COVERAGE_GRID): zlib int8 dBm; decoded once per change
+      if (data.coverage?.data && data.coverage.data !== coverageData) {
+        coverageData = data.coverage.data
+        const { w, h, cell, sources } = data.coverage
+        inflate(data.coverage.data).then((bytes) => {
+          if (coverageData !== data.coverage.data || bytes.length !== w * h) return
+          const st = useSim.getState()
+          st.set({ maps: { ...st.maps, coverage: { w, h, cell, sources, grid: new Int8Array(bytes.buffer, bytes.byteOffset, bytes.length) } } })
+        }).catch(() => { /* a bad frame: keep the last one */ })
+      }
       // the Command pane redraws only when its own map changed (maps arrive several times a second)
       const command = decodeMap(data.command)
       const old = s.maps.command
@@ -213,7 +226,8 @@ export function handleMessage(msg) {
       s.set({ maps: { reality: decodeMap(data.reality), command, version: s.maps.version + 1,
                       commandVersion: same && (sameB || !s.beliefOn) ? s.maps.commandVersion : s.maps.commandVersion + 1,
                       belief, beliefCommand, missing: data.missing ?? null,
-                      beliefVersion: belief || beliefCommand ? s.maps.beliefVersion + 1 : s.maps.beliefVersion } })
+                      beliefVersion: belief || beliefCommand ? s.maps.beliefVersion + 1 : s.maps.beliefVersion,
+                      coverage: useSim.getState().maps.coverage ?? null } })
       break
     }
     case 'event': {
