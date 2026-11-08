@@ -1,0 +1,162 @@
+"""Demo guard: replays the docs/DEMO.md demo and fails if any beat moves.
+
+Seed 7, 3 robots, plan P-1 (rejected: R2's north-east zone is a dead zone) then fixed to
+lost_link_ok and dispatched after the startup tick, exactly like the phone beat. Director
+presses at the DEMO.md times: R (rubble ahead of R1) at 150 s, F (overcurrent on R3) at 165 s,
+O (perception overload on R1) at 175 s.
+
+If you change robot, network or floor plan behavior and a beat moves, this fails on purpose.
+Re-measure, update the BEATS table below AND docs/DEMO.md together, and tell the team.
+"""
+import math
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from deadzone.command.plan import PlanManager, SearchPlan  # noqa: E402
+from deadzone.command.safety import SafetyChecker  # noqa: E402
+from deadzone.robot import perception  # noqa: E402
+from deadzone.sim import Sim  # noqa: E402
+
+TOL = 0.25            # seconds of sim time (2 ticks); any real change moves a beat further
+
+# Sim-time beats from docs/DEMO.md (keep both in sync)
+BEATS = {
+    "S3_found": 14.4,       # R1, linked
+    "D1_rejected": 56.7,    # R1, trained model only (decoys are off in sim fallback)
+    "RL1_dropped": 57.1,    # R3
+    "R2_dark": 119.1,       # R2 enters the steel cage
+    "S1_found": 129.0,      # R2, dark, beacon next to the survivor
+    "S1_reported": 143.1,   # S1 + rescue route reach Command
+    "S2_found": 246.0,      # bonus, only with R/F/O on time
+}
+DIRECTOR = {150.0: ("rubble", "R1"), 165.0: ("overcurrent", "R3"), 175.0: ("overload", "R1")}
+END = 250.0
+
+ZW = [[0, 17], [20, 17], [20, 30], [0, 30]]
+ZB = [[20, 17], [32, 17], [32, 30], [20, 30]]
+ZNE = [[32, 17], [40, 17], [40, 30], [32, 30]]
+
+
+def demo_plan(plan_id, ne_comms):
+    return {"plan_id": plan_id, "author": "judge-phone", "lost_link_budget_s": 60, "no_go": [], "zones": [
+        {"id": "ZW", "robot": "R1", "priority": 1, "comms": "relay", "poly": ZW},
+        {"id": "ZNE", "robot": "R2", "priority": 1, "comms": ne_comms, "poly": ZNE},
+        {"id": "ZB", "robot": "R3", "priority": 1, "comms": "relay", "poly": ZB}]}
+
+
+@pytest.fixture(scope="module")
+def run():
+    perception.reset_detector()
+    sim = Sim(n_robots=3, seed=7)
+    sim.tick()                                     # startup tick: Command hears the robots
+    plans = PlanManager(sim, SafetyChecker(sim.prior, sim.robot_specs, sim.energy_time_scale))
+    plans.save(SearchPlan.model_validate(demo_plan("P-1", "relay")))
+    rejected = plans.check("P-1")
+    plans.save(SearchPlan.model_validate(demo_plan("P-1", "lost_link_ok")))   # "Allow ZNE to go dark"
+    accepted = plans.check("P-1")
+    dispatched = plans.dispatch("P-1")
+    log = []
+    while sim.time < END:
+        act = DIRECTOR.get(round(sim.time, 1))
+        if act:
+            name, rid = act
+            r = sim.robots[rid]
+            if name == "rubble":
+                x, y, th = r.pose
+                sim.drop_rubble((x + math.cos(th) * 1.5, y + math.sin(th) * 1.5))
+            elif name == "overcurrent":
+                r.inject_overcurrent()
+            else:
+                r.inject_perception_overload()
+        sim.tick()
+        log += [(round(sim.time, 1), e) for e in sim.drain_events()]
+    return {"sim": sim, "log": log, "rejected": rejected, "accepted": accepted, "dispatched": dispatched,
+            "detector": perception.get_detector().mode}
+
+
+def first(log, pred):
+    return next(((t, e) for t, e in log if pred(e)), (None, None))
+
+
+def at(beat, t):
+    assert t is not None, f"{beat} never happened"
+    assert abs(t - BEATS[beat]) <= TOL, f"{beat} moved: {t} s, DEMO.md says {BEATS[beat]} s"
+
+
+def test_safety_beat_rejects_then_accepts(run):
+    assert not run["rejected"]["ok"]
+    assert {(v["robot"], v["zone"], v["rule"]) for v in run["rejected"]["violations"]} == {("R2", "ZNE", "comms_plan")}
+    assert run["accepted"]["ok"] and run["dispatched"]["ok"]
+    applied = {e["robot"] for t, e in run["log"] if e["kind"] == "plan_applied" and t <= 1.0}
+    assert applied == {"R1", "R2", "R3"}
+
+
+def test_s3_found_linked_and_reported_at_once(run):
+    t, e = first(run["log"], lambda e: e["kind"] == "survivor_found" and e["survivor"] == "S3")
+    at("S3_found", t)
+    assert e["robot"] == "R1" and e["linked"]
+    t2, _ = first(run["log"], lambda e: e["kind"] == "survivor_reported" and e["survivor"] == "S3")
+    assert t2 == t
+
+
+def test_radiator_rejected_by_the_model(run):
+    if run["detector"] != "model":
+        pytest.skip("trained model not loaded: decoys are off in sim fallback")
+    t, e = first(run["log"], lambda e: e["kind"] == "hotspot_rejected" and e["id"] == "D1")
+    at("D1_rejected", t)
+    assert e["robot"] == "R1"
+
+
+def test_first_relay(run):
+    t, e = first(run["log"], lambda e: e["kind"] == "relay_dropped")
+    at("RL1_dropped", t)
+    assert e["id"] == "RL1" and e["owner"] == "R3"
+
+
+def test_dark_moment(run):
+    log = run["log"]
+    t_dark, _ = first(log, lambda e: e["kind"] == "link_lost" and e["robot"] == "R2")
+    at("R2_dark", t_dark)
+    t, e = first(log, lambda e: e["kind"] == "survivor_found" and e["survivor"] == "S1")
+    at("S1_found", t)
+    assert e["robot"] == "R2" and not e["linked"] and e["conf"] >= 0.6
+    tb, b = first(log, lambda e: e["kind"] == "relay_dropped" and e.get("beacon_for") == "S1")
+    assert tb == t and b["owner"] == "R2"
+    tr, route = first(log, lambda e: e["kind"] == "rescue_route" and e["survivor"] == "S1")
+    assert tr == t and route["beacon"] == b["id"] and 45 < route["length_m"] < 55
+
+
+def test_s1_reaches_command_late(run):
+    log = run["log"]
+    t, e = first(log, lambda e: e["kind"] == "survivor_reported" and e["survivor"] == "S1")
+    at("S1_reported", t)
+    assert e["delay_s"] >= 10
+    tr, _ = first(log, lambda e: e["kind"] == "rescue_route_reported"
+                  and (e.get("survivor_id") or e.get("survivor")) == "S1")
+    assert tr == t, "the rescue route arrives with the survivor report"
+
+
+def test_director_beats(run):
+    log = run["log"]
+    t = next((t for t, e in log if t >= 150.0 and e["kind"] == "replan" and e["robot"] == "R1"), None)
+    assert t is not None and t <= 151.0, f"R key: R1 replan at {t}"
+    t, e = first(log, lambda e: e["kind"] == "fault" and e["robot"] == "R3")
+    assert t is not None and 165.0 <= t <= 166.0 and e["fault"] == "OVERCURRENT", f"F key: {t} {e}"
+    misses = [t for t, e in log if e["kind"] == "deadline_miss" and e["robot"] == "R1"]
+    assert misses and all(175.0 <= t <= 179.0 for t in misses), f"O key: misses at {misses}"
+    assert not any(e["kind"] == "deadline_miss" and e["task"] == "safety" for _, e in log)
+
+
+def test_s2_bonus(run):
+    t, e = first(run["log"], lambda e: e["kind"] == "survivor_found" and e["survivor"] == "S2")
+    at("S2_found", t)
+    assert e["linked"]
+
+
+def test_no_decoy_ever_reported(run):
+    found = {e["survivor"] for _, e in run["log"] if e["kind"] == "survivor_found"}
+    assert found <= {"S1", "S2", "S3"}
