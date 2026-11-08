@@ -43,3 +43,13 @@ export function overview() {
   shared.src = null
   shared.rev++
 }
+
+// A new layout means a new pane shape: forget the fitted overview so the next pane refits.
+export function resetOverview() {
+  shared.pos.set(20, 50, 16)
+  shared.target.set(20, 0, -15)
+  shared.home = null
+  shared.src = null
+  shared.rev++
+  useSim.getState().set({ follow: null })
+}

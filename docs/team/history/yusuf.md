@@ -3,8 +3,8 @@
 Owns `web/`. Only Yusuf's sessions edit this file.
 
 ## Now
-- **Working on:** UI design pass. `p3/ui-calm` (Steps 0–1: preload spoiler fix + declutter) committed; next Step 2 Command pane as a blueprint, Step 3 bloom/materials.
-- **Works on main:** M1–M8 and replay (#10, #16, #18, #20, #23, #24, #26, #27, #31). With #28: real crop images, detector chip, routes on Command and phones.
+- **Working on:** UI pass, combined with Rayan's Version 2 plan. `p3/one-view` (Step 2: one-view gap mode, key M) committed. Next: Step 3 3D realism (bloom, materials, crops in the world), Step 4 collapsed scheduler, Step 5 auto-director.
+- **Works on main:** M1–M8, replay, UI Steps 0–1 calm pass (#10, #16, #18, #20, #23, #24, #26, #27, #31, #35).
 - **In flight (not merged):** `p3/ai-scope`:
   - AI detection cards (frosted glass): Reality on `survivor_found` ("Person · 100%", "no link, holding the report") and `hotspot_rejected` (faded "Not a person · 0% · rejected"); Command on `survivor_reported` with the delivered record's `crop`. Image `/crops/<crop>`, thermal placeholder until the backend serves it.
   - Detector chip in the top bar from `hello.detector` (hidden until the server sends it).
@@ -16,6 +16,12 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - Truth survivors and decoys show only on the Reality pane (T). Never on Command. The UI renders actual robot state and never assumes a dispatch, fault or resume made a robot act.
 
 ## Log
+
+### 2026-11-08 00:15 · p3/one-view · Step 2: one-view "gap" mode (Version 2 plan), key M
+- **Did:** the Version 2 "one main 3D view" as a toggle: **M** (or the top-bar layout button) switches between today's split and one full-width Reality view with Command's gap drawn on it. Dark robots get a ghost at Command's last fix with an amber dashed tether to the real robot ("R2 · last report 13s ago"); found-but-unreported survivors pulse amber "S1 · not reported yet" and flip to "S1 · reported to command" with the shockwave; ground the robots mapped but Command hasn't is hazed amber and fades out as map patches arrive (the reveal); rescue routes are faint "not reported yet" until delivered. A blueprint Command inset (public floorplan without truth rubble, delivered map/robots/survivors/routes/relays) and both AI cards sit in a reserved right column; the camera frames the building in the remaining space (projection view offset), follow mode included. Split stays the default until a dry run passes (Rayan's guardrail); the choice is remembered per browser. Also: zones count as dispatched when a robot reports following the plan (no stale "draft" after a reload); the camera refits once a new canvas has a size. Tested with DEMO.md's fixed plan P-2 at 4x: R2 dark with ghost + haze at 2:08, "S1 · not reported yet" + held route at 2:22, reveal at 2:39 (14.1 s, matches DEMO.md).
+- **Contract changes:** none. New key M.
+- **Heads-up for others:** Rayan: for the pitch, M gives the one-view story; DEMO.md beats are unchanged (frontend only). Try it in the next dry run and tell me if it should become the default. Version 1 backup: record it with the split view before more visuals land.
+- **Next:** Step 3 3D realism pass.
 
 ### 2026-11-07 23:30 · p3/ui-calm · Preload spoiler fix (Rayan's ask) + calm declutter pass
 - **Did:** Step 0, Rayan's quiet-preload ask, done in the frontend: phones only show a safety result for a check they ran themselves, and the big screen hides a `safety_reject` that arrives within 1 s of a fresh `plan_state` (the signature of `POST /api/plan`, which saves and checks in one request). The phone no longer re-saves an unchanged draft before checking. Tested: preload → phone shows "Ready to check P-1", big screen silent; judge taps Run safety check → phone "Safety check failed" + big-screen headline and feed line. Step 1 declutter: one headline at a time (ranked, survivor news never bumped), one AI card per pane, links faint except each robot's path home in its color (server routing rules), relays unlabeled and pulsing only while carrying data, lidar as one soft fan per robot, robot tags name only (dBm moved to signal bars), survivor labels/pulses for 10 s then calm, shockwave only when Command learns a survivor, antenna pulse only for survivor/route/fault deliveries, compact robot cards (followed card expands), QR card → "Join on phone" button, key list → `?` overlay, network stats in the Command pane title, feed 10 lines.

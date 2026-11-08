@@ -18,9 +18,10 @@ function pct(conf) {
   return v >= 99.5 || v <= 0.5 ? `${Math.round(v)}%` : `${v.toFixed(1)}%`
 }
 
-export default function DetectionCards({ side }) {
+// sides: which cards this pane shows, latest of each (the one-view pane shows both).
+export default function DetectionCards({ side, sides = [side] }) {
   const all = useSim((s) => s.detections)
-  const cards = all.filter((c) => c.side === side).slice(-1) // one card per pane: the latest decision
+  const cards = sides.map((sd) => all.filter((c) => c.side === sd).slice(-1)[0]).filter(Boolean)
   useEffect(() => {
     if (!all.length) return
     const oldest = all[0]
@@ -37,15 +38,15 @@ export default function DetectionCards({ side }) {
         <div key={c.eid} className={`det-card ${c.verdict}`}>
           <Crop crop={c.crop} />
           <div className="det-body">
-            <span className="det-kicker">{side === 'command' ? 'Reported to command' : 'Onboard AI detector'}</span>
+            <span className="det-kicker">{c.side === 'command' ? 'Reported to command' : 'Onboard AI detector'}</span>
             <b>{c.verdict === 'person' ? `Person · ${pct(c.conf)}` : `Not a person · ${pct(c.conf)}`}</b>
             <span className="muted small">
               {c.verdict === 'person' ? `${c.subject} · seen by ${c.robot}` : `hot spot ${c.subject} · ${c.robot} · rejected`}
             </span>
-            {side === 'reality' && c.verdict === 'person' && c.linked === false && (
+            {c.side === 'reality' && c.verdict === 'person' && c.linked === false && (
               <span className="det-warn small">No link, holding the report</span>
             )}
-            {side === 'command' && c.delay != null && <span className="muted small">arrived {c.delay}s after detection</span>}
+            {c.side === 'command' && c.delay != null && <span className="muted small">arrived {c.delay}s after detection</span>}
           </div>
         </div>
       ))}
