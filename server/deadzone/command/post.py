@@ -2,12 +2,14 @@
 from copy import deepcopy
 from collections import OrderedDict, deque
 import logging
+import os
 
 import numpy as np
 from pydantic import ValidationError
 
 from .rescue import RescueRoute
 from .ack import CommandAck, STATUS_ORDER
+from .camera import delivered_frame
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +20,7 @@ class CommandPost:
         self.map = np.zeros((fp.h, fp.w), dtype=np.uint8)
         self.map_sent_t = np.full((fp.h, fp.w), -np.inf)
         self.robots = {}      # id -> last telemetry + last_seen
+        self.camera_telemetry = os.environ.get("DZ_CAMERA_TELEMETRY") == "1"
         self.relays = {}
         self.survivors = {}   # id -> record + reported_t
         self.faults = {}
@@ -74,11 +77,19 @@ class CommandPost:
                                          "revision": version[1], "beacon_for": p.get("beacon_for")}
         elif k == "telemetry":
             prev = self.robots.get(p["id"])
+            camera = prev.get("camera") if self.camera_telemetry and prev else None
             if prev is None or prev["sent_t"] <= b["created"]:
                 self.robots[p["id"]] = {"id": p["id"], "pose": p["pose"], "state": p["state"],
                                         "battery_pct": p["battery_pct"], "last_seen": round(b["created"], 1),
                                         "sent_t": b["created"],
                                         "plan_id": p.get("plan_id"), "zone": p.get("zone")}
+                if camera is not None:
+                    self.robots[p["id"]]["camera"] = camera
+            if self.camera_telemetry and p["id"] == b["src"] and "camera" in p:
+                frame = delivered_frame(p["camera"], b["created"], now, self.size)
+                if frame is not None and (camera is None or
+                        (frame["t"], frame["delivered_t"]) >= (camera["t"], camera["delivered_t"])):
+                    self.robots[p["id"]]["camera"] = frame
         elif k == "map_patch":
             fresh = self.map_sent_t[p["iy"], p["ix"]] <= b["created"]
             ix, iy = p["ix"][fresh], p["iy"][fresh]
@@ -136,8 +147,12 @@ class CommandPost:
     def view(self, now):
         robots = []
         for r in self.robots.values():
-            robots.append({k: r[k] for k in ("id", "pose", "state", "battery_pct", "last_seen", "plan_id", "zone")}
-                          | {"stale_s": round(now - r["sent_t"], 1)})
+            record = {k: r[k] for k in ("id", "pose", "state", "battery_pct", "last_seen", "plan_id", "zone")}
+            record["stale_s"] = round(now - r["sent_t"], 1)
+            if self.camera_telemetry and "camera" in r:
+                record["camera"] = deepcopy(r["camera"]) | {
+                    "last_seen_s": round(max(0, now - r["camera"]["t"]), 1)}
+            robots.append(record)
         relays = [{"id": r["id"], "pos": list(r["pos"]), "beacon_for": r["beacon_for"]}
                   for r in self.relays.values()]
         faults = [{k: v for k, v in f.items() if k != "sent_t"} for f in self.faults.values()]
