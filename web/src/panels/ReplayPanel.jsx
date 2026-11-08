@@ -9,11 +9,14 @@ const mb = (n) => `${(n / 1e6).toFixed(1)} MB`
 export function ReplayChip() {
   const recorder = useSim((s) => s.recorder)
   const replay = useSim((s) => s.replay)
+  // Only with ?record in the URL (never otherwise): the recording status and the one way to save it
+  // (a .json.gz download, played back with ?replay)
   if (RECORDING) {
     return (
-      <button className="rec-chip" title="Save the mission recording" onClick={saveRecording}>
-        <i />REC {fmtClock((recorder?.ms ?? 0) / 1000)} · {mb(recorder?.bytes ?? 0)}
-      </button>
+      <span className="rec-group">
+        <span className="rec-chip" title="This page is recording the mission"><i />REC {fmtClock((recorder?.ms ?? 0) / 1000)} · {mb(recorder?.bytes ?? 0)}</span>
+        <button className="tb-btn rec-save" title="Download the mission recording (.json.gz) to play back later with ?replay" onClick={saveRecording}>Save recording</button>
+      </span>
     )
   }
   if (REPLAY && replay?.loaded) {
