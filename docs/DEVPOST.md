@@ -1,10 +1,8 @@
 # Deadzone: Devpost draft
 
-> **Notes for us, delete before submitting**
-> - Gemini shipped (G briefing and phone Ask, `DZ_GEMINI=1`, dry run passed), so it is under Built with; tick the Gemini prize.
-> - Reed-Solomon is built (`server/deadzone/network/fec.py`) but behind `DZ_FEC=1`, off in the demo run; the text says so.
-> - Add the demo video link and the repo link. Gallery screenshots are in `docs/screenshots/` (live seed-7 run, demo flags): `phone-safety-card.jpg` (the rejected plan), `phone-dispatched.jpg`, `dark-find.jpg` (Robot 2 finds S1 out of contact, Reality only), `s1-burst.jpg` (S1 and its route reach the command post), `scheduler-overload.jpg` (perception misses, safety on time), `model-lab.jpg`, `model-test.jpg`. ML slides: `docs/assets/` (`stats_card.png`, `confusion_matrix.png`, `gradcam_strip.png`, `benchmark_v2.png`).
-> - Prize categories: Best General, Best AI/ML, Most Over Engineered, Best UI/UX (+ MLH Best Use of Gemini API only if Gemini ships).
+**Repo:** REPO LINK
+
+**Video:** VIDEO LINK
 
 ## Tagline
 
@@ -18,7 +16,7 @@ The DARPA Subterranean Challenge showed a better way. The winning robots explore
 
 ## What it does
 
-Deadzone simulates three rescue robots searching a collapsed warehouse. The big screen shows two synced 3D views of the same building:
+Deadzone simulates three rescue robots searching Riverside Block C, an apartment and office block after an earthquake. The big screen shows two synced 3D views of the same building:
 
 - **Reality**: where the robots are and what they found.
 - **Command post**: only what has actually arrived over the radio.
@@ -37,6 +35,17 @@ Here's the demo:
 10. Press G and Gemini writes a short briefing for the incident commander, using only what reached the command post.
 
 Everything runs on a fixed seed, so the story happens on cue. Between cues the robots really are on their own.
+
+### Screenshots
+
+| | |
+|---|---|
+| ![The opening shot from the street: the command post truck and tent in front of Riverside Block C](screenshots/street-opening.jpg) | ![Robot 2 has lost its signal: the top bar shows it as Lost, and the command post inset still shows its last known position](screenshots/dark-moment-inset.jpg) |
+| The opening shot from the street | The dark moment: the top bar shows Scout 2 as Lost, and the command post inset only shows where it was last heard |
+| ![Predicted radio coverage on the command post side, strong to dead](screenshots/coverage-heatmap.jpg) | ![Scout 2's thermal camera at the moment it finds a survivor out of contact](screenshots/thermal-scout-camera.jpg) |
+| W: the radio coverage the command post predicts, strong to dead | The thermal scout camera when Scout 2 finds a survivor in the dark |
+| ![The 3D command post: response truck, mast and the incident command tent](screenshots/command-post-3d.jpg) | ![The phone's robot page for Scout 2 showing No signal and the age of its last image](screenshots/phone-no-signal.jpg) |
+| The 3D command post outside the building | A phone following Scout 2: No signal, with the age of its last image |
 
 ## How we built it
 
@@ -67,9 +76,9 @@ Everything runs on a fixed seed, so the story happens on cue. Between cues the r
 
 We added a "without Deadzone" baseline: the same robots with the same mapping and planning, but each one stops and waits as soon as its link drops and carries no relays, like a tethered or teleoperated robot. Press B on the big screen to switch to it live.
 
-**In simulation**, on our demo building over 30 random seeds, Deadzone got 88 of 90 survivors to the command post and the baseline got 38 of 90. The command post had 89% of the building mapped with Deadzone and 43% with the baseline.
+**In simulation**, on Riverside Block C over 30 random seeds, Deadzone got 88 of 90 survivors to the command post and the baseline got 38 of 90. The command post had 89% of the building mapped with Deadzone and 43% with the baseline.
 
-Our radio numbers are our own choices, so we checked that the result doesn't hinge on them. We swept 9 radio settings on that building and tried 3 generated buildings: Deadzone came out ahead in all 15 cases, and in none of 330 paired runs did it find fewer survivors than the baseline. With published 2.4 GHz wall losses (NIST) and the ITU-R indoor path-loss exponent, it was ahead in 9 of 9 settings.
+Our radio numbers are our own choices, so we checked that the result doesn't hinge on them. We swept 9 radio settings on Riverside Block C and tried 3 generated buildings (Harborview Logistics Center among them): Deadzone came out ahead in all 15 cases, and in none of 330 paired runs did it find fewer survivors than the baseline. With published 2.4 GHz wall losses (NIST) and the ITU-R indoor path-loss exponent, it was ahead in 9 of 9 settings.
 
 These are still simulation results, not real-world ones. They show the idea holds across reasonable radio models, not how much it would help in a real collapse. The scripts and full tables are in the repo (`ml/benchmark_v2.py`, `docs/assets/benchmark_v2.md`, `docs/assets/benchmark_published.md`).
 
@@ -96,11 +105,25 @@ These are still simulation results, not real-world ones. They show the idea hold
 
 ## What's next
 
-- Multi-floor buildings.
-- Running the same robot code on real ROS 2 robots. It only talks to `io`, so you'd swap the sim for real drivers.
-- Reed-Solomon error correction on by default, tuned to how bad the link is.
-- Mesh radios and real phone relays in the field.
+- **Real hardware.** The robot code only talks to its `io` object, so the same code can drive a real robot. `hardware/ros2_bridge.py` is a stub of that `io` for ROS 2 (lidar scan, odometry, velocity commands, thermal camera, mesh radio), with the method shapes already matching the simulator.
+- **The detector on the robot's computer.** The ONNX export scores one thermal crop in 0.5 ms on a laptop CPU. By the published MobileNetV3 numbers it should fit a Raspberry Pi 5; we haven't measured it on the board yet.
+- **Field trials with a USAR team**, to replace our chosen radio numbers with measured ones and see how the command post view holds up with real responders.
 
 ## Built with
 
-Python, FastAPI, numpy, PyTorch, torchvision, ONNX Runtime, Google Gemini API, reedsolo, React, three.js, react-three-fiber, Vite, zustand.
+Python, FastAPI, NumPy, PyTorch, ONNX Runtime, React, three.js, Gemini API, ElevenLabs API, Cloudflare Tunnel
+
+## Team and tools
+
+- **Rayan Diya**: robots and the AI detector
+- **Aziz**: sim, radio network and command post
+- **Yusuf Nusrat**: big screen, phone app and 3D
+
+We used Claude Code and OpenAI Codex to write code. A person on the team reviewed every change before it was merged, and the test suite and the demo guard ran on every merge.
+
+**Datasets and sources**
+
+- **Teledyne FLIR ADAS v2**: street thermal frames with person boxes (training crops, the 1,200-image held-out test, the Model test set, decoys). Used under Teledyne's free dataset terms.
+- **SDT (Synthetic Depth & Thermal)**, real indoor split only (FLIR Lepton 3.5 frames): CC BY 4.0; the record also says non-commercial research use. Zenodo 4124309.
+- **Radio references**: Rappaport, *Wireless Communications: Principles and Practice*, 2nd ed., Table 4.3; Stone (1997), NISTIR 6055; ITU-R Recommendation P.1238.
+- **3D assets**: Poly Haven and Poly Pizza, all CC0.
