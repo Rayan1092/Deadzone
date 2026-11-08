@@ -15,7 +15,7 @@ Owns `server/deadzone/robot/`, `ml/`, `data/floorplans/`. Only Rayan's sessions 
 - **Did (tester's bug, trace not in yet):** a robot parked inside a found survivor's 0.5 m clearance (after the find, or a look-closer stop) had only its own cell open, so with furniture and collision bodies around, A* found no departure and TRAPPED fired after 10 s. Now `_drive_trav` blocks, for a disk the robot stands in, only the cells **closer to the person than the robot already is**: it can always back away, never move toward them; outside the disk the full clearance stands. TRAPPED is raised only when `_enclosed()`: the free space the robot stands in (its map, walls, no-go areas, no survivor clearance) reaches no frontier and not the entrance. New `tests/test_parked_by_survivor.py` (3). When the tester's trace arrives I'll replay it against this.
 - **Also (Rayan):** `DZ_COVERAGE_GRID=1` added to DEMO.md's required step-4 flags (Aziz's preflight reads them from there) so **W** shows the command post's predicted coverage; Command view only. The guard runs with it on: **every beat unchanged**.
 - **Contract changes:** none on the wire; main run adds `DZ_COVERAGE_GRID=1`.
-- **Heads-up for others:** **Yusuf:** the guard's `FLAGS` changed (coverage grid on); per your note, re-run `web/scripts/record-seed7-paths.py` if the path test asks (robot behaviour on seed 7 is unchanged).
+- **Heads-up for others:** **Yusuf:** the coverage grid is in a separate `VIEW_FLAGS` in the guard (it never changes robot behaviour), so your path test's `FLAGS` and recorded paths stay valid.
 - **Next:** stop (code freeze 11:40).
 
 ### 2026-11-09 10:45 · rayan/readme-keys · README key table matches the screen's help (H) and DEMO.md
