@@ -1,6 +1,7 @@
 {
   "id": "collapse_01",
-  "name": "Eastside Warehouse Collapse",
+  "name": "Riverside Block C, post-earthquake",
+  "description": "Office block and warehouse after an earthquake: offices, break room, loading office and a steel storage cage that blocks the radio; three people missing",
   "size": [40, 30],
   "cell": 0.25,
   "wall_height": 3.0,
@@ -66,16 +67,16 @@
     {"id": "H1", "type": "gas", "poly": [[12.2,0.2],[23.8,0.2],[23.8,12.8],[12.2,12.8]]}
   ],
   "survivors": [
-    {"id": "S1", "pos": [36.0, 27.0], "thermal": "pos_0001.png"},
-    {"id": "S2", "pos": [29.0, 4.0],  "thermal": "pos_0002.png"},
-    {"id": "S3", "pos": [5.0, 26.0],  "thermal": "pos_0003.png"}
+    {"id": "S1", "descriptor": "Crouched low in the steel storage cage", "pos": [36.0, 27.0], "thermal": "pos_0001.png"},
+    {"id": "S2", "descriptor": "Kneeling, bent over in the loading office", "pos": [29.0, 4.0],  "thermal": "pos_0002.png"},
+    {"id": "S3", "descriptor": "Slumped in a chair in Office A", "pos": [5.0, 26.0],  "thermal": "pos_0003.png"}
   ],
   "decoys": [
     {"id": "D1", "label": "radiator",       "pos": [15.0, 28.0], "thermal": "neg_0001.png"},
     {"id": "D2", "label": "engine",         "pos": [37.0, 12.0], "thermal": "neg_0002.png"},
     {"id": "D3", "label": "coffee machine", "pos": [22.0, 28.0], "thermal": "neg_0003.png"}
   ],
-  "events": [{"t": 162.5, "type": "collapse", "near": "R1", "at": [25.31, 15.65], "label": "secondary collapse on the rescue corridor"}],
+  "events": [{"t": 162.5, "type": "collapse", "near": "R1", "at": [25.31, 15.65], "label": "Secondary collapse on the rescue corridor"}],
   "heat_sources": [{"id": "HS1", "type": "generator", "x": 34.5, "y": 4.5, "temp_c": 65.0, "size_m": 0.9}, {"id": "HS2", "type": "space_heater", "x": 12.0, "y": 20.0, "temp_c": 55.0, "size_m": 0.5}, {"id": "HS3", "type": "hot_pipe", "x": 11.4, "y": 7.0, "temp_c": 70.0, "size_m": 1.5}, {"id": "HS4", "type": "server_rack", "x": 30.0, "y": 7.0, "temp_c": 42.0, "size_m": 0.8}, {"id": "HS5", "type": "dog", "x": 26.5, "y": 23.5, "temp_c": 38.5, "size_m": 0.7}, {"id": "HS6", "type": "laptop", "x": 6.5, "y": 20.5, "temp_c": 35.0, "size_m": 0.35}, {"id": "HS7", "type": "sunlit", "x": 37.5, "y": 19.0, "temp_c": 32.0, "size_m": 1.2}],
   "entry": [1.0, 15.0],
   "command_post": {"pos": [-2.0, 15.0], "tx_dbm": 20},

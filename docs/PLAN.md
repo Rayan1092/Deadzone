@@ -320,7 +320,8 @@ Walls are line segments and doors are simply gaps between segments. Rubble and h
 ```json
 {
   "id": "collapse_01",
-  "name": "Eastside Warehouse Collapse",
+  "name": "Riverside Block C, post-earthquake",
+  "description": "Office block and warehouse after an earthquake: ... three people missing",
   "size": [40, 30],
   "cell": 0.25,
   "wall_height": 3.0,
@@ -330,11 +331,13 @@ Walls are line segments and doors are simply gaps between segments. Rubble and h
   "rooms": [{"id": "N1", "name": "Office A", "poly": [[0,17],[10,17],[10,30],[0,30]]}],
   "rubble": [{"id": "RB1", "poly": [[21,13],[23,13],[23,15],[21,15]], "height": 1.2}],
   "hazards": [{"id": "H1", "type": "gas", "poly": [[12,0],[24,0],[24,13],[12,13]]}],
-  "survivors": [{"id": "S1", "pos": [37, 26], "thermal": "pos_0007.png"}],
+  "survivors": [{"id": "S1", "descriptor": "Crouched low in the steel storage cage", "pos": [37, 26], "thermal": "pos_0007.png"}],
   "entry": [1.0, 15.0],
   "command_post": {"pos": [-2.0, 15.0], "tx_dbm": 20}
 }
 ```
+
+User-facing text (the screen shows these, never file ids): `name` and a one-line `description` per building, a short `descriptor` per survivor (ids stay S1, S2 ...) used in captions, and a `label` on every scenario event and timeline entry for the banner.
 
 The door `state` is visual only (`open`, `broken`, `blocked`). A blocked door must also have a rubble polygon so physics agrees with visuals.
 

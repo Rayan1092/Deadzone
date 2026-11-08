@@ -1,6 +1,7 @@
 {
  "id": "gen_3",
- "name": "Generated collapse #3",
+ "name": "Building 3, post-earthquake",
+ "description": "Collapsed building, 44 x 32 m: 10 rooms, 1 steel dead zone that blocks the radio, 3 people to find",
  "size": [
   44,
   32
@@ -745,6 +746,7 @@
  "survivors": [
   {
    "id": "S1",
+   "descriptor": "Crouched low in the steel storage cage",
    "pos": [
     39.62,
     31.38
@@ -753,6 +755,7 @@
   },
   {
    "id": "S2",
+   "descriptor": "Kneeling, bent over in the boiler room",
    "pos": [
     16.62,
     25.88
@@ -761,6 +764,7 @@
   },
   {
    "id": "S3",
+   "descriptor": "Slumped in a chair on the warehouse floor",
    "pos": [
     36.88,
     5.88

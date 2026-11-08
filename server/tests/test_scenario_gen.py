@@ -128,7 +128,7 @@ def test_showcase_building_on_disk_matches_its_generator_and_plan():
     data = json.loads(SHOWCASE.read_text(encoding="utf-8"))
     g = data["generator"]
     again = generate.generate(g["seed"], size=tuple(data["size"]), plan_id=data["id"], name=data["name"],
-                              location="showcase_01")
+                              location="showcase_01", description=data["description"])
     assert json.dumps(again, sort_keys=True) == json.dumps(generate.strip_export(data), sort_keys=True)
     assert data.get("obstacles"), "the showcase carries Yusuf's furniture footprints for DZ_OBSTACLES=1"
     assert generate.validate(data) == [] and len(generate.steel_rooms(data)) == 2
