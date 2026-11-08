@@ -17,7 +17,7 @@ function useJoinLoader() {
         if (!stop) { useSim.getState().set({ joinUrl: body.url }); setError(null) }
       } catch (err) {
         if (stop) return
-        setError(err.message || 'Server offline')
+        setError("Can't reach the simulation to make the join link. Check it is running, then reload.")
         timer = setTimeout(load, 3000)
       }
     }

@@ -164,7 +164,7 @@ export function TopBar() {
       </div>
       {!REPLAY && <JoinButton icon={Icon.phone} />}
       <BriefingButton />
-      {!REPLAY && <span className={`tb-conn ${connected ? 'ok' : 'bad'}`} role="status" title={connected ? 'Connected to the simulation' : 'The simulation server is not answering; this screen reconnects by itself'}><i />{connected ? 'Live' : 'Server disconnected · reconnecting…'}</span>}
+      {!REPLAY && <span className={`tb-conn ${connected ? 'ok' : 'bad'}`} role="status" title={connected ? 'Connected to the simulation' : 'The simulation is not answering. This screen reconnects by itself.'}><i />{connected ? 'Live' : 'Reconnecting…'}</span>}
       <button className={`tb-icon${full ? ' on' : ''}`} aria-pressed={full} title={full ? 'Hide the side panels' : 'Show the side panels (robots, events, scheduler)'}
               onClick={() => setLayout(full ? 'judge' : 'full')}>{Icon.panels}</button>
     </header>
@@ -362,14 +362,14 @@ async function nextScenario(home) {
     if (!res.ok) throw new Error(String(res.status))
     cat = await res.json()
   } catch {
-    note('This server cannot switch buildings')
+    note("Other buildings aren't available right now.")
     return
   }
   const ids = (cat.floorplans ?? []).map((f) => f.id)
   if (home) {
     const main = ids.includes(MAIN_SCENARIO) ? MAIN_SCENARIO : ids[0]
     if (main) control('reset', { floorplan: main, timeline: false })
-    else note('No building is registered on this server')
+    else note("The main scenario isn't available right now.")
     return
   }
   if (cat.generator) {
@@ -377,7 +377,7 @@ async function nextScenario(home) {
     return
   }
   const pool = ids.filter((id) => id !== cat.selected && id !== MAIN_SCENARIO)
-  if (!pool.length) { note('No other building is registered on this server'); return }
+  if (!pool.length) { note('There is no other building to load.'); return }
   control('reset', { floorplan: pool[Math.floor(Math.random() * pool.length)], timeline: false })
 }
 

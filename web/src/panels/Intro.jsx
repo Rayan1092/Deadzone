@@ -1,58 +1,54 @@
 import { useEffect, useState } from 'react'
 import { useSim } from '../store'
 
-// First glance for someone who has never seen the project: what the screen shows, in three
-// lines, over the 3D view. Opens once per browser session (and with the ? key's "How to read
-// this" button); closes on click, Esc, or by itself once the robots get going.
-const AUTO_CLOSE_MS = 14000
-
-// ?nointro (the demo URL) never opens it by itself; the ? overlay's button still does
+// The first thing a newcomer reads, in three lines: what this is, what they are looking at, and
+// how to start. Opens once per browser session unless "Don't show again" was chosen (or the page
+// was opened with ?nointro); the help popup's "What am I looking at?" always opens it. Closes on
+// Space (which also starts the mission), a click, Esc, or when the mission starts.
 const NO_INTRO = (() => { try { return new URLSearchParams(location.search).has('nointro') } catch { return false } })()
 
 function seen() {
-  try { return sessionStorage.getItem('dz-intro') === '1' } catch { return false }
+  try { return sessionStorage.getItem('dz-intro') === '1' || localStorage.getItem('dz-intro-off') === '1' } catch { return false }
 }
 
 export default function Intro() {
   const open = useSim((s) => s.introOpen)
+  const running = useSim((s) => s.running)
   const set = useSim((s) => s.set)
   const view = useSim((s) => s.view)
+  const [never, setNever] = useState(() => { try { return localStorage.getItem('dz-intro-off') === '1' } catch { return false } })
   useEffect(() => { if (!seen() && !NO_INTRO) set({ introOpen: true }) }, [set])
-  const [shownAt, setShownAt] = useState(0)
   useEffect(() => {
-    if (!open) return
-    setShownAt(Date.now())
+    if (!open) return undefined
     try { sessionStorage.setItem('dz-intro', '1') } catch { /* private mode */ }
-    const id = setTimeout(() => useSim.getState().set({ introOpen: false }), AUTO_CLOSE_MS)
-    return () => clearTimeout(id)
-  }, [open])
+    const onKey = (e) => { if (e.code === 'Space') set({ introOpen: false }) } // the key handler starts the mission
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, set])
+  useEffect(() => { if (running && useSim.getState().introOpen) set({ introOpen: false }) }, [running, set])
   if (!open) return null
   const close = () => set({ introOpen: false })
+  const toggleNever = (e) => {
+    const on = e.target.checked
+    setNever(on)
+    try { localStorage.setItem('dz-intro-off', on ? '1' : '0') } catch { /* private mode */ }
+  }
   return (
-    <div className="intro" role="dialog" aria-label="How to read this screen" onClick={close} key={shownAt}>
+    <div className="intro" role="dialog" aria-label="What this is" onClick={close}>
       <div className="intro-card" onClick={(e) => e.stopPropagation()}>
-        <div className="intro-kicker">DEADZONE · how to read this screen</div>
-        <h2>Rescue robots that keep working where radio can't reach</h2>
-        <ol>
-          <li>
-            <i className="n">1</i>
-            <span><b>Three robots search a collapsed building.</b> Thick walls block radio, so most of the time they can't talk to the command post outside.</span>
-          </li>
-          <li>
-            <i className="n">2</i>
-            <span>
-              {view === 'gap'
-                ? <><b>Amber means "the command post hasn't heard this yet".</b> Robots keep searching anyway and carry their findings until a radio path opens.</>
-                : <><b>Left is what's really happening. Right is what the command post knows.</b> The difference is the information still stuck inside the building.</>}
-            </span>
-          </li>
-          <li>
-            <i className="n">3</i>
-            <span><b>When a robot sees something warm, an onboard AI checks its thermal image</b> (person or not), then the report hops relay to relay to the command post.</span>
-          </li>
-        </ol>
-        <button className="intro-go" onClick={close}>Got it</button>
-        <span className="intro-hint">Press ? anytime for the keys</span>
+        <div className="intro-kicker">Deadzone</div>
+        <p className="intro-line lead">Rescue robots that keep searching a collapsed building where radio can't reach, and carry what they find back to the command post.</p>
+        <p className="intro-line">
+          {view === 'gap'
+            ? 'The big view is the building as it really is. The map at the bottom right is only what the command post has heard so far.'
+            : 'On the left is the building as it really is. On the right is only what the command post has heard so far.'}
+        </p>
+        <p className="intro-line go">Press <kbd>Space</kbd> to start the mission.</p>
+        <div className="intro-foot">
+          <label className="intro-never"><input type="checkbox" checked={never} onChange={toggleNever} />Don't show again</label>
+          <span className="intro-hint">Press H for the keys</span>
+          <button className="intro-go" onClick={close}>Got it</button>
+        </div>
       </div>
     </div>
   )
