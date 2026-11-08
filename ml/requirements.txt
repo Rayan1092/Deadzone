@@ -3,3 +3,7 @@ torch>=2.6
 torchvision>=0.21
 pillow>=10
 matplotlib>=3.8
+# ONNX export and CPU timing (ml/export_onnx.py)
+onnx>=1.16
+onnxruntime>=1.18
+onnxscript>=0.1
