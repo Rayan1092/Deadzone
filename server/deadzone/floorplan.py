@@ -1,5 +1,6 @@
 """Load a floor plan JSON and rasterize it into a truth grid."""
 import json
+import os
 from copy import deepcopy
 from pathlib import Path
 
@@ -19,6 +20,8 @@ class FloorPlan:
         self.w = int(round(self.W / self.cell))
         self.h = int(round(self.H / self.cell))
         mats = data["materials"]
+        self.obstacles_enabled = os.environ.get("DZ_OBSTACLES") == "1"
+        obstacles = self._validated_obstacles() if self.obstacles_enabled else []
 
         # Wall segments for propagation (rubble edges count too)
         segs, loss = [], []
@@ -31,6 +34,10 @@ class FloorPlan:
                 a, b = poly[i], poly[(i + 1) % len(poly)]
                 segs.append([*a, *b])
                 loss.append(mats.get("rubble", 8))
+        for poly, material_loss in obstacles:
+            for a, b in zip(poly, poly[1:] + poly[:1]):
+                segs.append([*a, *b])
+                loss.append(material_loss)
         self.segs = np.array(segs, dtype=float)
         self.seg_loss = np.array(loss, dtype=float)
 
@@ -41,6 +48,10 @@ class FloorPlan:
         cx, cy = self.cell_centers()
         for rb in data.get("rubble", []):
             self.occ |= points_in_poly(cx, cy, rb["poly"])
+        for poly, _ in obstacles:
+            self.occ |= points_in_poly(cx, cy, poly)
+            for a, b in zip(poly, poly[1:] + poly[:1]):
+                self._raster_segment(a, b)
         self.nogo = np.zeros_like(self.occ)
         for hz in data.get("hazards", []):
             self.nogo |= points_in_poly(cx, cy, hz["poly"])
@@ -48,6 +59,37 @@ class FloorPlan:
         self.entry = tuple(data["entry"])
         self.cmd_pos = tuple(data["command_post"]["pos"])
         self.cmd_tx = data["command_post"].get("tx_dbm", 20)
+
+    def _validated_obstacles(self):
+        obstacles = self.data.get("obstacles", [])
+        if not isinstance(obstacles, list):
+            raise ValueError("obstacles must be a list of polygon footprints")
+        out = []
+        for i, obstacle in enumerate(obstacles):
+            if not isinstance(obstacle, dict):
+                raise ValueError(f"Obstacle {i} must have a poly footprint")
+            try:
+                poly = np.asarray(obstacle.get("poly"), dtype=float)
+            except (TypeError, ValueError):
+                raise ValueError(f"Obstacle {i} has invalid polygon coordinates") from None
+            if (poly.ndim != 2 or poly.shape[1] != 2 or len(poly) < 3 or not np.isfinite(poly).all()
+                    or (poly[:, 0] < 0).any() or (poly[:, 0] > self.W).any()
+                    or (poly[:, 1] < 0).any() or (poly[:, 1] > self.H).any()):
+                raise ValueError(f"Obstacle {i} needs >=3 finite vertices inside the building")
+            cross = poly[:, 0] * np.roll(poly[:, 1], -1) - np.roll(poly[:, 0], -1) * poly[:, 1]
+            if abs(float(cross.sum())) <= 1e-9:
+                raise ValueError(f"Obstacle {i} footprint must have positive area")
+            material = obstacle.get("material", "metal")
+            if not isinstance(material, str) or material not in self.data["materials"]:
+                raise ValueError(f"Obstacle {i} material must be declared in materials")
+            try:
+                material_loss = float(self.data["materials"][material])
+            except (TypeError, ValueError):
+                raise ValueError(f"Obstacle {i} material loss must be finite and nonnegative") from None
+            if not np.isfinite(material_loss) or material_loss < 0:
+                raise ValueError(f"Obstacle {i} material loss must be finite and nonnegative")
+            out.append((poly.tolist(), material_loss))
+        return out
 
     @classmethod
     def load(cls, path):
@@ -62,6 +104,8 @@ class FloorPlan:
         """Public pre-collapse structure, without hidden survivors or debris."""
         keys = ("id", "name", "size", "cell", "wall_height", "materials", "walls",
                 "doors", "rooms", "hazards", "entry", "command_post")
+        if self.obstacles_enabled:
+            keys += ("obstacles",)
         data = {key: deepcopy(self.data[key]) for key in keys if key in self.data}
         for door in data.get("doors", []):
             door["state"] = "open"  # post-collapse door damage is not part of the prior

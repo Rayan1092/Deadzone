@@ -4,14 +4,33 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Working on:** batch 1, `p2/robot-collisions`: hard swept-disc robot contacts are implemented; final validation/PR underway. #101 is merged and confirmed on main; its old local/remote branches are deleted. Latest integrated main: 2fbfb98 (#106 contracts, #107 phone diagnosis).
-- **Works in this branch:** DZ_ROBOT_COLLISIONS=1 opts in at Sim reset to 0.30 m bodies, continuous simultaneous contact rejection (including reverse, crossing and stopped-leader chains), v=0 and odometry blocked feedback on the next robot step; rotation is preserved. Flag-on odometry adds sorted blocked_by; Reality adds blocked/blocked_by/body_radius_m plus once-per-encounter robot_contact {a,b,pos}. All remain absent from Command, phones and radio bundles. Default flag-off motion is unchanged. Rayan's radius/blocked proposal agrees; his yielding policy remains his code.
-- **Batch queue, one PR each:** 2 obstacles/radio; 3 delivered phone camera + existing exclusive leases; 4 actual traffic/queues and opt-in compatible compact stream; 5 trace fixes for global no-go dispatch to unassigned robots and safety starting inside new exclusions. No next branch until this PR merges and is confirmed on main.
-- **Contracts/dependencies received:** Rayan 13:10 camera producer is DZ_CAMERA_TELEMETRY=1, camera {t,hits:[id,pos,verdict,conf,crop]}; retain only delivered snapshots and their age. Testing trace is rayan-ml.md 15:10 (not PLAN). Its unassigned-recipient and safety-start bugs are backend batch 5; no-go-only draft sharing already shipped in #101. Rayan owns escaping a newly imposed exclusion; Yusuf owns zone priority/assignment defaults. Earlier save-order work is defensive, not the trace's demonstrated root cause.
-- **Validation:** final full backend 489 passed/1 skipped (121.97 s), including the fixed seed-7 guard; 12 focused collision tests passed. No robot/web/data source edits.
-- **Runtime/acceptance:** existing 8030/HTTPS preview retained with experiment flags off; new collision behavior has unit/integration coverage, not testing-laptop acceptance. Gemini key setup remains explicitly deferred by Aziz. No physical phone or provider success claim.
+- **Working on:** batch 2 `p2/shelf-obstacles`, ready to publish from main baf9d29 (Rayan shutdown included). #108 hard collisions is merged/confirmed as 9144aad; its branch is deleted. #101 phone sync is also merged.
+- **Works in this branch / contract:** DZ_OBSTACLES=1 at FloorPlan construction enables static obstacles [{id?,poly:[[x,y],...],material:"metal",height?,...}]. Material defaults to metal and must be in materials; finite positive-area in-bounds footprints become filled occupied cells plus rasterized boundaries, so thin shelves cannot disappear. Each crossed edge applies the configured material loss as for rubble/walls. Known enabled shelves stay in planning_data, with hidden survivors/rubble/dynamic walls still omitted. Default off preserves existing physics/radio/planning metadata and the fixed demo.
+- **Validation:** 503 backend passed / 1 opt-in skipped (120.23 s), including seed-7 guard and Rayan shutdown tests; 12 focused shelf cases passed. No robot/web/data source edits. Actual shelf data is still Rayan's work from Yusuf's footprint export; backend acceptance is not a claim that those assets exist.
+- **Queue:** after this PR merges/confirmed/deleted, batch 3 delivered phone camera under Rayan's DZ_CAMERA_TELEMETRY contract (exclusive leases already exist), batch 4 traffic events/node queues + compatible opt-in compact stream, batch 5 trace fixes. The trace's backend roots are global no-go not sent to unassigned robots and route safety unable to start inside a new exclusion; Rayan owns robot escape and Yusuf owns zone defaults.
+- **Coordination:** collision DZ_ROBOT_COLLISIONS remains off until laptop dry run; Rayan's predictive peer-avoid code is parked, not imported. Phone/camera uses delivered telemetry only. Existing public preview remains unmodified by these experiment flags; Gemini key setup is deferred by Aziz.
 
 ## Log
+
+### 2026-11-08 PT - p2/shelf-obstacles - Known shelf occupancy and material radio loss
+- **Did:** added default-off physical obstacle loading with footprint validation, filled/boundary occupancy for shelves, actual material radio loss per edge, and matching known pre-collapse planning metadata. Thin shelves block lidar instead of falling between cell centres. Integrated shutdown main baf9d29 without robot source edits.
+- **Contract changes:** DZ_OBSTACLES=1 and obstacles poly/material schema were recorded before code; material defaults metal, loss comes from materials, known shelves enter planning_data only when enabled. No API/event shape changes and no truth rubble or survivor leak.
+- **Heads-up for others:** Rayan owns obstacle JSON and Yusuf exports footprints; both can use the backend contract in Now. No data/web/robot source touched. Outside source area: server/tests/test_obstacles.py and required own history. Collision stays independently off pending dry run.
+- **Validation:** final full backend 503 passed / 1 opt-in skipped (120.23 s), including fixed demo guard and shutdown integration; 12 focused obstacle cases passed.
+- **Next:** publish/merge/confirm this one PR, delete branch, then phone camera backend.
+
+
+### 2026-11-08 PT - p2/shelf-obstacles - Integrate shutdown main while validating shelves
+- **Did:** shelves passed 12 focused cases and full backend 501 passed/1 skipped (122.16 s). Integrated Rayan's shutdown PR #109 on main baf9d29 before publishing; no edits to his robot source.
+- **Contract changes:** none from this integration; obstacle contract in Now remains default-off DZ_OBSTACLES. Rayan's shutdown/yielding ownership unchanged.
+- **Heads-up for others:** actual shelf footprints remain with Yusuf/Rayan. New material footprints are known pre-collapse structure, not hidden rubble. Full combined validation is rerun after the main integration.
+- **Next:** publish/merge shelves after final checks, then delivered camera backend.
+
+### 2026-11-08 PT - p2/shelf-obstacles - Collision merged, shelf contract before code
+- **Did:** confirmed #108 merged on main 9144aad and deleted its branch. Started only batch 2 after fetching/reading team context.
+- **Contract changes BEFORE code:** DZ_OBSTACLES=1 enables static obstacles poly/material occupancy, thin-boundary rasterization, material loss per crossed edge and public planning metadata as specified in Now. Default off. Rayan owns JSON data and Yusuf exports footprints.
+- **Heads-up for others:** Rayan/Yusuf can publish poly footprints now; no source/data edits in their areas. Collision flag remains independently default off. Gemini key remains deferred.
+- **Next:** test shelf occupancy, lidar/visibility blocking, propagation loss, public-prior consistency, malformed footprints and guard; finish one PR before camera backend.
 
 ### 2026-11-08 PT - p2/robot-collisions - Hard robot bodies and real blocked feedback
 - **Did:** added opt-in continuous 0.30 m robot-body collision checks with simultaneous proposals and iterative chain blocking, preserving rotation and legacy flag-off motion. Stops are visible to robot policy through real odometry on the next step. Contact pairs emit one Reality event per encounter; no robot state is injected.
