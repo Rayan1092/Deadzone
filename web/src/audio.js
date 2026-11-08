@@ -1,8 +1,19 @@
 // Sound cues for the big screen. Browsers only play audio after a user gesture, so the
 // context is created lazily on the first call; a cue that arrives before any gesture is
 // skipped (no error, no retry). Everything is synthesized: no files to load.
+
+// X turns every cue on or off; the choice is kept per browser.
+let on = true
+try { on = localStorage.getItem('dz-sound') !== '0' } catch { /* storage blocked: sound stays on */ }
+export const soundOn = () => on
+export function setSound(value) {
+  on = value
+  try { localStorage.setItem('dz-sound', value ? '1' : '0') } catch { /* not remembered */ }
+}
+
 let ctx = null
 function context() {
+  if (!soundOn()) return null
   try {
     ctx ??= new (window.AudioContext || window.webkitAudioContext)()
     if (ctx.state === 'suspended') ctx.resume().catch(() => {})
@@ -62,3 +73,47 @@ export function rumble(seconds = 5) {
   thud.start(t0)
   thud.stop(t0 + 0.8)
 }
+
+// Short tonal cues, one per kind of news. Each note: [frequency Hz, start s, length s].
+// A cue that fires again within its gap is dropped, so a burst of events plays once.
+const lastPlayed = {}
+function cue(name, gapMs, notes, { type = 'sine', gain = 0.2, lowpass = 0 } = {}) {
+  const now = performance.now()
+  if (now - (lastPlayed[name] ?? -Infinity) < gapMs) return
+  const ac = context()
+  if (!ac) return
+  lastPlayed[name] = now
+  const t0 = ac.currentTime + 0.01
+  const out = ac.createGain()
+  out.gain.value = gain
+  let tail = out
+  if (lowpass) {
+    const f = ac.createBiquadFilter()
+    f.type = 'lowpass'
+    f.frequency.value = lowpass
+    out.connect(f)
+    tail = f
+  }
+  tail.connect(ac.destination)
+  for (const [freq, start, len] of notes) {
+    const osc = ac.createOscillator()
+    osc.type = type
+    osc.frequency.value = freq
+    const env = ac.createGain()
+    env.gain.setValueAtTime(0.0001, t0 + start)
+    env.gain.exponentialRampToValueAtTime(1, t0 + start + 0.012)
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + start + len)
+    osc.connect(env).connect(out)
+    osc.start(t0 + start)
+    osc.stop(t0 + start + len + 0.05)
+  }
+}
+
+// A robot found someone: two soft rising notes.
+export const ping = () => cue('ping', 800, [[880, 0, 0.22], [1318.5, 0.11, 0.42]])
+// The report reached the command post: a brighter three-note confirm.
+export const confirm = () => cue('confirm', 800, [[784, 0, 0.18], [987.8, 0.1, 0.18], [1568, 0.2, 0.5]], { type: 'triangle', gain: 0.22 })
+// A robot faulted: two low, muffled buzzes.
+export const alarm = () => cue('alarm', 3000, [[392, 0, 0.16], [392, 0.24, 0.16]], { type: 'square', gain: 0.1, lowpass: 1400 })
+// A robot's link came back: a quick rising arpeggio, quieter than the news cues.
+export const chime = () => cue('chime', 5000, [[659.3, 0, 0.14], [880, 0.07, 0.14], [1174.7, 0.14, 0.3]], { type: 'triangle', gain: 0.12 })

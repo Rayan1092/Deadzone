@@ -4,6 +4,7 @@ import { Billboard } from '@react-three/drei'
 import * as THREE from 'three'
 import { FOCUS_HOLD_MS, useSim } from '../store'
 import { AI_CAPTION } from '../format'
+import { useCropManifest } from '../crops'
 import Building from './Building'
 import { PersonFigure } from './Actors'
 import { ROBOT_SCALE } from './Rover'
@@ -143,14 +144,6 @@ function Robots({ robotId, thermal }) {
 // the box is the object's known extent projected through this camera.
 const THERMAL_RANGE = 5   // m, matches the sim's thermal camera
 const MAX_BOXES = 6
-// fetched once when the app loads, so the first camera view already has every score
-let manifest = null
-const manifestReady = fetch('/crops/manifest.json').then((r) => (r.ok ? r.json() : null)).then((j) => { manifest = j; return j }).catch(() => null)
-function useManifest() {
-  const [m, setM] = useState(manifest)
-  useEffect(() => { if (!manifest) manifestReady.then(setM) }, [])
-  return m
-}
 
 // 2D segment intersection, for line of sight against walls and rubble edges.
 function crosses([ax, ay], [bx, by], [cx, cy], [dx, dy]) {
@@ -170,7 +163,7 @@ const corner = new THREE.Vector3()
 function ClassifyBoxes({ robotId, thermal, boxes }) {
   const { camera, size } = useThree()
   const fp = useSim((s) => s.floorplan)
-  const m = useManifest()
+  const m = useCropManifest()
   const segs = useMemo(() => (fp ? blockers(fp) : []), [fp])
   const objects = useMemo(() => {
     if (!fp) return []
