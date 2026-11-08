@@ -1,8 +1,7 @@
 """DZ_SMART_RUBBLE=1 (Rayan, 2026-11-08): the R key drops its rubble on the followed robot's planned
 path 3-4 m ahead, at the nearest spot that walls nobody in (flood fill on the truth grid); when no
-such spot exists it falls back to the plain spot. Separately, a scripted secondary collapse drops
-rubble 1.5 m ahead of R1 at DZ_COLLAPSE_AT sim seconds (162.5 on collapse_01) whatever anyone
-pressed (rubble_fall, cause "collapse"). Flag unset: exactly the old behaviour."""
+such spot exists it falls back to the plain spot. Flag unset: exactly the old behaviour. (The
+demo's 162.5 s collapse is a scenario event in collapse_01.json, tests/test_scenario_events.py.)"""
 import math
 
 import pytest
@@ -30,7 +29,6 @@ def rubble_centers(sim):
 def test_flag_unset_drops_exactly_where_the_screen_says(monkeypatch):
     monkeypatch.delenv("DZ_SMART_RUBBLE", raising=False)
     sim = Sim(n_robots=1, seed=7)
-    assert sim.collapse_at is None
     for _ in range(50):
         sim.tick()
     at = ahead(sim.robots["R1"])
@@ -39,14 +37,13 @@ def test_flag_unset_drops_exactly_where_the_screen_says(monkeypatch):
     assert rubble_centers(sim) == [(round(at[0], 2), round(at[1], 2))]
     for _ in range(100):
         sim.tick()
-    assert len(rubble_centers(sim)) == 1, "no scripted collapse with the flag unset"
+    assert len(rubble_centers(sim)) == 1, "one press, one rubble"
 
 
 def test_smart_press_lands_on_the_path_ahead_and_walls_nobody_in(monkeypatch):
     monkeypatch.setenv("DZ_SMART_RUBBLE", "1")
-    monkeypatch.setenv("DZ_COLLAPSE_AT", "0")
+    monkeypatch.setenv("DZ_SCENARIO_EVENTS", "0")
     sim = Sim(n_robots=3, seed=7)
-    assert sim.collapse_at is None
     while sim.time < 20.0:                          # R1 in Storage with a 7 m planned path
         sim.tick()
     r1 = sim.robots["R1"]
@@ -92,44 +89,10 @@ def test_doorway_spot_is_refused_and_corridor_spot_accepted(monkeypatch):
 
 def test_no_safe_spot_falls_back_to_the_plain_spot(monkeypatch):
     monkeypatch.setenv("DZ_SMART_RUBBLE", "1")
-    monkeypatch.setenv("DZ_COLLAPSE_AT", "0")
+    monkeypatch.setenv("DZ_SCENARIO_EVENTS", "0")
     sim = Sim(n_robots=1, seed=7)
     sim.tick()
     sim.robots["R1"].path = []                      # nothing planned: no candidate on the path
     at = ahead(sim.robots["R1"])
     placed = sim.press_rubble(at)
     assert placed["smart"] is False and rubble_centers(sim) == [(round(at[0], 2), round(at[1], 2))]
-
-
-def test_scripted_collapse_drops_ahead_of_r1_once_even_after_a_key_press(monkeypatch):
-    monkeypatch.setenv("DZ_SMART_RUBBLE", "1")
-    monkeypatch.setenv("DZ_COLLAPSE_AT", "6.0")
-    sim = Sim(n_robots=3, seed=7)
-    assert sim.collapse_at == 6.0
-    log = []
-    while sim.time < 4.0:
-        sim.tick()
-        log += [(round(sim.time, 1), e) for e in sim.drain_events()]
-    sim.press_rubble(ahead(sim.robots["R3"]), robot="R3")    # a Q&A press first changes nothing
-    while sim.time < 5.95:
-        sim.tick()
-        log += [(round(sim.time, 1), e) for e in sim.drain_events()]
-    expected = ahead(sim.robots["R1"])                       # pose at the tick the collapse fires
-    while sim.time < 10.0:
-        sim.tick()
-        log += [(round(sim.time, 1), e) for e in sim.drain_events()]
-    falls = [(t, e.get("cause"), e.get("robot")) for t, e in log if e["kind"] == "rubble_fall"]
-    assert [f[1] for f in falls] == ["key", "collapse"], falls
-    t, cause, robot = falls[1]
-    assert abs(t - 6.1) < 0.15 and robot == "R1"
-    assert not any(e["kind"] == "rubble_pressed" and t2 > 5 for t2, e in log), "the collapse is not a key press"
-    cx, cy = rubble_centers(sim)[1]
-    assert math.dist((cx, cy), expected) < 0.05, ((cx, cy), expected)
-
-
-def test_default_collapse_time_is_the_demo_beat_on_collapse_01_only(monkeypatch):
-    monkeypatch.setenv("DZ_SMART_RUBBLE", "1")
-    monkeypatch.delenv("DZ_COLLAPSE_AT", raising=False)
-    assert Sim(n_robots=1, seed=7).collapse_at == 162.5
-    monkeypatch.setenv("DZ_COLLAPSE_AT", "0")
-    assert Sim(n_robots=1, seed=7).collapse_at is None
