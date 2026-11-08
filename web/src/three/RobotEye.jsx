@@ -32,7 +32,7 @@ function PhoneFrameUploader({ robotId }) {
 
 // Picture-in-picture from a robot's forward camera (V key or the card's Camera
 // button). Reality pane only: it shows what the robot's own camera sees. A third
-// WebGL canvas, so it only exists while open and renders small at dpr 1.
+// WebGL canvas, so it only exists while open; it renders at full resolution, 24 frames a second.
 // the camera head on the drawn rover (Rover.jsx, scaled): lens height and how far forward
 const EYE_H = 0.56
 const EYE_FWD = 0.36
@@ -77,6 +77,7 @@ function cropTexture(name) {
   if (!crops.has(name)) {
     const tex = loader.load(`/crops/${name}`, undefined, undefined, () => crops.set(name, null))
     tex.colorSpace = THREE.SRGBColorSpace
+    tex.anisotropy = 8 // mipmapped and anisotropic: the crop stays sharp seen at an angle, no shimmer far away
     crops.set(name, tex)
   }
   return crops.get(name)
@@ -413,9 +414,11 @@ export default function RobotEye() {
         <button className={`eye-toggle${thermal ? ' on' : ''}`} onClick={() => set({ eyeThermal: !thermal })}>Thermal</button>
         <button className="eye-close" aria-label="Close camera" onClick={() => set({ eyeRobot: null })}>×</button>
       </div>
-      {/* a whole second scene: half resolution, at most 15 frames a second (rayan-ml's profile: opening it halved the fps) */}
-      <Canvas dpr={0.5} frameloop="demand" camera={{ fov: 85, near: 0.05, far: 60 }} gl={{ antialias: false, powerPreference: 'low-power' }}>
-        <EyeRate fps={15} />
+      {/* a whole second scene at the window's full resolution and the screen's pixel ratio (capped at 2),
+          antialiased: no low-res target stretched up. On demand at 24 frames a second, so it costs a
+          fixed share of the main view (rayan-ml's profile: drawing it every frame halved the fps) */}
+      <Canvas dpr={[1, 2]} frameloop="demand" camera={{ fov: 85, near: 0.05, far: 60 }} gl={{ antialias: true }}>
+        <EyeRate fps={24} />
         <color attach="background" args={[thermal ? '#030614' : night ? '#07080a' : '#0e1114']} />
         {thermal ? <ambientLight intensity={0.6} /> : night ? (
           <>
