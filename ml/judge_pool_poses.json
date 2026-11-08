@@ -1,0 +1,22 @@
+{
+ "pos_01.png": "standing",
+ "pos_02.png": "walking",
+ "pos_03.png": "walking",
+ "pos_04.png": "walking",
+ "pos_05.png": "walking",
+ "pos_06.png": "walking",
+ "pos_07.png": "standing",
+ "pos_08.png": "standing",
+ "pos_09.png": "walking",
+ "pos_10.png": "walking",
+ "pos_11.png": "walking",
+ "pos_12.png": "walking",
+ "pos_13.png": "partly hidden",
+ "pos_14.png": "standing",
+ "pos_15.png": "standing",
+ "pos_16.png": "standing",
+ "pos_17.png": "walking",
+ "pos_18.png": "standing",
+ "pos_19.png": "walking",
+ "pos_20.png": "walking"
+}
