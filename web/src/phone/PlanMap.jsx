@@ -317,7 +317,8 @@ export default function PlanMap() {
     let drag = null
     let down = null
     const onDown = (e) => {
-      const { mode } = usePhone.getState()
+      const { mode, checking } = usePhone.getState()
+      if (checking) { down = null; return }
       down = toWorld(e)
       if (mode === 'view' || mode === 'place') return
       el.setPointerCapture(e.pointerId)
@@ -354,7 +355,8 @@ export default function PlanMap() {
     el.addEventListener('pointerdown', onDown)
     el.addEventListener('pointermove', onMove)
     el.addEventListener('pointerup', onUp)
-    el.addEventListener('pointercancel', () => { drag = null; dirty = true })
+    const onCancel = () => { drag = null; down = null; dirty = true }
+    el.addEventListener('pointercancel', onCancel)
 
     const frame = (ms) => {
       const st = usePhone.getState()
@@ -372,7 +374,13 @@ export default function PlanMap() {
     ro.observe(wrap.current)
     resize()
     raf = requestAnimationFrame(frame)
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); unsub() }
+    return () => {
+      cancelAnimationFrame(raf); ro.disconnect(); unsub()
+      el.removeEventListener('pointerdown', onDown)
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerup', onUp)
+      el.removeEventListener('pointercancel', onCancel)
+    }
   }, [fp])
 
   return (

@@ -100,6 +100,16 @@ class PlanRef(Model):
     plan_id: Identifier
 
 
+class PlanDraft(SearchPlan):
+    """Drafts can contain only exclusions, or clear the last drawn region."""
+    zones: list[Zone] = Field(max_length=32)
+    plan_epoch: Identifier | None = Field(default=None, exclude=True)
+
+
+class EpochPlanRef(PlanRef):
+    plan_epoch: Identifier | None = Field(default=None, exclude=True)
+
+
 class PlanError(ValueError):
     def __init__(self, code, message, status=409):
         super().__init__(message)
@@ -131,10 +141,13 @@ class PlanManager:
     def get(self, plan_id):
         if plan_id not in self.saved:
             raise PlanError("plan_not_found", f"Unknown plan: {plan_id}", 404)
-        return SearchPlan.model_validate(self.saved[plan_id])
+        return PlanDraft.model_validate(self.saved[plan_id])
 
     def check(self, plan_id):
-        return self.checker.check(self.get(plan_id), self.sim.post, self.sim.time)
+        plan = self.get(plan_id)
+        if not plan.zones:
+            raise PlanError("empty_plan", "Add a search zone before checking or dispatching", 422)
+        return self.checker.check(plan, self.sim.post, self.sim.time)
 
     def dispatch(self, plan_id):
         if plan_id in self.dispatched:

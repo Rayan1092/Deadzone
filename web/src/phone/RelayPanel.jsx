@@ -17,6 +17,7 @@ function label(id) {
 
 export default function RelayPanel() {
   const relay = usePhone((s) => s.relay)
+  const connected = usePhone((s) => s.connected)
   const relayId = usePhone((s) => s.hello?.relay_id)
   const pending = usePhone((s) => s.relayPending)
   const mode = usePhone((s) => s.mode)
@@ -45,6 +46,7 @@ export default function RelayPanel() {
       </div>
 
       <button className={`power${on ? ' on' : ''}${pending != null ? ' pending' : ''}`} onClick={toggle}
+              disabled={!connected || pending != null}
               aria-pressed={on} aria-label={on ? 'Turn relay off' : 'Turn relay on'}>
         <span className="power-icon" aria-hidden />
         <span>{pending != null ? (on ? 'Turning on…' : 'Turning off…') : on ? 'Turn off' : 'Turn on'}</span>
@@ -78,6 +80,7 @@ export default function RelayPanel() {
       {relay.on && !neighbors.length && <p className="hint">No one in range here. Move closer to the command post or another relay.</p>}
 
       <button className={`tool${mode === 'place' ? ' on' : ''}`}
+              disabled={!connected}
               onClick={() => set({ mode: mode === 'place' ? 'view' : 'place', selected: null })}>
         <i className="tool-relay" />{mode === 'place' ? 'Tap the map below to move here' : 'Move my relay'}
       </button>

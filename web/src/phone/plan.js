@@ -1,5 +1,5 @@
 import { usePhone } from './store'
-import { sendPhone } from './socket'
+import { createDraftSync, postJSON } from './sync'
 
 // Shared draft editing for planner phones. The server keeps one draft
 // (last write wins) and broadcasts it as plan_state to every phone.
@@ -53,27 +53,23 @@ let timer = null
 // Apply a change locally now; send it shortly after so sliders don't flood the socket.
 export function commit(change) {
   const s = usePhone.getState()
+  if (s.checking) return
   const draft = structuredClone(s.draft ?? emptyDraft())
   // A dispatched plan ID is immutable on the server, so edits start a new plan.
-  if (s.dispatched.includes(draft.plan_id)) draft.plan_id = bumpPlanId(draft.plan_id)
+  while (s.dispatched.includes(draft.plan_id)) draft.plan_id = bumpPlanId(draft.plan_id)
+  draft.author = s.hello?.client
   change(draft)
   s.set({ draft, safety: null, pending: true })
   clearTimeout(timer)
   timer = setTimeout(flush, 250)
 }
 
+const saveDraft = createDraftSync(usePhone.getState)
+
 export function flush() {
   clearTimeout(timer)
   timer = null
-  const s = usePhone.getState()
-  // Nothing edited since the last send: don't re-save. A needless save right before a
-  // check would also look like a laptop preload to the big screen and hide the result.
-  if (!s.pending) return
-  s.set({ pending: false })
-  // The server requires at least one zone; no-go-only drafts stay local until then.
-  if (!s.draft?.zones.length) return
-  const { plan_id, zones, no_go, lost_link_budget_s } = s.draft
-  sendPhone('plan_edit', { plan_id, zones, no_go, lost_link_budget_s })
+  return saveDraft()
 }
 
 export function addRegion(kind, poly) {
@@ -121,31 +117,35 @@ export function forkDispatched() {
 }
 
 // ------------------------------------------------------------------ check + dispatch
-export function checkPlan() {
-  flush()
-  const { draft, set } = usePhone.getState()
-  if (!draft?.zones.length) return
-  set({ checking: true, safety: null })
-  sendPhone('plan_submit', { plan_id: draft.plan_id })
+export async function checkPlan() {
+  return planAction('/api/plan/check')
 }
 
 export async function dispatchPlan() {
-  flush()
-  const { draft, set } = usePhone.getState()
-  if (!draft?.zones.length) return
-  set({ checking: true })
+  return planAction('/api/dispatch')
+}
+
+async function planAction(path) {
+  const initial = usePhone.getState()
+  if (initial.checking || !initial.draft?.zones.length) return
+  initial.set({ checking: true, safety: null })
+  const epoch = initial.hello?.plan_epoch
+  let draft = null
   try {
-    const res = await fetch('/api/dispatch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan_id: draft.plan_id }),
-    })
-    const body = await res.json()
-    if (!res.ok) throw new Error(body.detail?.msg ?? 'Dispatch failed')
+    if (!await flush()) return
+    if (usePhone.getState().hello?.plan_epoch !== epoch) return
+    draft = usePhone.getState().draft
+    const body = await postJSON(path, { plan_id: draft.plan_id, plan_epoch: epoch })
     const s = usePhone.getState()
-    if (body.ok) s.set({ dispatched: [...new Set([...s.dispatched, body.plan_id])], checking: false })
-    else s.set({ safety: body, checking: false }) // rechecked against newer Command knowledge and rejected
+    if (s.hello?.plan_epoch !== epoch || s.draft !== draft) return
+    if (path === '/api/dispatch' && body.ok) {
+      s.set({ dispatched: [...new Set([...s.dispatched, body.plan_id])] })
+    } else s.set({ safety: body })
   } catch (err) {
-    usePhone.getState().set({ checking: false, error: { code: 'dispatch', msg: err.message, at: Date.now() } })
+    if (usePhone.getState().hello?.plan_epoch === epoch) {
+      usePhone.getState().set({ error: { code: err.code ?? 'plan', msg: err.message, at: Date.now() } })
+    }
+  } finally {
+    if (usePhone.getState().hello?.plan_epoch === epoch) usePhone.getState().set({ checking: false })
   }
 }

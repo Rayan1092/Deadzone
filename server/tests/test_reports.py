@@ -50,6 +50,37 @@ def invoke(sim, handler):
     return asyncio.run(run())
 
 
+@pytest.mark.parametrize("setting,reason", [("key", "missing_key"), ("flag", "disabled"), ("model", "invalid_model")])
+def test_phone_ask_explains_configuration_without_disclosing_secrets(monkeypatch, setting, reason):
+    if setting == "key":
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    elif setting == "flag":
+        monkeypatch.setenv("DZ_GEMINI", "0")
+    else:
+        monkeypatch.setenv("GEMINI_MODEL", "invalid-private-setting")
+    sim = Sim()
+    result = asyncio.run(reports.command_report(sim.post, 0, question="What is still unexplored?"))
+    assert result["source"] == "local"
+    assert result["unavailable_reason"] == reason
+    assert "does not answer your question" in result["text"]
+    assert "test-not-a-real-key" not in json.dumps(result)
+    assert "invalid-private-setting" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("status", [401, 429, 500])
+def test_phone_provider_failure_returns_safe_reason_not_error_body(status):
+    async def run():
+        def handler(request):
+            return httpx.Response(status, text="private provider error containing test-not-a-real-key")
+        sim = Sim()
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await reports.command_report(sim.post, 0, client=client, question="Where can responders go?")
+    result = asyncio.run(run())
+    assert result["unavailable_reason"] == "provider_error"
+    assert "private provider error" not in json.dumps(result)
+    assert "test-not-a-real-key" not in json.dumps(result)
+
+
 def test_parallel_tools_then_spoken_reply_preserve_signatures_ids_and_command_boundary():
     sim = Sim()
     sim.tick()

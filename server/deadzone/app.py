@@ -28,7 +28,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from .ai_lab import AILabAssets
-from .command.plan import PlanError, PlanManager, PlanRef, SearchPlan
+from .command.plan import EpochPlanRef, PlanDraft, PlanError, PlanManager, PlanRef, SearchPlan
 from .command.crdt import MergeBatch, PlanSync
 from .command.leases import LeaseClaim, LeaseGroupClaim, LeaseTable, PresenterRelease, RobotGroup, RobotRef
 from .command import voice as voice_services
@@ -81,6 +81,7 @@ class Hub:
         self._init_plans()
 
     def _init_plans(self):
+        self.plan_epoch = secrets.token_hex(16)
         checker = SafetyChecker(self.sim.prior, self.sim.robot_specs, self.sim.energy_time_scale)
         self.plans = PlanManager(self.sim, checker)
         self.plan_sync = PlanSync(self.plans)
@@ -288,6 +289,7 @@ class Hub:
         return {"floorplan": self.sim.prior.planning_data(),
                 "grid": {"w": self.sim.prior.w, "h": self.sim.prior.h, "cell": self.sim.prior.cell},
                 "robots": robots, "plan": self.plans.current(), "client": client, "role": role,
+                "plan_epoch": self.plan_epoch, "dispatched_plan_ids": sorted(self.plans.dispatched),
                 "relay_id": self.relay_clients.get(client) if role == "relay" else None,
                 "leases": self.lease_state(),
                 "voice": {"enabled":os.environ.get("DZ_VOICE") == "1"},
@@ -330,6 +332,11 @@ class Hub:
                 self.sim.set_relay_power(self.relay_clients[client], False)
                 if notify:
                     await self.relay_states()
+                    await self.publish_paused_relay_view()
+
+    async def publish_paused_relay_view(self):
+        if not self.running:
+            await self.send_all(self.screens, self.envelope("tick", self.sim.snapshot()))
 
     async def plan_state(self, state):
         message = self.envelope("plan_state", state)
@@ -338,6 +345,9 @@ class Hub:
 
     async def save_plan(self, plan, check=True):
         async with self.plan_lock:
+            self.require_plan_epoch(getattr(plan, "plan_epoch", None))
+            if check and not plan.zones:
+                raise PlanError("empty_plan", "Add a search zone before checking or dispatching", 422)
             state = self.plans.save(plan)
             self.plan_sync.invalidate(plan.plan_id)
             await self.plan_state(state)
@@ -345,8 +355,13 @@ class Hub:
                 return await self._check_plan(plan.plan_id)
             return {"saved": True, "plan_id": plan.plan_id, "checked": False}
 
-    async def dispatch(self, plan_id):
+    def require_plan_epoch(self, epoch):
+        if epoch is not None and epoch != self.plan_epoch:
+            raise PlanError("plan_reset", "The incident reset; reconnect before editing this plan", 409)
+
+    async def dispatch(self, plan_id, epoch=None):
         async with self.plan_lock:
+            self.require_plan_epoch(epoch)
             return await self._dispatch(plan_id)
 
     async def _dispatch(self, plan_id):
@@ -356,8 +371,9 @@ class Hub:
         if result["ok"]:
             await self.plan_state(self.plans.get(plan_id).model_dump(mode="json"))
             if not was_dispatched:
-                await self.send_all(self.screens, self.envelope("event", {
-                    "kind": "plan_dispatched", "plan_id": plan_id}))
+                event = self.envelope("event", {"kind": "plan_dispatched", "plan_id": plan_id})
+                await self.send_all(self.screens, event)
+                await self.send_all(self.phones, event)
         else:
             await self.send_all(self.phones, self.envelope("safety", result))
             await self.send_all(self.screens, self.envelope("event", {"kind": "safety_reject", **result}))
@@ -368,8 +384,9 @@ class Hub:
         return self.sim.post.view(self.sim.time) | {
             "map": base64.b64encode(self.sim.post.map.tobytes()).decode()}
 
-    async def check_plan(self, plan_id):
+    async def check_plan(self, plan_id, epoch=None):
         async with self.plan_lock:
+            self.require_plan_epoch(epoch)
             return await self._check_plan(plan_id)
 
     async def _check_plan(self, plan_id):
@@ -399,11 +416,12 @@ class Hub:
                 except ValueError as error:
                     raise PlanError("invalid_relay_position", str(error), 422) from None
             await self.relay_states()
+            await self.publish_paused_relay_view()
             return
         if role != "planner":
             raise PlanError("read_only_role", "Relay sessions cannot edit or submit search plans", 403)
         if kind == "plan_edit":
-            plan = SearchPlan.model_validate({**data, "author": client})
+            plan = PlanDraft.model_validate({**data, "author": client})
             await self.save_plan(plan, check=False)
         elif kind == "plan_submit":
             ref = PlanRef.model_validate(data)
@@ -692,7 +710,7 @@ def floorplan():
 
 
 @app.post("/api/plan")
-async def save_plan(plan: SearchPlan, check: bool = True):
+async def save_plan(plan: PlanDraft, check: bool = True):
     return await hub.save_plan(plan, check=check)
 
 
@@ -730,9 +748,14 @@ async def merge_sync(batch: MergeBatch):
         return await publish_sync(hub.plan_sync.merge(batch))
 
 
+@app.post("/api/plan/check")
+async def check_saved_plan(ref: EpochPlanRef):
+    return await hub.check_plan(ref.plan_id, ref.plan_epoch)
+
+
 @app.post("/api/dispatch")
-async def dispatch_plan(ref: PlanRef):
-    return await hub.dispatch(ref.plan_id)
+async def dispatch_plan(ref: EpochPlanRef):
+    return await hub.dispatch(ref.plan_id, ref.plan_epoch)
 
 
 @app.post("/api/fault")
@@ -851,6 +874,7 @@ async def ws_phone(ws: WebSocket,
         await ws.send_text(hub.envelope("cmd_view", hub.phone_view()))
         if role == "relay":
             await ws.send_text(hub.envelope("relay_state", hub.relay_state(client)))
+            await hub.publish_paused_relay_view()
         while True:
             try:
                 message = json.loads(await ws.receive_text())

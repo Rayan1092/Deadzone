@@ -44,6 +44,8 @@ def test_screen_and_phone_hello_report_same_detector_on_connect_and_reset(sessio
             phone.receive_json()
             if role == "relay":
                 phone.receive_json()
+                # A joining relay refreshes the paused screen without stepping time.
+                assert screen.receive_json()["t"] == "tick"
             assert a["detector"] == b["detector"] == mode
             assert "survivors" not in b["floorplan"] and "decoys" not in b["floorplan"]
             if mode == "sim":
