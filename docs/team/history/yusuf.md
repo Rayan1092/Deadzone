@@ -31,6 +31,7 @@ Owns `web/`. Only Yusuf's sessions edit this file.
   - **Tested live at 4x:** S3 detection opened Scout 3's camera with the box and all four steps ticked. D2 was rejected by R2 with the grey box. The phone Ask returned the local fallback labelled correctly (no key on this laptop). B showed the chip and one feed line, and B again turned it off.
 - **Contract changes:** none. New key B.
 - **Heads-up for others:** Rayan: the box and steps use your `conf`, `rescue_route`, `beacon_for` and `survivor_reported`. The route replace is ready for your recompute PR. With your key, check the phone Ask shows "Gemini". The robot camera now opens by itself on detections; press × or V to close it.
+- **Update after merging main (Rayan's route recompute):** `rescue_route_blocked` now shows as "R1: route to S1 blocked, no safe path right now". Replans use the route-replace path above. Not forced live: an aftershock on the S3 route would block the entrance.
 - **Next:** item 4 collapse look.
 
 ### 2026-11-08 03:30 · p3/ai-eye · Plan for Rayan's realistic visuals + AI showcase (answer to his ask)

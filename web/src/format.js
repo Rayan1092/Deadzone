@@ -51,6 +51,7 @@ export function describeEvent(e) {
     case 'rescue_route': return e.updated
       ? `${e.robot} replanned the route to ${e.survivor} · ${Math.round(e.length_m)} m`
       : `${e.robot} planned a safe route to ${e.survivor} · ${Math.round(e.length_m)} m${e.beacon ? `, beacon ${e.beacon}` : ''}`
+    case 'rescue_route_blocked': return `${e.robot}: route to ${e.survivor} blocked, no safe path right now`
     case 'rescue_route_reported': return `${e.updated ? 'Updated route' : 'Route'} to ${e.survivor} reached the command post · ${Math.round(e.length_m)} m`
     case 'deadline_miss': return `${e.robot} missed a ${e.task} deadline`
     case 'rubble_fall': return 'Rubble fell'
