@@ -37,3 +37,9 @@ export const KEY_GROUPS = [
     ['W', 'Show the radio coverage the command post predicts: strong, weak or dead.'],
   ] },
 ]
+
+// Keys whose data this run does not have stay out of the list: Y only when the server sends a
+// belief map (maps.belief or maps.belief_command).
+export function helpGroups({ belief = false } = {}) {
+  return KEY_GROUPS.map((g) => ({ ...g, keys: g.keys.filter(([k]) => k !== 'Y' || belief) }))
+}

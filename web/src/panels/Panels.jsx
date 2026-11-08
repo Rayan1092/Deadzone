@@ -8,7 +8,7 @@ import { JoinButton } from './JoinPanel'
 import { requestReport } from './ReportPanel'
 import { ReplayChip } from './ReplayPanel'
 import { REPLAY } from '../net/replay'
-import { KEY_GROUPS } from './keys'
+import { helpGroups } from './keys'
 import { followRobot, frameCommandPost, overview, resetOverview } from '../three/camera'
 import { pickAftershock } from '../quake'
 import { lock, presenterLocked, unlock } from '../net/presenter'
@@ -319,6 +319,7 @@ function EventFeed({ events }) {
 export function HelpOverlay() {
   const open = useSim((s) => s.helpOpen)
   const set = useSim((s) => s.set)
+  const belief = useSim((s) => Boolean(s.maps.belief || s.maps.beliefCommand))
   const box = useRef(null)
   useEffect(() => {
     if (!open) return undefined
@@ -334,7 +335,7 @@ export function HelpOverlay() {
         <button className="text-link" onClick={() => set({ helpOpen: false, introOpen: true })}>What am I looking at?</button>
         <button className="eye-close" aria-label="Close help" onClick={() => set({ helpOpen: false })}>×</button>
       </div>
-      {KEY_GROUPS.map((g) => (
+      {helpGroups({ belief }).map((g) => (
         <section key={g.title}>
           <h4>{g.title}</h4>
           <div className="keys">
@@ -403,7 +404,7 @@ export function useKeyboard() {
       if (key === 'p') setPerf(!s.perf)
       if (key === 'm') toggleView()
       if (key === 'w' && !e.repeat) {
-        if (!s.maps.coverage && !s.coverageOn) s.set({ toasts: [...s.toasts, { kind: 'note', msg: "Radio coverage isn't available in this run.", time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
+        if (!s.maps.coverage && !s.coverageOn) s.set({ toasts: [...s.toasts, { kind: 'note', msg: 'Coverage data not enabled', time: s.time, eid: -Date.now(), at: Date.now() }].slice(-8) })
         else s.set({ coverageOn: !s.coverageOn })
       }
       if (key === 'c' && !e.repeat) {
