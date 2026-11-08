@@ -4,14 +4,21 @@ Owns `server/deadzone/sim.py`, `app.py`, `floorplan.py`, `network/`, `command/`.
 
 ## Now
 
-- **Role:** Aziz owns backend/network/simulation/Command contracts and integration tests. Yusuf owns web; Rayan owns robot policy. No frontend or additional planner implementation in Aziz's backend PR.
-- **Working on:** resolving artifact PR #81 on `p2/camera-owner-handoffs`. Synced main `811d17c`: Yusuf's camera/visual redesign and survivor-clearance integration are on main; Rayan's dry-run/demo updates are on main. Runtime on this handoff branch is identical to main.
-- **Backend merge status correction:** #78 merged the early contract commit before implementation `6d77051` was pushed. The tested sensor-frame implementation is still on `p2/sensor-camera` and needs a follow-up PR; it is not live on main. Its last validation was 404 passed / 1 skipped, 12 sensor regressions, camera-enabled demo guard 10 passed. No key/provider call.
-- **Contracts:** gated DZ_SENSOR_VIEW Reality-only frame/config as posted below; Command/phone/Gemini/DTN privacy and paused-world invalidation. Only the necessary observation hook requires Rayan review. Default off until owner/test-laptop acceptance.
-- **Owner handoffs:** outputs/handoffs contains optional prototypes for owner review, not applied source. Yusuf owns renderer adoption and the modified-shortcut R-key finding; Rayan owns additional safe-route policy. Existing #77 exploration is merged/default off. Artifact PR #81 changes only these files and Aziz history; do not treat it as a renderer implementation.
-- **Next:** push #81 conflict resolution; publish remaining backend implementation in a new PR. Rayan's newly posted 3-sentence G briefing ask is queued as a separate backend item, not mixed into this conflict fix.
+- **Role:** Aziz owns backend/network/simulation/Command contracts and integration tests. Yusuf owns all web rendering; Rayan owns robot policy. No frontend or extra planner implementation in the backend follow-up.
+- **Working on:** tested backend sensor implementation follow-up, ready for review, from `p2/sensor-camera`. #78 merged its early contract before implementation 6d77051 was pushed; actual sensor code therefore needs a new PR, not another push to closed #78. Main 811d17c integrated unchanged, including Yusuf's camera/visual redesign and survivor-clearance map. User's #81 screenshot was the optional handoff artifact PR; its history overlap is resolved and GitHub reports MERGEABLE.
+- **Contract:** DZ_SENSOR_VIEW=1 (startup, default off), screen-only hello.sensor_view config and optional Reality robot camera {t,pose,hits:[{id,pos,crop,verdict,conf,source}]}, as posted below. Actual onboard IO/detector outcomes only; empty hits clears observations; reset/rubble/aftershock invalidates the frame until next normal IO sample. No camera data in Command, phones, Gemini or DTN. Minimal observation hook only, for Rayan review; Yusuf handles adoption/rendering.
+- **Owner handoffs:** p2/camera-owner-handoffs / PR #81 changes only outputs/handoffs patch artifacts plus this history, no runtime source. Optional prototype bases/limitations and Ctrl+R director finding remain in its README. User's role correction is maintained; no frontend implementation retained by Aziz.
+- **Validation:** latest-main full backend **404 passed, 1 opt-in soak skipped** (183.36 s); Yusuf frontend builds unchanged (737 modules). Diff contains no web changes. PR #81 is MERGEABLE.
+- **Next:** review/merge backend implementation follow-up, then handle Rayan's newly posted 3-sentence G briefing ask as a separate backend item. Same current history will be kept on both active Aziz branches to avoid another history-only conflict between these PRs. No keys/provider calls.
 
 ## Log
+
+### 2026-11-07 PT - p2/sensor-camera - Publish implementation after early contract merge; keep handoff history aligned
+- **Did:** fixed PR #81's history-only merge block and preserved all work logs. Detected #78 merged before implementation 6d77051 was pushed; opened a separate implementation follow-up after integrating main 811d17c. Yusuf's merged web and survivor-clearance integration imported unchanged. Same current history on both active Aziz branches prevents a repeat history-only conflict when either PR lands.
+- **Contract changes:** none beyond the preposted actual sensor-frame contract; default off. Backend stream implementation has only the minimal onboard observation hook for Rayan review; no web or further planner policy changes.
+- **Validation:** final full backend **404 passed, 1 skipped** (183.36 s), latest unchanged web build **737 modules passed**, diff check clean. Artifact branch runtime equals main; #81 changes only optional patch files/README and Aziz history.
+- **Heads-up for others:** #78 contains only the early contract; use the new backend implementation PR. Yusuf owns renderer adoption; Rayan owns proposed route fitting. Rayan's request for a 3-sentence G briefing is queued separately, not bundled into this merge fix.
+- **Next:** review/merge the two clearly separated PRs, then the queued backend briefing change.
 
 ### 2026-11-07 PT - p2/camera-owner-handoffs - Resolve handoff history overlap with current main
 - **Did:** integrated main 811d17c, retained both the owner-handoff and backend implementation histories, and refreshed Now without restoring the old frontend ownership exception. Final handoff diff is documentation/patch artifacts only; runtime matches main.
