@@ -41,6 +41,8 @@ The `team_sync` hook does the detection. It runs on session start and before eve
 (pull, merge, rebase, branch switch) and the new commits include teammates' commits, it puts
 the commit list and history-file diffs into your context. **Act on it before answering the prompt.**
 
+Also run /team-sync before starting any new task and at least every 30 minutes while working, so teammates' contracts and asks are picked up without anyone messaging you.
+
 ## Rule 2: write before you commit
 
 Every commit made through Claude must also stage the author's own history file.
